@@ -2283,7 +2283,7 @@
   <!-- Fixed top nav -->
   <div class="server-list-top">
     <!-- Home / Logo -->
-    <div class="server-icon" id="homeNavIcon" title="Home" style="background:var(--accent);border-radius:14px;overflow:hidden;">
+    <div class="server-icon" id="homeNavIcon" title="Home" onclick="showServersPanel()" style="background:var(--accent);border-radius:14px;overflow:hidden;cursor:pointer;">
       <svg id="homeLogoSvg" width="28" height="28" viewBox="0 0 48 48" xmlns="http://www.w3.org/2000/svg" style="display:block;">
         <rect x="14" y="8" width="8" height="32" rx="2" fill="white"/>
         <rect x="14" y="32" width="22" height="8" rx="2" fill="white"/>
@@ -2297,15 +2297,18 @@
     </div>
     <div class="server-divider"></div>
     <!-- My Profile -->
-    <div class="profile-nav-btn" id="profileNavIcon" title="My Profile">
+    <div class="profile-nav-btn" id="profileNavIcon" title="My Profile" onclick="showMyProfile()" style="cursor:pointer">
       <div class="profile-nav-avatar" id="profileNavAvatar">👤</div>
       <div class="profile-nav-label">Profile</div>
     </div>
     <div class="server-divider"></div>
-    <div class="server-icon active" id="dmServerIcon" title="Direct Messages" style="font-size:0">
+    <div class="server-icon active" id="dmServerIcon" title="Direct Messages" onclick="showDMPanel()" style="font-size:0;cursor:pointer">
       <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
     </div>
-    <div class="server-icon" id="groupsNavIcon" title="Groups" style="font-size:0">
+    <div class="server-icon" id="serversNavIcon" title="Servers" onclick="showServersPanel()" style="font-size:0">
+      <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="2" width="20" height="8" rx="2" ry="2"/><rect x="2" y="14" width="20" height="8" rx="2" ry="2"/><line x1="6" y1="6" x2="6.01" y2="6"/><line x1="6" y1="18" x2="6.01" y2="18"/></svg>
+    </div>
+    <div class="server-icon" id="groupsNavIcon" title="Groups" onclick="showGroupsPanel()" style="font-size:0">
       <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
     </div>
     <div class="server-divider"></div>
@@ -3716,11 +3719,7 @@ function renderChannelList(channels, members, server) {
   const svgText = `<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><line x1="4" y1="6" x2="20" y2="6"/><line x1="4" y1="12" x2="20" y2="12"/><line x1="4" y1="18" x2="14" y2="18"/></svg>`;
   const svgVoice= `<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"/><path d="M19.07 4.93a10 10 0 0 1 0 14.14M15.54 8.46a5 5 0 0 1 0 7.07"/></svg>`;
 
-  let html = `<div style="padding:12px;border-bottom:1px solid rgba(255,255,255,.05);margin-bottom:8px">
-    <button onclick="openModal('createServerModal')" style="width:100%;padding:8px 12px;background:var(--accent);color:white;border:none;border-radius:6px;font-size:14px;font-weight:600;cursor:pointer;transition:background .15s">
-      ➕ Create Server
-    </button>
-  </div>`;
+  let html = "";
   if (ann.length) {
     html += `<div class="channel-section">
       <div class="channel-section-label"><span style="display:flex;align-items:center;gap:6px">${svgAnn} Announcements</span>${addBtn}</div>`;
@@ -4492,6 +4491,39 @@ function showToast(msg, type="success") {
   const el = document.getElementById("toast");
   el.textContent = msg; el.className = `show ${type}`;
   clearTimeout(toastTimer); toastTimer = setTimeout(() => el.className="", 3000);
+}
+
+// ── Servers List ──────────────────────────────────────────────
+async function showServersPanel() {
+  selectedServer = null;
+  clearAllNavIcons();
+  document.getElementById("serversNavIcon").classList.add("active");
+  document.getElementById("sidebarTitle").textContent = "Servers"; setSidebarMode("servers");
+  setPageTitle("SERVERS 🎮");
+  document.getElementById("membersSidebar").classList.remove("open");
+  document.body.classList.remove("members-visible");
+  document.body.classList.remove("members-bar-open");
+  document.getElementById("chatMain").innerHTML = `<div class="empty-state"><div class="empty-icon">🎮</div><h3>Your Servers</h3><p>Select a server to join or create a new one</p></div>`;
+  
+  const servers = await api("/servers");
+  let html = `<div style="padding:12px;border-bottom:1px solid rgba(255,255,255,.05);margin-bottom:12px">
+    <button onclick="openModal('createServerModal')" style="width:100%;padding:8px 12px;background:var(--accent);color:white;border:none;border-radius:6px;font-size:14px;font-weight:600;cursor:pointer;transition:background .15s">
+      ➕ Create Server
+    </button>
+  </div>`;
+  
+  html += `<div class="channel-section"><div class="channel-section-label">Servers</div>`;
+  if (!servers?.length) {
+    html += `<div style="padding:12px;font-size:13px;color:var(--text-3)">No servers yet. Create one!</div>`;
+  } else {
+    servers.forEach(s => {
+      const icon = s.icon_url ? `<img src="${s.icon_url}" style="width:32px;height:32px;border-radius:50%;object-fit:cover;"/>` : s.name.slice(0,2).toUpperCase();
+      html += `<div class="dm-item" onclick="selectServer({id:${s.id},name:'${s.name.replace(/'/g,"\\'")}'})" style="cursor:pointer"><div class="dm-avatar" style="font-size:18px;display:flex;align-items:center;justify-content:center">${icon}</div>
+        <div style="flex:1;min-width:0"><div style="font-size:14px;font-weight:600">${s.name}</div><div style="font-size:11px;color:var(--text-3)">${s.member_count||0} members</div></div></div>`;
+    });
+  }
+  html += "</div>";
+  document.getElementById("channelSidebarContent").innerHTML = html;
 }
 
 // ── Groups ────────────────────────────────────────────────────
