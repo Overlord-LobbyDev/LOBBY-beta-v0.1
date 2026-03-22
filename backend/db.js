@@ -1,146 +1,130 @@
-require("dotenv").config();
-// ============================================================
-//  db.js  —  PostgreSQL connection + auto-init tables
-// ============================================================
+const { Pool } = require('pg');
 
-const { Pool } = require("pg");
-
-// Create pool with SSL for Render
-const pool = new Pool(
-  process.env.DATABASE_URL ? { 
-    connectionString: process.env.DATABASE_URL,
-    ssl: { rejectUnauthorized: false }  // Required for Render PostgreSQL
-  } : {
-    host:     process.env.PG_HOST     || "localhost",
-    port:     process.env.PG_PORT     || 5432,
-    database: process.env.PG_DB       || "discordclone",
-    user:     process.env.PG_USER     || "postgres",
-    password: process.env.PG_PASSWORD || "8AuqFFqdyde3pN7yXT9X",
+const pool = new Pool({
+  connectionString: process.env.DATABASE_URL,
+  ssl: {
+    rejectUnauthorized: false
   }
-);
+});
 
 async function initDb() {
   try {
-    console.log("🔄 Initializing database tables...");
-
-    // Users table
+    // Users table with avatar/banner
     await pool.query(`
       CREATE TABLE IF NOT EXISTS users (
-        id           SERIAL PRIMARY KEY,
-        username     TEXT UNIQUE NOT NULL,
-        email        TEXT UNIQUE,
-        password     TEXT NOT NULL,
-        avatar_url   TEXT DEFAULT NULL,
-        is_admin     BOOLEAN DEFAULT FALSE,
-        is_banned    BOOLEAN DEFAULT FALSE,
-        banned_until TIMESTAMPTZ DEFAULT NULL,
-        ban_reason   TEXT DEFAULT NULL,
-        created_at   TIMESTAMPTZ DEFAULT NOW()
-      );
+        id SERIAL PRIMARY KEY,
+        username VARCHAR(255) UNIQUE NOT NULL,
+        email VARCHAR(255) UNIQUE NOT NULL,
+        password VARCHAR(255) NOT NULL,
+        avatar_url VARCHAR(500),
+        banner_url VARCHAR(500),
+        bio TEXT,
+        is_admin BOOLEAN DEFAULT false,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      )
     `);
 
-    // Friends table
+    // Posts table for social feed
     await pool.query(`
-      CREATE TABLE IF NOT EXISTS friends (
-        id         SERIAL PRIMARY KEY,
-        user_id    INTEGER REFERENCES users(id) ON DELETE CASCADE,
-        friend_id  INTEGER REFERENCES users(id) ON DELETE CASCADE,
-        status     TEXT DEFAULT 'pending',
-        created_at TIMESTAMPTZ DEFAULT NOW(),
-        UNIQUE(user_id, friend_id)
-      );
+      CREATE TABLE IF NOT EXISTS posts (
+        id SERIAL PRIMARY KEY,
+        user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+        content TEXT NOT NULL,
+        image_url VARCHAR(500),
+        likes INTEGER DEFAULT 0,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      )
     `);
 
     // Servers table
     await pool.query(`
       CREATE TABLE IF NOT EXISTS servers (
-        id          SERIAL PRIMARY KEY,
-        name        TEXT NOT NULL,
-        icon_url    TEXT DEFAULT NULL,
-        owner_id    INTEGER REFERENCES users(id) ON DELETE CASCADE,
-        created_at  TIMESTAMPTZ DEFAULT NOW()
-      );
+        id SERIAL PRIMARY KEY,
+        creator_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+        name VARCHAR(255) NOT NULL,
+        description TEXT,
+        game_type VARCHAR(100),
+        region VARCHAR(100),
+        max_players INTEGER DEFAULT 32,
+        current_players INTEGER DEFAULT 0,
+        ip_address VARCHAR(50),
+        port INTEGER,
+        password VARCHAR(255),
+        icon_url VARCHAR(500),
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      )
+    `);
+
+    // Steam accounts linking
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS steam_accounts (
+        id SERIAL PRIMARY KEY,
+        user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+        steam_id VARCHAR(255) UNIQUE NOT NULL,
+        username VARCHAR(255),
+        avatar_url VARCHAR(500),
+        linked_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      )
+    `);
+
+    // Friends table (keep existing)
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS friends (
+        id SERIAL PRIMARY KEY,
+        user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+        friend_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+        status VARCHAR(50) DEFAULT 'pending',
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        UNIQUE(user_id, friend_id)
+      )
+    `);
+
+    // Messages table (keep existing)
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS messages (
+        id SERIAL PRIMARY KEY,
+        sender_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+        receiver_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+        content TEXT NOT NULL,
+        read BOOLEAN DEFAULT false,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      )
+    `);
+
+    // Post likes table
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS post_likes (
+        id SERIAL PRIMARY KEY,
+        post_id INTEGER NOT NULL REFERENCES posts(id) ON DELETE CASCADE,
+        user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        UNIQUE(post_id, user_id)
+      )
     `);
 
     // Server members table
     await pool.query(`
       CREATE TABLE IF NOT EXISTS server_members (
-        id         SERIAL PRIMARY KEY,
-        server_id  INTEGER REFERENCES servers(id) ON DELETE CASCADE,
-        user_id    INTEGER REFERENCES users(id) ON DELETE CASCADE,
-        role       TEXT DEFAULT 'member',
-        joined_at  TIMESTAMPTZ DEFAULT NOW(),
+        id SERIAL PRIMARY KEY,
+        server_id INTEGER NOT NULL REFERENCES servers(id) ON DELETE CASCADE,
+        user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+        role VARCHAR(50) DEFAULT 'member',
+        joined_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
         UNIQUE(server_id, user_id)
-      );
+      )
     `);
 
-    // Server invites table
-    await pool.query(`
-      CREATE TABLE IF NOT EXISTS server_invites (
-        id          SERIAL PRIMARY KEY,
-        server_id   INTEGER REFERENCES servers(id) ON DELETE CASCADE,
-        inviter_id  INTEGER REFERENCES users(id) ON DELETE CASCADE,
-        invitee_id  INTEGER REFERENCES users(id) ON DELETE CASCADE,
-        created_at  TIMESTAMPTZ DEFAULT NOW(),
-        UNIQUE(server_id, invitee_id)
-      );
-    `);
-
-    // Channels table
-    await pool.query(`
-      CREATE TABLE IF NOT EXISTS channels (
-        id          SERIAL PRIMARY KEY,
-        server_id   INTEGER REFERENCES servers(id) ON DELETE CASCADE,
-        name        TEXT NOT NULL,
-        type        TEXT DEFAULT 'text',
-        created_at  TIMESTAMPTZ DEFAULT NOW()
-      );
-    `);
-
-    // Messages table
-    await pool.query(`
-      CREATE TABLE IF NOT EXISTS messages (
-        id          SERIAL PRIMARY KEY,
-        channel_id  INTEGER REFERENCES channels(id) ON DELETE CASCADE,
-        user_id     INTEGER REFERENCES users(id) ON DELETE SET NULL,
-        content     TEXT,
-        created_at  TIMESTAMPTZ DEFAULT NOW()
-      );
-    `);
-
-    // Direct messages table
-    await pool.query(`
-      CREATE TABLE IF NOT EXISTS direct_messages (
-        id           SERIAL PRIMARY KEY,
-        from_user_id INTEGER REFERENCES users(id) ON DELETE CASCADE,
-        to_user_id   INTEGER REFERENCES users(id) ON DELETE CASCADE,
-        content      TEXT,
-        created_at   TIMESTAMPTZ DEFAULT NOW()
-      );
-    `);
-
-    // Attachments table
-    await pool.query(`
-      CREATE TABLE IF NOT EXISTS attachments (
-        id           SERIAL PRIMARY KEY,
-        message_id   INTEGER REFERENCES messages(id) ON DELETE CASCADE,
-        dm_id        INTEGER REFERENCES direct_messages(id) ON DELETE CASCADE,
-        file_url     TEXT NOT NULL,
-        file_type    TEXT,
-        file_size    INTEGER,
-        uploaded_by  INTEGER REFERENCES users(id) ON DELETE SET NULL,
-        created_at   TIMESTAMPTZ DEFAULT NOW()
-      );
-    `);
-
-    console.log("✅ Database tables initialized successfully!");
+    console.log('✅ Database initialized successfully');
   } catch (error) {
-    console.error("❌ Database initialization error:", error);
-    process.exit(1);
+    console.error('❌ Database initialization error:', error);
+    throw error;
   }
 }
 
-// Auto-initialize on module load
-initDb();
+// Auto-initialize on startup
+initDb().catch(console.error);
 
-module.exports = pool;
+module.exports = { pool, initDb };
