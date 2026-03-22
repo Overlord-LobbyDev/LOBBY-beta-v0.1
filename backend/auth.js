@@ -3,38 +3,63 @@ const bcrypt = require('bcrypt');
 const jwt = require('jsonwebtoken');
 const multer = require('multer');
 const path = require('path');
-require('dotenv').config();
+const fs = require('fs');
 
-// Import the pool from db.js
-const { pool } = require('./db');
+// Import database pool
+const pool = require('./db');
 
 const app = express();
-const upload = multer({ dest: 'uploads/' });
+const PORT = process.env.PORT || 3001;
 
 // Middleware
 app.use(express.json());
+app.use(express.static(path.join(__dirname, 'public')));
 
-// ==================== AUTHENTICATION ====================
+// Multer setup for file uploads
+const upload = multer({
+  dest: path.join(__dirname, 'uploads'),
+  limits: { fileSize: 5 * 1024 * 1024 } // 5MB max
+});
 
-// Register
+// Ensure uploads directory exists
+const uploadsDir = path.join(__dirname, 'uploads');
+if (!fs.existsSync(uploadsDir)) {
+  fs.mkdirSync(uploadsDir, { recursive: true });
+}
+
+// JWT Secret
+const JWT_SECRET = process.env.JWT_SECRET || 'your-secret-key';
+
+// Health check
+app.get('/auth/health', (req, res) => {
+  res.json({ status: 'ok', message: 'Auth server is running' });
+});
+
+// ============ AUTHENTICATION ============
+
+// Register endpoint
 app.post('/auth/register', async (req, res) => {
   try {
-    const { username, email, password } = req.body;
+    const { username, password, email } = req.body;
 
-    if (!username || !email || !password) {
-      return res.status(400).json({ error: 'Missing required fields' });
+    if (!username || !password) {
+      return res.status(400).json({ error: 'Username and password are required' });
     }
 
     const hashedPassword = await bcrypt.hash(password, 10);
 
     const result = await pool.query(
-      'INSERT INTO users (username, email, password_hash) VALUES ($1, $2, $3) RETURNING id, username, email',
-      [username, email, hashedPassword]
+      'INSERT INTO users (username, password_hash, email) VALUES ($1, $2, $3) RETURNING id, username, is_admin',
+      [username, hashedPassword, email || null]
     );
 
-    res.status(201).json({ 
+    const user = result.rows[0];
+    const token = jwt.sign({ userId: user.id, username: user.username }, JWT_SECRET, { expiresIn: '24h' });
+
+    res.status(201).json({
       message: 'User registered successfully',
-      user: result.rows[0]
+      token,
+      user: { id: user.id, username: user.username, isAdmin: user.is_admin }
     });
   } catch (err) {
     console.error('Register error:', err);
@@ -42,17 +67,17 @@ app.post('/auth/register', async (req, res) => {
   }
 });
 
-// Login
+// Login endpoint
 app.post('/auth/login', async (req, res) => {
   try {
     const { username, password } = req.body;
 
     if (!username || !password) {
-      return res.status(400).json({ error: 'Username and password required' });
+      return res.status(400).json({ error: 'Username and password are required' });
     }
 
     const result = await pool.query(
-      'SELECT id, username, email, password_hash, is_admin FROM users WHERE username = $1',
+      'SELECT id, username, password_hash, is_admin FROM users WHERE username = $1',
       [username]
     );
 
@@ -67,20 +92,12 @@ app.post('/auth/login', async (req, res) => {
       return res.status(401).json({ error: 'Invalid credentials' });
     }
 
-    const token = jwt.sign(
-      { id: user.id, username: user.username },
-      process.env.JWT_SECRET,
-      { expiresIn: '24h' }
-    );
+    const token = jwt.sign({ userId: user.id, username: user.username }, JWT_SECRET, { expiresIn: '24h' });
 
     res.json({
+      message: 'Login successful',
       token,
-      user: {
-        id: user.id,
-        username: user.username,
-        email: user.email,
-        isAdmin: user.is_admin
-      }
+      user: { id: user.id, username: user.username, isAdmin: user.is_admin }
     });
   } catch (err) {
     console.error('Login error:', err);
@@ -88,29 +105,33 @@ app.post('/auth/login', async (req, res) => {
   }
 });
 
-// Middleware to verify token
+// Middleware to verify JWT
 function verifyToken(req, res, next) {
   const token = req.headers.authorization?.split(' ')[1];
-  if (!token) return res.status(401).json({ error: 'No token provided' });
-
+  if (!token) {
+    return res.status(401).json({ error: 'Token required' });
+  }
   try {
-    req.user = jwt.verify(token, process.env.JWT_SECRET);
+    const decoded = jwt.verify(token, JWT_SECRET);
+    req.userId = decoded.userId;
     next();
   } catch (err) {
     res.status(401).json({ error: 'Invalid token' });
   }
 }
 
-// ==================== USER ENDPOINTS ====================
+// ============ USER ENDPOINTS ============
 
 // Get current user
 app.get('/auth/me', verifyToken, async (req, res) => {
   try {
     const result = await pool.query(
-      'SELECT id, username, email, avatar_url, banner_url, bio FROM users WHERE id = $1',
-      [req.user.id]
+      'SELECT id, username, email, is_admin, avatar_url, banner_url, bio FROM users WHERE id = $1',
+      [req.userId]
     );
-    if (result.rows.length === 0) return res.status(404).json({ error: 'User not found' });
+    if (result.rows.length === 0) {
+      return res.status(404).json({ error: 'User not found' });
+    }
     res.json(result.rows[0]);
   } catch (err) {
     res.status(500).json({ error: err.message });
@@ -124,7 +145,9 @@ app.get('/auth/profile/:userId', async (req, res) => {
       'SELECT id, username, avatar_url, banner_url, bio, created_at FROM users WHERE id = $1',
       [req.params.userId]
     );
-    if (result.rows.length === 0) return res.status(404).json({ error: 'User not found' });
+    if (result.rows.length === 0) {
+      return res.status(404).json({ error: 'User not found' });
+    }
     res.json(result.rows[0]);
   } catch (err) {
     res.status(500).json({ error: err.message });
@@ -135,9 +158,9 @@ app.get('/auth/profile/:userId', async (req, res) => {
 app.get('/auth/profile/:userId/friends', async (req, res) => {
   try {
     const result = await pool.query(
-      `SELECT u.id, u.username, u.avatar_url FROM users u
-       INNER JOIN friends f ON u.id = f.friend_id
-       WHERE f.user_id = $1 AND f.status = 'accepted'`,
+      `SELECT u.id, u.username, u.avatar_url FROM friends f
+       JOIN users u ON f.friend_id = u.id
+       WHERE f.user_id = $1`,
       [req.params.userId]
     );
     res.json(result.rows);
@@ -150,7 +173,7 @@ app.get('/auth/profile/:userId/friends', async (req, res) => {
 app.get('/auth/profile/:userId/posts', async (req, res) => {
   try {
     const result = await pool.query(
-      'SELECT id, content, created_at FROM posts WHERE user_id = $1 ORDER BY created_at DESC',
+      'SELECT id, content, image_url, created_at FROM posts WHERE user_id = $1 ORDER BY created_at DESC',
       [req.params.userId]
     );
     res.json(result.rows);
@@ -162,12 +185,10 @@ app.get('/auth/profile/:userId/posts', async (req, res) => {
 // Search users
 app.get('/auth/users/search', async (req, res) => {
   try {
-    const { q } = req.query;
-    if (!q) return res.status(400).json({ error: 'Search query required' });
-
+    const query = req.query.q || '';
     const result = await pool.query(
-      "SELECT id, username, avatar_url FROM users WHERE username ILIKE $1 LIMIT 20",
-      [`%${q}%`]
+      'SELECT id, username, avatar_url FROM users WHERE username ILIKE $1 LIMIT 10',
+      [`%${query}%`]
     );
     res.json(result.rows);
   } catch (err) {
@@ -175,13 +196,25 @@ app.get('/auth/users/search', async (req, res) => {
   }
 });
 
-// ==================== FRIENDS ====================
+// Get public data
+app.get('/auth/public', async (req, res) => {
+  try {
+    const users = await pool.query('SELECT id, username, avatar_url FROM users LIMIT 20');
+    const posts = await pool.query('SELECT p.id, p.content, u.username FROM posts p JOIN users u ON p.user_id = u.id ORDER BY p.created_at DESC LIMIT 20');
+    res.json({ users: users.rows, posts: posts.rows });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
 
+// ============ FRIENDS ============
+
+// Get friends list
 app.get('/auth/friends/:userId', async (req, res) => {
   try {
     const result = await pool.query(
-      `SELECT u.id, u.username, u.avatar_url, f.status FROM users u
-       INNER JOIN friends f ON u.id = f.friend_id
+      `SELECT u.id, u.username, u.avatar_url FROM friends f
+       JOIN users u ON f.friend_id = u.id
        WHERE f.user_id = $1`,
       [req.params.userId]
     );
@@ -191,41 +224,41 @@ app.get('/auth/friends/:userId', async (req, res) => {
   }
 });
 
+// Add friend
 app.post('/auth/friends/add', verifyToken, async (req, res) => {
   try {
     const { friendId } = req.body;
     await pool.query(
-      'INSERT INTO friends (user_id, friend_id, status) VALUES ($1, $2, $3)',
-      [req.user.id, friendId, 'pending']
+      'INSERT INTO friends (user_id, friend_id) VALUES ($1, $2) ON CONFLICT DO NOTHING',
+      [req.userId, friendId]
     );
-    res.json({ message: 'Friend request sent' });
+    res.json({ message: 'Friend added' });
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
 });
 
+// Remove friend
 app.post('/auth/friends/remove', verifyToken, async (req, res) => {
   try {
     const { friendId } = req.body;
-    await pool.query(
-      'DELETE FROM friends WHERE user_id = $1 AND friend_id = $2',
-      [req.user.id, friendId]
-    );
+    await pool.query('DELETE FROM friends WHERE user_id = $1 AND friend_id = $2', [req.userId, friendId]);
     res.json({ message: 'Friend removed' });
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
 });
 
-// ==================== MESSAGES ====================
+// ============ MESSAGES ============
 
+// Get messages with a friend
 app.get('/auth/messages/:userId/:friendId', verifyToken, async (req, res) => {
   try {
     const { userId, friendId } = req.params;
     const result = await pool.query(
       `SELECT id, sender_id, content, created_at FROM messages
        WHERE (sender_id = $1 AND recipient_id = $2) OR (sender_id = $2 AND recipient_id = $1)
-       ORDER BY created_at DESC LIMIT 50`,
+       ORDER BY created_at ASC`,
       [userId, friendId]
     );
     res.json(result.rows);
@@ -234,41 +267,13 @@ app.get('/auth/messages/:userId/:friendId', verifyToken, async (req, res) => {
   }
 });
 
-// ==================== POSTS & SOCIAL ====================
-
-app.get('/auth/feed', async (req, res) => {
+// Send message
+app.post('/auth/messages', verifyToken, async (req, res) => {
   try {
-    const { tab } = req.query;
-    const query = tab === 'friends'
-      ? `SELECT p.id, p.content, p.created_at, u.username, u.avatar_url FROM posts p
-         JOIN users u ON p.user_id = u.id ORDER BY p.created_at DESC LIMIT 50`
-      : `SELECT p.id, p.content, p.created_at, u.username, u.avatar_url FROM posts p
-         JOIN users u ON p.user_id = u.id ORDER BY p.created_at DESC LIMIT 50`;
-    
-    const result = await pool.query(query);
-    res.json(result.rows);
-  } catch (err) {
-    res.status(500).json({ error: err.message });
-  }
-});
-
-app.get('/auth/posts', async (req, res) => {
-  try {
+    const { recipientId, content } = req.body;
     const result = await pool.query(
-      'SELECT p.id, p.content, p.created_at, u.username FROM posts p JOIN users u ON p.user_id = u.id ORDER BY p.created_at DESC'
-    );
-    res.json(result.rows);
-  } catch (err) {
-    res.status(500).json({ error: err.message });
-  }
-});
-
-app.post('/auth/posts', verifyToken, async (req, res) => {
-  try {
-    const { content } = req.body;
-    const result = await pool.query(
-      'INSERT INTO posts (user_id, content) VALUES ($1, $2) RETURNING *',
-      [req.user.id, content]
+      'INSERT INTO messages (sender_id, recipient_id, content) VALUES ($1, $2, $3) RETURNING *',
+      [req.userId, recipientId, content]
     );
     res.status(201).json(result.rows[0]);
   } catch (err) {
@@ -276,25 +281,84 @@ app.post('/auth/posts', verifyToken, async (req, res) => {
   }
 });
 
-// ==================== SERVERS ====================
+// ============ SOCIAL FEED ============
 
+// Get feed
+app.get('/auth/feed', verifyToken, async (req, res) => {
+  try {
+    const tab = req.query.tab || 'friends';
+    let query;
+
+    if (tab === 'friends') {
+      query = `SELECT p.id, p.content, p.image_url, p.created_at, u.id as user_id, u.username, u.avatar_url
+               FROM posts p
+               JOIN users u ON p.user_id = u.id
+               WHERE p.user_id IN (SELECT friend_id FROM friends WHERE user_id = $1)
+               ORDER BY p.created_at DESC`;
+    } else {
+      query = `SELECT p.id, p.content, p.image_url, p.created_at, u.id as user_id, u.username, u.avatar_url
+               FROM posts p
+               JOIN users u ON p.user_id = u.id
+               ORDER BY p.created_at DESC`;
+    }
+
+    const result = await pool.query(query, [req.userId]);
+    res.json(result.rows);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// Create post
+app.post('/auth/posts', verifyToken, upload.single('image'), async (req, res) => {
+  try {
+    const { content } = req.body;
+    const imageUrl = req.file ? `/uploads/${req.file.filename}` : null;
+
+    const result = await pool.query(
+      'INSERT INTO posts (user_id, content, image_url) VALUES ($1, $2, $3) RETURNING *',
+      [req.userId, content, imageUrl]
+    );
+    res.status(201).json(result.rows[0]);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// Get all posts
+app.get('/auth/posts', async (req, res) => {
+  try {
+    const result = await pool.query(
+      `SELECT p.id, p.content, p.image_url, p.created_at, u.id as user_id, u.username, u.avatar_url
+       FROM posts p
+       JOIN users u ON p.user_id = u.id
+       ORDER BY p.created_at DESC`
+    );
+    res.json(result.rows);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// ============ SERVERS ============
+
+// Get all servers
 app.get('/auth/servers', async (req, res) => {
   try {
-    const result = await pool.query(
-      'SELECT id, name, description, icon_url, created_at FROM servers'
-    );
+    const result = await pool.query('SELECT * FROM servers ORDER BY created_at DESC');
     res.json(result.rows);
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
 });
 
+// Search servers
 app.get('/auth/servers/search', async (req, res) => {
   try {
-    const { q } = req.query;
+    const query = req.query.q || '';
     const result = await pool.query(
-      "SELECT id, name, description, icon_url FROM servers WHERE name ILIKE $1 LIMIT 20",
-      [`%${q}%`]
+      'SELECT * FROM servers WHERE name ILIKE $1 ORDER BY created_at DESC',
+      [`%${query}%`]
     );
     res.json(result.rows);
   } catch (err) {
@@ -302,25 +366,26 @@ app.get('/auth/servers/search', async (req, res) => {
   }
 });
 
+// Get server by ID
 app.get('/auth/servers/:id', async (req, res) => {
   try {
-    const result = await pool.query(
-      'SELECT * FROM servers WHERE id = $1',
-      [req.params.id]
-    );
-    if (result.rows.length === 0) return res.status(404).json({ error: 'Server not found' });
+    const result = await pool.query('SELECT * FROM servers WHERE id = $1', [req.params.id]);
+    if (result.rows.length === 0) {
+      return res.status(404).json({ error: 'Server not found' });
+    }
     res.json(result.rows[0]);
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
 });
 
+// Create server
 app.post('/auth/servers', verifyToken, async (req, res) => {
   try {
     const { name, description } = req.body;
     const result = await pool.query(
-      'INSERT INTO servers (owner_id, name, description) VALUES ($1, $2, $3) RETURNING *',
-      [req.user.id, name, description]
+      'INSERT INTO servers (creator_id, name, description) VALUES ($1, $2, $3) RETURNING *',
+      [req.userId, name, description]
     );
     res.status(201).json(result.rows[0]);
   } catch (err) {
@@ -328,105 +393,99 @@ app.post('/auth/servers', verifyToken, async (req, res) => {
   }
 });
 
+// Upload server banner
 app.post('/auth/servers/:id/banner', verifyToken, upload.single('banner'), async (req, res) => {
   try {
     const bannerUrl = req.file ? `/uploads/${req.file.filename}` : null;
-    await pool.query(
-      'UPDATE servers SET banner_url = $1 WHERE id = $2',
+    const result = await pool.query(
+      'UPDATE servers SET banner_url = $1 WHERE id = $2 RETURNING *',
       [bannerUrl, req.params.id]
     );
-    res.json({ message: 'Banner updated', bannerUrl });
+    if (result.rows.length === 0) {
+      return res.status(404).json({ error: 'Server not found' });
+    }
+    res.json(result.rows[0]);
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
 });
 
+// Upload server icon
 app.post('/auth/servers/:id/icon', verifyToken, upload.single('icon'), async (req, res) => {
   try {
     const iconUrl = req.file ? `/uploads/${req.file.filename}` : null;
-    await pool.query(
-      'UPDATE servers SET icon_url = $1 WHERE id = $2',
+    const result = await pool.query(
+      'UPDATE servers SET icon_url = $1 WHERE id = $2 RETURNING *',
       [iconUrl, req.params.id]
     );
-    res.json({ message: 'Icon updated', iconUrl });
+    if (result.rows.length === 0) {
+      return res.status(404).json({ error: 'Server not found' });
+    }
+    res.json(result.rows[0]);
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
 });
 
-// ==================== AVATARS & BANNERS ====================
+// ============ PROFILE UPLOADS ============
 
+// Upload avatar
 app.post('/auth/avatar', verifyToken, upload.single('avatar'), async (req, res) => {
   try {
     const avatarUrl = req.file ? `/uploads/${req.file.filename}` : null;
-    await pool.query(
-      'UPDATE users SET avatar_url = $1 WHERE id = $2',
-      [avatarUrl, req.user.id]
+    const result = await pool.query(
+      'UPDATE users SET avatar_url = $1 WHERE id = $2 RETURNING *',
+      [avatarUrl, req.userId]
     );
-    res.json({ message: 'Avatar updated', avatarUrl });
+    res.json(result.rows[0]);
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
 });
 
+// Upload banner
 app.post('/auth/banner', verifyToken, upload.single('banner'), async (req, res) => {
   try {
     const bannerUrl = req.file ? `/uploads/${req.file.filename}` : null;
-    await pool.query(
-      'UPDATE users SET banner_url = $1 WHERE id = $2',
-      [bannerUrl, req.user.id]
+    const result = await pool.query(
+      'UPDATE users SET banner_url = $1 WHERE id = $2 RETURNING *',
+      [bannerUrl, req.userId]
     );
-    res.json({ message: 'Banner updated', bannerUrl });
+    res.json(result.rows[0]);
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
 });
 
-// ==================== FILE UPLOAD ====================
-
-app.post('/auth/upload', upload.single('file'), (req, res) => {
+// Generic upload endpoint
+app.post('/auth/upload', verifyToken, upload.single('file'), async (req, res) => {
   try {
-    const fileUrl = req.file ? `/uploads/${req.file.filename}` : null;
-    res.json({ message: 'File uploaded', fileUrl });
+    if (!req.file) {
+      return res.status(400).json({ error: 'No file uploaded' });
+    }
+    res.json({ url: `/uploads/${req.file.filename}`, filename: req.file.filename });
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
 });
 
-// ==================== PUBLIC ====================
+// ============ STEAM ============
 
-app.get('/auth/public', async (req, res) => {
-  try {
-    const users = await pool.query('SELECT id, username, avatar_url FROM users LIMIT 10');
-    const posts = await pool.query('SELECT id, content, created_at FROM posts LIMIT 10');
-    res.json({
-      users: users.rows,
-      posts: posts.rows
-    });
-  } catch (err) {
-    res.status(500).json({ error: err.message });
-  }
-});
-
-// ==================== STEAM (PLACEHOLDER) ====================
-
+// Get recent Steam games
 app.get('/auth/steam/recent', verifyToken, async (req, res) => {
   try {
-    // Placeholder - would integrate with Steam API
-    res.json({ games: [] });
+    const result = await pool.query(
+      'SELECT * FROM steam_accounts WHERE user_id = $1',
+      [req.userId]
+    );
+    res.json(result.rows);
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
-});
-
-// ==================== HEALTH CHECK ====================
-
-app.get('/health', (req, res) => {
-  res.json({ status: 'ok' });
 });
 
 // Start server
-const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => {
   console.log(`✅ Auth server running on port ${PORT}`);
+  console.log(`📍 Available at https://lobby-auth-server.onrender.com`);
 });
