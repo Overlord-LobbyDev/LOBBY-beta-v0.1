@@ -25,7 +25,7 @@ function createWindow() {
   win.webContents.setWindowOpenHandler(({ url }) => {
     if (
       url.startsWith("https://steamcommunity.com") ||
-      url.startsWith("http://localhost:3001/steam")
+      url.startsWith("https://lobby-auth-server.onrender.com/steam")
     ) {
       return {
         action: "allow",
@@ -46,7 +46,7 @@ function createWindow() {
     });
     steamWin.loadURL(url);
     steamWin.webContents.on("did-navigate", (e, navUrl) => {
-      if (navUrl.startsWith("http://localhost:3001/steam/callback")) {
+      if (navUrl.startsWith("https://lobby-auth-server.onrender.com/steam/callback")) {
         setTimeout(() => { try { if (steamWin && !steamWin.isDestroyed()) steamWin.close(); } catch(e) {} }, 2500);
       }
     });
