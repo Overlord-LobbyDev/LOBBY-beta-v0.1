@@ -2,10 +2,12 @@
   "name": "lobby",
   "version": "1.0.0",
   "description": "LOBBY — Your Gaming Social Hub",
-  "main": "server.js",
+  "main": "main.js",
   "scripts": {
-    "start": "node server.js",
-    "dev": "node server.js",
+    "start": "electron .",
+    "dev": "electron .",
+    "build": "electron-builder",
+    "build:win": "electron-builder --win",
     "server": "node server.js",
     "auth": "node auth.js"
   },
