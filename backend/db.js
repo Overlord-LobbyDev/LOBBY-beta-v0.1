@@ -1,5 +1,4 @@
 const { Pool } = require('pg');
-require('dotenv').config();
 
 const pool = new Pool({
   connectionString: process.env.DATABASE_URL,
@@ -10,31 +9,32 @@ const pool = new Pool({
 
 async function initDb() {
   try {
-    // Users table
+    // Users table with avatar/banner
     await pool.query(`
       CREATE TABLE IF NOT EXISTS users (
         id SERIAL PRIMARY KEY,
-        username VARCHAR(50) UNIQUE NOT NULL,
-        email VARCHAR(100) UNIQUE NOT NULL,
+        username VARCHAR(255) UNIQUE NOT NULL,
+        email VARCHAR(255) UNIQUE NOT NULL,
         password VARCHAR(255) NOT NULL,
-        avatar TEXT,
-        banner TEXT,
+        avatar_url VARCHAR(500),
+        banner_url VARCHAR(500),
         bio TEXT,
-        is_admin BOOLEAN DEFAULT FALSE,
-        created_at TIMESTAMP DEFAULT NOW(),
-        updated_at TIMESTAMP DEFAULT NOW()
+        is_admin BOOLEAN DEFAULT false,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
       )
     `);
 
-    // Posts table
+    // Posts table for social feed
     await pool.query(`
       CREATE TABLE IF NOT EXISTS posts (
         id SERIAL PRIMARY KEY,
         user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
         content TEXT NOT NULL,
-        image_url TEXT,
-        created_at TIMESTAMP DEFAULT NOW(),
-        updated_at TIMESTAMP DEFAULT NOW()
+        image_url VARCHAR(500),
+        likes INTEGER DEFAULT 0,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
       )
     `);
 
@@ -42,63 +42,55 @@ async function initDb() {
     await pool.query(`
       CREATE TABLE IF NOT EXISTS servers (
         id SERIAL PRIMARY KEY,
-        owner_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
-        name VARCHAR(100) NOT NULL,
+        creator_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+        name VARCHAR(255) NOT NULL,
         description TEXT,
-        icon_url TEXT,
-        genre VARCHAR(50),
-        max_members INTEGER DEFAULT 100,
-        member_count INTEGER DEFAULT 1,
-        is_public BOOLEAN DEFAULT TRUE,
-        created_at TIMESTAMP DEFAULT NOW(),
-        updated_at TIMESTAMP DEFAULT NOW()
+        game_type VARCHAR(100),
+        region VARCHAR(100),
+        max_players INTEGER DEFAULT 32,
+        current_players INTEGER DEFAULT 0,
+        ip_address VARCHAR(50),
+        port INTEGER,
+        password VARCHAR(255),
+        icon_url VARCHAR(500),
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
       )
     `);
 
-    // Server members table
+    // Steam accounts linking
     await pool.query(`
-      CREATE TABLE IF NOT EXISTS server_members (
+      CREATE TABLE IF NOT EXISTS steam_accounts (
         id SERIAL PRIMARY KEY,
-        server_id INTEGER NOT NULL REFERENCES servers(id) ON DELETE CASCADE,
         user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
-        joined_at TIMESTAMP DEFAULT NOW(),
-        UNIQUE(server_id, user_id)
+        steam_id VARCHAR(255) UNIQUE NOT NULL,
+        username VARCHAR(255),
+        avatar_url VARCHAR(500),
+        linked_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
       )
     `);
 
-    // Friends table
+    // Friends table (keep existing)
     await pool.query(`
       CREATE TABLE IF NOT EXISTS friends (
         id SERIAL PRIMARY KEY,
         user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
         friend_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
-        status VARCHAR(20) DEFAULT 'pending',
-        created_at TIMESTAMP DEFAULT NOW(),
+        status VARCHAR(50) DEFAULT 'pending',
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
         UNIQUE(user_id, friend_id)
       )
     `);
 
-    // Messages table
+    // Messages table (keep existing)
     await pool.query(`
       CREATE TABLE IF NOT EXISTS messages (
         id SERIAL PRIMARY KEY,
         sender_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
-        recipient_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+        receiver_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
         content TEXT NOT NULL,
-        is_read BOOLEAN DEFAULT FALSE,
-        created_at TIMESTAMP DEFAULT NOW()
-      )
-    `);
-
-    // Steam accounts table
-    await pool.query(`
-      CREATE TABLE IF NOT EXISTS steam_accounts (
-        id SERIAL PRIMARY KEY,
-        user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
-        steam_id VARCHAR(100) UNIQUE NOT NULL,
-        steam_username VARCHAR(100),
-        avatar_url TEXT,
-        created_at TIMESTAMP DEFAULT NOW()
+        read BOOLEAN DEFAULT false,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
       )
     `);
 
@@ -108,18 +100,31 @@ async function initDb() {
         id SERIAL PRIMARY KEY,
         post_id INTEGER NOT NULL REFERENCES posts(id) ON DELETE CASCADE,
         user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
-        created_at TIMESTAMP DEFAULT NOW(),
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
         UNIQUE(post_id, user_id)
       )
     `);
 
-    console.log('✅ Database tables initialized successfully!');
-  } catch (err) {
-    console.error('❌ Database initialization error:', err.message);
+    // Server members table
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS server_members (
+        id SERIAL PRIMARY KEY,
+        server_id INTEGER NOT NULL REFERENCES servers(id) ON DELETE CASCADE,
+        user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+        role VARCHAR(50) DEFAULT 'member',
+        joined_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        UNIQUE(server_id, user_id)
+      )
+    `);
+
+    console.log('✅ Database initialized successfully');
+  } catch (error) {
+    console.error('❌ Database initialization error:', error);
+    throw error;
   }
 }
 
-// Initialize on startup
-initDb();
+// Auto-initialize on startup
+initDb().catch(console.error);
 
-module.exports = pool;
+module.exports = { pool, initDb };

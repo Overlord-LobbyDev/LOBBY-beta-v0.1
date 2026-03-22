@@ -100,6 +100,42 @@ app.get('/auth/profile/:userId', async (req, res) => {
   }
 });
 
+// Get user's friends (for profile view)
+app.get('/auth/profile/:userId/friends', async (req, res) => {
+  try {
+    const { userId } = req.params;
+    const result = await pool.query(
+      `SELECT u.id, u.username, u.avatar FROM users u
+       JOIN friends f ON (f.friend_id = u.id OR f.user_id = u.id)
+       WHERE (f.user_id = $1 OR f.friend_id = $1) AND f.status = 'accepted'
+       AND u.id != $1`,
+      [userId]
+    );
+    res.json(result.rows);
+  } catch (error) {
+    res.status(400).json({ error: error.message });
+  }
+});
+
+// Get user's posts (for profile view)
+app.get('/auth/profile/:userId/posts', async (req, res) => {
+  try {
+    const { userId } = req.params;
+    const result = await pool.query(
+      `SELECT p.*, u.username, u.avatar,
+          (SELECT COUNT(*) FROM post_likes WHERE post_id = p.id) as likes
+       FROM posts p
+       JOIN users u ON p.user_id = u.id
+       WHERE p.user_id = $1
+       ORDER BY p.created_at DESC LIMIT 50`,
+      [userId]
+    );
+    res.json(result.rows);
+  } catch (error) {
+    res.status(400).json({ error: error.message });
+  }
+});
+
 // Update profile
 app.put('/auth/profile', authenticateToken, async (req, res) => {
   try {
@@ -133,6 +169,17 @@ app.post('/auth/banner', authenticateToken, upload.single('banner'), async (req,
     const bannerUrl = `/uploads/${req.file.filename}`;
     await pool.query('UPDATE users SET banner = $1 WHERE id = $2', [bannerUrl, req.user.id]);
     res.json({ banner: bannerUrl });
+  } catch (error) {
+    res.status(400).json({ error: error.message });
+  }
+});
+
+// Generic upload endpoint (used by frontend)
+app.post('/auth/upload', authenticateToken, upload.single('file'), async (req, res) => {
+  try {
+    if (!req.file) return res.status(400).json({ error: 'No file uploaded' });
+    const fileUrl = `/uploads/${req.file.filename}`;
+    res.json({ url: fileUrl, filename: req.file.filename });
   } catch (error) {
     res.status(400).json({ error: error.message });
   }
@@ -295,6 +342,34 @@ app.post('/auth/servers', authenticateToken, async (req, res) => {
     await pool.query('INSERT INTO server_members (server_id, user_id) VALUES ($1, $2)', [serverId, req.user.id]);
 
     res.json(result.rows[0]);
+  } catch (error) {
+    res.status(400).json({ error: error.message });
+  }
+});
+
+// Upload server banner
+app.post('/auth/servers/:id/banner', authenticateToken, upload.single('banner'), async (req, res) => {
+  try {
+    const { id } = req.params;
+    if (!req.file) return res.status(400).json({ error: 'No file uploaded' });
+    
+    const bannerUrl = `/uploads/${req.file.filename}`;
+    await pool.query('UPDATE servers SET icon_url = $1 WHERE id = $2', [bannerUrl, id]);
+    res.json({ banner: bannerUrl });
+  } catch (error) {
+    res.status(400).json({ error: error.message });
+  }
+});
+
+// Upload server icon
+app.post('/auth/servers/:id/icon', authenticateToken, upload.single('icon'), async (req, res) => {
+  try {
+    const { id } = req.params;
+    if (!req.file) return res.status(400).json({ error: 'No file uploaded' });
+    
+    const iconUrl = `/uploads/${req.file.filename}`;
+    await pool.query('UPDATE servers SET icon_url = $1 WHERE id = $2', [iconUrl, id]);
+    res.json({ icon: iconUrl });
   } catch (error) {
     res.status(400).json({ error: error.message });
   }
