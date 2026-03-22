@@ -3427,7 +3427,7 @@
 </div>
 
 <script>
-const AUTH_URL = "http://localhost:3001";
+const AUTH_URL = "https://lobby-auth-server.onrender.com";
 const FEED_AUTH_URL = "https://lobby-auth-server.onrender.com";
 let feedToken = null;
 let feedMe = null;
@@ -3529,7 +3529,7 @@ async function loadPendingServerInvites() {
 // ── WebSocket ─────────────────────────────────────────────────
 function connectWS() {
   const _t = localStorage.getItem("vh_token") || sessionStorage.getItem("vh_token");
-  ws = new WebSocket(`ws://localhost:3000?token=${encodeURIComponent(_t)}`);
+  ws = new WebSocket(`wss://lobby-qds-v0.1.onrender.com?token=${encodeURIComponent(_t)}`);
   ws.onopen = () => console.log("[ws] connected");
   ws.onclose = () => setTimeout(connectWS, 3000);
   if (typeof initRTC === "function") initRTC();
@@ -7547,7 +7547,7 @@ async function loadUserPanel(userId) {
   const t = localStorage.getItem("vh_token") || sessionStorage.getItem("vh_token");
   if (!t || !userId) return;
   try {
-    const data = await fetch("http://localhost:3001/profile/" + userId, {
+    const data = await fetch("https://lobby-auth-server.onrender.com/profile/" + userId, {
       headers: { Authorization: "Bearer " + t }
     }).then(r => r.json());
     if (data.error) return;
@@ -7600,7 +7600,7 @@ async function loadUserPanel(userId) {
 async function checkAdminStatus() {
   const t=localStorage.getItem("vh_token")||sessionStorage.getItem("vh_token"); if (!t) return;
   try {
-    const r=await fetch("http://localhost:3001/me",{ headers:{ Authorization:"Bearer "+t } }).then(r=>r.json());
+    const r=await fetch("https://lobby-auth-server.onrender.com/me",{ headers:{ Authorization:"Bearer "+t } }).then(r=>r.json());
     if (r.is_admin) {
       document.getElementById("adminBtn").style.display="flex";
       document.getElementById("adminPanelBtn").style.display="flex";
@@ -10236,7 +10236,7 @@ input.sp-slider::-webkit-slider-thumb:hover { transform: scale(1.2); }
 <script>
 /* settings-panel.js — inject a slide-in settings drawer */
 (function () {
-  const AUTH_URL = "http://localhost:3001";
+  const AUTH_URL = "https://lobby-auth-server.onrender.com";
   const PRESETS  = ["#5865f2","#eb459e","#ed4245","#fee75c","#57f287","#00b0f4","#f47fff","#ff7b7d","#23a55a","#1e1f22"];
 
   const LOBBY_THEMES = {
@@ -11374,7 +11374,7 @@ async function loadUserPanel(userId) {
   const t = localStorage.getItem("vh_token") || sessionStorage.getItem("vh_token");
   if (!t || !userId) return;
   try {
-    const data = await fetch("http://localhost:3001/profile/" + userId, {
+    const data = await fetch("https://lobby-auth-server.onrender.com/profile/" + userId, {
       headers: { Authorization: "Bearer " + t }
     }).then(r => r.json());
     if (data.error) return;
@@ -11427,7 +11427,7 @@ async function loadUserPanel(userId) {
 async function checkAdminStatus() {
   const t=localStorage.getItem("vh_token")||sessionStorage.getItem("vh_token"); if (!t) return;
   try {
-    const r=await fetch("http://localhost:3001/me",{ headers:{ Authorization:"Bearer "+t } }).then(r=>r.json());
+    const r=await fetch("https://lobby-auth-server.onrender.com/me",{ headers:{ Authorization:"Bearer "+t } }).then(r=>r.json());
     if (r.is_admin) {
       document.getElementById("adminBtn").style.display="flex";
       document.getElementById("adminPanelBtn").style.display="flex";
@@ -14897,7 +14897,7 @@ input.sp-slider::-webkit-slider-thumb:hover { transform: scale(1.2); }
     const tok = token();
     if (!tok) { spShowMsg("spSteamMsg", "Not logged in", "error"); return; }
 
-    const steamUrl = `http://localhost:3001/steam/auth?token=${encodeURIComponent(tok)}`;
+    const steamUrl = `https://lobby-auth-server.onrender.com/steam/auth?token=${encodeURIComponent(tok)}`;
     spShowMsg("spSteamMsg", "Opening Steam login…", "");
 
     // Method 1: Electron IPC (most reliable in Electron)

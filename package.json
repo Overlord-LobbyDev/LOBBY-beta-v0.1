@@ -7,9 +7,7 @@
     "start": "electron .",
     "dev": "electron .",
     "build": "electron-builder",
-    "build:win": "electron-builder --win",
-    "server": "node server.js",
-    "auth": "node auth.js"
+    "build:win": "electron-builder --win"
   },
   "build": {
     "appId": "com.lobby.app",
@@ -20,16 +18,7 @@
       "target": "nsis"
     }
   },
-  "dependencies": {
-    "bcrypt": "^6.0.0",
-    "cors": "^2.8.5",
-    "dotenv": "^16.4.5",
-    "express": "^4.18.2",
-    "jsonwebtoken": "^9.0.2",
-    "multer": "^1.4.5-lts.1",
-    "pg": "^8.11.3",
-    "ws": "^8.18.0"
-  },
+  "dependencies": {},
   "devDependencies": {
     "electron": "^34.5.8",
     "electron-builder": "^26.8.1"
