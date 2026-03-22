@@ -1,19 +1,19 @@
-     // v2 redeploy - FIXED with server startup
+// ============================================================
+// auth.js — Authentication Server with DB initialization
+// ============================================================
 const express = require('express');
 const bcrypt = require('bcrypt');
 const jwt = require('jsonwebtoken');
-const db = require('./db');
-const { Pool } = require('pg');
 const cors = require('cors');
 const bodyParser = require('body-parser');
 
-const router = express.Router();
-const pool = new Pool({
-  connectionString: process.env.DATABASE_URL,
-  ssl: { rejectUnauthorized: false }  // Required for Render PostgreSQL
-});
+// Import pool from db.js (which auto-initializes tables)
+const pool = require('./db');
 
+const router = express.Router();
 const JWT_SECRET = process.env.JWT_SECRET || 'yFLyUwQDkz¿Y3u9RmRMtRxFejhh9';
+
+// ===== AUTH ROUTES =====
 
 // Register route
 router.post('/register', async (req, res) => {
@@ -24,7 +24,7 @@ router.post('/register', async (req, res) => {
   }
 
   try {
-    // Check if user exists
+    // Check if user exists (by email)
     const userResult = await pool.query('SELECT * FROM users WHERE email = $1', [email]);
     if (userResult.rows.length > 0) {
       return res.status(409).json({ error: 'User already exists' });
@@ -266,7 +266,7 @@ router.post('/messages/send', async (req, res) => {
 
   try {
     const result = await pool.query(
-      'INSERT INTO messages (sender_id, recipient_id, message_text, created_at) VALUES ($1, $2, $3, NOW()) RETURNING *',
+      'INSERT INTO direct_messages (from_user_id, to_user_id, content) VALUES ($1, $2, $3) RETURNING *',
       [senderId, recipientId, message]
     );
 
@@ -287,8 +287,8 @@ router.get('/messages/:userId/:friendId', async (req, res) => {
 
   try {
     const result = await pool.query(
-      `SELECT * FROM messages 
-       WHERE (sender_id = $1 AND recipient_id = $2) OR (sender_id = $2 AND recipient_id = $1)
+      `SELECT * FROM direct_messages 
+       WHERE (from_user_id = $1 AND to_user_id = $2) OR (from_user_id = $2 AND to_user_id = $1)
        ORDER BY created_at ASC`,
       [userId, friendId]
     );
@@ -300,7 +300,7 @@ router.get('/messages/:userId/:friendId', async (req, res) => {
   }
 });
 
-// ===== SERVER STARTUP (FIXED) =====
+// ===== SERVER STARTUP =====
 const app = express();
 
 // Middleware
