@@ -785,7 +785,7 @@
 <input type="file" id="fileInput" multiple accept="*/*" onchange="handleFileSelect()" />
 
 <script>
-const AUTH_URL = "http://localhost:3001";
+const AUTH_URL = "http://lobby-auth-server.onrender.com";
 const token    = localStorage.getItem("vh_token") || sessionStorage.getItem("vh_token");
 if (!token) window.location.href = "login.html";
 
@@ -828,7 +828,7 @@ async function boot() {
 
   // Load banner into user panel
   try {
-    const profile = await fetch(`http://localhost:3001/profile/${me.id}`, {
+    const profile = await fetch(`http://lobby-auth-server.onrender.com/profile/${me.id}`, {
       headers: { Authorization: `Bearer ${token}` }
     }).then(r => r.json());
     const bannerEl = document.getElementById("chatPanelBanner");

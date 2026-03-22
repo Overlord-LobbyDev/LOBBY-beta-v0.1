@@ -390,7 +390,7 @@
 <input type="file" id="bannerImgInput" accept="image/*" />
 
 <script>
-const AUTH_URL = "http://localhost:3001";
+const AUTH_URL = "http://lobby-auth-server.onrender.com";
 const token    = localStorage.getItem("vh_token") || sessionStorage.getItem("vh_token");
 if (!token) smoothNavigate("login.html", "down");
 
