@@ -7,7 +7,10 @@ const { Pool } = require("pg");
 
 // Use DATABASE_URL if available (Render), otherwise use individual variables
 const pool = new Pool(
-  process.env.DATABASE_URL ? { connectionString: process.env.DATABASE_URL } : {
+  process.env.DATABASE_URL ? { 
+    connectionString: process.env.DATABASE_URL,
+    ssl: { rejectUnauthorized: false }  // Required for Render PostgreSQL
+  } : {
     host:     process.env.PG_HOST     || "localhost",
     port:     process.env.PG_PORT     || 5432,
     database: process.env.PG_DB       || "discordclone",
