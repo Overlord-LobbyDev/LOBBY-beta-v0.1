@@ -1,4 +1,4 @@
-// v2 redeploy - FIXED with server startup
+     // v2 redeploy - FIXED with server startup
 const express = require('express');
 const bcrypt = require('bcrypt');
 const jwt = require('jsonwebtoken');
@@ -10,6 +10,7 @@ const bodyParser = require('body-parser');
 const router = express.Router();
 const pool = new Pool({
   connectionString: process.env.DATABASE_URL,
+  ssl: { rejectUnauthorized: false }  // Required for Render PostgreSQL
 });
 
 const JWT_SECRET = process.env.JWT_SECRET || 'yFLyUwQDkz¿Y3u9RmRMtRxFejhh9';

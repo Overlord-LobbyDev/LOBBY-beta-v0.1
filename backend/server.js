@@ -18,13 +18,9 @@ const server = http.createServer(app);
 // ── Port (Render assigns PORT env var dynamically) ──
 const PORT = process.env.PORT || 3000;
 
-// ── Serve static files ────────────────────────────────
-app.use(express.static(__dirname));
-app.use(express.static(path.join(__dirname, "public")));
-
-// ── Fallback: serve index.html for any unknown routes ──
-app.get("*", (req, res) => {
-  res.sendFile(path.join(__dirname, "index.html"));
+// ── Health check endpoint ──────────────────────────────
+app.get("/", (req, res) => {
+  res.status(200).json({ message: "WebSocket server is running" });
 });
 
 // ── WebSocket server ──────────────────────────────────
