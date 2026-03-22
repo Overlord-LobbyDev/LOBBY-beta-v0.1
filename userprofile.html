@@ -1,0 +1,191 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>VoiceHub — Profile</title>
+  <link rel="stylesheet" href="transitions.css" />
+  <script src="nav.js"></script>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    :root {
+      --bg-0:#1e1f22; --bg-1:#2b2d31; --bg-2:#313338; --bg-3:#383a40;
+      --accent:#5865f2; --accent-h:#4752c4; --danger:#ed4245;
+      --green:#23a55a; --text-1:#f2f3f5; --text-2:#b5bac1; --text-3:#80848e;
+      --radius:8px; --font:"gg sans","Noto Sans",Whitney,Helvetica Neue,Helvetica,Arial,sans-serif;
+    }
+    body { background:var(--bg-0); color:var(--text-1); font-family:var(--font); min-height:100vh; display:flex; align-items:center; justify-content:center; }
+
+    .profile-card {
+      background:var(--bg-1); border-radius:16px; overflow:hidden;
+      width:min(480px, 92vw); box-shadow:0 24px 64px rgba(0,0,0,.5);
+    }
+
+    .profile-banner {
+      height:120px; background:var(--accent);
+      background-size:cover; background-position:center;
+    }
+
+    .profile-header {
+      padding:0 20px 20px;
+      display:flex; flex-direction:column;
+    }
+
+    .avatar-wrap {
+      margin-top:-40px; margin-bottom:12px;
+      display:flex; align-items:flex-end; justify-content:space-between;
+    }
+
+    .profile-avatar {
+      width:80px; height:80px; border-radius:50%;
+      border:4px solid var(--bg-1); background:var(--accent);
+      display:flex; align-items:center; justify-content:center;
+      font-size:32px; font-weight:700; overflow:hidden; flex-shrink:0;
+    }
+    .profile-avatar img { width:100%; height:100%; object-fit:cover; }
+
+    .profile-actions { display:flex; gap:8px; }
+
+    .btn {
+      padding:8px 16px; border-radius:var(--radius); border:none;
+      font-size:13px; font-weight:600; font-family:var(--font); cursor:pointer;
+      transition:background .15s;
+    }
+    .btn-primary { background:var(--accent); color:#fff; }
+    .btn-primary:hover { background:var(--accent-h); }
+    .btn-grey { background:var(--bg-3); color:var(--text-2); }
+    .btn-grey:hover { background:var(--bg-0); color:var(--text-1); }
+
+    .profile-username { font-size:22px; font-weight:800; }
+    .profile-status { font-size:13px; margin-top:4px; display:flex; align-items:center; gap:6px; }
+    .status-dot { width:10px; height:10px; border-radius:50%; background:var(--green); flex-shrink:0; }
+    .status-dot.offline { background:var(--text-3); }
+
+    .profile-bio {
+      font-size:14px; color:var(--text-2); line-height:1.6;
+      margin-top:12px; padding-top:12px; border-top:1px solid rgba(255,255,255,.06);
+    }
+
+    .profile-meta {
+      margin-top:12px; font-size:12px; color:var(--text-3);
+      display:flex; gap:16px;
+    }
+
+    .close-btn {
+      position:absolute; top:16px; right:16px;
+      background:rgba(0,0,0,.4); border:none; color:#fff;
+      width:32px; height:32px; border-radius:50%; font-size:16px;
+      cursor:pointer; display:flex; align-items:center; justify-content:center;
+    }
+    .close-btn:hover { background:rgba(0,0,0,.7); }
+
+    .wrapper { position:relative; }
+
+    ::-webkit-scrollbar { width:6px; }
+    ::-webkit-scrollbar-thumb { background:var(--bg-3); border-radius:3px; }
+  </style>
+</head>
+<body>
+
+<div class="wrapper">
+  <div class="profile-card" id="profileCard">
+    <div class="profile-banner" id="profileBanner"></div>
+    <div class="profile-header">
+      <div class="avatar-wrap">
+        <div class="profile-avatar" id="profileAvatar">?</div>
+        <div class="profile-actions" id="profileActions"></div>
+      </div>
+      <div class="profile-username" id="profileUsername">Loading…</div>
+      <div class="profile-status" id="profileStatus">
+        <div class="status-dot" id="statusDot"></div>
+        <span id="statusText">Online</span>
+      </div>
+      <div class="profile-bio" id="profileBio" style="display:none"></div>
+      <div class="profile-meta" id="profileMeta"></div>
+    </div>
+  </div>
+</div>
+
+<script>
+const AUTH_URL = "http://localhost:3001";
+const token    = localStorage.getItem("vh_token") || sessionStorage.getItem("vh_token");
+if (!token) smoothNavigate("login.html", "down");
+
+// Get user ID from URL param
+const params = new URLSearchParams(window.location.search);
+const userId = params.get("id");
+const returnTo = params.get("from") || "chat.html";
+
+if (!userId) smoothNavigate(returnTo, "down");
+
+async function api(path, opts = {}) {
+  return fetch(`${AUTH_URL}${path}`, {
+    ...opts,
+    headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json", ...(opts.headers || {}) }
+  }).then(r => r.json());
+}
+
+async function boot() {
+  const [me, profile] = await Promise.all([api("/me"), api(`/profile/${userId}`)]);
+
+  if (profile.error) {
+    document.getElementById("profileUsername").textContent = "User not found";
+    return;
+  }
+
+  // Banner
+  const banner = document.getElementById("profileBanner");
+  if (profile.banner_url) {
+    banner.style.backgroundImage = `url(${profile.banner_url})`;
+    banner.style.backgroundSize  = "cover";
+  } else {
+    banner.style.background = profile.banner_colour || "#5865f2";
+  }
+
+  // Avatar
+  const avatarEl = document.getElementById("profileAvatar");
+  if (profile.avatar_url) {
+    avatarEl.innerHTML = `<img src="${profile.avatar_url}" alt="${profile.username}" />`;
+  } else {
+    avatarEl.textContent = profile.username.slice(0,1).toUpperCase();
+  }
+
+  // Username
+  document.getElementById("profileUsername").textContent = profile.username;
+
+  // Status
+  const statusText = profile.status || "Online";
+  document.getElementById("statusText").textContent = statusText;
+  document.title = `${profile.username} — VoiceHub`;
+
+  // Bio
+  if (profile.bio) {
+    const bioEl = document.getElementById("profileBio");
+    bioEl.textContent = profile.bio;
+    bioEl.style.display = "block";
+  }
+
+  // Member since
+  const joined = new Date(profile.created_at).toLocaleDateString("en-GB", { day:"numeric", month:"long", year:"numeric" });
+  document.getElementById("profileMeta").innerHTML = `<span>📅 Member since ${joined}</span>`;
+
+  // Actions — show edit button if own profile, otherwise show message button
+  const actionsEl = document.getElementById("profileActions");
+  if (parseInt(userId) === me.id) {
+    actionsEl.innerHTML = `<button class="btn btn-grey" onclick="smoothNavigate('profile.html', 'up')">✏️ Edit Profile</button>`;
+  } else {
+    actionsEl.innerHTML = `
+      <button class="btn btn-primary" onclick="openDMAndReturn(${profile.id}, '${profile.username}')">💬 Message</button>
+      <button class="btn btn-grey" onclick="smoothNavigate('${returnTo}', 'down')">✕ Close</button>`;
+  }
+}
+
+function openDMAndReturn(userId, username) {
+  // Store pending DM to open in chat
+  localStorage.setItem("pendingDM", JSON.stringify({ userId, username }));
+  smoothNavigate("chat.html", "down");
+}
+
+boot();
+</script>
+</body>
+</html>

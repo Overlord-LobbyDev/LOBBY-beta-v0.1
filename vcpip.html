@@ -1,0 +1,214 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8"/>
+  <title>Voice PiP</title>
+  <style>
+    *, *::before, *::after { box-sizing:border-box; margin:0; padding:0; }
+    :root {
+      --bg-0:#1e1f22; --bg-1:#2b2d31; --bg-2:#313338; --bg-3:#383a40;
+      --accent:#5865f2; --danger:#ed4245; --green:#23a55a;
+      --text-1:#f2f3f5; --text-2:#b5bac1; --text-3:#80848e;
+      --font:"gg sans","Noto Sans",Helvetica,Arial,sans-serif;
+    }
+    html, body { width:100%; height:100%; background:transparent; overflow:hidden; user-select:none; }
+    #pip {
+      width:100%; height:100%; background:var(--bg-1);
+      border:1px solid rgba(255,255,255,.12); border-radius:14px;
+      display:flex; flex-direction:column; overflow:hidden;
+      box-shadow:0 20px 60px rgba(0,0,0,.8); -webkit-app-region:no-drag;
+    }
+    #pipBar {
+      display:flex; align-items:center; justify-content:space-between;
+      padding:9px 11px 8px; background:rgba(0,0,0,.25); flex-shrink:0;
+      -webkit-app-region:drag; cursor:grab;
+    }
+    #pipBar * { -webkit-app-region:no-drag; }
+    .pip-header { display:flex; align-items:center; gap:7px; }
+    .pip-live-dot {
+      width:7px; height:7px; border-radius:50%; background:var(--green); flex-shrink:0;
+      box-shadow:0 0 6px var(--green); animation:pulse 2s ease-in-out infinite;
+    }
+    @keyframes pulse { 0%,100%{box-shadow:0 0 4px var(--green)} 50%{box-shadow:0 0 10px var(--green)} }
+    .pip-channel-name { font-size:12px; font-weight:700; color:var(--text-1); font-family:var(--font); }
+    .pip-actions { display:flex; gap:3px; }
+    .pip-btn {
+      background:none; border:none; border-radius:6px; color:var(--text-3);
+      width:24px; height:24px; display:flex; align-items:center; justify-content:center;
+      cursor:pointer; transition:background .15s, color .15s;
+    }
+    .pip-btn:hover { background:rgba(255,255,255,.1); color:var(--text-1); }
+
+    /* grid */
+    #pipBody {
+      flex:1; overflow:hidden; display:grid; gap:3px; padding:3px; background:var(--bg-0);
+    }
+    #pipBody.t1 { grid-template-columns:1fr; }
+    #pipBody.t2 { grid-template-columns:1fr 1fr; }
+    #pipBody.t3 { grid-template-columns:1fr 1fr; }
+    #pipBody.t3 .tile:first-child { grid-column:1/-1; }
+    #pipBody.t4 { grid-template-columns:1fr 1fr; }
+
+    .tile {
+      position:relative; border-radius:8px; overflow:hidden;
+      background:var(--bg-2); display:flex; align-items:center; justify-content:center;
+      aspect-ratio:16/9; border:2px solid transparent;
+    }
+    .tile.cam    { border-color:rgba(88,101,242,.4); }
+    .tile.screen { border-color:rgba(88,101,242,.6); }
+    .tile.speaking { border-color:var(--green) !important; }
+    .tile video { position:absolute; inset:0; width:100%; height:100%; object-fit:cover; display:block; }
+    .tile .av-wrap { display:flex; flex-direction:column; align-items:center; gap:5px; }
+    .tile .av {
+      width:40px; height:40px; border-radius:50%; background:var(--accent);
+      display:flex; align-items:center; justify-content:center;
+      font-size:15px; font-weight:700; color:#fff; overflow:hidden; font-family:var(--font);
+    }
+    .tile .av img { width:100%; height:100%; object-fit:cover; }
+
+    /* screen share placeholder */
+    .screen-icon { display:flex; flex-direction:column; align-items:center; gap:8px; }
+    .screen-icon svg { opacity:.4; }
+    .screen-label {
+      font-size:11px; font-weight:700; color:var(--accent);
+      font-family:var(--font); letter-spacing:.5px; text-transform:uppercase;
+    }
+
+    .tile .tname {
+      position:absolute; bottom:5px; left:7px;
+      font-size:10px; font-weight:700; color:#fff; font-family:var(--font);
+      background:rgba(0,0,0,.6); padding:2px 7px; border-radius:4px;
+      white-space:nowrap; max-width:90%; overflow:hidden; text-overflow:ellipsis;
+      display:flex; align-items:center; gap:4px;
+    }
+    .tbadge { font-size:9px; font-weight:800; background:var(--accent); color:#fff; padding:1px 5px; border-radius:3px; }
+    .tile .tmuted {
+      position:absolute; top:5px; right:5px; background:rgba(0,0,0,.6); border-radius:50%;
+      width:18px; height:18px; display:flex; align-items:center; justify-content:center; color:var(--danger);
+    }
+
+    /* controls */
+    #pipControls {
+      display:flex; flex-shrink:0;
+      border-top:1px solid rgba(255,255,255,.06); background:rgba(0,0,0,.2);
+    }
+    .pctrl {
+      flex:1; display:flex; align-items:center; justify-content:center; gap:5px;
+      background:none; border:none; border-right:1px solid rgba(255,255,255,.06);
+      color:var(--text-3); font-size:11px; font-weight:600; font-family:var(--font);
+      padding:8px 4px; cursor:pointer; transition:background .15s, color .15s;
+    }
+    .pctrl:last-child { border-right:none; }
+    .pctrl:hover { background:rgba(255,255,255,.07); color:var(--text-1); }
+    .pctrl.muted   { color:var(--danger); }
+    .pctrl.sharing { color:var(--accent); }
+    .pctrl.leave   { color:var(--danger); }
+    .pctrl.leave:hover { background:rgba(237,66,69,.12); }
+  </style>
+</head>
+<body>
+<div id="pip">
+  <div id="pipBar">
+    <div class="pip-header">
+      <span class="pip-live-dot"></span>
+      <span class="pip-channel-name" id="pipName">Voice</span>
+    </div>
+    <div class="pip-actions">
+      <button class="pip-btn" id="btnExpand" title="Return to app">
+        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 3 21 3 21 9"/><polyline points="9 21 3 21 3 15"/><line x1="21" y1="3" x2="14" y2="10"/><line x1="3" y1="21" x2="10" y2="14"/></svg>
+      </button>
+    </div>
+  </div>
+
+  <div id="pipBody" class="t1"></div>
+
+  <div id="pipControls">
+    <button class="pctrl" id="btnMute">
+      <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"/><path d="M19 10v2a7 7 0 0 1-14 0v-2"/><line x1="12" y1="19" x2="12" y2="23"/><line x1="8" y1="23" x2="16" y2="23"/></svg>
+      <span id="muteLabel">Mute</span>
+    </button>
+    <button class="pctrl" id="btnScreen">
+      <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="3" width="20" height="14" rx="2"/><line x1="8" y1="21" x2="16" y2="21"/><line x1="12" y1="17" x2="12" y2="21"/></svg>
+      <span id="shareLabel">Share</span>
+    </button>
+    <button class="pctrl leave" id="btnLeave">
+      <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>
+      Leave
+    </button>
+  </div>
+</div>
+
+<script>
+  const api = window.electronAPI;
+  api?.onVcPipData(data => render(data));
+
+  const mutedSvg = `<svg width="9" height="9" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><line x1="1" y1="1" x2="23" y2="23"/><path d="M9 9v3a3 3 0 0 0 5.12 2.12M15 9.34V4a3 3 0 0 0-5.94-.6"/></svg>`;
+
+  function render(data) {
+    if (!data) return;
+    const { channelName, members = [], muted, sharing, camOn } = data;
+
+    document.getElementById("pipName").textContent = channelName || "Voice";
+
+    // Mute button
+    const btnMute = document.getElementById("btnMute");
+    btnMute.classList.toggle("muted", !!muted);
+    document.getElementById("muteLabel").textContent = muted ? "Unmute" : "Mute";
+
+    // Share button
+    const btnScreen = document.getElementById("btnScreen");
+    btnScreen.classList.toggle("sharing", !!sharing);
+    document.getElementById("shareLabel").textContent = sharing ? "Stop" : "Share";
+
+    // Build tiles: camera replaces avatar tile, screenshare is an extra tile
+    const tiles = [];
+    members.forEach(m => {
+      if (m.isSelf) {
+        tiles.push({ kind: camOn ? "cam" : "avatar", member: m });
+        if (sharing) tiles.push({ kind: "screen", member: m });
+      } else {
+        tiles.push({ kind: "avatar", member: m });
+      }
+    });
+
+    const body = document.getElementById("pipBody");
+    const count = Math.max(1, tiles.length);
+    body.className = `t${Math.min(count, 4)}`;
+
+    body.innerHTML = tiles.map(t => {
+      const m = t.member;
+      const av = m.avatarUrl ? `<img src="${m.avatarUrl}"/>` : (m.username||"?").slice(0,1).toUpperCase();
+      const muteIcon = m.muted ? `<div class="tmuted">${mutedSvg}</div>` : "";
+
+      if (t.kind === "screen") return `
+        <div class="tile screen">
+          <div class="screen-icon">
+            <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"><rect x="2" y="3" width="20" height="14" rx="2"/><line x1="8" y1="21" x2="16" y2="21"/><line x1="12" y1="17" x2="12" y2="21"/></svg>
+            <span class="screen-label">Sharing Screen</span>
+          </div>
+          <div class="tname">${m.username||"?"} <span class="tbadge">Screen</span></div>
+        </div>`;
+
+      if (t.kind === "cam") return `
+        <div class="tile cam">
+          <div class="av-wrap"><div class="av">${av}</div></div>
+          <div class="tname">${m.username||"?"} <span class="tbadge">Cam</span></div>
+          ${muteIcon}
+        </div>`;
+
+      return `
+        <div class="tile${m.speaking ? " speaking" : ""}">
+          <div class="av-wrap"><div class="av">${av}</div></div>
+          <div class="tname">${m.username||"?"}</div>
+          ${muteIcon}
+        </div>`;
+    }).join("");
+  }
+
+  document.getElementById("btnExpand").onclick = () => api?.vcPipAction("expand");
+  document.getElementById("btnMute").onclick   = () => api?.vcPipAction("mute");
+  document.getElementById("btnScreen").onclick = () => api?.vcPipAction("screen");
+  document.getElementById("btnLeave").onclick  = () => api?.vcPipAction("leave");
+</script>
+</body>
+</html>

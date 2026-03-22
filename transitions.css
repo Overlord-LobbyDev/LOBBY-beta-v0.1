@@ -1,0 +1,61 @@
+/* ============================================================
+   transitions.css — shared page transition animations
+   ============================================================ */
+
+/* Prevent white flash before CSS loads */
+html { background: #1e1f22; }
+
+/* Default fade in on every page load */
+@keyframes pageFadeIn {
+  from { opacity: 0; }
+  to   { opacity: 1; }
+}
+
+/* Slide up — used when opening chat/admin */
+@keyframes pageSlideUp {
+  from { opacity: 0; transform: translateY(32px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+/* Slide down — used when going back */
+@keyframes pageSlideDown {
+  from { opacity: 0; transform: translateY(-24px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+/* Applied to body by default */
+body {
+  animation: pageFadeIn 0.2s ease forwards;
+  animation-fill-mode: forwards;
+}
+
+/* Override with slide-up class added before navigation */
+body.slide-up {
+  animation: pageSlideUp 0.25s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
+/* Override with slide-down class */
+body.slide-down {
+  animation: pageSlideDown 0.25s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
+/* Fade out before leaving — applied by JS */
+@keyframes pageFadeOut {
+  from { opacity: 1; transform: translateY(0); }
+  to   { opacity: 0; transform: translateY(-16px); }
+}
+
+@keyframes pageSlideOut {
+  from { opacity: 1; transform: translateY(0); }
+  to   { opacity: 0; transform: translateY(32px); }
+}
+
+body.leaving {
+  animation: pageFadeOut 0.15s ease forwards;
+  pointer-events: none;
+}
+
+body.leaving-down {
+  animation: pageSlideOut 0.15s ease forwards;
+  pointer-events: none;
+}

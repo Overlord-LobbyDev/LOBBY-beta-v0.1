@@ -1,0 +1,440 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <link rel="stylesheet" href="transitions.css" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>VoiceHub — Login</title>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --bg-0: #1e1f22;
+      --bg-1: #2b2d31;
+      --bg-2: #313338;
+      --bg-3: #383a40;
+      --accent: #5865f2;
+      --accent-h: #4752c4;
+      --danger: #ed4245;
+      --green: #23a55a;
+      --text-1: #f2f3f5;
+      --text-2: #b5bac1;
+      --text-3: #80848e;
+      --radius: 8px;
+      --font: "gg sans", "Noto Sans", Whitney, Helvetica Neue, Helvetica, Arial, sans-serif;
+    }
+
+    body {
+      min-height: 100vh;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      background: var(--bg-0);
+      font-family: var(--font);
+      color: var(--text-1);
+    }
+
+    /* Subtle background pattern */
+    body::before {
+      content: "";
+      position: fixed;
+      inset: 0;
+      background:
+        radial-gradient(ellipse at 20% 50%, rgba(88,101,242,.15) 0%, transparent 60%),
+        radial-gradient(ellipse at 80% 20%, rgba(35,165,90,.08) 0%, transparent 50%);
+      pointer-events: none;
+    }
+
+    .card {
+      background: var(--bg-1);
+      border-radius: 16px;
+      padding: 40px 40px 32px;
+      width: min(480px, 92vw);
+      box-shadow: 0 24px 64px rgba(0,0,0,.5);
+      position: relative;
+    }
+
+    .logo {
+      text-align: center;
+      margin-bottom: 24px;
+    }
+
+    .logo-icon {
+      font-size: 48px;
+      line-height: 1;
+    }
+
+    .logo h1 {
+      font-size: 24px;
+      font-weight: 800;
+      color: var(--text-1);
+      margin-top: 8px;
+      letter-spacing: -.3px;
+    }
+
+    .logo p {
+      font-size: 14px;
+      color: var(--text-3);
+      margin-top: 4px;
+    }
+
+    /* Tabs */
+    .tabs {
+      display: flex;
+      background: var(--bg-0);
+      border-radius: var(--radius);
+      padding: 4px;
+      margin-bottom: 28px;
+      gap: 4px;
+    }
+
+    .tab {
+      flex: 1;
+      padding: 9px;
+      border: none;
+      border-radius: 6px;
+      background: transparent;
+      color: var(--text-3);
+      font-size: 14px;
+      font-weight: 600;
+      font-family: var(--font);
+      cursor: pointer;
+      transition: background .15s, color .15s;
+    }
+
+    .tab.active {
+      background: var(--bg-1);
+      color: var(--text-1);
+      box-shadow: 0 1px 4px rgba(0,0,0,.3);
+    }
+
+    /* Form */
+    .form { display: flex; flex-direction: column; gap: 18px; }
+    .form.hidden { display: none; }
+
+    .field { display: flex; flex-direction: column; gap: 6px; }
+
+    label {
+      font-size: 12px;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: .6px;
+      color: var(--text-2);
+    }
+
+    input[type="text"],
+    input[type="password"] {
+      background: var(--bg-0);
+      border: 1.5px solid rgba(255,255,255,.08);
+      border-radius: var(--radius);
+      color: var(--text-1);
+      font-size: 15px;
+      font-family: var(--font);
+      padding: 11px 14px;
+      outline: none;
+      transition: border-color .15s;
+    }
+
+    input:focus { border-color: var(--accent); }
+
+    /* Avatar upload */
+    .avatar-upload {
+      display: flex;
+      align-items: center;
+      gap: 14px;
+    }
+
+    .avatar-preview {
+      width: 56px;
+      height: 56px;
+      border-radius: 50%;
+      background: var(--bg-3);
+      border: 2px dashed rgba(255,255,255,.15);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 24px;
+      overflow: hidden;
+      flex-shrink: 0;
+      cursor: pointer;
+      transition: border-color .15s;
+    }
+
+    .avatar-preview:hover { border-color: var(--accent); }
+    .avatar-preview img { width: 100%; height: 100%; object-fit: cover; }
+
+    .avatar-hint {
+      font-size: 12px;
+      color: var(--text-3);
+      line-height: 1.5;
+    }
+
+    #avatarInput { display: none; }
+
+    /* Submit button */
+    .submit-btn {
+      width: 100%;
+      padding: 13px;
+      background: var(--accent);
+      color: #fff;
+      border: none;
+      border-radius: var(--radius);
+      font-size: 15px;
+      font-weight: 700;
+      font-family: var(--font);
+      cursor: pointer;
+      transition: background .15s, transform .1s;
+      margin-top: 4px;
+    }
+
+    .submit-btn:hover { background: var(--accent-h); }
+    .submit-btn:active { transform: scale(.98); }
+    .submit-btn:disabled { opacity: .5; cursor: default; }
+
+    /* Error / success messages */
+    .message {
+      font-size: 13px;
+      padding: 10px 14px;
+      border-radius: var(--radius);
+      display: none;
+    }
+    .message.error   { background: rgba(237,66,69,.15); color: #ff7b7d; display: block; }
+    .message.success { background: rgba(35,165,90,.15);  color: #57f287;  display: block; }
+
+    /* Remember me */
+    .remember {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      font-size: 13px;
+      color: var(--text-2);
+      cursor: pointer;
+    }
+
+    .remember input { cursor: pointer; accent-color: var(--accent); width: 15px; height: 15px; }
+
+    .divider {
+      height: 1px;
+      background: rgba(255,255,255,.07);
+      margin: 4px 0;
+    }
+  </style>
+  <script src="nav.js"></script>
+</head>
+<body>
+<div class="card">
+  <div class="logo">
+    <div class="logo-icon">🎮</div>
+    <h1>VoiceHub</h1>
+    <p>Voice, video &amp; chat</p>
+  </div>
+
+  <div class="tabs">
+    <button class="tab active" id="loginTab">Sign In</button>
+    <button class="tab" id="registerTab">Create Account</button>
+  </div>
+
+  <!-- ── Login form ── -->
+  <form class="form" id="loginForm" autocomplete="on">
+    <div class="field">
+      <label for="loginUsername">Username</label>
+      <input type="text" id="loginUsername" placeholder="Enter your username" autocomplete="username" />
+    </div>
+    <div class="field">
+      <label for="loginPassword">Password</label>
+      <input type="password" id="loginPassword" placeholder="Enter your password" autocomplete="current-password" />
+    </div>
+    <label class="remember">
+      <input type="checkbox" id="rememberMe" checked />
+      Keep me signed in
+    </label>
+    <div class="message" id="loginMsg"></div>
+    <button type="submit" class="submit-btn" id="loginBtn">Sign In</button>
+  </form>
+
+  <!-- ── Register form ── -->
+  <form class="form hidden" id="registerForm" autocomplete="off">
+    <div class="field">
+      <label for="regUsername">Username</label>
+      <input type="text" id="regUsername" placeholder="Choose a username (2–32 chars)" autocomplete="off" />
+    </div>
+    <div class="field">
+      <label for="regPassword">Password</label>
+      <input type="password" id="regPassword" placeholder="At least 6 characters" autocomplete="new-password" />
+    </div>
+    <div class="field">
+      <label for="regPassword2">Confirm Password</label>
+      <input type="password" id="regPassword2" placeholder="Repeat your password" autocomplete="new-password" />
+    </div>
+    <div class="divider"></div>
+    <div class="field">
+      <label>Profile Picture <span style="font-weight:400;text-transform:none;letter-spacing:0;color:var(--text-3)">(optional)</span></label>
+      <div class="avatar-upload">
+        <div class="avatar-preview" id="avatarPreview" title="Click to upload">🙂</div>
+        <div class="avatar-hint">Click the circle to upload a photo.<br>JPG, PNG, GIF or WebP · max 8 MB<br>Animated GIFs supported!</div>
+        <input type="file" id="avatarInput" accept="image/*" />
+      </div>
+    </div>
+    <div class="message" id="registerMsg"></div>
+    <button type="submit" class="submit-btn" id="registerBtn">Create Account</button>
+  </form>
+</div>
+
+<script>
+  const AUTH_URL = "http://localhost:3001";
+
+  // ── Tab switching ────────────────────────────────────────
+  document.getElementById("loginTab").addEventListener("click", () => {
+    document.getElementById("loginTab").classList.add("active");
+    document.getElementById("registerTab").classList.remove("active");
+    document.getElementById("loginForm").classList.remove("hidden");
+    document.getElementById("registerForm").classList.add("hidden");
+  });
+
+  document.getElementById("registerTab").addEventListener("click", () => {
+    document.getElementById("registerTab").classList.add("active");
+    document.getElementById("loginTab").classList.remove("active");
+    document.getElementById("registerForm").classList.remove("hidden");
+    document.getElementById("loginForm").classList.add("hidden");
+  });
+
+  // ── Avatar preview ───────────────────────────────────────
+  const avatarPreview = document.getElementById("avatarPreview");
+  const avatarInput   = document.getElementById("avatarInput");
+  let avatarFile = null;
+
+  avatarPreview.addEventListener("click", () => avatarInput.click());
+  avatarInput.addEventListener("change", () => {
+    avatarFile = avatarInput.files[0];
+    if (!avatarFile) return;
+    const reader = new FileReader();
+    reader.onload = e => {
+      avatarPreview.innerHTML = `<img src="${e.target.result}" alt="avatar" />`;
+    };
+    reader.readAsDataURL(avatarFile);
+  });
+
+  // ── Helper: show message ─────────────────────────────────
+  function showMsg(elId, text, type) {
+    const el = document.getElementById(elId);
+    el.textContent = text;
+    el.className = `message ${type}`;
+  }
+
+  // ── Persistent login check ───────────────────────────────
+  window.addEventListener("DOMContentLoaded", async () => {
+    const token = localStorage.getItem("vh_token");
+    if (!token) return;
+    try {
+      const res = await fetch(`${AUTH_URL}/me`, {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      if (res.ok) {
+        // Token still valid — go straight to app
+        const userData = await res.json();
+        launchApp(token, userData.isAdmin);
+      } else {
+        localStorage.removeItem("vh_token");
+      }
+    } catch { /* server not running yet */ }
+  });
+
+  // ── Login ────────────────────────────────────────────────
+  document.getElementById("loginForm").addEventListener("submit", async e => {
+    e.preventDefault();
+    const btn      = document.getElementById("loginBtn");
+    const username = document.getElementById("loginUsername").value.trim();
+    const password = document.getElementById("loginPassword").value;
+    const remember = document.getElementById("rememberMe").checked;
+
+    if (!username || !password) return showMsg("loginMsg", "Please fill in all fields.", "error");
+
+    btn.disabled = true;
+    btn.textContent = "Signing in…";
+
+    try {
+      const res  = await fetch(`${AUTH_URL}/login`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ username, password })
+      });
+      const data = await res.json();
+
+      if (!res.ok) {
+        showMsg("loginMsg", data.error || "Login failed.", "error");
+        btn.disabled = false;
+        btn.textContent = "Sign In";
+        return;
+      }
+
+      if (remember) localStorage.setItem("vh_token", data.token);
+      else          sessionStorage.setItem("vh_token", data.token);
+
+      launchApp(data.token, data.user.isAdmin);
+    } catch {
+      showMsg("loginMsg", "Could not reach auth server. Is it running?", "error");
+      btn.disabled = false;
+      btn.textContent = "Sign In";
+    }
+  });
+
+  // ── Register ─────────────────────────────────────────────
+  document.getElementById("registerForm").addEventListener("submit", async e => {
+    e.preventDefault();
+    const btn   = document.getElementById("registerBtn");
+    const uname = document.getElementById("regUsername").value.trim();
+    const pass1 = document.getElementById("regPassword").value;
+    const pass2 = document.getElementById("regPassword2").value;
+
+    if (!uname || !pass1) return showMsg("registerMsg", "Please fill in all fields.", "error");
+    if (pass1 !== pass2)  return showMsg("registerMsg", "Passwords do not match.", "error");
+    if (pass1.length < 6) return showMsg("registerMsg", "Password must be at least 6 characters.", "error");
+
+    btn.disabled = true;
+    btn.textContent = "Creating account…";
+
+    try {
+      // 1. Register
+      const res  = await fetch(`${AUTH_URL}/register`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ username: uname, password: pass1 })
+      });
+      const data = await res.json();
+
+      if (!res.ok) {
+        showMsg("registerMsg", data.error || "Registration failed.", "error");
+        btn.disabled = false;
+        btn.textContent = "Create Account";
+        return;
+      }
+
+      // 2. Upload avatar if one was chosen
+      if (avatarFile) {
+        const form = new FormData();
+        form.append("avatar", avatarFile);
+        await fetch(`${AUTH_URL}/avatar`, {
+          method: "POST",
+          headers: { Authorization: `Bearer ${data.token}` },
+          body: form
+        });
+      }
+
+      localStorage.setItem("vh_token", data.token);
+      showMsg("registerMsg", "Account created! Launching…", "success");
+      setTimeout(() => launchApp(data.token, data.user.isAdmin), 800);
+    } catch {
+      showMsg("registerMsg", "Could not reach auth server. Is it running?", "error");
+      btn.disabled = false;
+      btn.textContent = "Create Account";
+    }
+  });
+
+  // ── Launch app (admin → admin panel, user → main app) ──────
+  function launchApp(token, isAdmin) {
+    sessionStorage.setItem("vh_token", token);
+    window.location.href = isAdmin ? "admin.html" : "index.html";
+  }
+</script>
+</body>
+</html>

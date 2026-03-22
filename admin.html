@@ -1,0 +1,438 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <link rel="stylesheet" href="transitions.css" />
+  <title>VoiceHub — Admin Panel</title>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    :root {
+      --bg-0:#1e1f22; --bg-1:#2b2d31; --bg-2:#313338; --bg-3:#383a40;
+      --accent:#5865f2; --accent-h:#4752c4; --danger:#ed4245; --danger-h:#c03537;
+      --green:#23a55a; --yellow:#f0b232;
+      --text-1:#f2f3f5; --text-2:#b5bac1; --text-3:#80848e;
+      --radius:8px; --font:"gg sans","Noto Sans",Whitney,Helvetica Neue,Helvetica,Arial,sans-serif;
+    }
+    body { display:flex; height:100vh; overflow:hidden; background:var(--bg-0); color:var(--text-1); font-family:var(--font); font-size:14px; }
+    .sidebar { width:220px; min-width:220px; background:var(--bg-1); display:flex; flex-direction:column; border-right:1px solid rgba(0,0,0,.3); }
+    .sidebar-header { padding:16px; font-weight:800; font-size:15px; border-bottom:1px solid rgba(0,0,0,.2); display:flex; align-items:center; gap:10px; color:var(--danger); }
+    .sidebar-header .badge { background:var(--danger); color:#fff; font-size:10px; font-weight:700; padding:2px 7px; border-radius:99px; }
+    .nav-section { padding:16px 14px 4px; font-size:11px; font-weight:700; text-transform:uppercase; letter-spacing:.8px; color:var(--text-3); }
+    .nav-item { display:flex; align-items:center; gap:10px; padding:10px 14px; color:var(--text-2); cursor:pointer; border-radius:6px; margin:2px 8px; font-size:14px; font-weight:500; transition:background .15s,color .15s; border:none; background:transparent; width:calc(100% - 16px); text-align:left; font-family:var(--font); }
+    .nav-item:hover { background:var(--bg-3); color:var(--text-1); }
+    .nav-item.active { background:var(--bg-3); color:var(--text-1); font-weight:600; }
+    .nav-item .icon { font-size:16px; width:20px; text-align:center; }
+    .sidebar-bottom { margin-top:auto; padding:12px; border-top:1px solid rgba(0,0,0,.2); display:flex; align-items:center; gap:10px; }
+    .admin-avatar { width:34px; height:34px; border-radius:50%; background:var(--danger); display:flex; align-items:center; justify-content:center; font-weight:700; font-size:15px; flex-shrink:0; }
+    .admin-info { flex:1; min-width:0; }
+    .admin-name { font-size:13px; font-weight:600; }
+    .admin-role { font-size:11px; color:var(--danger); font-weight:600; }
+    .main { flex:1; display:flex; flex-direction:column; overflow:hidden; }
+    .topbar { height:50px; padding:0 24px; display:flex; align-items:center; justify-content:space-between; border-bottom:1px solid rgba(0,0,0,.3); background:var(--bg-2); flex-shrink:0; }
+    .topbar-title { font-size:16px; font-weight:700; }
+    .topbar-actions { display:flex; gap:8px; }
+    .content { flex:1; overflow-y:auto; padding:24px; background:var(--bg-2); }
+    .stats-row { display:grid; grid-template-columns:repeat(4,1fr); gap:16px; margin-bottom:28px; }
+    .stat-card { background:var(--bg-1); border-radius:var(--radius); padding:18px 20px; }
+    .stat-label { font-size:11px; color:var(--text-3); font-weight:600; text-transform:uppercase; letter-spacing:.6px; margin-bottom:6px; }
+    .stat-value { font-size:28px; font-weight:800; }
+    .stat-icon  { font-size:22px; margin-bottom:4px; }
+    .toolbar { display:flex; align-items:center; gap:10px; margin-bottom:16px; }
+    .search-wrap { flex:1; position:relative; }
+    .search-wrap input { width:100%; background:var(--bg-1); border:1.5px solid rgba(255,255,255,.06); border-radius:var(--radius); color:var(--text-1); font-size:14px; font-family:var(--font); padding:9px 14px 9px 36px; outline:none; }
+    .search-wrap input:focus { border-color:var(--accent); }
+    .search-icon { position:absolute; left:11px; top:50%; transform:translateY(-50%); color:var(--text-3); pointer-events:none; }
+    select.filter { background:var(--bg-1); border:1.5px solid rgba(255,255,255,.06); border-radius:var(--radius); color:var(--text-2); font-size:13px; font-family:var(--font); padding:9px 12px; outline:none; cursor:pointer; }
+    .table-wrap { background:var(--bg-1); border-radius:var(--radius); overflow:hidden; border:1px solid rgba(255,255,255,.05); }
+    table { width:100%; border-collapse:collapse; }
+    thead tr { background:var(--bg-0); }
+    th { padding:12px 16px; text-align:left; font-size:11px; font-weight:700; text-transform:uppercase; letter-spacing:.7px; color:var(--text-3); white-space:nowrap; }
+    td { padding:12px 16px; border-top:1px solid rgba(255,255,255,.04); vertical-align:middle; }
+    tbody tr:hover { background:rgba(255,255,255,.02); }
+    .user-cell { display:flex; align-items:center; gap:10px; }
+    .user-cell-avatar { width:32px; height:32px; border-radius:50%; background:var(--accent); display:flex; align-items:center; justify-content:center; font-size:13px; font-weight:700; flex-shrink:0; overflow:hidden; }
+    .user-cell-avatar img { width:100%; height:100%; object-fit:cover; }
+    .user-cell-name { font-weight:600; font-size:14px; }
+    .user-cell-id { font-size:11px; color:var(--text-3); }
+    .badge { display:inline-flex; align-items:center; gap:4px; padding:3px 9px; border-radius:99px; font-size:11px; font-weight:700; white-space:nowrap; }
+    .badge-green  { background:rgba(35,165,90,.2);  color:#57f287; }
+    .badge-red    { background:rgba(237,66,69,.2);  color:#ff7b7d; }
+    .badge-yellow { background:rgba(240,178,50,.2); color:#ffd166; }
+    .badge-blue   { background:rgba(88,101,242,.2); color:#8b9eff; }
+    .badge-grey   { background:rgba(255,255,255,.08); color:var(--text-3); }
+    .actions { display:flex; gap:6px; flex-wrap:wrap; }
+    .btn { padding:6px 12px; border-radius:6px; border:none; font-size:12px; font-weight:600; font-family:var(--font); cursor:pointer; transition:background .15s,transform .1s; white-space:nowrap; }
+    .btn:active { transform:scale(.96); }
+    .btn-danger { background:rgba(237,66,69,.2); color:#ff7b7d; }
+    .btn-danger:hover { background:var(--danger); color:#fff; }
+    .btn-yellow { background:rgba(240,178,50,.15); color:#ffd166; }
+    .btn-yellow:hover { background:var(--yellow); color:#000; }
+    .btn-green  { background:rgba(35,165,90,.2); color:#57f287; }
+    .btn-green:hover  { background:var(--green); color:#fff; }
+    .btn-blue   { background:rgba(88,101,242,.2); color:#8b9eff; }
+    .btn-blue:hover   { background:var(--accent); color:#fff; }
+    .btn-grey   { background:var(--bg-3); color:var(--text-2); }
+    .btn-grey:hover   { background:var(--bg-0); color:var(--text-1); }
+    .btn-app { background:var(--accent); color:#fff; padding:7px 16px; border-radius:var(--radius); border:none; font-size:13px; font-weight:600; font-family:var(--font); cursor:pointer; }
+    .btn-app:hover { background:var(--accent-h); }
+    .modal-overlay { display:none; position:fixed; inset:0; z-index:9999; background:rgba(0,0,0,.75); align-items:center; justify-content:center; }
+    .modal-overlay.open { display:flex; }
+    .modal { background:var(--bg-1); border-radius:12px; padding:28px; width:min(440px,90vw); box-shadow:0 24px 64px rgba(0,0,0,.6); display:flex; flex-direction:column; gap:18px; }
+    .modal h3 { font-size:18px; font-weight:700; }
+    .modal p  { font-size:13px; color:var(--text-2); line-height:1.6; }
+    .modal-field { display:flex; flex-direction:column; gap:6px; }
+    .modal-field label { font-size:11px; font-weight:700; text-transform:uppercase; letter-spacing:.6px; color:var(--text-2); }
+    .modal-field input,.modal-field select,.modal-field textarea { background:var(--bg-0); border:1.5px solid rgba(255,255,255,.08); border-radius:var(--radius); color:var(--text-1); font-size:14px; font-family:var(--font); padding:10px 13px; outline:none; resize:none; }
+    .modal-field input:focus,.modal-field select:focus,.modal-field textarea:focus { border-color:var(--accent); }
+    .modal-actions { display:flex; justify-content:flex-end; gap:10px; }
+    .modal-msg { font-size:13px; padding:8px 12px; border-radius:6px; display:none; }
+    .modal-msg.error   { background:rgba(237,66,69,.15); color:#ff7b7d; display:block; }
+    .modal-msg.success { background:rgba(35,165,90,.15);  color:#57f287;  display:block; }
+    #toast { position:fixed; bottom:24px; right:24px; background:var(--bg-3); color:var(--text-1); padding:12px 20px; border-radius:var(--radius); font-size:14px; font-weight:500; box-shadow:0 8px 24px rgba(0,0,0,.4); transform:translateY(80px); opacity:0; transition:transform .25s,opacity .25s; z-index:99999; max-width:320px; }
+    #toast.show { transform:translateY(0); opacity:1; }
+    #toast.success { border-left:4px solid var(--green); }
+    #toast.error   { border-left:4px solid var(--danger); }
+    .empty { text-align:center; padding:48px 24px; color:var(--text-3); }
+    .empty .empty-icon { font-size:40px; margin-bottom:12px; }
+    ::-webkit-scrollbar { width:6px; }
+    ::-webkit-scrollbar-thumb { background:var(--bg-3); border-radius:3px; }
+  </style>
+  <script src="nav.js"></script>
+</head>
+<body>
+
+<aside class="sidebar">
+  <div class="sidebar-header">🛡️ Admin Panel <span class="badge">ADMIN</span></div>
+  <div style="padding:8px 0">
+    <div class="nav-section">Management</div>
+    <button class="nav-item active" data-view="all"><span class="icon">👥</span> All Users</button>
+    <button class="nav-item" data-view="banned"><span class="icon">🚫</span> Banned Users</button>
+    <button class="nav-item" data-view="admin"><span class="icon">🛡️</span> Admins</button>
+  </div>
+  <div class="sidebar-bottom">
+    <div class="admin-avatar" id="sidebarAvatar">A</div>
+    <div class="admin-info">
+      <div class="admin-name" id="sidebarName">Admin</div>
+      <div class="admin-role">Administrator</div>
+    </div>
+  </div>
+</aside>
+
+<main class="main">
+  <div class="topbar">
+    <div class="topbar-title" id="viewTitle">👥 All Users</div>
+    <div class="topbar-actions">
+      <button class="btn-app" onclick="smoothNavigate('index.html', 'down')">🎮 Go to App</button>
+      <button class="btn btn-grey" onclick="logout()">⏏ Sign Out</button>
+    </div>
+  </div>
+  <div class="content">
+    <div class="stats-row">
+      <div class="stat-card"><div class="stat-icon">👥</div><div class="stat-label">Total Users</div><div class="stat-value" id="statTotal">—</div></div>
+      <div class="stat-card"><div class="stat-icon">🛡️</div><div class="stat-label">Admins</div><div class="stat-value" id="statAdmins">—</div></div>
+      <div class="stat-card"><div class="stat-icon">🚫</div><div class="stat-label">Banned</div><div class="stat-value" id="statBanned">—</div></div>
+      <div class="stat-card"><div class="stat-icon">⏱️</div><div class="stat-label">Timed Out</div><div class="stat-value" id="statTimedOut">—</div></div>
+    </div>
+    <div class="toolbar">
+      <div class="search-wrap">
+        <span class="search-icon">🔍</span>
+        <input type="text" id="searchInput" placeholder="Search users…" />
+      </div>
+      <select class="filter" id="filterSelect">
+        <option value="all">All Users</option>
+        <option value="admin">Admins Only</option>
+        <option value="banned">Banned</option>
+        <option value="active">Active</option>
+      </select>
+      <button class="btn btn-grey" onclick="loadUsers()">↻ Refresh</button>
+    </div>
+    <div class="table-wrap">
+      <table>
+        <thead><tr><th>User</th><th>Status</th><th>Role</th><th>Joined</th><th>Actions</th></tr></thead>
+        <tbody id="userTableBody"><tr><td colspan="5"><div class="empty"><div class="empty-icon">⏳</div><p>Loading…</p></div></td></tr></tbody>
+      </table>
+    </div>
+  </div>
+</main>
+
+<!-- Ban Modal -->
+<div class="modal-overlay" id="banModal">
+  <div class="modal">
+    <h3 id="banModalTitle">Ban / Timeout User</h3>
+    <p>This will prevent the user from logging in.</p>
+    <div class="modal-field"><label>Type</label>
+      <select id="banType">
+        <option value="permanent">Permanent Ban</option>
+        <option value="custom">Timeout (custom minutes)</option>
+      </select>
+    </div>
+    <div class="modal-field" id="customDurationWrap" style="display:none">
+      <label>Duration in minutes</label>
+      <input type="number" id="banDuration" placeholder="e.g. 60 = 1hr · 1440 = 1 day · 10080 = 1 week" min="1" />
+    </div>
+    <div class="modal-field"><label>Reason (optional)</label><textarea id="banReason" rows="3" placeholder="Why is this user being banned?"></textarea></div>
+    <div class="modal-msg" id="banModalMsg"></div>
+    <div class="modal-actions">
+      <button class="btn btn-grey" onclick="closeModal('banModal')">Cancel</button>
+      <button class="btn btn-danger" onclick="confirmBan()">Confirm</button>
+    </div>
+  </div>
+</div>
+
+<!-- Password Modal -->
+<div class="modal-overlay" id="passwordModal">
+  <div class="modal">
+    <h3>Reset Password</h3>
+    <p>Set a new password for <strong id="passwordModalUser"></strong>.</p>
+    <div class="modal-field"><label>New Password</label><input type="password" id="newPassword" placeholder="At least 6 characters" /></div>
+    <div class="modal-msg" id="passwordModalMsg"></div>
+    <div class="modal-actions">
+      <button class="btn btn-grey" onclick="closeModal('passwordModal')">Cancel</button>
+      <button class="btn btn-blue" onclick="confirmPasswordReset()">Reset</button>
+    </div>
+  </div>
+</div>
+
+<!-- Username Modal -->
+<div class="modal-overlay" id="usernameModal">
+  <div class="modal">
+    <h3>Change Username</h3>
+    <p>Changing username for <strong id="usernameModalUser"></strong>.</p>
+    <div class="modal-field"><label>New Username</label><input type="text" id="newUsername" placeholder="2–32 characters" /></div>
+    <div class="modal-msg" id="usernameModalMsg"></div>
+    <div class="modal-actions">
+      <button class="btn btn-grey" onclick="closeModal('usernameModal')">Cancel</button>
+      <button class="btn btn-blue" onclick="confirmUsernameChange()">Save</button>
+    </div>
+  </div>
+</div>
+
+<!-- Delete Modal -->
+<div class="modal-overlay" id="deleteModal">
+  <div class="modal">
+    <h3>Delete Account</h3>
+    <p>Permanently delete <strong id="deleteModalUser"></strong>? This cannot be undone.</p>
+    <div class="modal-msg" id="deleteModalMsg"></div>
+    <div class="modal-actions">
+      <button class="btn btn-grey" onclick="closeModal('deleteModal')">Cancel</button>
+      <button class="btn btn-danger" onclick="confirmDelete()">Delete</button>
+    </div>
+  </div>
+</div>
+
+<div id="toast"></div>
+
+<script>
+const AUTH_URL = "http://localhost:3001";
+const token = localStorage.getItem("vh_token") || sessionStorage.getItem("vh_token");
+if (!token) window.location.href = "login.html";
+
+let allUsers = [], currentUser = null, actionTarget = null;
+
+async function boot() {
+  try {
+    const res = await fetch(`${AUTH_URL}/me`, { headers: auth() });
+    const data = await res.json();
+    if (!res.ok || !data.isAdmin) { alert("Admin accounts only."); window.location.href = "index.html"; return; }
+    currentUser = data;
+    document.getElementById("sidebarName").textContent   = data.username;
+    document.getElementById("sidebarAvatar").textContent = data.username.slice(0,1).toUpperCase();
+  } catch { alert("Cannot connect to auth server."); window.location.href = "login.html"; return; }
+  await loadUsers();
+}
+
+function auth() { return { Authorization: `Bearer ${token}`, "Content-Type": "application/json" }; }
+
+async function loadUsers() {
+  try {
+    const res = await fetch(`${AUTH_URL}/admin/users`, { headers: auth() });
+    allUsers = await res.json();
+    updateStats(); renderTable();
+  } catch { showToast("Failed to load users", "error"); }
+}
+
+function updateStats() {
+  const now = new Date();
+  document.getElementById("statTotal").textContent    = allUsers.length;
+  document.getElementById("statAdmins").textContent   = allUsers.filter(u => u.is_admin).length;
+  document.getElementById("statBanned").textContent   = allUsers.filter(u => u.is_banned && !u.banned_until).length;
+  document.getElementById("statTimedOut").textContent = allUsers.filter(u => u.is_banned && u.banned_until && new Date(u.banned_until) > now).length;
+}
+
+function renderTable() {
+  const search = document.getElementById("searchInput").value.toLowerCase();
+  const filter = document.getElementById("filterSelect").value;
+  const now    = new Date();
+  const tbody  = document.getElementById("userTableBody");
+  let users = allUsers.filter(u => {
+    if (search && !u.username.toLowerCase().includes(search)) return false;
+    if (filter === "admin")  return u.is_admin;
+    if (filter === "banned") return u.is_banned;
+    if (filter === "active") return !u.is_banned;
+    return true;
+  });
+  if (!users.length) { tbody.innerHTML = `<tr><td colspan="5"><div class="empty"><div class="empty-icon">🔍</div><p>No users found</p></div></td></tr>`; return; }
+  tbody.innerHTML = users.map(u => {
+    const isBanned   = u.is_banned && (!u.banned_until || new Date(u.banned_until) > now);
+    const isTimedOut = u.is_banned && u.banned_until && new Date(u.banned_until) > now;
+    const isMe       = currentUser && u.id === currentUser.id;
+    const statusBadge = isBanned
+      ? (isTimedOut ? `<span class="badge badge-yellow">⏱ Timeout until ${new Date(u.banned_until).toLocaleDateString()}</span>` : `<span class="badge badge-red">🚫 Banned</span>`)
+      : `<span class="badge badge-green">✓ Active</span>`;
+    const roleBadge = u.is_admin ? `<span class="badge badge-blue">🛡 Admin</span>` : `<span class="badge badge-grey">User</span>`;
+    const avatarHtml = u.avatar_url ? `<img src="${u.avatar_url}" alt="${u.username}" />` : u.username.slice(0,1).toUpperCase();
+    const joined = new Date(u.created_at).toLocaleDateString("en-GB", { day:"numeric", month:"short", year:"numeric" });
+    const banBtn = isBanned
+      ? `<button class="btn btn-green" onclick="unbanUser(${u.id})">✓ Unban</button>`
+      : `<button class="btn btn-yellow" onclick="openBanModal(${u.id},'${u.username}')">⏱ Ban/Timeout</button>`;
+    return `<tr>
+      <td><div class="user-cell"><div class="user-cell-avatar">${avatarHtml}</div><div><div class="user-cell-name">${u.username}${isMe?" <span style='color:var(--text-3);font-size:11px'>(you)</span>":""}</div><div class="user-cell-id">ID #${u.id}</div></div></div></td>
+      <td>${statusBadge}${u.ban_reason?`<div style="font-size:11px;color:var(--text-3);margin-top:3px">${u.ban_reason}</div>`:""}</td>
+      <td>${roleBadge}</td>
+      <td style="color:var(--text-3);font-size:12px">${joined}</td>
+      <td><div class="actions">
+        <button class="btn btn-grey" onclick="openPasswordModal(${u.id},'${u.username}')">🔑 Reset PW</button>
+        <button class="btn btn-grey" onclick="openUsernameModal(${u.id},'${u.username}')">✏️ Rename</button>
+        ${banBtn}
+        ${isMe?"":u.is_admin?`<button class="btn btn-grey" onclick="toggleAdmin(${u.id},false)">Remove Admin</button>`:`<button class="btn btn-blue" onclick="toggleAdmin(${u.id},true)">Make Admin</button>`}
+        ${isMe?"":` <button class="btn btn-danger" onclick="openDeleteModal(${u.id},'${u.username}')">🗑 Delete</button>`}
+      </div></td>
+    </tr>`;
+  }).join("");
+}
+
+document.getElementById("searchInput").addEventListener("input", renderTable);
+document.getElementById("filterSelect").addEventListener("change", renderTable);
+
+document.querySelectorAll(".nav-item[data-view]").forEach(btn => {
+  btn.addEventListener("click", () => {
+    document.querySelectorAll(".nav-item").forEach(b => b.classList.remove("active"));
+    btn.classList.add("active");
+    const view = btn.dataset.view;
+    const titles = { all:"👥 All Users", banned:"🚫 Banned Users", admin:"🛡️ Admins" };
+    const filters = { all:"all", banned:"banned", admin:"admin" };
+    document.getElementById("viewTitle").textContent = titles[view];
+    document.getElementById("filterSelect").value = filters[view];
+    renderTable();
+  });
+});
+
+function openBanModal(id, username) {
+  actionTarget = { id, username };
+  document.getElementById("banModalTitle").textContent = `Ban / Timeout — ${username}`;
+  document.getElementById("banReason").value = "";
+  document.getElementById("banDuration").value = "";
+  document.getElementById("banType").value = "permanent";
+  document.getElementById("customDurationWrap").style.display = "none";
+  showModalMsg("banModalMsg","","");
+  openModal("banModal");
+}
+
+document.getElementById("banType").addEventListener("change", e => {
+  document.getElementById("customDurationWrap").style.display = e.target.value === "custom" ? "block" : "none";
+});
+
+async function confirmBan() {
+  const type = document.getElementById("banType").value;
+  const reason = document.getElementById("banReason").value.trim();
+  const duration = type === "custom" ? parseInt(document.getElementById("banDuration").value) : null;
+  if (type === "custom" && (!duration || duration < 1)) { showModalMsg("banModalMsg","Enter a valid duration in minutes.","error"); return; }
+  try {
+    const res = await fetch(`${AUTH_URL}/admin/users/${actionTarget.id}/ban`, { method:"PATCH", headers:auth(), body:JSON.stringify({ durationMinutes:duration, reason }) });
+    const data = await res.json();
+    if (!res.ok) { showModalMsg("banModalMsg", data.error, "error"); return; }
+    closeModal("banModal");
+    showToast(`${actionTarget.username} ${type==="custom"?"timed out":"banned"}`, "success");
+    await loadUsers();
+  } catch { showModalMsg("banModalMsg","Server error","error"); }
+}
+
+async function unbanUser(id) {
+  const user = allUsers.find(u => u.id === id);
+  try {
+    await fetch(`${AUTH_URL}/admin/users/${id}/unban`, { method:"PATCH", headers:auth() });
+    showToast(`${user?.username} unbanned`, "success");
+    await loadUsers();
+  } catch { showToast("Server error","error"); }
+}
+
+function openPasswordModal(id, username) {
+  actionTarget = { id, username };
+  document.getElementById("passwordModalUser").textContent = username;
+  document.getElementById("newPassword").value = "";
+  showModalMsg("passwordModalMsg","","");
+  openModal("passwordModal");
+}
+
+async function confirmPasswordReset() {
+  const newPassword = document.getElementById("newPassword").value;
+  if (!newPassword || newPassword.length < 6) { showModalMsg("passwordModalMsg","At least 6 characters.","error"); return; }
+  try {
+    const res = await fetch(`${AUTH_URL}/admin/users/${actionTarget.id}/password`, { method:"PATCH", headers:auth(), body:JSON.stringify({ newPassword }) });
+    const data = await res.json();
+    if (!res.ok) { showModalMsg("passwordModalMsg", data.error, "error"); return; }
+    closeModal("passwordModal");
+    showToast(`Password reset for ${actionTarget.username}`, "success");
+  } catch { showModalMsg("passwordModalMsg","Server error","error"); }
+}
+
+function openUsernameModal(id, username) {
+  actionTarget = { id, username };
+  document.getElementById("usernameModalUser").textContent = username;
+  document.getElementById("newUsername").value = username;
+  showModalMsg("usernameModalMsg","","");
+  openModal("usernameModal");
+}
+
+async function confirmUsernameChange() {
+  const newUsername = document.getElementById("newUsername").value.trim();
+  if (!newUsername || newUsername.length < 2 || newUsername.length > 32) { showModalMsg("usernameModalMsg","2–32 characters required.","error"); return; }
+  try {
+    const res = await fetch(`${AUTH_URL}/admin/users/${actionTarget.id}/username`, { method:"PATCH", headers:auth(), body:JSON.stringify({ newUsername }) });
+    const data = await res.json();
+    if (!res.ok) { showModalMsg("usernameModalMsg", data.error, "error"); return; }
+    closeModal("usernameModal");
+    showToast(`Username changed to ${newUsername}`, "success");
+    await loadUsers();
+  } catch { showModalMsg("usernameModalMsg","Server error","error"); }
+}
+
+function openDeleteModal(id, username) {
+  actionTarget = { id, username };
+  document.getElementById("deleteModalUser").textContent = username;
+  showModalMsg("deleteModalMsg","","");
+  openModal("deleteModal");
+}
+
+async function confirmDelete() {
+  try {
+    const res = await fetch(`${AUTH_URL}/admin/users/${actionTarget.id}`, { method:"DELETE", headers:auth() });
+    const data = await res.json();
+    if (!res.ok) { showModalMsg("deleteModalMsg", data.error, "error"); return; }
+    closeModal("deleteModal");
+    showToast(`${actionTarget.username} deleted`, "success");
+    await loadUsers();
+  } catch { showModalMsg("deleteModalMsg","Server error","error"); }
+}
+
+async function toggleAdmin(id, makeAdmin) {
+  const user = allUsers.find(u => u.id === id);
+  try {
+    await fetch(`${AUTH_URL}/admin/users/${id}/admin`, { method:"PATCH", headers:auth(), body:JSON.stringify({ isAdmin:makeAdmin }) });
+    showToast(`${user?.username} is ${makeAdmin?"now an admin":"no longer an admin"}`, "success");
+    await loadUsers();
+  } catch { showToast("Server error","error"); }
+}
+
+function logout() { localStorage.removeItem("vh_token"); sessionStorage.removeItem("vh_token"); smoothNavigate("login.html", "down"); }
+function openModal(id)  { document.getElementById(id).classList.add("open"); }
+function closeModal(id) { document.getElementById(id).classList.remove("open"); }
+function showModalMsg(elId, text, type) { const el = document.getElementById(elId); el.textContent = text; el.className = `modal-msg${type?" "+type:""}`; }
+document.querySelectorAll(".modal-overlay").forEach(o => o.addEventListener("click", e => { if (e.target===o) o.classList.remove("open"); }));
+let toastTimer;
+function showToast(msg, type="success") { const el=document.getElementById("toast"); el.textContent=msg; el.className=`show ${type}`; clearTimeout(toastTimer); toastTimer=setTimeout(()=>el.className="",3000); }
+
+boot();
+</script>
+</body>
+</html>

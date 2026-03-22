@@ -1,0 +1,20 @@
+Text chats 
+Notifications 
+Volume control of own MIC and others output
+Group chat 
+Group Calls
+GUI Improvements 
+Account creation
+Usernames with creation of unique userID's per account, but the users can't see the ID's it's just what the system uses to identify in the background 
+Nicknames in group chats 
+Media sharing - photos and videos over chat 
+Voice notes
+Settings save to account profile
+Password protected chats 
+Profile Photos 
+Profile Banners 
+A section of want to watch tv shows / movies that people can see provided by the user so people can have watch parties 
+Same thing as above for games
+Bio section in profile 
+hyperlinks for other socials on profile
+Profile Customisation like steam
