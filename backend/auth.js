@@ -1,9 +1,11 @@
-// v2 redeploy
+// v2 redeploy - FIXED with server startup
 const express = require('express');
 const bcrypt = require('bcrypt');
 const jwt = require('jsonwebtoken');
 const db = require('./db');
 const { Pool } = require('pg');
+const cors = require('cors');
+const bodyParser = require('body-parser');
 
 const router = express.Router();
 const pool = new Pool({
@@ -290,6 +292,27 @@ router.get('/messages/:userId/:friendId', async (req, res) => {
     console.error('Get messages error:', error);
     res.status(500).json({ error: 'Internal server error' });
   }
+});
+
+// ===== SERVER STARTUP (FIXED) =====
+const app = express();
+
+// Middleware
+app.use(cors());
+app.use(bodyParser.json());
+
+// Routes
+app.use('/auth', router);
+
+// Health check
+app.get('/', (req, res) => {
+  res.status(200).json({ message: 'Auth server is running' });
+});
+
+// Start server
+const PORT = process.env.PORT || 3000;
+app.listen(PORT, () => {
+  console.log(`✅ Auth server running on port ${PORT}`);
 });
 
 module.exports = router;
