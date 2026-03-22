@@ -5,13 +5,16 @@ require("dotenv").config();
 
 const { Pool } = require("pg");
 
-const pool = new Pool({
-  host:     process.env.PG_HOST     || "localhost",
-  port:     process.env.PG_PORT     || 5432,
-  database: process.env.PG_DB       || "discordclone",
-  user:     process.env.PG_USER     || "postgres",
-  password: process.env.PG_PASSWORD || "8AuqFFqdyde3pN7yXT9X",
-});
+// Use DATABASE_URL if available (Render), otherwise use individual variables
+const pool = new Pool(
+  process.env.DATABASE_URL ? { connectionString: process.env.DATABASE_URL } : {
+    host:     process.env.PG_HOST     || "localhost",
+    port:     process.env.PG_PORT     || 5432,
+    database: process.env.PG_DB       || "discordclone",
+    user:     process.env.PG_USER     || "postgres",
+    password: process.env.PG_PASSWORD || "8AuqFFqdyde3pN7yXT9X",
+  }
+);
 
 async function initDb() {
   // Users
