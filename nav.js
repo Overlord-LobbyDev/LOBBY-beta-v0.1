@@ -34,3 +34,18 @@ function smoothNavigate(page, direction = "fade") {
     }
   }, 150);
 }
+// Additional functions for UI interactions
+function showMyProfile() {
+  if (window._spSwitchCat) window._spSwitchCat("profile");
+  else if (window.openPanel) window.openPanel();
+}
+
+function _doInviteToServer() {
+  const serverId = window._selectedServerId;
+  if (!serverId) {
+    alert("Please select a server first");
+    return;
+  }
+  const invitePanel = document.getElementById("invitePanel");
+  if (invitePanel) invitePanel.style.display = "block";
+}

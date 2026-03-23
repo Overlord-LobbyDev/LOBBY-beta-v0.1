@@ -673,4 +673,18 @@
     spMsgTimers[id] = setTimeout(() => el.className = "sp-msg", 4000);
   }
 
+  // Expose functions globally for onclick handlers
+  window._spApplyTheme = (themeId) => {
+    const btn = document.querySelector(`[data-theme-btn="${themeId}"]`);
+    if (btn) btn.click();
+  };
+  window._spSwitchCat = (catId) => {
+    const btn = document.querySelector(`[data-sp="${catId}"]`);
+    if (btn) btn.click();
+  };
+  window.spSelect = (id) => {
+    const el = document.getElementById(id);
+    if (el && el.click) el.click();
+  };
+
 })();
