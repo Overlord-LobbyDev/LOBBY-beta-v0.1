@@ -224,6 +224,7 @@ async function initDb() {
     "ALTER TABLE servers ADD COLUMN IF NOT EXISTS banner_url   TEXT DEFAULT NULL",
     "ALTER TABLE servers ADD COLUMN IF NOT EXISTS tags         TEXT DEFAULT '[]'",
     "ALTER TABLE servers ADD COLUMN IF NOT EXISTS unique_id    TEXT DEFAULT NULL",
+    "ALTER TABLE server_members ADD COLUMN IF NOT EXISTS role  TEXT DEFAULT 'member'",
   ];
   for (const sql of alters) await pool.query(sql).catch(() => {});
 
