@@ -3533,11 +3533,9 @@ async function loadPendingServerInvites() {
 // ── WebSocket ─────────────────────────────────────────────────
 function connectWS() {
   const _t = localStorage.getItem("vh_token") || sessionStorage.getItem("vh_token");
-  console.log("🔌 Attempting WS connection to Render...");
   ws = new WebSocket(`wss://lobby-websocket-server.onrender.com?token=${encodeURIComponent(_t)}`);
-  ws.onopen = () => console.log("[ws] connected ✅");
-  ws.onerror = (err) => console.error("❌ WS Error:", err);
-  ws.onclose = () => { console.log("⏹️ WS closed, reconnecting in 3s..."); setTimeout(connectWS, 3000); };
+  ws.onopen = () => console.log("[ws] connected");
+  ws.onclose = () => setTimeout(connectWS, 3000);
   if (typeof initRTC === "function") initRTC();
   ws.onmessage = async ({ data }) => {
     const msg = JSON.parse(data);

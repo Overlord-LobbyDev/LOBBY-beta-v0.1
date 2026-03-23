@@ -214,7 +214,7 @@ app.get('/auth/public', async (req, res) => {
 // Get current user's friends (authenticated)
 app.get('/auth/friends', verifyToken, async (req, res) => {
   try {
-    const userId = req.user.id;
+    const userId = req.userId;
     const result = await pool.query(
       `SELECT u.id, u.username, u.avatar_url, u.status, u.banner_colour, u.is_private FROM friends f
        JOIN users u ON f.friend_id = u.id
