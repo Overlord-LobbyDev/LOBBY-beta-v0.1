@@ -7441,7 +7441,7 @@ async function handleMentionInput(input, postId) {
   drop.style.display = "block";
   drop.innerHTML = candidates.slice(0,6).map((u,i) => {
     const av = u.avatar ? `<img src="${u.avatar}" />` : u.username.slice(0,1).toUpperCase();
-    return `<div class="mention-option" onmousedown="insertMention('${u.username}','${input.id}','${commentId}')"}>
+    return `<div class="mention-option" onmousedown="insertMention('${u.username}','${input.id}','${commentId}')">
       <div class="mention-avatar">${av}</div>
       <span>@${u.username}</span>
     </div>`;
@@ -11268,7 +11268,7 @@ async function handleMentionInput(input, postId) {
   drop.style.display = "block";
   drop.innerHTML = candidates.slice(0,6).map((u,i) => {
     const av = u.avatar ? `<img src="${u.avatar}" />` : u.username.slice(0,1).toUpperCase();
-    return `<div class="mention-option" onmousedown="insertMention('${u.username}','${input.id}','${commentId}')"}>
+    return `<div class="mention-option" onmousedown="insertMention('${u.username}','${input.id}','${commentId}')">
       <div class="mention-avatar">${av}</div>
       <span>@${u.username}</span>
     </div>`;
