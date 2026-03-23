@@ -14990,6 +14990,258 @@ input.sp-slider::-webkit-slider-thumb:hover { transform: scale(1.2); }
   } else {
     init();
   }
+
+  // Missing UI functions from working version
+  window.toggleNotifPanel = function() {
+    notifPanelOpen = !notifPanelOpen;
+    const panel = document.getElementById("notifPanel");
+    const backdrop = document.getElementById("notifBackdrop");
+    if (notifPanelOpen) {
+      panel?.classList.remove("hidden");
+      if (backdrop) backdrop.style.display = "block";
+      renderNotifPanel();
+    } else {
+      closeNotifPanel();
+    }
+  };
+
+  window.closeNotifPanel = function() {
+    notifPanelOpen = false;
+    document.getElementById("notifPanel")?.classList.add("hidden");
+    const backdrop = document.getElementById("notifBackdrop");
+    if (backdrop) backdrop.style.display = "none";
+  };
+
+  window.clickNotif = function(id) {
+    const notifs = loadNotifs();
+    const n = notifs.find(x => x.id == id);
+    if (!n) return;
+    n.read = true;
+    saveNotifs(notifs);
+    renderNotifBadge();
+    document.getElementById(`notif-${id}`)?.classList.remove("unread");
+    document.getElementById(`notif-${id}`)?.querySelector(".notif-unread-dot")?.remove();
+  };
+
+  window.handleNotifAction = function(id, action, event) {
+    event.stopPropagation();
+    const notifs = loadNotifs();
+    const n = notifs.find(x => x.id == id);
+    if (n) { n.read = true; saveNotifs(notifs); renderNotifBadge(); }
+    const el = document.getElementById(`notif-${id}`);
+
+    if (action === "accept-friend" && n?.meta?.friendId) {
+      acceptFriend(n.meta.friendId);
+      el?.remove();
+    } else if (action === "decline-friend" && n?.meta?.friendId) {
+      declineFriend(n.meta.friendId);
+      el?.remove();
+    } else if (action === "accept-group" && n?.meta?.groupId) {
+      api(`/groups/${n.meta.groupId}/accept`, { method:"POST" }).then(() => {
+        showToast("Joined group!", "success"); el?.remove();
+      });
+    } else if (action === "decline-group" && n?.meta?.groupId) {
+      el?.remove();
+    } else if (action === "accept-server" && n?.meta?.serverId) {
+      const btn = event?.target;
+      if (btn) { btn.disabled = true; btn.textContent = "Joining…"; }
+      api(`/servers/${n.meta.serverId}/accept-invite`, { method:"POST" }).then(r => {
+        if (r.success) {
+          showToast("Joined server!", "success");
+          loadServers();
+          el?.remove();
+          const notifs = loadNotifs().filter(x => !(x.type === "server" && x.meta?.serverId === n.meta.serverId));
+          saveNotifs(notifs);
+          renderNotifBadge();
+        } else {
+          if (btn) { btn.disabled = false; btn.textContent = "Join"; }
+        }
+      }).catch(e => {
+        if (btn) { btn.disabled = false; btn.textContent = "Join"; }
+      });
+    }
+  };
+
+  window.switchFeedTab = function(tab) {
+    if (tab === feedTab) return;
+    feedTab = tab;
+    document.getElementById("feedTabFriends").classList.toggle("active", tab === "friends");
+    document.getElementById("feedTabPublic").classList.toggle("active", tab === "public");
+    document.getElementById("feedTabCommunities")?.classList.toggle("active", tab === "communities");
+
+    const composeBox = document.querySelector(".compose-box");
+    if (composeBox) {
+      if (tab === "communities") {
+        const isAdmin = (_allServers||[]).some(s =>
+          s.role === "owner" || s.myRole === "owner" ||
+          s.owner_id === feedMe?.id || s.created_by === feedMe?.id);
+        composeBox.style.display = isAdmin ? "" : "none";
+        if (!isAdmin) {
+          const notice = document.getElementById("communityTabNotice") || document.createElement("div");
+          notice.id = "communityTabNotice";
+          notice.style.cssText = "text-align:center;padding:12px 16px;font-size:12px;color:var(--text-3);background:var(--bg-1);border-top:1px solid rgba(255,255,255,.06)";
+          notice.innerHTML = "🏘 Only community admins can post here — follow communities by joining their servers";
+          document.getElementById("socialFeed").appendChild(notice);
+        }
+      } else {
+        composeBox.style.display = "";
+        document.getElementById("communityTabNotice")?.remove();
+      }
+    }
+
+    feedPage = 0; feedExhausted = false; feedLoadedIds.clear();
+    const container = document.getElementById("feedPosts");
+    container.innerHTML = `<div style="text-align:center;padding:40px;color:var(--text-3)">Loading…</div>`;
+    refreshFriendIds().then(() => loadFeed());
+  };
+
+  window.showDMPanel = async function() {
+    selectedServer = null;
+    clearAllNavIcons();
+    const mtBtn = document.getElementById("membersToggleBtn");
+    if (mtBtn) { mtBtn.style.display = "none"; }
+    document.getElementById("membersSidebar").classList.remove("open");
+    document.body.classList.remove("members-visible");
+    document.getElementById("dmServerIcon").classList.add("active");
+    document.getElementById("sidebarTitle").textContent = "Direct Messages"; setSidebarMode("dm");
+    document.getElementById("membersSidebar").classList.remove("open");
+    document.body.classList.remove("members-visible");
+    document.body.classList.remove("members-bar-open");
+    document.getElementById("chatMain").innerHTML = `<div class="empty-state"><div class="empty-icon">💬</div><h3>Your Messages</h3><p>Select a friend to start chatting</p></div>`;
+    const friends = await api("/friends");
+    const accepted = (friends || []).filter(f => f.status === "accepted");
+    const pending  = (friends || []).filter(f => f.status === "pending" && !f.is_sender);
+    const sent     = (friends || []).filter(f => f.status === "pending" && f.is_sender);
+    let html = "";
+    if (pending.length) {
+      html += `<div class="channel-section"><div class="channel-section-label">Friend Requests <span class="friend-req-badge">${pending.length}</span></div>`;
+      pending.forEach(f => {
+        const av = f.avatar_url ? `<img src="${f.avatar_url}" />` : f.username.slice(0,1).toUpperCase();
+        html += `<div class="friend-req-item"><div class="dm-avatar">${av}</div><span style="font-size:14px">${f.username}</span>
+          <div class="friend-req-actions">
+            <button class="small-btn small-btn-green" onclick="acceptFriend(${f.id})">✓</button>
+            <button class="small-btn small-btn-red" onclick="declineFriend(${f.id})">✕</button>
+          </div></div>`;
+      });
+      html += "</div>";
+    }
+    if (sent.length) {
+      html += `<div class="channel-section"><div class="channel-section-label">Pending</div>`;
+      sent.forEach(f => {
+        const av = f.avatar_url ? `<img src="${f.avatar_url}" />` : f.username.slice(0,1).toUpperCase();
+        html += `<div class="dm-item"><div class="dm-avatar">${av}</div><span>${f.username}</span><span style="font-size:11px;color:var(--text-3);margin-left:auto">Pending</span></div>`;
+      });
+      html += "</div>";
+    }
+    html += `<div class="channel-section"><div class="channel-section-label">Friends</div>`;
+    if (accepted.length) {
+      accepted.forEach(f => {
+        const isOnline = onlineUserIds.has(f.other_id);
+        const av = f.avatar_url ? `<img src="${f.avatar_url}" />` : f.username.slice(0,1).toUpperCase();
+        const dot = isOnline ? `<div class="online-dot"></div>` : "";
+        html += `<div class="dm-item" data-user-id="${f.other_id}" data-friend-id="${f.id}" data-username="${f.username}"
+          onclick="openDM(${f.other_id},'${f.username}','${f.avatar_url||''}')"
+          oncontextmenu="showFriendContextMenu(event,${f.id},'${f.username}',${f.other_id})">
+          <div class="dm-avatar">${av}${dot}</div>
+          <div style="flex:1;min-width:0">
+            <div style="display:flex;align-items:baseline;gap:6px;">
+              <div style="font-size:14px;font-weight:600">${f.username}</div>
+              <div style="font-size:10px;font-weight:700;color:var(--accent);opacity:.85;">${lobbyTagFromId(f.other_id)}</div>
+            </div>
+            <div style="font-size:11px;color:${isOnline?"var(--green)":"var(--text-3)"}">${isOnline?"● Online":"○ Offline"}</div>
+          </div></div>`;
+      });
+    } else {
+      html += `<div style="padding:12px;font-size:13px;color:var(--text-3)">No friends yet. Add one above!</div>`;
+    }
+    html += "</div>";
+    document.getElementById("channelSidebarContent").innerHTML = html;
+  };
+
+  window.showServersPanel = async function() {
+    selectedServer = null;
+    clearAllNavIcons();
+    document.getElementById("serversNavIcon").classList.add("active");
+    document.getElementById("sidebarTitle").textContent = "Servers"; setSidebarMode("servers");
+    setPageTitle("SERVERS 🎮");
+    document.getElementById("membersSidebar").classList.remove("open");
+    document.body.classList.remove("members-visible");
+    document.body.classList.remove("members-bar-open");
+    document.getElementById("chatMain").innerHTML = `<div class="empty-state"><div class="empty-icon">🎮</div><h3>Your Servers</h3><p>Select a server to join or create a new one</p></div>`;
+    
+    const servers = await api("/servers");
+    let html = `<div style="padding:12px;border-bottom:1px solid rgba(255,255,255,.05);margin-bottom:12px">
+      <button onclick="openModal('createServerModal')" style="width:100%;padding:8px 12px;background:var(--accent);color:white;border:none;border-radius:6px;font-size:14px;font-weight:600;cursor:pointer;transition:background .15s">
+        ➕ Create Server
+      </button>
+    </div>`;
+    
+    html += `<div class="channel-section"><div class="channel-section-label">Servers</div>`;
+    if (!servers?.length) {
+      html += `<div style="padding:12px;font-size:13px;color:var(--text-3)">No servers yet. Create one!</div>`;
+    } else {
+      servers.forEach(s => {
+        const icon = s.icon_url ? `<img src="${s.icon_url}" style="width:32px;height:32px;border-radius:50%;object-fit:cover;"/>` : s.name.slice(0,2).toUpperCase();
+        html += `<div class="dm-item" onclick="selectServer({id:${s.id},name:'${s.name.replace(/'/g,"\\'")}'})" style="cursor:pointer"><div class="dm-avatar" style="font-size:18px;display:flex;align-items:center;justify-content:center">${icon}</div>
+          <div style="flex:1;min-width:0"><div style="font-size:14px;font-weight:600">${s.name}</div><div style="font-size:11px;color:var(--text-3)">${s.member_count||0} members</div></div></div>`;
+      });
+    }
+    html += "</div>";
+    document.getElementById("channelSidebarContent").innerHTML = html;
+  };
+
+  window.showGroupsPanel = async function() {
+    selectedServer = null;
+    clearAllNavIcons();
+    document.getElementById("groupsNavIcon").classList.add("active");
+    document.getElementById("sidebarTitle").textContent = "Groups"; setSidebarMode("groups");
+    setPageTitle("GROUPS 👥");
+    document.getElementById("membersSidebar").classList.remove("open");
+    document.body.classList.remove("members-visible");
+    document.body.classList.remove("members-bar-open");
+    document.getElementById("chatMain").innerHTML = `<div class="empty-state"><div class="empty-icon">👥</div><h3>Your Groups</h3><p>Select a group to chat or start a call</p></div>`;
+    const groups = await api("/groups");
+    let html = `<div class="channel-section"><div class="channel-section-label">Groups <button class="channel-add" onclick="openCreateGroupModal()">+</button></div>`;
+    if (!groups?.length) {
+      html += `<div style="padding:12px;font-size:13px;color:var(--text-3)">No groups yet. Create one!</div>`;
+    } else {
+      groups.forEach(g => {
+        const icon = g.icon_url ? `<img src="${g.icon_url}" style="width:32px;height:32px;border-radius:50%;object-fit:cover"/>` : "👥";
+        html += `<div class="dm-item" onclick="openGroup(${g.id},'${g.name}')"><div class="dm-avatar" style="font-size:18px">${icon}</div>
+          <div style="flex:1;min-width:0"><div style="font-size:14px;font-weight:600">${g.name}</div><div style="font-size:11px;color:var(--text-3)">${g.member_count} members</div></div></div>`;
+      });
+    }
+    html += "</div>";
+    document.getElementById("channelSidebarContent").innerHTML = html;
+  };
+
+  window.showFriendsPanel = async function() {
+    clearAllNavIcons();
+    document.getElementById("friendsNavIcon").classList.add("active");
+    document.getElementById("sidebarTitle").textContent = "Friends"; setSidebarMode("friends");
+    setPageTitle("FRIENDS 👥");
+    const friends = await api("/friends");
+    const accepted = (friends || []).filter(f => f.status === "accepted");
+    let html = `<div style="padding:12px;border-bottom:1px solid rgba(255,255,255,.05);margin-bottom:12px">
+      <button onclick="openModal('addFriendsModal')" style="width:100%;padding:8px 12px;background:var(--accent);color:white;border:none;border-radius:6px;font-size:14px;font-weight:600;cursor:pointer;transition:background .15s">
+        ➕ Add Friends
+      </button>
+    </div>`;
+    html += `<div class="channel-section"><div class="channel-section-label">All Friends</div>`;
+    if (!accepted.length) {
+      html += `<div style="padding:12px;font-size:13px;color:var(--text-3)">No friends yet. Add some!</div>`;
+    } else {
+      accepted.forEach(f => {
+        const isOnline = onlineUserIds.has(f.other_id);
+        const av = f.avatar_url ? `<img src="${f.avatar_url}" />` : f.username.slice(0,1).toUpperCase();
+        const dot = isOnline ? `<div class="online-dot"></div>` : "";
+        html += `<div class="dm-item" onclick="openDM(${f.other_id},'${f.username}','${f.avatar_url||''}')"><div class="dm-avatar">${av}${dot}</div>
+          <div style="flex:1"><div style="font-size:14px;font-weight:600">${f.username}</div><div style="font-size:11px;color:var(--text-3)">${isOnline?"Online":"Offline"}</div></div></div>`;
+      });
+    }
+    html += "</div>";
+    document.getElementById("channelSidebarContent").innerHTML = html;
+  };
 })();
 </script>
 <script src="nav.js"></script>
