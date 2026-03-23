@@ -785,7 +785,7 @@
 <input type="file" id="fileInput" multiple accept="*/*" onchange="handleFileSelect()" />
 
 <script>
-const AUTH_URL = "http://lobby-auth-server.onrender.com";
+const AUTH_URL = "https://lobby-auth-server.onrender.com";
 const token    = localStorage.getItem("vh_token") || sessionStorage.getItem("vh_token");
 if (!token) window.location.href = "login.html";
 
@@ -828,7 +828,7 @@ async function boot() {
 
   // Load banner into user panel
   try {
-    const profile = await fetch(`http://lobby-auth-server.onrender.com/profile/${me.id}`, {
+    const profile = await fetch(`https://lobby-auth-server.onrender.com/profile/${me.id}`, {
       headers: { Authorization: `Bearer ${token}` }
     }).then(r => r.json());
     const bannerEl = document.getElementById("chatPanelBanner");
@@ -852,7 +852,7 @@ async function boot() {
 
 // ── WebSocket ─────────────────────────────────────────────────
 function connectWS() {
-  ws = new WebSocket(`ws://localhost:3000?token=${encodeURIComponent(token)}`);
+  ws = new WebSocket(`wss://lobby-websocket-server.onrender.com?token=${encodeURIComponent(token)}`);
   ws.onopen = () => console.log("[ws] connected");
   ws.onclose = () => setTimeout(connectWS, 3000); // auto-reconnect
   ws.onmessage = async ({ data }) => {

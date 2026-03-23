@@ -78,283 +78,205 @@
       margin-top: 4px;
     }
 
-    .tab-bar {
-      display: grid;
-      grid-template-columns: 1fr 1fr;
-      gap: 8px;
-      margin-bottom: 24px;
+    /* Tabs */
+    .tabs {
+      display: flex;
+      background: var(--bg-0);
+      border-radius: var(--radius);
+      padding: 4px;
+      margin-bottom: 28px;
+      gap: 4px;
     }
 
-    .tab-btn {
-      background: transparent;
+    .tab {
+      flex: 1;
+      padding: 9px;
       border: none;
-      color: var(--text-2);
-      font-size: 15px;
+      border-radius: 6px;
+      background: transparent;
+      color: var(--text-3);
+      font-size: 14px;
       font-weight: 600;
-      padding: 8px;
-      border-radius: 8px;
+      font-family: var(--font);
       cursor: pointer;
-      transition: all 0.2s;
+      transition: background .15s, color .15s;
     }
 
-    .tab-btn.active {
-      background: var(--bg-2);
+    .tab.active {
+      background: var(--bg-1);
       color: var(--text-1);
+      box-shadow: 0 1px 4px rgba(0,0,0,.3);
     }
 
-    .tab-btn:hover {
-      color: var(--text-1);
-    }
+    /* Form */
+    .form { display: flex; flex-direction: column; gap: 18px; }
+    .form.hidden { display: none; }
 
-    .form-group {
-      margin-bottom: 16px;
-    }
+    .field { display: flex; flex-direction: column; gap: 6px; }
 
     label {
-      display: block;
-      font-size: 13px;
+      font-size: 12px;
       font-weight: 700;
       text-transform: uppercase;
-      letter-spacing: 0.5px;
+      letter-spacing: .6px;
       color: var(--text-2);
-      margin-bottom: 6px;
     }
 
     input[type="text"],
-    input[type="email"],
-    input[type="password"],
-    input[type="file"] {
-      width: 100%;
-      background: var(--bg-2);
-      border: 1px solid var(--bg-3);
+    input[type="password"] {
+      background: var(--bg-0);
+      border: 1.5px solid rgba(255,255,255,.08);
+      border-radius: var(--radius);
       color: var(--text-1);
-      padding: 10px 12px;
-      border-radius: 6px;
       font-size: 15px;
-      font-family: inherit;
-      transition: all 0.2s;
-    }
-
-    input:focus {
+      font-family: var(--font);
+      padding: 11px 14px;
       outline: none;
-      border-color: var(--accent);
-      box-shadow: 0 0 0 2px rgba(88, 101, 242, 0.1);
+      transition: border-color .15s;
     }
 
-    input::placeholder {
-      color: var(--text-3);
+    input:focus { border-color: var(--accent); }
+
+    /* Avatar upload */
+    .avatar-upload {
+      display: flex;
+      align-items: center;
+      gap: 14px;
     }
 
-    .file-input-wrapper {
-      position: relative;
-      display: inline-block;
-      width: 100%;
-    }
-
-    .file-input-wrapper input[type="file"] {
-      display: none;
-    }
-
-    .file-input-label {
+    .avatar-preview {
+      width: 56px;
+      height: 56px;
+      border-radius: 50%;
+      background: var(--bg-3);
+      border: 2px dashed rgba(255,255,255,.15);
       display: flex;
       align-items: center;
       justify-content: center;
-      width: 100px;
-      height: 100px;
-      background: var(--bg-2);
-      border: 2px dashed var(--bg-3);
-      border-radius: 50%;
+      font-size: 24px;
+      overflow: hidden;
+      flex-shrink: 0;
       cursor: pointer;
-      font-size: 48px;
-      transition: all 0.2s;
+      transition: border-color .15s;
     }
 
-    .file-input-label:hover {
-      border-color: var(--accent);
-      background: rgba(88, 101, 242, 0.05);
-    }
+    .avatar-preview:hover { border-color: var(--accent); }
+    .avatar-preview img { width: 100%; height: 100%; object-fit: cover; }
 
-    .text-center {
-      text-align: center;
-      font-size: 13px;
-      color: var(--text-3);
-    }
-
-    .btn {
-      width: 100%;
-      background: var(--accent);
-      color: white;
-      border: none;
-      padding: 10px;
-      border-radius: 6px;
-      font-size: 15px;
-      font-weight: 600;
-      cursor: pointer;
-      transition: all 0.2s;
-    }
-
-    .btn:hover {
-      background: var(--accent-h);
-    }
-
-    .btn:disabled {
-      opacity: 0.6;
-      cursor: not-allowed;
-    }
-
-    .hidden {
-      display: none;
-    }
-
-    .message {
-      padding: 12px;
-      border-radius: 6px;
-      margin-bottom: 16px;
-      font-size: 14px;
-      font-weight: 500;
-    }
-
-    .message.success {
-      background: rgba(35, 165, 90, 0.15);
-      color: #23a55a;
-      border: 1px solid rgba(35, 165, 90, 0.3);
-    }
-
-    .message.error {
-      background: rgba(237, 66, 69, 0.15);
-      color: #ed4245;
-      border: 1px solid rgba(237, 66, 69, 0.3);
-    }
-
-    .divider {
-      text-align: center;
-      margin: 16px 0;
+    .avatar-hint {
       font-size: 12px;
       color: var(--text-3);
+      line-height: 1.5;
     }
 
-    .divider::before,
-    .divider::after {
-      content: "";
-      display: inline-block;
-      width: 40%;
-      height: 1px;
-      background: var(--bg-3);
-      vertical-align: middle;
-      margin: 0 8px;
-    }
+    #avatarInput { display: none; }
 
-    .oauth-button {
+    /* Submit button */
+    .submit-btn {
       width: 100%;
-      background: var(--bg-2);
-      color: var(--text-1);
-      border: 1px solid var(--bg-3);
-      padding: 10px;
-      border-radius: 6px;
+      padding: 13px;
+      background: var(--accent);
+      color: #fff;
+      border: none;
+      border-radius: var(--radius);
       font-size: 15px;
-      font-weight: 500;
+      font-weight: 700;
+      font-family: var(--font);
       cursor: pointer;
-      transition: all 0.2s;
-      margin-top: 8px;
+      transition: background .15s, transform .1s;
+      margin-top: 4px;
     }
 
-    .oauth-button:hover {
-      background: var(--bg-3);
-      border-color: var(--accent);
-    }
+    .submit-btn:hover { background: var(--accent-h); }
+    .submit-btn:active { transform: scale(.98); }
+    .submit-btn:disabled { opacity: .5; cursor: default; }
 
-    .checkbox-group {
+    /* Error / success messages */
+    .message {
+      font-size: 13px;
+      padding: 10px 14px;
+      border-radius: var(--radius);
+      display: none;
+    }
+    .message.error   { background: rgba(237,66,69,.15); color: #ff7b7d; display: block; }
+    .message.success { background: rgba(35,165,90,.15);  color: #57f287;  display: block; }
+
+    /* Remember me */
+    .remember {
       display: flex;
       align-items: center;
       gap: 8px;
-      margin-bottom: 16px;
-    }
-
-    input[type="checkbox"] {
+      font-size: 13px;
+      color: var(--text-2);
       cursor: pointer;
-      width: 18px;
-      height: 18px;
     }
 
-    .checkbox-group label {
-      margin: 0;
-      font-size: 14px;
-      text-transform: none;
-      letter-spacing: normal;
-      font-weight: 400;
+    .remember input { cursor: pointer; accent-color: var(--accent); width: 15px; height: 15px; }
+
+    .divider {
+      height: 1px;
+      background: rgba(255,255,255,.07);
+      margin: 4px 0;
     }
   </style>
+  <script src="nav.js"></script>
 </head>
 <body>
 <div class="card">
   <div class="logo">
-    <div class="logo-icon">🎙️</div>
+    <div class="logo-icon">🎮</div>
     <h1>VoiceHub</h1>
-    <p>Voice, video & chat</p>
+    <p>Voice, video &amp; chat</p>
   </div>
 
-  <div class="tab-bar">
-    <button id="loginTab" class="tab-btn active">Sign In</button>
-    <button id="registerTab" class="tab-btn">Create Account</button>
+  <div class="tabs">
+    <button class="tab active" id="loginTab">Sign In</button>
+    <button class="tab" id="registerTab">Create Account</button>
   </div>
 
-  <div id="loginMsg"></div>
-  <div id="registerMsg"></div>
-
-  <form id="loginForm">
-    <div class="form-group">
+  <!-- ── Login form ── -->
+  <form class="form" id="loginForm" autocomplete="on">
+    <div class="field">
       <label for="loginUsername">Username</label>
-      <input id="loginUsername" type="text" placeholder="Enter your username" />
+      <input type="text" id="loginUsername" placeholder="Enter your username" autocomplete="username" />
     </div>
-
-    <div class="form-group">
+    <div class="field">
       <label for="loginPassword">Password</label>
-      <input id="loginPassword" type="password" placeholder="Enter your password" />
+      <input type="password" id="loginPassword" placeholder="Enter your password" autocomplete="current-password" />
     </div>
-
-    <div class="checkbox-group">
-      <input id="rememberMe" type="checkbox" />
-      <label for="rememberMe">Remember me</label>
-    </div>
-
-    <button type="submit" class="btn">Sign In</button>
+    <label class="remember">
+      <input type="checkbox" id="rememberMe" checked />
+      Keep me signed in
+    </label>
+    <div class="message" id="loginMsg"></div>
+    <button type="submit" class="submit-btn" id="loginBtn">Sign In</button>
   </form>
 
-  <form id="registerForm" class="hidden">
-    <div class="form-group">
+  <!-- ── Register form ── -->
+  <form class="form hidden" id="registerForm" autocomplete="off">
+    <div class="field">
       <label for="regUsername">Username</label>
-      <input id="regUsername" type="text" placeholder="Choose a username" />
+      <input type="text" id="regUsername" placeholder="Choose a username (2–32 chars)" autocomplete="off" />
     </div>
-
-    <div class="form-group">
-      <label for="regEmail">Email</label>
-      <input id="regEmail" type="email" placeholder="Enter your email" />
-    </div>
-
-    <div class="form-group">
+    <div class="field">
       <label for="regPassword">Password</label>
-      <input id="regPassword" type="password" placeholder="Create a password" />
+      <input type="password" id="regPassword" placeholder="At least 6 characters" autocomplete="new-password" />
     </div>
-
-    <div class="form-group">
-      <label for="regConfirmPassword">Confirm Password</label>
-      <input id="regConfirmPassword" type="password" placeholder="Confirm your password" />
+    <div class="field">
+      <label for="regPassword2">Confirm Password</label>
+      <input type="password" id="regPassword2" placeholder="Repeat your password" autocomplete="new-password" />
     </div>
-
-    <div class="form-group">
-      <label>Profile Picture (optional)</label>
-      <div class="file-input-wrapper">
-        <input id="avatarInput" type="file" accept="image/*" />
-        <label for="avatarInput" class="file-input-label">😊</label>
-      </div>
-      <div class="text-center" style="margin-top: 8px;">
-        Click the circle to upload a photo.<br />
-        JPG, PNG, GIF or WebP · max 8 MB<br />
-        Animated GIFs supported!
+    <div class="divider"></div>
+    <div class="field">
+      <label>Profile Picture <span style="font-weight:400;text-transform:none;letter-spacing:0;color:var(--text-3)">(optional)</span></label>
+      <div class="avatar-upload">
+        <div class="avatar-preview" id="avatarPreview" title="Click to upload">🙂</div>
+        <div class="avatar-hint">Click the circle to upload a photo.<br>JPG, PNG, GIF or WebP · max 8 MB<br>Animated GIFs supported!</div>
+        <input type="file" id="avatarInput" accept="image/*" />
       </div>
     </div>
-
-    <button type="submit" class="btn">Create Account</button>
+    <div class="message" id="registerMsg"></div>
+    <button type="submit" class="submit-btn" id="registerBtn">Create Account</button>
   </form>
 </div>
 
@@ -367,8 +289,6 @@
     document.getElementById("registerTab").classList.remove("active");
     document.getElementById("loginForm").classList.remove("hidden");
     document.getElementById("registerForm").classList.add("hidden");
-    document.getElementById("loginMsg").textContent = "";
-    document.getElementById("registerMsg").textContent = "";
   });
 
   document.getElementById("registerTab").addEventListener("click", () => {
@@ -376,24 +296,56 @@
     document.getElementById("loginTab").classList.remove("active");
     document.getElementById("registerForm").classList.remove("hidden");
     document.getElementById("loginForm").classList.add("hidden");
-    document.getElementById("loginMsg").textContent = "";
-    document.getElementById("registerMsg").textContent = "";
   });
 
-  // ── Message display ────────────────────────────────────────
-  function showMsg(elementId, message, type) {
-    const el = document.getElementById(elementId);
-    el.textContent = message;
+  // ── Avatar preview ───────────────────────────────────────
+  const avatarPreview = document.getElementById("avatarPreview");
+  const avatarInput   = document.getElementById("avatarInput");
+  let avatarFile = null;
+
+  avatarPreview.addEventListener("click", () => avatarInput.click());
+  avatarInput.addEventListener("change", () => {
+    avatarFile = avatarInput.files[0];
+    if (!avatarFile) return;
+    const reader = new FileReader();
+    reader.onload = e => {
+      avatarPreview.innerHTML = `<img src="${e.target.result}" alt="avatar" />`;
+    };
+    reader.readAsDataURL(avatarFile);
+  });
+
+  // ── Helper: show message ─────────────────────────────────
+  function showMsg(elId, text, type) {
+    const el = document.getElementById(elId);
+    el.textContent = text;
     el.className = `message ${type}`;
   }
 
-  // ── Login handler ────────────────────────────────────────
-  document.getElementById("loginForm").addEventListener("submit", async (e) => {
+  // ── Persistent login check ───────────────────────────────
+  window.addEventListener("DOMContentLoaded", async () => {
+    const token = localStorage.getItem("vh_token");
+    if (!token) return;
+    try {
+      const res = await fetch(`${AUTH_URL}/me`, {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      if (res.ok) {
+        // Token still valid — go straight to app
+        const userData = await res.json();
+        launchApp(token, userData.isAdmin);
+      } else {
+        localStorage.removeItem("vh_token");
+      }
+    } catch { /* server not running yet */ }
+  });
+
+  // ── Login ────────────────────────────────────────────────
+  document.getElementById("loginForm").addEventListener("submit", async e => {
     e.preventDefault();
-    const username = document.getElementById("loginUsername").value;
+    const btn      = document.getElementById("loginBtn");
+    const username = document.getElementById("loginUsername").value.trim();
     const password = document.getElementById("loginPassword").value;
     const remember = document.getElementById("rememberMe").checked;
-    const btn = e.target.querySelector("button[type=submit]");
 
     if (!username || !password) return showMsg("loginMsg", "Please fill in all fields.", "error");
 
@@ -401,7 +353,7 @@
     btn.textContent = "Signing in…";
 
     try {
-      const res  = await fetch(`${AUTH_URL}/auth/login`, {
+      const res  = await fetch(`${AUTH_URL}/login`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ username, password })
@@ -426,31 +378,27 @@
     }
   });
 
-  // ── Register handler ────────────────────────────────────────
-  document.getElementById("registerForm").addEventListener("submit", async (e) => {
+  // ── Register ─────────────────────────────────────────────
+  document.getElementById("registerForm").addEventListener("submit", async e => {
     e.preventDefault();
-    const username = document.getElementById("regUsername").value;
-    const email = document.getElementById("regEmail").value;
-    const password = document.getElementById("regPassword").value;
-    const confirmPassword = document.getElementById("regConfirmPassword").value;
-    const btn = e.target.querySelector("button[type=submit]");
+    const btn   = document.getElementById("registerBtn");
+    const uname = document.getElementById("regUsername").value.trim();
+    const pass1 = document.getElementById("regPassword").value;
+    const pass2 = document.getElementById("regPassword2").value;
 
-    if (!username || !email || !password || !confirmPassword) {
-      return showMsg("registerMsg", "Please fill in all fields.", "error");
-    }
-
-    if (password !== confirmPassword) {
-      return showMsg("registerMsg", "Passwords do not match.", "error");
-    }
+    if (!uname || !pass1) return showMsg("registerMsg", "Please fill in all fields.", "error");
+    if (pass1 !== pass2)  return showMsg("registerMsg", "Passwords do not match.", "error");
+    if (pass1.length < 6) return showMsg("registerMsg", "Password must be at least 6 characters.", "error");
 
     btn.disabled = true;
-    btn.textContent = "Creating Account…";
+    btn.textContent = "Creating account…";
 
     try {
-      const res  = await fetch(`${AUTH_URL}/auth/register`, {
+      // 1. Register
+      const res  = await fetch(`${AUTH_URL}/register`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ username, email, password })
+        body: JSON.stringify({ username: uname, password: pass1 })
       });
       const data = await res.json();
 
@@ -461,8 +409,20 @@
         return;
       }
 
+      // 2. Upload avatar if one was chosen
+      if (avatarFile) {
+        const form = new FormData();
+        form.append("avatar", avatarFile);
+        await fetch(`${AUTH_URL}/avatar`, {
+          method: "POST",
+          headers: { Authorization: `Bearer ${data.token}` },
+          body: form
+        });
+      }
+
       localStorage.setItem("vh_token", data.token);
-      launchApp(data.token, data.user.isAdmin || false);
+      showMsg("registerMsg", "Account created! Launching…", "success");
+      setTimeout(() => launchApp(data.token, data.user.isAdmin), 800);
     } catch {
       showMsg("registerMsg", "Could not reach auth server. Is it running?", "error");
       btn.disabled = false;
@@ -470,33 +430,10 @@
     }
   });
 
-  // ── Avatar upload handler ────────────────────────────────────────
-  document.getElementById("avatarInput").addEventListener("change", async (e) => {
-    const file = e.target.files[0];
-    if (!file) return;
-
-    const maxSize = 8 * 1024 * 1024;
-    if (file.size > maxSize) {
-      return showMsg("registerMsg", "File is too large. Maximum 8 MB.", "error");
-    }
-
-    const formData = new FormData();
-    formData.append("avatar", file);
-
-    try {
-      await fetch(`${AUTH_URL}/auth/avatar`, {
-        method: "POST",
-        body: formData
-      });
-    } catch (err) {
-      console.error("Avatar upload error:", err);
-    }
-  });
-
-  // ── Launch app ────────────────────────────────────────
+  // ── Launch app (admin → admin panel, user → main app) ──────
   function launchApp(token, isAdmin) {
-    localStorage.setItem("vh_token", token);
-    window.location.href = "index.html";
+    sessionStorage.setItem("vh_token", token);
+    window.location.href = isAdmin ? "admin.html" : "index.html";
   }
 </script>
 </body>
