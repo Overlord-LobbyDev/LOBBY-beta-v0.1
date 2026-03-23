@@ -432,7 +432,7 @@
 
   // ── Launch app (admin → admin panel, user → main app) ──────
   function launchApp(token, isAdmin) {
-    sessionStorage.setItem("vh_token", token);
+    localStorage.setItem("vh_token", token);
     window.location.href = isAdmin ? "admin.html" : "index.html";
   }
 </script>
