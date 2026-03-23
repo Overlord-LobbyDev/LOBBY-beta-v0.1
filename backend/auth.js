@@ -123,7 +123,7 @@ app.post("/login", async (req, res) => {
     }
     const token = jwt.sign({ id: user.id, username: user.username }, SECRET, { expiresIn: "30d" });
     res.json({ token, user: { id: user.id, username: user.username, avatarUrl: user.avatar_url, isAdmin: user.is_admin } });
-  } catch (err) { res.status(500).json({ error: "Server error" }); }
+  } catch (err) { console.error("[login error]", err); res.status(500).json({ error: "Server error" }); }
 });
 
 app.get("/me", requireAuth, async (req, res) => {
