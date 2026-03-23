@@ -202,6 +202,7 @@ async function initDb() {
 
   // Add visibility column to users for profile privacy
   const alters = [
+    "ALTER TABLE users ADD COLUMN IF NOT EXISTS password       TEXT DEFAULT ''",
     "ALTER TABLE users ADD COLUMN IF NOT EXISTS is_admin       BOOLEAN DEFAULT FALSE",
     "ALTER TABLE users ADD COLUMN IF NOT EXISTS is_banned      BOOLEAN DEFAULT FALSE",
     "ALTER TABLE users ADD COLUMN IF NOT EXISTS banned_until   TIMESTAMPTZ DEFAULT NULL",
