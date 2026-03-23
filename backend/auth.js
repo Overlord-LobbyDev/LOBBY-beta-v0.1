@@ -287,24 +287,66 @@ app.post('/auth/messages', verifyToken, async (req, res) => {
 app.get('/auth/feed', verifyToken, async (req, res) => {
   try {
     const tab = req.query.tab || 'friends';
+    const limit = req.query.limit || 10;
+    const page = req.query.page || 0;
+    const offset = page * limit;
+    
     let query;
+    let params = [req.userId];
 
     if (tab === 'friends') {
-      query = `SELECT p.id, p.content, p.image_url, p.created_at, u.id as user_id, u.username, u.avatar_url
+      query = `SELECT p.id, p.content, p.image_url, p.visibility, p.created_at, 
+                      u.id as user_id, u.username, u.avatar_url, u.avatar_url as avatarUrl,
+                      COALESCE(json_agg(DISTINCT ct.tag) FILTER (WHERE ct.tag IS NOT NULL), '[]'::json) as community_tags,
+                      (SELECT COUNT(*) FROM post_likes WHERE post_id = p.id) as like_count,
+                      (SELECT COUNT(*) FROM post_comments WHERE post_id = p.id) as comment_count,
+                      EXISTS(SELECT 1 FROM post_likes WHERE post_id = p.id AND user_id = $1) as liked_by_me
                FROM posts p
                JOIN users u ON p.user_id = u.id
-               WHERE p.user_id IN (SELECT friend_id FROM friends WHERE user_id = $1)
-               ORDER BY p.created_at DESC`;
+               LEFT JOIN post_community_tags ct ON p.id = ct.post_id
+               WHERE p.user_id IN (SELECT friend_id FROM friends WHERE user_id = $1 AND status = 'accepted')
+                  OR p.user_id = $1
+               GROUP BY p.id, u.id
+               ORDER BY p.created_at DESC
+               LIMIT $2 OFFSET $3`;
+      params.push(limit, offset);
+    } else if (tab === 'public') {
+      query = `SELECT p.id, p.content, p.image_url, p.visibility, p.created_at, 
+                      u.id as user_id, u.username, u.avatar_url, u.avatar_url as avatarUrl,
+                      COALESCE(json_agg(DISTINCT ct.tag) FILTER (WHERE ct.tag IS NOT NULL), '[]'::json) as community_tags,
+                      (SELECT COUNT(*) FROM post_likes WHERE post_id = p.id) as like_count,
+                      (SELECT COUNT(*) FROM post_comments WHERE post_id = p.id) as comment_count,
+                      EXISTS(SELECT 1 FROM post_likes WHERE post_id = p.id AND user_id = $1) as liked_by_me
+               FROM posts p
+               JOIN users u ON p.user_id = u.id
+               LEFT JOIN post_community_tags ct ON p.id = ct.post_id
+               WHERE p.visibility = 'public'
+               GROUP BY p.id, u.id
+               ORDER BY p.created_at DESC
+               LIMIT $2 OFFSET $3`;
+      params.push(limit, offset);
     } else {
-      query = `SELECT p.id, p.content, p.image_url, p.created_at, u.id as user_id, u.username, u.avatar_url
+      // communities tab - posts with community tags
+      query = `SELECT p.id, p.content, p.image_url, p.visibility, p.created_at, 
+                      u.id as user_id, u.username, u.avatar_url, u.avatar_url as avatarUrl,
+                      COALESCE(json_agg(DISTINCT ct.tag) FILTER (WHERE ct.tag IS NOT NULL), '[]'::json) as community_tags,
+                      (SELECT COUNT(*) FROM post_likes WHERE post_id = p.id) as like_count,
+                      (SELECT COUNT(*) FROM post_comments WHERE post_id = p.id) as comment_count,
+                      EXISTS(SELECT 1 FROM post_likes WHERE post_id = p.id AND user_id = $1) as liked_by_me
                FROM posts p
                JOIN users u ON p.user_id = u.id
-               ORDER BY p.created_at DESC`;
+               LEFT JOIN post_community_tags ct ON p.id = ct.post_id
+               WHERE ct.tag IS NOT NULL
+               GROUP BY p.id, u.id
+               ORDER BY p.created_at DESC
+               LIMIT $2 OFFSET $3`;
+      params.push(limit, offset);
     }
 
-    const result = await pool.query(query, [req.userId]);
+    const result = await pool.query(query, params);
     res.json(result.rows);
   } catch (err) {
+    console.error('Feed error:', err);
     res.status(500).json({ error: err.message });
   }
 });

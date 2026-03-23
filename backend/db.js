@@ -18,6 +18,8 @@ async function initializeDatabase() {
     console.log('📊 Initializing database schema...');
     
     // Drop old tables if they exist (fresh start)
+    await pool.query(`DROP TABLE IF EXISTS post_comments CASCADE`);
+    await pool.query(`DROP TABLE IF EXISTS post_community_tags CASCADE`);
     await pool.query(`DROP TABLE IF EXISTS post_likes CASCADE`);
     await pool.query(`DROP TABLE IF EXISTS server_members CASCADE`);
     await pool.query(`DROP TABLE IF EXISTS messages CASCADE`);
@@ -63,6 +65,7 @@ async function initializeDatabase() {
         user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
         content TEXT NOT NULL,
         image_url TEXT,
+        visibility VARCHAR(20) DEFAULT 'public',
         created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
       )
     `);
@@ -88,6 +91,7 @@ async function initializeDatabase() {
         id SERIAL PRIMARY KEY,
         user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
         friend_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+        status VARCHAR(20) DEFAULT 'accepted',
         created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
         UNIQUE(user_id, friend_id)
       )
@@ -117,6 +121,29 @@ async function initializeDatabase() {
       )
     `);
     console.log('✅ post_likes table created');
+
+    // Create post_comments table
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS post_comments (
+        id SERIAL PRIMARY KEY,
+        post_id INTEGER NOT NULL REFERENCES posts(id) ON DELETE CASCADE,
+        user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+        content TEXT NOT NULL,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      )
+    `);
+    console.log('✅ post_comments table created');
+
+    // Create post_community_tags table
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS post_community_tags (
+        id SERIAL PRIMARY KEY,
+        post_id INTEGER NOT NULL REFERENCES posts(id) ON DELETE CASCADE,
+        tag VARCHAR(100) NOT NULL,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      )
+    `);
+    console.log('✅ post_community_tags table created');
 
     // Create server_members table
     await pool.query(`
