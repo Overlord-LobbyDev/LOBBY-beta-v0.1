@@ -17,17 +17,8 @@ async function initializeDatabase() {
   try {
     console.log('📊 Initializing database schema...');
     
-    // Drop old tables if they exist (fresh start)
-    await pool.query(`DROP TABLE IF EXISTS post_comments CASCADE`);
-    await pool.query(`DROP TABLE IF EXISTS post_community_tags CASCADE`);
-    await pool.query(`DROP TABLE IF EXISTS post_likes CASCADE`);
-    await pool.query(`DROP TABLE IF EXISTS server_members CASCADE`);
-    await pool.query(`DROP TABLE IF EXISTS messages CASCADE`);
-    await pool.query(`DROP TABLE IF EXISTS friends CASCADE`);
-    await pool.query(`DROP TABLE IF EXISTS posts CASCADE`);
-    await pool.query(`DROP TABLE IF EXISTS servers CASCADE`);
-    await pool.query(`DROP TABLE IF EXISTS steam_accounts CASCADE`);
-    await pool.query(`DROP TABLE IF EXISTS users CASCADE`);
+    // NOTE: NOT dropping tables - they persist across deployments
+    // Tables only created if they don't already exist
 
     // Create users table
     await pool.query(`
