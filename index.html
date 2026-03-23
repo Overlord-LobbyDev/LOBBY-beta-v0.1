@@ -3533,7 +3533,7 @@ async function loadPendingServerInvites() {
 // ── WebSocket ─────────────────────────────────────────────────
 function connectWS() {
   const _t = localStorage.getItem("vh_token") || sessionStorage.getItem("vh_token");
-  ws = new WebSocket(`ws://localhost:3000?token=${encodeURIComponent(_t)}`);
+  ws = new WebSocket(`wss://lobby-websocket-server.onrender.com?token=${encodeURIComponent(_t)}`);
   ws.onopen = () => console.log("[ws] connected");
   ws.onclose = () => setTimeout(connectWS, 3000);
   if (typeof initRTC === "function") initRTC();
