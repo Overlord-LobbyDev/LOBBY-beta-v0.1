@@ -11443,35 +11443,6 @@ async function submitComment(postId) {
   const btn=document.querySelector(`#post-${postId} .post-action-btn:nth-child(2) span`); if (btn) btn.textContent=parseInt(btn.textContent||0)+1;
 }
 
-async function deletePost(postId) {
-  if (!confirm("Delete this post?")) return;
-  await feedApi(`/posts/${postId}`,{ method:"DELETE" }); document.getElementById(`post-${postId}`)?.remove();
-}
-
-function sharePost(postId) { navigator.clipboard.writeText(`Posted on LOBBY — Post #${postId}`).then(()=>alert("Post link copied!")).catch(()=>{}); }
-
-setTimeout(() => {
-  if (ws) ws.addEventListener("message",({ data }) => {
-    try {
-      const msg = JSON.parse(data);
-      if (msg.type === "new-post" && msg.post) {
-        const container = document.getElementById("feedPosts");
-        if (!container) return;
-        const post = msg.post;
-        // PRIVACY: enforce same rules as loadFeed
-        if (feedTab === "public" && post.visibility !== "public") return;
-        if (feedTab === "friends") {
-          const isMe     = post.user_id === feedMe?.id;
-          const isFriend = feedFriendIds.has(post.user_id);
-          if (!isMe && !isFriend) return;
-        }
-        const empty = container.querySelector("[style*='padding:48px']");
-        if (empty) container.innerHTML = "";
-        container.insertAdjacentHTML("afterbegin", renderPost(post));
-      }
-    } catch {}
-  });
-}, 2000);
 
 // ── User panel & admin ────────────────────────────────────────
 async function loadUserPanel(userId) {

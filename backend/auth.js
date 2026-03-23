@@ -601,6 +601,35 @@ app.delete('/auth/posts/:postId/like', verifyToken, async (req, res) => {
   }
 });
 
+// ── Delete Post ──────────────────────────────────────────────────
+app.delete('/auth/posts/:postId', verifyToken, async (req, res) => {
+  try {
+    const { postId } = req.params;
+    const userId = req.userId;
+
+    // Check if post exists and user is the owner
+    const postCheck = await pool.query('SELECT user_id FROM posts WHERE id = $1', [postId]);
+    if (postCheck.rows.length === 0) {
+      return res.status(404).json({ error: 'Post not found' });
+    }
+
+    if (postCheck.rows[0].user_id !== userId) {
+      return res.status(403).json({ error: 'Unauthorized' });
+    }
+
+    // Delete associated likes and comments first
+    await pool.query('DELETE FROM post_likes WHERE post_id = $1', [postId]);
+    await pool.query('DELETE FROM post_comments WHERE post_id = $1', [postId]);
+
+    // Delete the post
+    await pool.query('DELETE FROM posts WHERE id = $1', [postId]);
+
+    res.json({ success: true });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
 // ── Comments ────────────────────────────────────────────────────
 app.post('/auth/posts/:postId/comments', verifyToken, async (req, res) => {
   try {
