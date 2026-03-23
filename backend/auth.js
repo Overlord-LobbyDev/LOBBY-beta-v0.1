@@ -178,7 +178,7 @@ app.post("/banner", requireAuth, (req, res) => {
   bannerUpload.single("banner")(req, res, async (err) => {
     if (err) return res.status(400).json({ error: err.message });
     if (!req.file) return res.status(400).json({ error: "No file uploaded" });
-    const bannerUrl = `http://localhost:${PORT}/avatars/${req.file.filename}`;
+    const bannerUrl = `https://lobby-auth-server.onrender.com/avatars/${req.file.filename}`;
     await pool.query("UPDATE users SET banner_url = $1 WHERE id = $2", [bannerUrl, req.userId]);
     res.json({ bannerUrl });
   });
@@ -1077,7 +1077,7 @@ app.post("/profile/:id/avatar", requireAuth, (req, res) => {
   avatarUpload.single("avatar")(req, res, async (err) => {
     if (err) return res.status(400).json({ error: err.message });
     if (!req.file) return res.status(400).json({ error: "No file uploaded" });
-    const avatarUrl = `http://localhost:${PORT}/avatars/${req.file.filename}`;
+    const avatarUrl = `https://lobby-auth-server.onrender.com/avatars/${req.file.filename}`;
     await pool.query("UPDATE users SET avatar_url = $1 WHERE id = $2", [avatarUrl, req.userId]);
     res.json({ avatar_url: avatarUrl });
   });
