@@ -1,12 +1,19 @@
 const express = require('express');
 const bcrypt = require('bcrypt');
 const jwt = require('jsonwebtoken');
+const cloudinary = require('cloudinary').v2;
 const multer = require('multer');
 const path = require('path');
-const fs = require('fs');
 
 // Import database pool
 const pool = require('./db');
+
+// Cloudinary configuration
+cloudinary.config({
+  cloud_name: process.env.CLOUDINARY_CLOUD_NAME,
+  api_key: process.env.CLOUDINARY_API_KEY,
+  api_secret: process.env.CLOUDINARY_API_SECRET
+});
 
 const app = express();
 const PORT = process.env.PORT || 3001;
@@ -15,17 +22,11 @@ const PORT = process.env.PORT || 3001;
 app.use(express.json());
 app.use(express.static(path.join(__dirname, 'public')));
 
-// Multer setup for file uploads
+// Multer setup for memory storage (files go to Cloudinary, not disk)
 const upload = multer({
-  dest: path.join(__dirname, 'uploads'),
+  storage: multer.memoryStorage(),
   limits: { fileSize: 5 * 1024 * 1024 } // 5MB max
 });
-
-// Ensure uploads directory exists
-const uploadsDir = path.join(__dirname, 'uploads');
-if (!fs.existsSync(uploadsDir)) {
-  fs.mkdirSync(uploadsDir, { recursive: true });
-}
 
 // JWT Secret
 const JWT_SECRET = process.env.JWT_SECRET || 'your-secret-key';
@@ -351,17 +352,35 @@ app.get('/auth/feed', verifyToken, async (req, res) => {
   }
 });
 
+// Helper function to upload to Cloudinary
+async function uploadToCloudinary(fileBuffer, folder) {
+  return new Promise((resolve, reject) => {
+    const uploadStream = cloudinary.uploader.upload_stream(
+      { folder: `lobby/${folder}` },
+      (error, result) => {
+        if (error) reject(error);
+        else resolve(result.secure_url);
+      }
+    );
+    uploadStream.end(fileBuffer);
+  });
+}
+
 // Create post
 app.post('/auth/posts', verifyToken, upload.single('image'), async (req, res) => {
   try {
     const { content } = req.body;
-    const imageUrl = req.file ? `/uploads/${req.file.filename}` : null;
+    let imageUrl = null;
 
-    const result = await pool.query(
+    if (req.file) {
+      imageUrl = await uploadToCloudinary(req.file.buffer, 'posts');
+    }
+
+    const dbResult = await pool.query(
       'INSERT INTO posts (user_id, content, image_url) VALUES ($1, $2, $3) RETURNING *',
       [req.userId, content, imageUrl]
     );
-    res.status(201).json(result.rows[0]);
+    res.status(201).json(dbResult.rows[0]);
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
@@ -438,7 +457,10 @@ app.post('/auth/servers', verifyToken, async (req, res) => {
 // Upload server banner
 app.post('/auth/servers/:id/banner', verifyToken, upload.single('banner'), async (req, res) => {
   try {
-    const bannerUrl = req.file ? `/uploads/${req.file.filename}` : null;
+    let bannerUrl = null;
+    if (req.file) {
+      bannerUrl = await uploadToCloudinary(req.file.buffer, 'servers');
+    }
     const result = await pool.query(
       'UPDATE servers SET banner_url = $1 WHERE id = $2 RETURNING *',
       [bannerUrl, req.params.id]
@@ -455,7 +477,10 @@ app.post('/auth/servers/:id/banner', verifyToken, upload.single('banner'), async
 // Upload server icon
 app.post('/auth/servers/:id/icon', verifyToken, upload.single('icon'), async (req, res) => {
   try {
-    const iconUrl = req.file ? `/uploads/${req.file.filename}` : null;
+    let iconUrl = null;
+    if (req.file) {
+      iconUrl = await uploadToCloudinary(req.file.buffer, 'servers');
+    }
     const result = await pool.query(
       'UPDATE servers SET icon_url = $1 WHERE id = $2 RETURNING *',
       [iconUrl, req.params.id]
@@ -474,7 +499,10 @@ app.post('/auth/servers/:id/icon', verifyToken, upload.single('icon'), async (re
 // Upload avatar
 app.post('/auth/avatar', verifyToken, upload.single('avatar'), async (req, res) => {
   try {
-    const avatarUrl = req.file ? `/uploads/${req.file.filename}` : null;
+    let avatarUrl = null;
+    if (req.file) {
+      avatarUrl = await uploadToCloudinary(req.file.buffer, 'avatars');
+    }
     const result = await pool.query(
       'UPDATE users SET avatar_url = $1 WHERE id = $2 RETURNING *',
       [avatarUrl, req.userId]
@@ -488,7 +516,10 @@ app.post('/auth/avatar', verifyToken, upload.single('avatar'), async (req, res) 
 // Upload banner
 app.post('/auth/banner', verifyToken, upload.single('banner'), async (req, res) => {
   try {
-    const bannerUrl = req.file ? `/uploads/${req.file.filename}` : null;
+    let bannerUrl = null;
+    if (req.file) {
+      bannerUrl = await uploadToCloudinary(req.file.buffer, 'banners');
+    }
     const result = await pool.query(
       'UPDATE users SET banner_url = $1 WHERE id = $2 RETURNING *',
       [bannerUrl, req.userId]
@@ -505,7 +536,8 @@ app.post('/auth/upload', verifyToken, upload.single('file'), async (req, res) =>
     if (!req.file) {
       return res.status(400).json({ error: 'No file uploaded' });
     }
-    res.json({ url: `/uploads/${req.file.filename}`, filename: req.file.filename });
+    const url = await uploadToCloudinary(req.file.buffer, 'files');
+    res.json({ url: url, filename: req.file.originalname });
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
