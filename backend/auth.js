@@ -12,6 +12,28 @@ const multer   = require("multer");
 const path     = require("path");
 const fs       = require("fs");
 const { pool, initDb } = require("./db");
+const cloudinary = require("cloudinary").v2;
+
+// Cloudinary configuration
+cloudinary.config({
+  cloud_name: process.env.CLOUDINARY_CLOUD_NAME,
+  api_key: process.env.CLOUDINARY_API_KEY,
+  api_secret: process.env.CLOUDINARY_API_SECRET
+});
+
+// Helper to upload files to Cloudinary
+const uploadToCloudinary = async (buffer, publicId, folder) => {
+  return new Promise((resolve, reject) => {
+    const stream = cloudinary.uploader.upload_stream(
+      { public_id: publicId, folder },
+      (error, result) => {
+        if (error) reject(error);
+        else resolve(result.secure_url);
+      }
+    );
+    stream.end(buffer);
+  });
+};
 
 const app         = express();
 const PORT        = 3001;
@@ -19,44 +41,34 @@ const SECRET      = process.env.JWT_SECRET || "change-this-secret-in-production"
 const SALT_ROUNDS = 12;
 const STEAM_KEY   = process.env.STEAM_API_KEY || "";
 
-const cloudinary = require("cloudinary").v2;
-cloudinary.config({
-  cloud_name: process.env.CLOUDINARY_CLOUD_NAME,
-  api_key: process.env.CLOUDINARY_API_KEY,
-  api_secret: process.env.CLOUDINARY_API_SECRET
-});
-
-// Helper function to upload files to Cloudinary
-async function uploadToCloudinary(buffer, filename, folder) {
-  return new Promise((resolve, reject) => {
-    const upload_stream = cloudinary.uploader.upload_stream(
-      { folder: `lobby/${folder}`, public_id: filename, resource_type: "auto" },
-      (error, result) => {
-        if (error) reject(error);
-        else resolve(result.secure_url);
-      }
-    );
-    upload_stream.end(buffer);
-  });
-}
-
 // ── Middleware ───────────────────────────────────────────────
 app.use(cors({ origin: "*" }));
 app.use(express.json());
 
-// Multer with memory storage for Cloudinary
-const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 100 * 1024 * 1024 } });
-
+// Static file serving
+const AVATAR_DIR     = path.join(__dirname, "avatars");
+const UPLOAD_DIR     = path.join(__dirname, "uploads");
+const SERVER_ICON_DIR = path.join(__dirname, "server_icons");
+[AVATAR_DIR, UPLOAD_DIR, SERVER_ICON_DIR].forEach(d => { if (!fs.existsSync(d)) fs.mkdirSync(d); });
+app.use("/avatars",      express.static(AVATAR_DIR));
 app.use("/uploads",      express.static(UPLOAD_DIR));
 app.use("/server_icons", express.static(SERVER_ICON_DIR));
 
 // Multer configs
-,
+const avatarUpload = multer({
+  storage: multer.diskStorage({
+    destination: AVATAR_DIR,
+    filename: (req, file, cb) => cb(null, `${req.userId}${path.extname(file.originalname).toLowerCase()}`)
+  }),
   limits: { fileSize: 50 * 1024 * 1024 },
   fileFilter: (req, file, cb) => cb(null, /image\//.test(file.mimetype))
 });
 
-,
+const serverIconUpload = multer({
+  storage: multer.diskStorage({
+    destination: SERVER_ICON_DIR,
+    filename: (req, file, cb) => cb(null, `${Date.now()}${path.extname(file.originalname).toLowerCase()}`)
+  }),
   limits: { fileSize: 100 * 1024 * 1024 },
   fileFilter: (req, file, cb) => cb(null, /image\/|video\//.test(file.mimetype))
 });
@@ -188,7 +200,7 @@ app.post("/banner", requireAuth, (req, res) => {
   bannerUpload.single("banner")(req, res, async (err) => {
     if (err) return res.status(400).json({ error: err.message });
     if (!req.file) return res.status(400).json({ error: "No file uploaded" });
-    const bannerUrl = await uploadToCloudinary(req.file.buffer, `${req.userId}-banner`, 'avatars');
+    const bannerUrl = await uploadToCloudinary(req.file.buffer, `${req.userId}-banner`, 'banners');
     await pool.query("UPDATE users SET banner_url = $1 WHERE id = $2", [bannerUrl, req.userId]);
     res.json({ bannerUrl });
   });
@@ -405,7 +417,7 @@ app.post("/servers/:id/icon", requireAuth, (req, res) => {
   serverIconUpload.single("icon")(req, res, async (err) => {
     if (err) return res.status(400).json({ error: err.message });
     if (!req.file) return res.status(400).json({ error: "No file uploaded" });
-    const iconUrl = await uploadToCloudinary(req.file.buffer, `${Date.now()}-icon`, 'server_icons');
+    const iconUrl = await uploadToCloudinary(req.file.buffer, `server-${serverId}-icon`, 'server_icons');
     await pool.query("UPDATE servers SET icon_url = $1 WHERE id = $2 AND owner_id = $3", [iconUrl, req.params.id, req.userId]);
     res.json({ iconUrl });
   });
@@ -439,11 +451,11 @@ app.patch("/servers/:id", requireAuth, (req, res) => {
       updates.push(`tags = $${idx++}`); values.push(tags);
     }
     if (req.files?.banner?.[0]) {
-      const url = await uploadToCloudinary(req.files.banner[0].buffer, `${Date.now()}-banner`, 'server_icons');
+      const url = await uploadToCloudinary(req.files.banner[0].buffer, `server-${serverId}-banner`, 'server_banners');
       updates.push(`banner_url = $${idx++}`); values.push(url);
     }
     if (req.files?.icon?.[0]) {
-      const url = await uploadToCloudinary(req.files.icon[0].buffer, `${Date.now()}-icon`, 'server_icons');
+      const url = await uploadToCloudinary(req.files.icon[0].buffer, `server-${serverId}-icon`, 'server_icons');
       updates.push(`icon_url = $${idx++}`); values.push(url);
     }
     if (!updates.length) return res.json({ success: true });
@@ -461,7 +473,7 @@ app.post("/servers/:id/banner", requireAuth, (req, res) => {
   serverPatchUpload.single("banner")(req, res, async (err) => {
     if (err) return res.status(400).json({ error: err.message });
     if (!req.file) return res.status(400).json({ error: "No file uploaded" });
-    const bannerUrl = await uploadToCloudinary(req.file.buffer, `${Date.now()}-banner`, 'server_icons');
+    const bannerUrl = await uploadToCloudinary(req.file.buffer, `server-${serverId}-banner`, 'server_banners');
     await pool.query("UPDATE servers SET banner_url = $1 WHERE id = $2 AND owner_id = $3", [bannerUrl, req.params.id, req.userId]);
     res.json({ bannerUrl });
   });
@@ -707,7 +719,7 @@ app.post("/upload", requireAuth, (req, res) => {
   attachmentUpload.single("file")(req, res, async (err) => {
     if (err) return res.status(400).json({ error: err.message });
     if (!req.file) return res.status(400).json({ error: "No file" });
-    const url = await uploadToCloudinary(req.file.buffer, `${Date.now()}-upload`, 'uploads');
+    const url = await uploadToCloudinary(req.file.buffer, `upload-${Date.now()}`, 'uploads');
     res.json({
       url,
       filename:  req.file.originalname,
@@ -932,7 +944,7 @@ app.post("/posts", requireAuth, (req, res) => {
     const communityTags = req.body.community_tags ? JSON.parse(req.body.community_tags) : [];
     if (!content.trim() && !req.file) return res.status(400).json({ error: "Post needs content or an image" });
     if (content.length > 255) return res.status(400).json({ error: "Post must be 255 characters or less" });
-    const imageUrl = req.file ? await uploadToCloudinary(req.file.buffer, `${Date.now()}-image`, 'uploads') : null;
+    const imageUrl = req.file ? await uploadToCloudinary(req.file.buffer, `post-${Date.now()}`, 'posts') : null;
     const r = await pool.query(
       "INSERT INTO posts (user_id, content, image_url, visibility, community_tags) VALUES ($1,$2,$3,$4,$5) RETURNING *",
       [req.userId, content, imageUrl, visibility, JSON.stringify(communityTags)]
@@ -1099,7 +1111,7 @@ app.post("/profile/:id/banner", requireAuth, (req, res) => {
   bannerUpload.single("banner")(req, res, async (err) => {
     if (err) return res.status(400).json({ error: err.message });
     if (!req.file) return res.status(400).json({ error: "No file uploaded" });
-    const bannerUrl = await uploadToCloudinary(req.file.buffer, `${req.userId}-banner`, 'avatars');
+    const bannerUrl = await uploadToCloudinary(req.file.buffer, `${req.userId}-banner`, 'banners');
     await pool.query("UPDATE users SET banner_url = $1 WHERE id = $2", [bannerUrl, req.userId]);
     res.json({ banner_url: bannerUrl });
   });
@@ -1296,5 +1308,5 @@ app.get("/steam/recent", requireAuth, async (req, res) => {
 
 // ── Start ────────────────────────────────────────────────────
 initDb().then(() => {
-  app.listen(PORT, () => console.log(`[auth] HTTP server on Render (https://lobby-auth-server.onrender.com)`));
+  app.listen(PORT, () => console.log(`[auth] HTTP server on http://localhost:${PORT}`));
 });
