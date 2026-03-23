@@ -250,6 +250,61 @@ app.post('/auth/friends/remove', verifyToken, async (req, res) => {
   }
 });
 
+// ============ FRIEND INVITES/REQUESTS ============
+
+// Send friend request (creates pending friendship)
+app.post('/auth/friends/request', verifyToken, async (req, res) => {
+  const { friendId } = req.body;
+  if (!friendId || friendId === req.userId) return res.status(400).json({ error: 'Invalid user' });
+  try {
+    await pool.query(
+      "INSERT INTO friends (user_id, friend_id, status) VALUES ($1, $2, 'pending') ON CONFLICT DO NOTHING",
+      [req.userId, friendId]
+    );
+    res.json({ success: true });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// Accept friend request
+app.patch('/auth/friends/:id/accept', verifyToken, async (req, res) => {
+  try {
+    await pool.query(
+      "UPDATE friends SET status = 'accepted' WHERE id = $1 AND friend_id = $2",
+      [req.params.id, req.userId]
+    );
+    res.json({ success: true });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// Decline friend request
+app.patch('/auth/friends/:id/decline', verifyToken, async (req, res) => {
+  try {
+    await pool.query('DELETE FROM friends WHERE id = $1 AND friend_id = $2', [req.params.id, req.userId]);
+    res.json({ success: true });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// Block user
+app.post('/auth/friends/block', verifyToken, async (req, res) => {
+  const { blockId } = req.body;
+  try {
+    await pool.query(
+      `INSERT INTO friends (user_id, friend_id, status) VALUES ($1, $2, 'blocked')
+       ON CONFLICT (user_id, friend_id) DO UPDATE SET status = 'blocked'`,
+      [req.userId, blockId]
+    );
+    res.json({ success: true });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
 // ============ MESSAGES ============
 
 // Get messages with a friend
@@ -581,6 +636,98 @@ app.get('/auth/servers/:serverId/members', async (req, res) => {
     res.json({ success: true, members: result.rows, count: result.rows.length });
   } catch (err) {
     res.status(500).json({ error: err.message });
+  }
+});
+
+// ============ SERVER INVITES ============
+
+// Get all pending server invites for logged-in user
+app.get('/auth/me/invites', verifyToken, async (req, res) => {
+  try {
+    const r = await pool.query(`
+      SELECT si.id, si.server_id, si.created_at,
+             s.name AS server_name, s.icon_url AS server_icon,
+             u.username AS inviter_username, u.id AS inviter_id,
+             u.avatar_url AS inviter_avatar
+      FROM server_invites si
+      JOIN servers s ON s.id = si.server_id
+      JOIN users u ON u.id = si.inviter_id
+      WHERE si.invitee_id = $1
+      ORDER BY si.created_at DESC
+    `, [req.userId]);
+    res.json(r.rows);
+  } catch (e) {
+    console.error('[/me/invites]', e.message);
+    res.status(500).json({ error: 'Server error' });
+  }
+});
+
+// Invite user to server
+app.post('/auth/servers/:id/invite', verifyToken, async (req, res) => {
+  const { userId } = req.body;
+  if (!userId) return res.status(400).json({ error: 'userId required' });
+  try {
+    // Inviter must be a member of the server
+    const membership = await pool.query(
+      'SELECT 1 FROM server_members WHERE server_id = $1 AND user_id = $2',
+      [req.params.id, req.userId]
+    );
+    if (!membership.rows.length) return res.status(403).json({ error: 'You are not in this server' });
+
+    // Don't invite someone already in the server
+    const already = await pool.query(
+      'SELECT 1 FROM server_members WHERE server_id = $1 AND user_id = $2',
+      [req.params.id, userId]
+    );
+    if (already.rows.length) return res.status(409).json({ error: 'User is already in this server' });
+
+    // Store as a pending invite — recipient must accept
+    await pool.query(
+      'INSERT INTO server_invites (server_id, inviter_id, invitee_id) VALUES ($1, $2, $3) ON CONFLICT (server_id, invitee_id) DO NOTHING',
+      [req.params.id, req.userId, userId]
+    );
+    res.json({ success: true });
+  } catch (e) {
+    console.error('[/servers/invite]', e.message);
+    res.status(500).json({ error: 'Server error' });
+  }
+});
+
+// Accept server invite
+app.post('/auth/servers/:id/accept-invite', verifyToken, async (req, res) => {
+  try {
+    const invite = await pool.query(
+      'SELECT id FROM server_invites WHERE server_id = $1 AND invitee_id = $2',
+      [req.params.id, req.userId]
+    );
+    if (!invite.rows.length) return res.status(404).json({ error: 'No pending invite found' });
+
+    await pool.query(
+      "INSERT INTO server_members (server_id, user_id, role) VALUES ($1, $2, 'member') ON CONFLICT DO NOTHING",
+      [req.params.id, req.userId]
+    );
+    await pool.query(
+      'DELETE FROM server_invites WHERE server_id = $1 AND invitee_id = $2',
+      [req.params.id, req.userId]
+    );
+    res.json({ success: true });
+  } catch (e) {
+    console.error('[/servers/accept-invite]', e.message);
+    res.status(500).json({ error: 'Server error' });
+  }
+});
+
+// Decline server invite
+app.post('/auth/servers/:id/decline-invite', verifyToken, async (req, res) => {
+  try {
+    await pool.query(
+      'DELETE FROM server_invites WHERE server_id = $1 AND invitee_id = $2',
+      [req.params.id, req.userId]
+    );
+    res.json({ success: true });
+  } catch (e) {
+    console.error('[/servers/decline-invite]', e.message);
+    res.status(500).json({ error: 'Server error' });
   }
 });
 
