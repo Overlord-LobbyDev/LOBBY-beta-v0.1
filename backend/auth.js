@@ -257,11 +257,12 @@ app.post('/auth/friends/request', verifyToken, async (req, res) => {
   const { friendId } = req.body;
   if (!friendId || friendId === req.userId) return res.status(400).json({ error: 'Invalid user' });
   try {
-    await pool.query(
-      "INSERT INTO friends (user_id, friend_id, status) VALUES ($1, $2, 'pending') ON CONFLICT DO NOTHING",
+    const result = await pool.query(
+      "INSERT INTO friends (user_id, friend_id, status) VALUES ($1, $2, 'pending') ON CONFLICT DO NOTHING RETURNING id",
       [req.userId, friendId]
     );
-    res.json({ success: true });
+    const friendRequestId = result.rows[0]?.id;
+    res.json({ success: true, id: friendRequestId });
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
@@ -682,11 +683,12 @@ app.post('/auth/servers/:id/invite', verifyToken, async (req, res) => {
     if (already.rows.length) return res.status(409).json({ error: 'User is already in this server' });
 
     // Store as a pending invite — recipient must accept
-    await pool.query(
-      'INSERT INTO server_invites (server_id, inviter_id, invitee_id) VALUES ($1, $2, $3) ON CONFLICT (server_id, invitee_id) DO NOTHING',
+    const inviteResult = await pool.query(
+      'INSERT INTO server_invites (server_id, inviter_id, invitee_id) VALUES ($1, $2, $3) ON CONFLICT (server_id, invitee_id) DO NOTHING RETURNING id',
       [req.params.id, req.userId, userId]
     );
-    res.json({ success: true });
+    const inviteId = inviteResult.rows[0]?.id;
+    res.json({ success: true, id: inviteId });
   } catch (e) {
     console.error('[/servers/invite]', e.message);
     res.status(500).json({ error: 'Server error' });
