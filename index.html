@@ -7325,12 +7325,25 @@ document.getElementById("postBtn").addEventListener("click", async () => {
 });
 
 async function toggleLike(postId, btn) {
-  const r=await feedApi(`/posts/${postId}/like`,{ method:"POST" });
-  const countEl=btn.querySelector(".like-count"); const current=parseInt(countEl.textContent)||0;
-  const hFilled=`<svg width="15" height="15" viewBox="0 0 24 24" fill="currentColor" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"/></svg>`;
-  const hEmpty=`<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"/></svg>`;
-  if (r.liked) { btn.innerHTML=`${hFilled} <span class="like-count">${current+1}</span>`; btn.classList.add("liked"); }
-  else { btn.innerHTML=`${hEmpty} <span class="like-count">${Math.max(0,current-1)}</span>`; btn.classList.remove("liked"); }
+  const isLiked = btn.classList.contains("liked");
+  const method = isLiked ? "DELETE" : "POST";
+  const r = await feedApi(`/posts/${postId}/like`, { method });
+  
+  const countEl = btn.querySelector(".like-count");
+  const current = parseInt(countEl?.textContent) || 0;
+  
+  const hFilled = `<svg width="15" height="15" viewBox="0 0 24 24" fill="currentColor" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"/></svg>`;
+  const hEmpty = `<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"/></svg>`;
+  
+  if (!r.error) {
+    if (isLiked) {
+      btn.innerHTML = `${hEmpty} <span class="like-count">${Math.max(0, current - 1)}</span>`;
+      btn.classList.remove("liked");
+    } else {
+      btn.innerHTML = `${hFilled} <span class="like-count">${current + 1}</span>`;
+      btn.classList.add("liked");
+    }
+  }
 }
 
 async function toggleComments(postId) {
@@ -7551,7 +7564,7 @@ async function submitReply(parentCommentId, postId) {
 
   const saved = await feedApi(`/posts/${postId}/comments`, {
     method: "POST",
-    headers: { Authorization: `Bearer ${feedToken}`, "Content-Type": "application/json" },
+    headers: { "Content-Type": "application/json" },
     body: JSON.stringify({
       content,
       ...(parentCommentId ? { parent_comment_id: parentCommentId } : {})
@@ -8096,19 +8109,14 @@ async function loadSpotlight() {
 
   try {
     const token = localStorage.getItem("vh_token") || sessionStorage.getItem("vh_token");
-    const r = await fetch(`${AUTH_URL}/feed?tab=public&limit=100`, {
+    const r = await fetch(`${AUTH_URL}/spotlight`, {
       headers:{ Authorization:`Bearer ${token}` }
     });
     let posts = await r.json();
     if (!Array.isArray(posts)) posts = [];
 
-    // Filter to last 48h and sort by hotness score
-    const cutoff = Date.now() - 48 * 60 * 60 * 1000;
-    const hot = posts
-      .filter(p => new Date(p.created_at).getTime() > cutoff)
-      .map(p => ({ ...p, score: (p.like_count||0) * 2 + (p.comment_count||0) }))
-      .sort((a,b) => b.score - a.score)
-      .slice(0, 24);
+    // Posts are already sorted by trending score from backend
+    const hot = posts.slice(0, 24);
 
     if (!hot.length) {
       track.innerHTML = `<div style="color:var(--text-3);font-size:13px;padding:20px;background:var(--bg-2);border-radius:12px;border:1px dashed rgba(255,255,255,.1)">No trending posts yet — be the first to post something public!</div>`;
@@ -11152,12 +11160,25 @@ document.getElementById("postBtn").addEventListener("click", async () => {
 });
 
 async function toggleLike(postId, btn) {
-  const r=await feedApi(`/posts/${postId}/like`,{ method:"POST" });
-  const countEl=btn.querySelector(".like-count"); const current=parseInt(countEl.textContent)||0;
-  const hFilled=`<svg width="15" height="15" viewBox="0 0 24 24" fill="currentColor" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"/></svg>`;
-  const hEmpty=`<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"/></svg>`;
-  if (r.liked) { btn.innerHTML=`${hFilled} <span class="like-count">${current+1}</span>`; btn.classList.add("liked"); }
-  else { btn.innerHTML=`${hEmpty} <span class="like-count">${Math.max(0,current-1)}</span>`; btn.classList.remove("liked"); }
+  const isLiked = btn.classList.contains("liked");
+  const method = isLiked ? "DELETE" : "POST";
+  const r = await feedApi(`/posts/${postId}/like`, { method });
+  
+  const countEl = btn.querySelector(".like-count");
+  const current = parseInt(countEl?.textContent) || 0;
+  
+  const hFilled = `<svg width="15" height="15" viewBox="0 0 24 24" fill="currentColor" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"/></svg>`;
+  const hEmpty = `<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"/></svg>`;
+  
+  if (!r.error) {
+    if (isLiked) {
+      btn.innerHTML = `${hEmpty} <span class="like-count">${Math.max(0, current - 1)}</span>`;
+      btn.classList.remove("liked");
+    } else {
+      btn.innerHTML = `${hFilled} <span class="like-count">${current + 1}</span>`;
+      btn.classList.add("liked");
+    }
+  }
 }
 
 async function toggleComments(postId) {
@@ -11378,7 +11399,7 @@ async function submitReply(parentCommentId, postId) {
 
   const saved = await feedApi(`/posts/${postId}/comments`, {
     method: "POST",
-    headers: { Authorization: `Bearer ${feedToken}`, "Content-Type": "application/json" },
+    headers: { "Content-Type": "application/json" },
     body: JSON.stringify({
       content,
       ...(parentCommentId ? { parent_comment_id: parentCommentId } : {})
@@ -11923,19 +11944,14 @@ async function loadSpotlight() {
 
   try {
     const token = localStorage.getItem("vh_token") || sessionStorage.getItem("vh_token");
-    const r = await fetch(`${AUTH_URL}/feed?tab=public&limit=100`, {
+    const r = await fetch(`${AUTH_URL}/spotlight`, {
       headers:{ Authorization:`Bearer ${token}` }
     });
     let posts = await r.json();
     if (!Array.isArray(posts)) posts = [];
 
-    // Filter to last 48h and sort by hotness score
-    const cutoff = Date.now() - 48 * 60 * 60 * 1000;
-    const hot = posts
-      .filter(p => new Date(p.created_at).getTime() > cutoff)
-      .map(p => ({ ...p, score: (p.like_count||0) * 2 + (p.comment_count||0) }))
-      .sort((a,b) => b.score - a.score)
-      .slice(0, 24);
+    // Posts are already sorted by trending score from backend
+    const hot = posts.slice(0, 24);
 
     if (!hot.length) {
       track.innerHTML = `<div style="color:var(--text-3);font-size:13px;padding:20px;background:var(--bg-2);border-radius:12px;border:1px dashed rgba(255,255,255,.1)">No trending posts yet — be the first to post something public!</div>`;

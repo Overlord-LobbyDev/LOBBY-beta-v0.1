@@ -526,6 +526,131 @@ app.get('/auth/steam/recent', verifyToken, async (req, res) => {
   }
 });
 
+// ── Likes ────────────────────────────────────────────────────
+app.post('/auth/posts/:postId/like', verifyToken, async (req, res) => {
+  try {
+    const { postId } = req.params;
+    
+    // Check if post exists
+    const postCheck = await pool.query('SELECT id FROM posts WHERE id = $1', [postId]);
+    if (postCheck.rows.length === 0) {
+      return res.status(404).json({ error: 'Post not found' });
+    }
+
+    // Try to insert like (will fail if already liked due to UNIQUE constraint)
+    try {
+      await pool.query(
+        'INSERT INTO post_likes (user_id, post_id) VALUES ($1, $2)',
+        [req.userId, postId]
+      );
+      res.json({ success: true, liked: true });
+    } catch (err) {
+      // Already liked - return success anyway
+      if (err.code === '23505') {
+        return res.json({ success: true, liked: true });
+      }
+      throw err;
+    }
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+app.delete('/auth/posts/:postId/like', verifyToken, async (req, res) => {
+  try {
+    const { postId } = req.params;
+    await pool.query(
+      'DELETE FROM post_likes WHERE user_id = $1 AND post_id = $2',
+      [req.userId, postId]
+    );
+    res.json({ success: true, liked: false });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// ── Comments ────────────────────────────────────────────────────
+app.post('/auth/posts/:postId/comments', verifyToken, async (req, res) => {
+  try {
+    const { postId } = req.params;
+    const { content } = req.body;
+
+    if (!content || !content.trim()) {
+      return res.status(400).json({ error: 'Comment content required' });
+    }
+
+    // Check if post exists
+    const postCheck = await pool.query('SELECT id FROM posts WHERE id = $1', [postId]);
+    if (postCheck.rows.length === 0) {
+      return res.status(404).json({ error: 'Post not found' });
+    }
+
+    const result = await pool.query(
+      'INSERT INTO post_comments (post_id, user_id, content) VALUES ($1, $2, $3) RETURNING id, created_at',
+      [postId, req.userId, content]
+    );
+
+    res.json({
+      id: result.rows[0].id,
+      post_id: postId,
+      user_id: req.userId,
+      content: content,
+      created_at: result.rows[0].created_at
+    });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+app.get('/auth/posts/:postId/comments', async (req, res) => {
+  try {
+    const { postId } = req.params;
+    const result = await pool.query(
+      `SELECT pc.id, pc.post_id, pc.user_id, pc.content, pc.created_at, u.username, u.avatar_url
+       FROM post_comments pc
+       JOIN users u ON pc.user_id = u.id
+       WHERE pc.post_id = $1
+       ORDER BY pc.created_at DESC`,
+      [postId]
+    );
+    res.json(result.rows);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// ── Spotlight: Trending posts from last 48 hours ────────────────────────────────────────────────────
+app.get('/auth/spotlight', verifyToken, async (req, res) => {
+  try {
+    const result = await pool.query(
+      `SELECT 
+        p.id, p.user_id, p.content, p.image_url, p.visibility, p.created_at,
+        u.username, u.avatar_url,
+        (SELECT COUNT(*) FROM post_likes WHERE post_id = p.id)::INT as like_count,
+        (SELECT COUNT(*) FROM post_comments WHERE post_id = p.id)::INT as comment_count,
+        (SELECT EXISTS(SELECT 1 FROM post_likes WHERE post_id = p.id AND user_id = $1))::BOOLEAN as liked_by_me,
+        (
+          SELECT COALESCE(json_agg(json_build_object('tag', tag)), '[]'::json)
+          FROM post_community_tags 
+          WHERE post_id = p.id
+        ) as community_tags
+       FROM posts p
+       JOIN users u ON p.user_id = u.id
+       WHERE p.visibility = 'public'
+         AND p.created_at > NOW() - INTERVAL '48 hours'
+       ORDER BY (
+         (SELECT COUNT(*) FROM post_likes WHERE post_id = p.id) +
+         (SELECT COUNT(*) FROM post_comments WHERE post_id = p.id) * 2
+       ) DESC
+       LIMIT 10`,
+      [req.userId]
+    );
+    res.json(result.rows);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
 // Start server
 app.listen(PORT, () => {
   console.log(`✅ Auth server running on port ${PORT}`);
