@@ -3475,7 +3475,7 @@ async function boot() {
     const t = LOBBY_THEMES[localStorage.getItem("lobby_theme") || "default"] || LOBBY_THEMES.default;
     updateSubtitleGradient(t.t1, t.accent);
   }
-  checkAdminStatus();
+  await checkAdminStatus();
   await loadUserPanel(me.id);
   connectWS();
   await loadServers();
@@ -14722,7 +14722,7 @@ input.sp-slider::-webkit-slider-thumb:hover { transform: scale(1.2); }
     reader.onload = ev => updateBannerPreview(ev.target.result, null);
     reader.readAsDataURL(file);
     const form = new FormData(); form.append("banner", file);
-    const r = await fetch(`${AUTH_URL}/profile/${me.id}/banner`, { method:"POST", headers:{ Authorization:`Bearer ${token()}` }, body:form }).then(r=>r.json());
+    const r = await fetch(`${AUTH_URL}/auth/banner`, { method:"POST", headers:{ Authorization:`Bearer ${token()}` }, body:form }).then(r=>r.json());
     if (r.error) spShowMsg("spAppearanceMsg", r.error, "error");
     else { spShowMsg("spAppearanceMsg", "Banner updated!", "success"); refreshAllPanelBanners(r.banner_url, null); }
     e.target.value = "";
