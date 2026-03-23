@@ -218,6 +218,7 @@ async function initDb() {
     "ALTER TABLE users ADD COLUMN IF NOT EXISTS status_text    TEXT DEFAULT NULL",
     "ALTER TABLE users ADD COLUMN IF NOT EXISTS location       TEXT DEFAULT NULL",
     "ALTER TABLE users ADD COLUMN IF NOT EXISTS website        TEXT DEFAULT NULL",
+    "ALTER TABLE users ADD COLUMN IF NOT EXISTS steam_id       TEXT DEFAULT NULL",
     // Server settings columns
     "ALTER TABLE servers ADD COLUMN IF NOT EXISTS description  TEXT DEFAULT ''",
     "ALTER TABLE servers ADD COLUMN IF NOT EXISTS banner_url   TEXT DEFAULT NULL",
