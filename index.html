@@ -2283,7 +2283,7 @@
   <!-- Fixed top nav -->
   <div class="server-list-top">
     <!-- Home / Logo -->
-    <div class="server-icon" id="homeNavIcon" title="Home" onclick="showServersPanel()" style="background:var(--accent);border-radius:14px;overflow:hidden;cursor:pointer;">
+    <div class="server-icon" id="homeNavIcon" title="Home" onclick="showHomeFriendsSidebar()" style="background:var(--accent);border-radius:14px;overflow:hidden;cursor:pointer;">
       <svg id="homeLogoSvg" width="28" height="28" viewBox="0 0 48 48" xmlns="http://www.w3.org/2000/svg" style="display:block;">
         <rect x="14" y="8" width="8" height="32" rx="2" fill="white"/>
         <rect x="14" y="32" width="22" height="8" rx="2" fill="white"/>
@@ -2310,6 +2310,9 @@
     </div>
     <div class="server-icon" id="groupsNavIcon" title="Groups" onclick="showGroupsPanel()" style="font-size:0">
       <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
+    </div>
+    <div class="server-icon" id="friendsNavIcon" title="Friends" onclick="showFriendsPanel()" style="font-size:0">
+      <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="17" cy="5" r="3"/><circle cx="7" cy="5" r="3"/><path d="M7 10c-2 0-3 2-3 4s1 4 3 5h10c2-1 3-3 3-5s-1-4-3-4"/></svg>
     </div>
     <div class="server-divider"></div>
   </div>
@@ -4524,6 +4527,52 @@ async function showServersPanel() {
   }
   html += "</div>";
   document.getElementById("channelSidebarContent").innerHTML = html;
+}
+
+// ── Friends ────────────────────────────────────────────────────
+async function showFriendsPanel() {
+  try {
+    const res = await fetch(`${AUTH_URL}/friends/${userId}`, {
+      headers: { "Authorization": `Bearer ${token}` }
+    });
+    
+    if (!res.ok) throw new Error(await res.text());
+    const friends = await res.json();
+    
+    document.getElementById("sidebarTitle").textContent = "FRIENDS";
+    document.getElementById("serversNavIcon").classList.remove("active");
+    document.getElementById("groupsNavIcon").classList.remove("active");
+    document.getElementById("friendsNavIcon").classList.add("active");
+    document.getElementById("homeNavIcon").classList.remove("active");
+    document.getElementById("dmServerIcon").classList.remove("active");
+    
+    let html = `<div style="padding:12px;border-bottom:1px solid rgba(255,255,255,.05);margin-bottom:8px">
+      <button onclick="openModal('addFriendsModal')" style="width:100%;padding:8px 12px;background:var(--accent);color:white;border:none;border-radius:6px;font-size:14px;font-weight:600;cursor:pointer;transition:background .15s">
+        ➕ Add Friends
+      </button>
+    </div>`;
+    
+    if (!Array.isArray(friends) || friends.length === 0) {
+      html += `<div class="empty-state"><div class="empty-icon">👥</div><h3>No Friends Yet</h3><p>Add friends to get started!</p></div>`;
+    } else {
+      friends.forEach(f => {
+        const avatarSrc = f.avatar_url ? `${MEDIA_URL}${f.avatar_url}` : "👤";
+        const avatarEl = f.avatar_url ? `<img src="${avatarSrc}" style="width:40px;height:40px;border-radius:50%;object-fit:cover;"/>` : `<div style="width:40px;height:40px;border-radius:50%;background:var(--accent);display:flex;align-items:center;justify-content:center;font-size:18px;">${avatarEl}</div>`;
+        html += `<div class="chat-entry" onclick="openDM('${f.id}','${f.username}')" style="cursor:pointer;padding:8px 12px;margin:4px 8px;border-radius:6px;display:flex;align-items:center;gap:10px;transition:background .15s" onmouseover="this.style.background='rgba(255,255,255,.05)'" onmouseout="this.style.background=''">
+          ${avatarEl}
+          <div style="flex:1;min-width:0;">
+            <div style="font-size:14px;font-weight:600;color:var(--text-1);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${escapeHtml(f.username)}</div>
+            <div style="font-size:12px;color:var(--text-3)">${f.status || 'Offline'}</div>
+          </div>
+        </div>`;
+      });
+    }
+    
+    document.getElementById("sidebarListings").innerHTML = html;
+  } catch(e) {
+    console.error("Failed to load friends:", e);
+    document.getElementById("sidebarListings").innerHTML = `<div style="padding:12px;color:red">Error loading friends</div>`;
+  }
 }
 
 // ── Groups ────────────────────────────────────────────────────
