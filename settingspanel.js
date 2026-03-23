@@ -1,6 +1,6 @@
 /* settings-panel.js — inject a slide-in settings drawer */
 (function () {
-  const AUTH_URL = "http://lobby-auth-server.onrender.com";
+  const AUTH_URL = "http://localhost:3001";
   const PRESETS  = ["#5865f2","#eb459e","#ed4245","#fee75c","#57f287","#00b0f4","#f47fff","#ff7b7d","#23a55a","#1e1f22"];
 
   const LOBBY_THEMES = {
@@ -672,19 +672,5 @@
     clearTimeout(spMsgTimers[id]);
     spMsgTimers[id] = setTimeout(() => el.className = "sp-msg", 4000);
   }
-
-  // Expose functions globally for onclick handlers
-  window._spApplyTheme = (themeId) => {
-    const btn = document.querySelector(`[data-theme-btn="${themeId}"]`);
-    if (btn) btn.click();
-  };
-  window._spSwitchCat = (catId) => {
-    const btn = document.querySelector(`[data-sp="${catId}"]`);
-    if (btn) btn.click();
-  };
-  window.spSelect = (id) => {
-    const el = document.getElementById(id);
-    if (el && el.click) el.click();
-  };
 
 })();
