@@ -2,10 +2,10 @@
   "name": "lobby-backend",
   "version": "1.0.0",
   "description": "LOBBY Backend — Auth & WebSocket Server",
-  "main": "auth.js",
+  "main": "server.js",
   "scripts": {
-    "start": "node auth.js",
-    "dev": "node auth.js"
+    "start": "node server.js",
+    "dev": "node server.js"
   },
   "dependencies": {
     "express": "^4.18.2",
