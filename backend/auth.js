@@ -110,12 +110,12 @@ app.post("/login", async (req, res) => {
   if (!username || !password) return res.status(400).json({ error: "Username and password required" });
   try {
     const r = await pool.query(
-      "SELECT id, username, password, avatar_url, is_admin, is_banned, banned_until, ban_reason FROM users WHERE username = $1",
+      "SELECT id, username, password_hash, avatar_url, is_admin, is_banned, banned_until, ban_reason FROM users WHERE username = $1",
       [username.trim()]
     );
     const user = r.rows[0];
     if (!user) return res.status(401).json({ error: "Invalid username or password" });
-    if (!await bcrypt.compare(password, user.password)) return res.status(401).json({ error: "Invalid username or password" });
+    if (!await bcrypt.compare(password, user.password_hash)) return res.status(401).json({ error: "Invalid username or password" });
     if (isCurrentlyBanned(user)) {
       const until  = user.banned_until ? `until ${new Date(user.banned_until).toLocaleString()}` : "permanently";
       const reason = user.ban_reason ? ` Reason: ${user.ban_reason}` : "";
