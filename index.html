@@ -14165,7 +14165,7 @@ input.sp-slider::-webkit-slider-thumb:hover { transform: scale(1.2); }
       <div class="sp-section active" id="sp-profile">
         <h2>My Profile</h2>
         <div class="sp-preview">
-          <div class="sp-preview-banner" id="spPreviewBanner"></div>
+          <div class="sp-preview-banner" id="spPreviewBanner" onclick="document.getElementById('spBannerInput').click()"></div>
           <div class="sp-preview-avatar-wrap">
             <div class="sp-preview-avatar" id="spPreviewAvatar">U</div>
           </div>
@@ -14729,7 +14729,7 @@ input.sp-slider::-webkit-slider-thumb:hover { transform: scale(1.2); }
   }
 
   function refreshAllPanelBanners(imageUrl, colour) {
-    ["userPanelBanner","chatPanelBanner"].forEach(id => {
+    ["userPanelBanner","chatPanelBanner","spPreviewBanner"].forEach(id => {
       const el = document.getElementById(id);
       if (!el) return;
       if (imageUrl) {

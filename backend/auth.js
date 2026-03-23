@@ -494,6 +494,96 @@ app.post('/auth/servers/:id/icon', verifyToken, upload.single('icon'), async (re
   }
 });
 
+// ============ SERVER MEMBERSHIP ============
+
+// Join a server
+app.post('/auth/servers/:serverId/join', verifyToken, async (req, res) => {
+  try {
+    const { serverId } = req.params;
+    const userId = req.userId;
+
+    // Check if server exists
+    const serverCheck = await pool.query('SELECT id FROM servers WHERE id = $1', [serverId]);
+    if (serverCheck.rows.length === 0) {
+      return res.status(404).json({ error: 'Server not found' });
+    }
+
+    // Check if user is already a member
+    const memberCheck = await pool.query(
+      'SELECT id FROM server_members WHERE server_id = $1 AND user_id = $2',
+      [serverId, userId]
+    );
+    if (memberCheck.rows.length > 0) {
+      return res.status(400).json({ error: 'Already a member of this server' });
+    }
+
+    // Add user to server_members
+    const result = await pool.query(
+      'INSERT INTO server_members (server_id, user_id) VALUES ($1, $2) RETURNING *',
+      [serverId, userId]
+    );
+
+    res.json({ success: true, membership: result.rows[0] });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// Leave a server
+app.delete('/auth/servers/:serverId/leave', verifyToken, async (req, res) => {
+  try {
+    const { serverId } = req.params;
+    const userId = req.userId;
+
+    // Check if server exists
+    const serverCheck = await pool.query('SELECT id FROM servers WHERE id = $1', [serverId]);
+    if (serverCheck.rows.length === 0) {
+      return res.status(404).json({ error: 'Server not found' });
+    }
+
+    // Remove user from server_members
+    const result = await pool.query(
+      'DELETE FROM server_members WHERE server_id = $1 AND user_id = $2 RETURNING *',
+      [serverId, userId]
+    );
+
+    if (result.rows.length === 0) {
+      return res.status(400).json({ error: 'Not a member of this server' });
+    }
+
+    res.json({ success: true, message: 'Left the server' });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// Get server members
+app.get('/auth/servers/:serverId/members', async (req, res) => {
+  try {
+    const { serverId } = req.params;
+
+    // Check if server exists
+    const serverCheck = await pool.query('SELECT id FROM servers WHERE id = $1', [serverId]);
+    if (serverCheck.rows.length === 0) {
+      return res.status(404).json({ error: 'Server not found' });
+    }
+
+    // Get all members with user details
+    const result = await pool.query(
+      `SELECT u.id, u.username, u.avatar_url, u.status, sm.joined_at
+       FROM server_members sm
+       JOIN users u ON sm.user_id = u.id
+       WHERE sm.server_id = $1
+       ORDER BY sm.joined_at DESC`,
+      [serverId]
+    );
+
+    res.json({ success: true, members: result.rows, count: result.rows.length });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
 // ============ PROFILE UPLOADS ============
 
 // Upload avatar
@@ -527,6 +617,52 @@ app.post('/auth/banner', verifyToken, upload.single('banner'), async (req, res) 
     res.json(result.rows[0]);
   } catch (err) {
     res.status(500).json({ error: err.message });
+  }
+});
+
+// Update user profile (banner colour, bio, status, etc)
+app.patch('/auth/profile', verifyToken, async (req, res) => {
+  try {
+    const { bannerColour, bio, status, is_private } = req.body;
+    let updateFields = [];
+    let updateValues = [];
+    let paramCount = 1;
+
+    if (bannerColour !== undefined) {
+      updateFields.push(`banner_colour = $${paramCount}`);
+      updateValues.push(bannerColour);
+      paramCount++;
+    }
+    if (bio !== undefined) {
+      updateFields.push(`bio = $${paramCount}`);
+      updateValues.push(bio);
+      paramCount++;
+    }
+    if (status !== undefined) {
+      updateFields.push(`status = $${paramCount}`);
+      updateValues.push(status);
+      paramCount++;
+    }
+    if (is_private !== undefined) {
+      updateFields.push(`is_private = $${paramCount}`);
+      updateValues.push(is_private);
+      paramCount++;
+    }
+
+    if (updateFields.length === 0) {
+      return res.json({ success: false, error: 'No fields to update' });
+    }
+
+    updateValues.push(req.userId);
+    const query = `UPDATE users SET ${updateFields.join(', ')} WHERE id = $${paramCount} RETURNING *`;
+    const result = await pool.query(query, updateValues);
+    
+    if (result.rows.length === 0) {
+      return res.json({ success: false, error: 'User not found' });
+    }
+    res.json({ success: true, ...result.rows[0] });
+  } catch (err) {
+    res.status(500).json({ success: false, error: err.message });
   }
 });
 
