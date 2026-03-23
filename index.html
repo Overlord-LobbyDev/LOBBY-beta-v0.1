@@ -14222,7 +14222,7 @@ input.sp-slider::-webkit-slider-thumb:hover { transform: scale(1.2); }
         <div class="sp-form-group">
           <label class="sp-label">Banner Image</label>
           <label class="sp-upload-btn" for="spBannerInput" style="justify-content:center">🖼 Upload Banner</label>
-          <input type="file" id="spBannerInput" accept="image/*" style="display:none" />
+          <input type="file" id="spBannerInput" accept="image/*" style="display:none" onchange="uploadBanner(this)" />
           <div class="sp-hint">Shown at the top of your profile. GIFs supported.</div>
         </div>
         <div class="sp-form-group">
