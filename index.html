@@ -7541,7 +7541,6 @@ async function handleMentionInput(input, postId) {
       <span>@${u.username}</span>
     </div>`;
   }).join("");
-}
 
 function insertMention(username, inputId, commentId) {
   const input = document.getElementById(inputId);
@@ -11335,48 +11334,7 @@ function showReplyBox(commentId, postId, username) {
   }, 50);
 }
 
-async function handleMentionInput(input, postId) {
-  const val = input.value;
-  const commentId = input.id.replace("reply-input-","");
-  const drop = document.getElementById(`mention-drop-${commentId}`);
-  if (!drop) return;
 
-  // Find @ at cursor
-  const cursor = input.selectionStart;
-  const textBefore = val.slice(0, cursor);
-  const mentionMatch = textBefore.match(/@(\w*)$/);
-
-  if (!mentionMatch) { drop.style.display="none"; return; }
-
-  const query = mentionMatch[1].toLowerCase();
-
-  // Get candidates: friends + commenters on this post
-  const [friends, comments] = await Promise.all([
-    feedApi("/friends"),
-    feedApi(`/posts/${postId}/comments`)
-  ]);
-
-  const friendNames = (friends||[]).filter(f=>f.status==="accepted").map(f=>({ username:f.username, avatar:f.avatar_url }));
-  const commenterNames = (comments||[]).map(c=>({ username:c.username, avatar:c.avatar_url }));
-
-  // Deduplicate
-  const seen = new Set();
-  const candidates = [...friendNames, ...commenterNames].filter(u => {
-    if (seen.has(u.username)) return false;
-    seen.add(u.username); return true;
-  }).filter(u => u.username.toLowerCase().startsWith(query) && u.username !== feedMe?.username);
-
-  if (!candidates.length) { drop.style.display="none"; return; }
-
-  drop.style.display = "block";
-  drop.innerHTML = candidates.slice(0,6).map((u,i) => {
-    const av = u.avatar ? `<img src="${u.avatar}" />` : u.username.slice(0,1).toUpperCase();
-    return `<div class="mention-option" onmousedown="insertMention('${u.username}','${input.id}','${commentId}')"}>
-      <div class="mention-avatar">${av}</div>
-      <span>@${u.username}</span>
-    </div>`;
-  }).join("");
-}
 
 function insertMention(username, inputId, commentId) {
   const input = document.getElementById(inputId);
@@ -15032,7 +14990,7 @@ input.sp-slider::-webkit-slider-thumb:hover { transform: scale(1.2); }
   } else {
     init();
   }
-
+})();}
 </script>
 </body>
 </html>
