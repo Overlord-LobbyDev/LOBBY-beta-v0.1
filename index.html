@@ -3533,7 +3533,7 @@ async function loadPendingServerInvites() {
 // ── WebSocket ─────────────────────────────────────────────────
 function connectWS() {
   const _t = localStorage.getItem("vh_token") || sessionStorage.getItem("vh_token");
-  ws = new WebSocket(`wss://lobby-websocket-server.onrender.com?token=${encodeURIComponent(_t)}`);
+  ws = new WebSocket(`ws://localhost:3000?token=${encodeURIComponent(_t)}`);
   ws.onopen = () => console.log("[ws] connected");
   ws.onclose = () => setTimeout(connectWS, 3000);
   if (typeof initRTC === "function") initRTC();
@@ -10328,7 +10328,7 @@ input.sp-slider::-webkit-slider-thumb:hover { transform: scale(1.2); }
 /* settings-panel.js — inject a slide-in settings drawer */
 (function () {
   const AUTH_URL = "https://lobby-auth-server.onrender.com/auth";
-  const PRESETS  = ["#5865f2","#eb459e","#ed4245","#fee75c","#57f287","#00b0f4","#f47fff","#ff7b7d","#23a55a","#1e1f22"];
+  window.PRESETS  = ["#5865f2","#eb459e","#ed4245","#fee75c","#57f287","#00b0f4","#f47fff","#ff7b7d","#23a55a","#1e1f22"];
 
   const LOBBY_THEMES = {
     default:  { name:"Default",  emoji:"🌑", bg0:"#1e1f22", bg1:"#2b2d31", bg2:"#313338", bg3:"#383a40", accent:"#5865f2", accentH:"#4752c4", t1:"#f2f3f5", t2:"#b5bac1", t3:"#80848e" },
@@ -14855,7 +14855,7 @@ input.sp-slider::-webkit-slider-thumb:hover { transform: scale(1.2); }
 
   function buildComposePresets(selected) {
     const container = document.getElementById("spComposePresets"); if (!container) return;
-    container.innerHTML = PRESETS.map(c => `
+    container.innerHTML = window.PRESETS.map(c => `
       <div class="sp-colour-preset ${c===selected?"selected":""}" style="background:${c}" title="${c}"
         onclick="(function(){ window._spSelectComposeColour('${c}'); })()"></div>`).join("");
   }
