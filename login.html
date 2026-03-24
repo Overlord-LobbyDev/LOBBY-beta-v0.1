@@ -369,8 +369,16 @@
 
       if (remember) localStorage.setItem("vh_token", data.token);
       else          sessionStorage.setItem("vh_token", data.token);
+      
+      // DEBUG: Log what was saved
+      console.log("Token saved to", remember ? "localStorage" : "sessionStorage");
+      console.log("Token value:", data.token);
+      console.log("localStorage check:", localStorage.getItem("vh_token"));
 
-      launchApp(data.token, data.user.isAdmin);
+      // Small delay to ensure token is saved before redirect
+      setTimeout(() => {
+        launchApp(data.token, data.user.isAdmin);
+      }, 100);
     } catch {
       showMsg("loginMsg", "Could not reach auth server. Is it running?", "error");
       btn.disabled = false;
