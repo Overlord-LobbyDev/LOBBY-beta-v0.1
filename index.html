@@ -3434,7 +3434,10 @@ let feedToken = null;
 let feedMe = null;
 let postImageFile = null;
 const _wsToken = localStorage.getItem("vh_token") || sessionStorage.getItem("vh_token");
-if (!_wsToken) { window.location.href = "login.html"; }
+console.log("=== INDEX.HTML INIT ===");
+console.log("_wsToken found:", !!_wsToken);
+if (_wsToken) console.log("Token preview:", _wsToken.substring(0, 20) + "...");
+if (!_wsToken) { console.log("NO TOKEN - REDIRECTING TO LOGIN"); window.location.href = "login.html"; }
 
 let me = null;
 let ws = null;
@@ -3455,11 +3458,20 @@ function api(path, opts={}) {
 
 // ── Boot ─────────────────────────────────────────────────────
 async function boot() {
-  try { me = await api("/me"); } catch(e) { console.error("Boot failed:", e); return; }
+  console.log("BOOT: Starting...");
+  try { 
+    me = await api("/me");
+    console.log("BOOT: /me response:", me);
+  } catch(e) { 
+    console.error("BOOT: API call failed:", e); 
+    return; 
+  }
   if (!me || me.error) {
+    console.error("BOOT: /me returned error or null:", me);
     document.getElementById("myPanelName").textContent = "Not connected";
     return;
   }
+  console.log("BOOT: User loaded successfully:", me.username);
   document.getElementById("myPanelName").textContent = me.username;
   // Show unique lobby tag derived from user ID
   const tagEl = document.getElementById("myPanelLobbyTag");
