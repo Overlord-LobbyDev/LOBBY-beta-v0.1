@@ -353,29 +353,49 @@ app.get("/servers", requireAuth, async (req, res) => {
   res.json(rows);
 });
 
-// GET /servers/search?q= — search public servers by name, tags, or name#uid
+// GET /servers/search?q= — search servers by name, tags, or name#uid
+// Returns the user's own servers AND any public/discoverable servers (those with tags).
+// Each result includes is_member boolean so the frontend can show Join vs Open.
 app.get("/servers/search", requireAuth, async (req, res) => {
   const q = (req.query.q || "").trim().toLowerCase();
-  if (!q) return res.json([]);
   try {
-    // Match by name, unique_id, or tags (stored as JSON array string)
-    const r = await pool.query(`
-      SELECT s.*, (SELECT COUNT(*) FROM server_members WHERE server_id = s.id) AS member_count
-      FROM servers s
-      JOIN server_members sm ON sm.server_id = s.id AND sm.user_id = $1
-      WHERE LOWER(s.name) LIKE $2
-         OR LOWER(s.unique_id) LIKE $2
-         OR LOWER(s.tags::text) LIKE $2
-      ORDER BY s.name ASC
-      LIMIT 20
-    `, [req.userId, `%${q}%`]);
+    let r;
+    if (!q) {
+      // No query — return all public/discoverable servers (those with tags)
+      r = await pool.query(`
+        SELECT s.*,
+          (SELECT COUNT(*) FROM server_members WHERE server_id = s.id) AS member_count,
+          EXISTS(SELECT 1 FROM server_members WHERE server_id = s.id AND user_id = $1) AS is_member
+        FROM servers s
+        WHERE s.tags IS NOT NULL AND s.tags::text != '[]' AND s.tags::text != '' AND s.tags::text != 'null'
+        ORDER BY s.name ASC
+        LIMIT 50
+      `, [req.userId]);
+    } else {
+      // Search: return servers the user is a member of OR public servers matching the query
+      r = await pool.query(`
+        SELECT s.*,
+          (SELECT COUNT(*) FROM server_members WHERE server_id = s.id) AS member_count,
+          EXISTS(SELECT 1 FROM server_members WHERE server_id = s.id AND user_id = $1) AS is_member
+        FROM servers s
+        WHERE (LOWER(s.name) LIKE $2
+           OR LOWER(s.unique_id) LIKE $2
+           OR LOWER(s.tags::text) LIKE $2)
+          AND (
+            EXISTS(SELECT 1 FROM server_members WHERE server_id = s.id AND user_id = $1)
+            OR (s.tags IS NOT NULL AND s.tags::text != '[]' AND s.tags::text != '' AND s.tags::text != 'null')
+          )
+        ORDER BY s.name ASC
+        LIMIT 30
+      `, [req.userId, `%${q}%`]);
+    }
     const rows = r.rows.map(s => {
       if (s.tags && typeof s.tags === "string") { try { s.tags = JSON.parse(s.tags); } catch { s.tags = []; } }
       else if (!s.tags) s.tags = [];
       return s;
     });
     res.json(rows);
-  } catch(e) { res.status(500).json({ error: "Search failed" }); }
+  } catch(e) { console.error("[/servers/search]", e); res.status(500).json({ error: "Search failed" }); }
 });
 
 app.post("/servers", requireAuth, async (req, res) => {

@@ -3420,6 +3420,7 @@
     <button class="profile-tab"        id="ptabPhotos"  onclick="switchProfileTab('photos')">Photos</button>
     <button class="profile-tab"        id="ptabAbout"   onclick="switchProfileTab('about')">About</button>
     <button class="profile-tab"        id="ptabFriends" onclick="switchProfileTab('friends')">Friends</button>
+    <button class="profile-tab"        id="ptabGames"   onclick="switchProfileTab('games')">🎮 Games</button>
   </div>
 
   <!-- Body -->
@@ -3677,6 +3678,7 @@ function initServerDrag(container) {
 async function selectServer(server) {
   selectedServer = server;
   clearAllNavIcons();
+  document.querySelectorAll("#serverIcons .server-icon").forEach(el => el.classList.remove("active"));
   document.querySelector(`[data-server-id="${server.id}"]`)?.classList.add("active");
   document.getElementById("sidebarTitle").textContent = server.name;
   setSidebarMode("server");
@@ -4243,28 +4245,38 @@ async function showDMPanel() {
     });
     html += "</div>";
   }
-  html += `<div class="channel-section"><div class="channel-section-label">Friends</div>`;
-  if (accepted.length) {
-    accepted.forEach(f => {
-      const isOnline = onlineUserIds.has(f.other_id);
-      const av = f.avatar_url ? `<img src="${f.avatar_url}" />` : f.username.slice(0,1).toUpperCase();
-      const dot = isOnline ? `<div class="online-dot"></div>` : "";
-      html += `<div class="dm-item" data-user-id="${f.other_id}" data-friend-id="${f.id}" data-username="${f.username}"
-        onclick="openDM(${f.other_id},'${f.username}','${f.avatar_url||''}')"
-        oncontextmenu="showFriendContextMenu(event,${f.id},'${f.username}',${f.other_id})">
-        <div class="dm-avatar">${av}${dot}</div>
-        <div style="flex:1;min-width:0">
-          <div style="display:flex;align-items:baseline;gap:6px;">
-            <div style="font-size:14px;font-weight:600">${f.username}</div>
-            <div style="font-size:10px;font-weight:700;color:var(--accent);opacity:.85;">${lobbyTagFromId(f.other_id)}</div>
-          </div>
-          <div style="font-size:11px;color:${isOnline?"var(--green)":"var(--text-3)"}">${isOnline?"● Online":"○ Offline"}</div>
-        </div></div>`;
-    });
-  } else {
-    html += `<div style="padding:12px;font-size:13px;color:var(--text-3)">No friends yet. Add one above!</div>`;
+  const dmOnline  = accepted.filter(f => onlineUserIds.has(f.other_id));
+  const dmOffline = accepted.filter(f => !onlineUserIds.has(f.other_id));
+  const renderDmFriend = (f, isOnline) => {
+    const av = f.avatar_url ? `<img src="${f.avatar_url}" />` : f.username.slice(0,1).toUpperCase();
+    const dot = isOnline ? `<div class="online-dot"></div>` : "";
+    return `<div class="dm-item" ${!isOnline?'style="opacity:.6"':''} data-user-id="${f.other_id}" data-friend-id="${f.id}" data-username="${f.username}"
+      onclick="openDM(${f.other_id},'${f.username}','${f.avatar_url||''}')"
+      oncontextmenu="showFriendContextMenu(event,${f.id},'${f.username}',${f.other_id})">
+      <div class="dm-avatar">${av}${dot}</div>
+      <div style="flex:1;min-width:0">
+        <div style="display:flex;align-items:baseline;gap:6px;">
+          <div style="font-size:14px;font-weight:600">${f.username}</div>
+          <div style="font-size:10px;font-weight:700;color:var(--accent);opacity:.85;">${lobbyTagFromId(f.other_id)}</div>
+        </div>
+        <div style="font-size:11px;color:${isOnline?"var(--green)":"var(--text-3)"}">${isOnline?"● Online":"○ Offline"}</div>
+      </div></div>`;
+  };
+  if (dmOnline.length) {
+    html += `<div class="channel-section"><div class="channel-section-label">Online — ${dmOnline.length}</div>`;
+    dmOnline.forEach(f => { html += renderDmFriend(f, true); });
+    html += "</div>";
   }
-  html += "</div>";
+  if (dmOffline.length) {
+    html += `<div class="channel-section"><div class="channel-section-label">Offline — ${dmOffline.length}</div>`;
+    dmOffline.forEach(f => { html += renderDmFriend(f, false); });
+    html += "</div>";
+  }
+  if (!accepted.length) {
+    html += `<div class="channel-section"><div class="channel-section-label">Friends</div>`;
+    html += `<div style="padding:12px;font-size:13px;color:var(--text-3)">No friends yet. Add one above!</div>`;
+    html += "</div>";
+  }
   document.getElementById("channelSidebarContent").innerHTML = html;
 }
 
@@ -4414,7 +4426,7 @@ function appendMessage(msg, type) {
     const size = a.size_bytes > 1024*1024 ? `${(a.size_bytes/1024/1024).toFixed(1)} MB` : `${Math.round(a.size_bytes/1024)} KB`;
     return `<a class="msg-file" href="${a.url}" target="_blank" download>📎 ${a.filename} <span style="color:var(--text-3);font-size:11px">${size}</span></a>`;
   }).join("");
-  const canDelete = isMe || me.isAdmin;
+  const canDelete = isMe || me.isAdmin === true || (currentView.type === "channel" && (myServerRole === "owner" || myServerRole === "moderator"));
   const div = document.createElement("div");
   div.className = "message-group";
   div.innerHTML = `
@@ -4596,7 +4608,10 @@ function memberCallTile(member, isInCall) {
 
 async function joinGroupCall(groupId) {
   try { groupLocalStream = await navigator.mediaDevices.getUserMedia({ audio:true, video:true }); }
-  catch(e) { showToast("Could not access camera/mic","error"); return; }
+  catch(e) {
+    try { groupLocalStream = await navigator.mediaDevices.getUserMedia({ audio:true }); }
+    catch(e2) { showToast("Could not access microphone","error"); return; }
+  }
   groupCallActive = true;
   const myTile = document.getElementById(`calltile-${me.id}`);
   if (myTile) { myTile.innerHTML = `<video id="callvideo-${me.id}" autoplay playsinline muted></video><div class="tile-name">${me.username} (you)</div>`; document.getElementById(`callvideo-${me.id}`).srcObject = groupLocalStream; }
@@ -4783,7 +4798,10 @@ let callStream=null, callPeers={}, callActive=false, callTargetId=null, callTarg
 async function startDirectCall(userId, username) {
   if (callActive) { showToast("Already in a call","error"); return; }
   try { callStream = await navigator.mediaDevices.getUserMedia({ audio:true, video:true }); }
-  catch(e) { showToast("Could not access camera/mic: "+e.message,"error"); return; }
+  catch(e) {
+    try { callStream = await navigator.mediaDevices.getUserMedia({ audio:true }); }
+    catch(e2) { showToast("Could not access microphone: "+e2.message,"error"); return; }
+  }
   callActive=true; callTargetId=userId; callTargetName=username;
   openOutgoingCallModal(username, null); showFloatingCallBar(username, null, "Calling…");
   const targetPeerId = `u${userId}`;
@@ -4825,10 +4843,11 @@ function showIncomingCallModal(fromUsername, fromAvatarUrl, fromPeerId) {
   document.getElementById("acceptCallBtn").addEventListener("click", async () => {
     clearInterval(incomingTimer); closeIncomingCallModal();
     try {
-      callStream=await navigator.mediaDevices.getUserMedia({ audio:true, video:true });
+      try { callStream=await navigator.mediaDevices.getUserMedia({ audio:true, video:true }); }
+      catch { callStream=await navigator.mediaDevices.getUserMedia({ audio:true }); }
       callActive=true; callTargetId=peerUserIdFromCallPeerId(fromPeerId); callTargetName=fromUsername;
       wsSend({ type:"call-accept", to:fromPeerId }); showFloatingCallBar(fromUsername,null,"Connecting…");
-    } catch(e) { showToast("Could not access camera/mic","error"); wsSend({ type:"call-decline", to:fromPeerId }); forceEndCall(); }
+    } catch(e) { showToast("Could not access microphone","error"); wsSend({ type:"call-decline", to:fromPeerId }); forceEndCall(); }
   });
   document.getElementById("declineCallBtn").addEventListener("click", () => {
     clearInterval(incomingTimer); closeIncomingCallModal(); wsSend({ type:"call-decline", to:fromPeerId }); forceEndCall();
@@ -5291,15 +5310,18 @@ function createVcPeerConnection(peerId) {
   }
   pc.onicecandidate = ({ candidate }) => { if (candidate) wsSend({ type:"vc-candidate", candidate, to:peerId, channelId:vcChannelId }); };
   pc.ontrack = e => {
-    const stream = e.streams[0];
-    // Audio element — reuse or create
-    let audio = document.getElementById(`vcaudio-${peerId}`);
-    if (!audio) {
-      audio = document.createElement("audio");
-      audio.id = `vcaudio-${peerId}`; audio.autoplay = true; audio.style.display = "none";
-      document.body.appendChild(audio);
+    const stream = e.streams[0] || new MediaStream([e.track]);
+    if (e.track.kind === "audio") {
+      // Audio element — reuse or create
+      let audio = document.getElementById(`vcaudio-${peerId}`);
+      if (!audio) {
+        audio = document.createElement("audio");
+        audio.id = `vcaudio-${peerId}`; audio.autoplay = true; audio.style.display = "none";
+        document.body.appendChild(audio);
+      }
+      audio.srcObject = stream;
+      audio.play().catch(() => {});
     }
-    audio.srcObject = stream;
     // Refresh PiP so video tile appears if stream has video
     renderVcPip();
   };
@@ -6380,7 +6402,7 @@ function renderPost(post) {
       <div class="post-avatar" onclick="openProfilePanel(${post.user_id})" style="cursor:pointer">${av}</div>
       <div><div class="post-author" onclick="openProfilePanel(${post.user_id})">${post.username}</div><div style="font-size:11px;color:var(--text-3)">${time}</div></div>
       <span class="post-visibility-badge" style="display:flex;align-items:center;gap:4px">${post.visibility==="friends"?friendsIcon:globeIcon} ${vis}</span>
-      ${isMe?`<button class="post-delete-btn" onclick="deletePost(${post.id})" title="Delete post">${trashIcon}</button>`:""}
+      ${isMe||feedMe?.is_admin?`<button class="post-delete-btn" onclick="deletePost(${post.id})" title="Delete post">${trashIcon}</button>`:""}
     </div>
     ${post.content?`<div class="post-content">${escapeHtml(post.content)}</div>`:""}
     ${post.image_url?`<img class="post-image" src="${post.image_url}" onclick="openLightbox('${post.image_url}')" />`:""}
@@ -6916,10 +6938,10 @@ async function runGlobalSearch(q) {
   // Detect name#uid pattern for direct server lookup
   const uidMatch = q.match(/^(.+)#(\w+)$/);
 
-  // Run both searches in parallel
+  // Run searches in parallel — backend now returns both member + public servers with is_member flag
   const [usersRes, serversRes, friendsRes] = await Promise.allSettled([
     fetch(`${AUTH_URL}/users/search?q=${encodeURIComponent(q)}`, { headers }).then(r => r.ok ? r.json() : []),
-    fetch(`${AUTH_URL}/servers/search?q=${encodeURIComponent(uidMatch ? uidMatch[1] : q)}`, { headers }).then(r => r.ok ? r.json() : api("/servers")),
+    fetch(`${AUTH_URL}/servers/search?q=${encodeURIComponent(uidMatch ? uidMatch[1] : q)}`, { headers }).then(r => r.ok ? r.json() : []),
     api("/friends")
   ]);
 
@@ -6974,21 +6996,25 @@ async function runGlobalSearch(q) {
   }
 
   if (servers.length) {
-    // Filter out private servers from search
-    const publicServers2 = servers.filter(s => s.is_public !== false && s.visibility !== "private");
-    if (publicServers2.length) {
+    // Show all matching servers (backend returns member + public servers with is_member flag)
+    if (servers.length) {
       html += `<div class="gsearch-section-label">👥 Communities</div>`;
-      html += publicServers2.slice(0, 5).map(s => {
+      html += servers.slice(0, 8).map(s => {
         const icon = s.icon_url ? `<img src="${s.icon_url}"/>` : (s.name||"?").slice(0,2).toUpperCase();
         const count = s.member_count || s.members || 0;
         const uid = s.unique_id || s.uid || String(s.id).padStart(6,"0");
+        const isMember = s.is_member === true;
+        const tagStyle = isMember
+          ? 'background:rgba(88,101,242,.15);color:var(--accent)'
+          : 'background:rgba(67,181,129,.15);color:#43b581;cursor:pointer';
+        const tagLabel = isMember ? '\u2713 Member' : '+ Join';
         return `<div class="gsearch-item" onclick="globalSearchSelectServer(${s.id},'${escapeHtml(s.name)}','${s.icon_url||""}','${s.banner_url||""}','${escapeHtml(s.description||"")}',${count})">
           <div class="gsearch-av square">${icon}</div>
           <div>
             <div class="gsearch-name">${escapeHtml(s.name)} <span style="font-size:10px;color:var(--text-3);font-weight:400">#${uid}</span></div>
             <div class="gsearch-sub">${count} member${count!==1?"s":""}</div>
           </div>
-          <span class="gsearch-tag community">Community</span>
+          <span class="gsearch-tag community" style="${tagStyle}">${tagLabel}</span>
         </div>`;
       }).join("");
     }
@@ -8130,14 +8156,13 @@ async function loadCommunities() {
   try {
     const token = localStorage.getItem("vh_token") || sessionStorage.getItem("vh_token");
 
-    // Fetch all servers the user belongs to
-    const myServers = await api("/servers").catch(() => []);
-    const servers = Array.isArray(myServers) ? myServers : [];
-
-    // ── Filter: ONLY public servers ──────────────────────────────
-    const publicServers = servers.filter(s =>
-      s.is_public !== false && s.visibility !== "private"
-    );
+    // Fetch all public/discoverable servers (backend returns is_member flag)
+    const [myServersRaw, discoverRaw] = await Promise.all([
+      api("/servers").catch(() => []),
+      fetch(`${AUTH_URL}/servers/search?q=`, { headers:{ Authorization:`Bearer ${token}` }}).then(r => r.ok ? r.json() : []).catch(() => [])
+    ]);
+    const myServers = Array.isArray(myServersRaw) ? myServersRaw : [];
+    const publicServers = Array.isArray(discoverRaw) ? discoverRaw : [];
 
     if (!publicServers.length) {
       container.innerHTML = `
@@ -8205,12 +8230,16 @@ async function loadCommunities() {
         ? `background-image:url(${s.banner_url});background-size:cover;background-position:center`
         : `background:linear-gradient(135deg,var(--accent),var(--bg-0))`;
       const memberCount = s.member_count ?? s.members ?? "—";
+      const isMember = s.is_member === true || myServers.some(ms => ms.id === s.id);
       const desc = s.description || "";
       const encodedName = encodeURIComponent(s.name||"");
       const encodedDesc = encodeURIComponent(s.description||"");
       const relevanceBadge = s._score >= 6
         ? `<span style="position:absolute;top:8px;left:8px;font-size:9px;font-weight:800;color:#fff;background:rgba(88,101,242,.85);padding:2px 7px;border-radius:99px;letter-spacing:.3px;text-transform:uppercase">⭐ Recommended</span>`
         : "";
+      const joinBtn = isMember
+        ? `<button class="community-join-btn joined" onclick="event.stopPropagation();showChatPanel();setTimeout(()=>{},300)">→ Open</button>`
+        : `<button class="community-join-btn" onclick="event.stopPropagation();openCommunityTagJoin(${s.id},'${escapeHtml(s.name||"")}','${s.icon_url||""}','${s.banner_url||""}','${escapeHtml(desc)}',${memberCount})">+ Join</button>`;
       return `<div class="community-card">
         <div class="community-card-banner" style="${bannerStyle};position:relative">
           ${relevanceBadge}
@@ -8222,7 +8251,7 @@ async function loadCommunities() {
           <div class="community-card-desc">${desc ? escapeHtml(desc) : '<span style="color:var(--text-3);font-style:italic">No description yet</span>'}</div>
           <div class="community-card-meta">
             <span class="community-card-members">👥 ${memberCount} member${memberCount!==1?"s":""}</span>
-            <button class="community-join-btn joined" onclick="event.stopPropagation();showChatPanel();setTimeout(()=>{},300)">→ Open</button>
+            ${joinBtn}
           </div>
         </div>
       </div>`;
@@ -8349,6 +8378,7 @@ function openSpotlightFocus(post) {
           <span>${post.comment_count||0}</span>
         </button>
         <button class="post-action-btn" style="margin-left:auto" onclick="closeSpotlightFocus();openProfilePanel(${post.user_id})">👤 View Profile</button>
+        ${feedMe && (post.user_id === feedMe.id || feedMe.is_admin) ? `<button class="post-action-btn" onclick="deleteSpotlightPost(${post.id})" style="color:var(--text-3);transition:color .15s" onmouseover="this.style.color='var(--danger)'" onmouseout="this.style.color='var(--text-3)'" title="Delete post">🗑 Delete</button>` : ""}
       </div>
       <div id="slFocusComments" style="display:none;flex-direction:column;gap:8px;margin-top:10px">
         <div id="comment-list-sl-${post.id}"></div>
@@ -8406,6 +8436,16 @@ function closeSpotlightFocus(e) {
   if (e && e.target !== document.getElementById("spotlightFocusModal")) return;
   document.getElementById("spotlightFocusModal").style.display = "none";
   document.querySelector("#spotlightFocusContent video")?.pause();
+}
+
+async function deleteSpotlightPost(postId) {
+  if (!confirm("Delete this post?")) return;
+  await feedApi(`/posts/${postId}`, { method:"DELETE" });
+  closeSpotlightFocus();
+  document.getElementById(`post-${postId}`)?.remove();
+  document.getElementById(`fp-post-${postId}`)?.remove();
+  loadSpotlight();
+  showToast("Post deleted", "success");
 }
 
 document.addEventListener("keydown", e => {
@@ -9006,8 +9046,8 @@ async function renderFpSteam() {
     }
 
     document.getElementById("fpSteamGames").innerHTML = list.map((g, i) => {
-      const recent2w  = g.playtime_2weeks  || 0;
-      const totalMins = g.playtime_forever || 0;
+      const recent2w  = g.playtime_2weeks  || (g.hours_recent  ? g.hours_recent  * 60 : 0);
+      const totalMins = g.playtime_forever || (g.hours_total   ? g.hours_total   * 60 : 0);
       const recentLabel = fmtMins(recent2w);
       const totalLabel  = fmtMins(totalMins) || "0h";
 
@@ -9377,7 +9417,7 @@ async function openProfilePanel(userId) {
   document.getElementById("profileBackdrop").classList.add("open");
 
   // Reset tabs
-  ["posts","about","friends"].forEach(t => {
+  ["posts","photos","about","friends","games"].forEach(t => {
     document.getElementById(`ptab${t.charAt(0).toUpperCase()+t.slice(1)}`).classList.toggle("active", t === "posts");
   });
 
@@ -9515,6 +9555,7 @@ async function renderProfileTab(tab) {
   if (tab === "photos")  await renderProfilePhotos(body);
   if (tab === "about")   await renderProfileAbout(body);
   if (tab === "friends") await renderProfileFriends(body);
+  if (tab === "games")   await renderProfileGames(body);
 }
 
 async function renderProfilePosts(body) {
@@ -9811,6 +9852,99 @@ async function renderProfileFriends(body) {
     <div class="profile-friend-grid">${chips}</div>`;
 }
 
+async function renderProfileGames(body) {
+  const token = localStorage.getItem("vh_token") || sessionStorage.getItem("vh_token");
+  if (!token) { body.innerHTML = `<div style="text-align:center;padding:32px;color:var(--text-3)">Sign in to view games</div>`; return; }
+
+  const steamIcon = `<svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><path d="M11.979 0C5.678 0 .511 4.86.022 11.037l6.432 2.658c.545-.371 1.203-.59 1.912-.59.063 0 .125.004.188.006l2.861-4.142V8.91c0-2.495 2.028-4.524 4.524-4.524 2.494 0 4.524 2.031 4.524 4.527s-2.03 4.525-4.524 4.525h-.105l-4.076 2.911c0 .052.004.105.004.159 0 1.875-1.515 3.396-3.39 3.396-1.635 0-3.016-1.173-3.331-2.727L.436 15.27C1.862 20.307 6.486 24 11.979 24c6.627 0 11.999-5.373 11.999-12S18.606 0 11.979 0zM7.54 18.21l-1.473-.61c.262.543.714.999 1.314 1.25 1.297.539 2.793-.076 3.332-1.375.263-.63.264-1.319.005-1.949s-.75-1.121-1.377-1.383c-.624-.26-1.29-.249-1.878-.03l1.523.63c.956.4 1.409 1.5 1.009 2.455-.397.957-1.497 1.41-2.454 1.012H7.54zm11.415-9.303c0-1.662-1.353-3.015-3.015-3.015-1.665 0-3.015 1.353-3.015 3.015 0 1.665 1.35 3.015 3.015 3.015 1.663 0 3.015-1.35 3.015-3.015zm-5.273-.005c0-1.252 1.013-2.266 2.265-2.266 1.249 0 2.266 1.014 2.266 2.266 0 1.251-1.017 2.265-2.266 2.265-1.252 0-2.265-1.014-2.265-2.265z"/></svg>`;
+
+  // Fetch the target user's profile to get steam_id
+  let profile = {};
+  try {
+    profile = await fetch(`${AUTH_URL}/profile/${profilePanelUserId}`, { headers: { Authorization: `Bearer ${token}` } }).then(r => r.json());
+  } catch(e) {}
+
+  if (!profile.steam_id) {
+    const isOwn = profilePanelUserId === me?.id;
+    body.innerHTML = `<div style="text-align:center;padding:32px;color:var(--text-3)">
+      <div style="font-size:36px;margin-bottom:8px">🎮</div>
+      <div style="margin-bottom:6px">No Steam account linked</div>
+      ${isOwn ? `<button onclick="closeProfilePanel();document.querySelector('.sp-nav-btn[data-sp=&quot;steam&quot;]')?.click();openSettingsPanel();" style="margin-top:8px;background:var(--accent);color:#fff;border:none;border-radius:8px;padding:8px 18px;font-size:13px;font-weight:600;font-family:inherit;cursor:pointer">Connect Steam</button>` : ""}
+    </div>`;
+    return;
+  }
+
+  // Fetch games — try user-specific endpoint first, fall back to own
+  let games = [];
+  try {
+    const res = await fetch(`${AUTH_URL}/steam/recent/${profilePanelUserId}`, { headers: { Authorization: `Bearer ${token}` } });
+    if (res.ok) games = await res.json();
+  } catch(e) {}
+  if (!Array.isArray(games) || !games.length) {
+    try {
+      const res = await fetch(`${AUTH_URL}/steam/recent`, { headers: { Authorization: `Bearer ${token}` } });
+      if (res.ok) games = await res.json();
+    } catch(e) {}
+  }
+
+  if (!Array.isArray(games) || !games.length) {
+    body.innerHTML = `<div style="text-align:center;padding:32px;color:var(--text-3)">
+      <div style="font-size:36px;margin-bottom:8px">🎮</div>
+      No recent games found
+      <div style="font-size:11px;opacity:.6;margin-top:6px">Steam profile may be set to private</div>
+    </div>`;
+    return;
+  }
+
+  const list = games.slice(0, 20);
+
+  function fmtGameTime(mins) {
+    if (!mins || mins <= 0) return "0h";
+    if (mins < 60) return Math.round(mins) + "m";
+    const h = Math.floor(mins / 60);
+    const m = Math.round(mins % 60);
+    return m > 0 ? h + "h " + m + "m" : h + "h";
+  }
+
+  const html = list.map((g, i) => {
+    const recent2w  = g.playtime_2weeks  || (g.hours_recent ? g.hours_recent * 60 : 0);
+    const totalMins = g.playtime_forever || (g.hours_total  ? g.hours_total  * 60 : 0);
+    const recentLabel = recent2w > 0 ? fmtGameTime(recent2w) : null;
+    const totalLabel  = fmtGameTime(totalMins);
+    const imgUrl = `https://cdn.cloudflare.steamstatic.com/steam/apps/${g.appid}/header.jpg`;
+    const rankColor = i === 0 ? "#fbbf24" : i === 1 ? "#9ca3af" : i === 2 ? "#b45309" : "var(--text-3)";
+
+    return `<div style="background:var(--bg-1);border:1px solid rgba(255,255,255,.07);border-radius:10px;overflow:hidden;cursor:pointer;transition:border-color .15s,transform .15s;flex-shrink:0" onmouseover="this.style.borderColor='rgba(255,255,255,.18)';this.style.transform='translateY(-1px)'" onmouseout="this.style.borderColor='rgba(255,255,255,.07)';this.style.transform=''" onclick="window.open('https://store.steampowered.com/app/${g.appid}','_blank')">
+      <div style="position:relative;width:100%;height:56px;background:var(--bg-3);overflow:hidden">
+        <img src="${imgUrl}" style="width:100%;height:100%;object-fit:cover;display:block" onerror="this.style.display='none'" />
+        <div style="position:absolute;inset:0;background:linear-gradient(to right,rgba(0,0,0,.6) 0%,transparent 55%)"></div>
+        <div style="position:absolute;top:5px;left:7px;font-size:10px;font-weight:800;color:${rankColor};background:rgba(0,0,0,.7);padding:1px 6px;border-radius:5px;line-height:16px">#${i+1}</div>
+        ${recentLabel ? `<div style="position:absolute;top:5px;right:7px;font-size:9px;font-weight:800;color:#fff;background:rgba(88,101,242,.85);padding:1px 6px;border-radius:5px;line-height:15px">${recentLabel} recent</div>` : ""}
+      </div>
+      <div style="padding:7px 10px 8px">
+        <div style="font-size:12.5px;font-weight:700;color:var(--text-1);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${escapeHtml(g.name||"Unknown")}</div>
+        <div style="font-size:11px;color:var(--text-3);margin-top:2px">
+          ${recentLabel ? `<span style="color:var(--accent);font-weight:700">${recentLabel} this week</span> · ` : ""}${totalLabel} total
+        </div>
+      </div>
+    </div>`;
+  }).join("");
+
+  body.innerHTML = `<div style="display:flex;flex-direction:column;gap:8px">
+    <div style="display:flex;align-items:center;justify-content:space-between;padding:2px 4px 2px">
+      <div style="font-size:12px;font-weight:800;text-transform:uppercase;letter-spacing:.8px;color:var(--text-3);display:flex;align-items:center;gap:6px">${steamIcon} Recently Played</div>
+      <span style="font-size:10px;color:var(--text-3);background:var(--bg-2);padding:1px 7px;border-radius:99px;border:1px solid rgba(255,255,255,.06)">${list.length} games</span>
+    </div>
+    ${html}
+    <a href="https://steamcommunity.com/profiles/${profile.steam_id}" target="_blank"
+      style="display:flex;align-items:center;justify-content:center;gap:7px;padding:8px 12px;margin-top:6px;background:rgba(27,40,56,.7);border:1px solid rgba(102,192,244,.25);color:#66c0f4;border-radius:9px;font-size:12px;font-weight:600;text-decoration:none;transition:background .15s,border-color .15s"
+      onmouseover="this.style.background='rgba(27,40,56,1)';this.style.borderColor='rgba(102,192,244,.6)'"
+      onmouseout="this.style.background='rgba(27,40,56,.7)';this.style.borderColor='rgba(102,192,244,.25)'">
+      ${steamIcon} View Steam Profile
+    </a>
+  </div>`;
+}
+
 // Rewire openProfile and openUserProfile to use the panel instead of navigating away
 function openProfile(userId) { openProfilePanel(userId); }
 function openUserProfile(userId) { openProfilePanel(userId); }
@@ -9947,7 +10081,7 @@ document.body.classList.add("feed-open");
   opacity: 0; transition: opacity .15s;
 }
 .sp-preview-banner:hover::after { opacity: 1; }
-.sp-preview-avatar-wrap { margin: -26px 0 0 14px; display: inline-block; }
+.sp-preview-avatar-wrap { margin: -36px 0 0 14px; display: inline-block; position: relative; z-index: 2; }
 .sp-preview-avatar {
   width: 62px; height: 62px; border-radius: 14px; border: 3px solid var(--bg-1);
   background: var(--accent); display: flex; align-items: center;
@@ -10135,7 +10269,7 @@ input.sp-slider::-webkit-slider-thumb:hover { transform: scale(1.2); }
   opacity: 0; transition: opacity .15s;
 }
 .sp-preview-banner:hover::after { opacity: 1; }
-.sp-preview-avatar-wrap { margin: -26px 0 0 14px; display: inline-block; }
+.sp-preview-avatar-wrap { margin: -36px 0 0 14px; display: inline-block; position: relative; z-index: 2; }
 .sp-preview-avatar {
   width: 62px; height: 62px; border-radius: 14px; border: 3px solid var(--bg-1);
   background: var(--accent); display: flex; align-items: center;
@@ -10871,7 +11005,7 @@ input.sp-slider::-webkit-slider-thumb:hover { transform: scale(1.2); }
   }
 
   async function loadAVDevices() {
-    try { await navigator.mediaDevices.getUserMedia({ audio:true, video:true }); } catch {}
+    try { await navigator.mediaDevices.getUserMedia({ audio:true, video:true }); } catch { try { await navigator.mediaDevices.getUserMedia({ audio:true }); } catch {} }
     const devices  = await navigator.mediaDevices.enumerateDevices();
     populateSel("spMicSelect",     devices.filter(d=>d.kind==="audioinput"),  localStorage.getItem("vh_mic")||"");
     populateSel("spCamSelect",     devices.filter(d=>d.kind==="videoinput"),  localStorage.getItem("vh_cam")||"");
