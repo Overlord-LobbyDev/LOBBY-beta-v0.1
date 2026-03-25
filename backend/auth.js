@@ -208,19 +208,21 @@ app.patch("/profile/password", requireAuth, async (req, res) => {
     const hash = await bcrypt.hash(newPassword, SALT_ROUNDS);
     await pool.query("UPDATE users SET password = $1 WHERE id = $2", [hash, req.userId]);
     res.json({ success: true });
-  } catch { res.status(500).json({ error: "Server error" }); }
+  } catch(err) { console.error("API error at line " + 211 + ":", err.message || err); res.status(500).json({ error: "Server error: " + (err.message || "unknown") }); }
 });
 
 app.get("/profile/:id", requireAuth, async (req, res) => {
-  const r = await pool.query(
-    `SELECT id, username, avatar_url, bio, status, banner_url, banner_colour,
-            display_name, status_emoji, status_text, location, website,
-            created_at AS joined_at, steam_id, steam_name, steam_avatar
-     FROM users WHERE id = $1`,
-    [req.params.id]
-  );
-  if (!r.rows[0]) return res.status(404).json({ error: "User not found" });
-  res.json(r.rows[0]);
+  try {
+    const r = await pool.query(
+      `SELECT id, username, avatar_url, bio, status, banner_url, banner_colour,
+              display_name, status_emoji, status_text, location, website,
+              created_at AS joined_at, steam_id, steam_name, steam_avatar
+       FROM users WHERE id = $1`,
+      [req.params.id]
+    );
+    if (!r.rows[0]) return res.status(404).json({ error: "User not found" });
+    res.json(r.rows[0]);
+  } catch(err) { console.error("[GET /profile/:id]", err.message); res.status(500).json({ error: "Profile error: " + err.message }); }
 });
 
 // ── Friends ──────────────────────────────────────────────────
@@ -258,7 +260,7 @@ app.post("/friends/request", requireAuth, async (req, res) => {
       [req.userId, friendId]
     );
     res.json({ success: true });
-  } catch { res.status(500).json({ error: "Server error" }); }
+  } catch(err) { console.error("API error at line " + 261 + ":", err.message || err); res.status(500).json({ error: "Server error: " + (err.message || "unknown") }); }
 });
 
 app.patch("/friends/:id/accept", requireAuth, async (req, res) => {
@@ -291,7 +293,7 @@ app.post("/friends/block", requireAuth, async (req, res) => {
       [req.userId, blockId]
     );
     res.json({ success: true });
-  } catch { res.status(500).json({ error: "Server error" }); }
+  } catch(err) { console.error("API error at line " + 294 + ":", err.message || err); res.status(500).json({ error: "Server error: " + (err.message || "unknown") }); }
 });
 
 // ── Direct Messages ──────────────────────────────────────────
@@ -388,7 +390,7 @@ app.post("/servers", requireAuth, async (req, res) => {
       [server.id]
     );
     res.json(server);
-  } catch { res.status(500).json({ error: "Server error" }); }
+  } catch(err) { console.error("API error at line " + 391 + ":", err.message || err); res.status(500).json({ error: "Server error: " + (err.message || "unknown") }); }
 });
 
 app.post("/servers/:id/icon", requireAuth, (req, res) => {
@@ -798,7 +800,7 @@ app.post("/groups", requireAuth, async (req, res) => {
       );
     }
     res.json(group);
-  } catch { res.status(500).json({ error: "Server error" }); }
+  } catch(err) { console.error("API error at line " + 801 + ":", err.message || err); res.status(500).json({ error: "Server error: " + (err.message || "unknown") }); }
 });
 
 app.get("/groups/:id/members", requireAuth, async (req, res) => {
@@ -822,7 +824,7 @@ app.post("/groups/:id/members", requireAuth, async (req, res) => {
       [req.params.id, userId]
     );
     res.json({ success: true });
-  } catch { res.status(500).json({ error: "Server error" }); }
+  } catch(err) { console.error("API error at line " + 825 + ":", err.message || err); res.status(500).json({ error: "Server error: " + (err.message || "unknown") }); }
 });
 
 app.delete("/groups/:id/members/:userId", requireAuth, async (req, res) => {
