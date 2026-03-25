@@ -140,7 +140,7 @@ app.get("/me", requireAuth, async (req, res) => {
   const user = r.rows[0];
   if (!user) return res.status(404).json({ error: "User not found" });
   if (isCurrentlyBanned(user)) return res.status(403).json({ error: "Account banned" });
-  res.json({ id: user.id, username: user.username, avatarUrl: user.avatar_url, isAdmin: user.is_admin });
+  res.json({ id: user.id, username: user.username, avatarUrl: user.avatar_url, isAdmin: user.is_admin, is_admin: user.is_admin });
 });
 
 // GET /me/invites — fetch all pending server invites for the logged-in user

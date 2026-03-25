@@ -2308,19 +2308,17 @@
     <div class="server-icon" id="groupsNavIcon" title="Groups" style="font-size:0">
       <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
     </div>
+    <div class="server-add-btn" title="Create Server" onclick="openModal('createServerModal')" style="font-size:0">
+      <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+    </div>
     <div class="server-divider"></div>
   </div>
 
   <!-- Scrollable server icons -->
   <div id="serverIcons"></div>
 
-  <!-- Fixed bottom: add server -->
-  <div class="server-list-bottom">
-    <div class="server-divider"></div>
-    <div class="server-add-btn" title="Create Server" onclick="openModal('createServerModal')" style="font-size:0">
-      <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
-    </div>
-  </div>
+  <!-- Bottom spacer -->
+  <div class="server-list-bottom"></div>
 </div>
 
 <!-- Toggle button — wired in JS, no inline onclick -->
@@ -4351,7 +4349,7 @@ async function openChannel(id, name, type) {
   document.querySelectorAll(".channel-item").forEach(el => el.classList.remove("active"));
   wsSend({ type:"subscribe-channel", channelId: id });
   const isAnn = type === "announcement";
-  const canPost = !isAnn || myServerRole === "owner" || myServerRole === "moderator" || me.isAdmin;
+  const canPost = !isAnn || myServerRole === "owner" || myServerRole === "moderator" || me.is_admin;
   renderChatArea({ icon: isAnn ? "📢" : "#", name, placeholder: canPost ? `Message #${name}` : "Only moderators can post here", readonly: !canPost });
   const messages = await api(`/channels/${id}/messages`);
   const container = document.getElementById("msgContainer");
@@ -4426,7 +4424,7 @@ function appendMessage(msg, type) {
     const size = a.size_bytes > 1024*1024 ? `${(a.size_bytes/1024/1024).toFixed(1)} MB` : `${Math.round(a.size_bytes/1024)} KB`;
     return `<a class="msg-file" href="${a.url}" target="_blank" download>📎 ${a.filename} <span style="color:var(--text-3);font-size:11px">${size}</span></a>`;
   }).join("");
-  const canDelete = isMe || me.isAdmin === true || (currentView.type === "channel" && (myServerRole === "owner" || myServerRole === "moderator"));
+  const canDelete = isMe || me.is_admin === true || (currentView.type === "channel" && (myServerRole === "owner" || myServerRole === "moderator"));
   const div = document.createElement("div");
   div.className = "message-group";
   div.innerHTML = `
@@ -7628,6 +7626,7 @@ async function checkAdminStatus() {
   try {
     const r=await fetch("https://lobby-auth-server.onrender.com/me",{ headers:{ Authorization:"Bearer "+t } }).then(r=>r.json());
     if (r.is_admin) {
+      if (me) me.is_admin = true;
       document.getElementById("adminBtn").style.display="flex";
       document.getElementById("adminPanelBtn").style.display="flex";
     }
@@ -8222,7 +8221,7 @@ async function loadCommunities() {
     container.innerHTML = scored.map(s => {
       const isOwner = s.role === "owner" || s.myRole === "owner"
         || s.owner_id === me?.id || s.created_by === me?.id
-        || s.user_id === me?.id || me?.isAdmin;
+        || s.user_id === me?.id || me?.is_admin;
       const icon = s.icon_url
         ? `<img src="${s.icon_url}" style="width:100%;height:100%;object-fit:cover"/>`
         : `<span style="font-size:16px;font-weight:800;color:#fff">${(s.name||"?").slice(0,2).toUpperCase()}</span>`;
@@ -8866,7 +8865,7 @@ async function renderFpRight() {
           <div class="fp-post-time">${time}</div>
         </div>
         <div class="fp-post-vis">${visIcon} ${p.visibility==="friends"?"Friends":"Public"}</div>
-        ${fpIsOwn||me?.isAdmin?`<button onclick="fpDeletePost(${p.id})" style="background:none;border:none;color:var(--text-3);cursor:pointer;font-size:14px;padding:4px 8px;border-radius:6px;margin-left:4px;transition:color .15s,background .15s" onmouseover="this.style.color='var(--danger)';this.style.background='rgba(237,66,69,.1)'" onmouseout="this.style.color='var(--text-3)';this.style.background='none'">🗑</button>`:""}
+        ${fpIsOwn||me?.is_admin?`<button onclick="fpDeletePost(${p.id})" style="background:none;border:none;color:var(--text-3);cursor:pointer;font-size:14px;padding:4px 8px;border-radius:6px;margin-left:4px;transition:color .15s,background .15s" onmouseover="this.style.color='var(--danger)';this.style.background='rgba(237,66,69,.1)'" onmouseout="this.style.color='var(--text-3)';this.style.background='none'">🗑</button>`:""}
       </div>
       ${p.content?`<div class="fp-post-content">${escapeHtml(p.content)}</div>`:""}
       ${p.image_url?`<img class="fp-post-image" src="${p.image_url}" onclick="openLightbox('${p.image_url}')" />`:""}
