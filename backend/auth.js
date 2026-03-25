@@ -14,7 +14,7 @@ const fs       = require("fs");
 const { pool, initDb } = require("./db");
 
 const app         = express();
-const PORT        = 3001;
+const PORT        = process.env.PORT || 3001;
 const SECRET      = process.env.JWT_SECRET || "change-this-secret-in-production";
 const SALT_ROUNDS = 12;
 const STEAM_KEY   = process.env.STEAM_API_KEY || "";
