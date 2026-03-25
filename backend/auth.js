@@ -1024,7 +1024,9 @@ app.patch("/profile/visibility", requireAuth, async (req, res) => {
 // GET /profile/:id/posts — posts by a specific user (respects privacy)
 app.get("/profile/:id/posts", requireAuth, async (req, res) => {
   const targetId = parseInt(req.params.id);
+  if (isNaN(targetId)) return res.status(400).json({ error: "Invalid user ID" });
   const isSelf = targetId === req.userId;
+  try {
   const r = await pool.query(`
     SELECT p.*, u.username, u.avatar_url,
       (SELECT COUNT(*) FROM post_likes WHERE post_id = p.id) AS like_count,
@@ -1045,6 +1047,10 @@ app.get("/profile/:id/posts", requireAuth, async (req, res) => {
     LIMIT 50
   `, [targetId, req.userId, isSelf]);
   res.json(r.rows);
+  } catch (err) {
+    console.error("[profile posts error]", err.message);
+    res.status(500).json({ error: "Failed to load posts" });
+  }
 });
 
 // GET /profile/:id/friends — public friends list
