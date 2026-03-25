@@ -1299,4 +1299,11 @@ app.get("/steam/recent", requireAuth, async (req, res) => {
 // ── Start ────────────────────────────────────────────────────
 initDb().then(() => {
   app.listen(PORT, () => console.log(`[auth] HTTP server on http://localhost:${PORT}`));
+}).catch(err => {
+  console.error("[auth] Failed to init DB, retrying in 3s…", err.message || err);
+  setTimeout(() => {
+    initDb().then(() => {
+      app.listen(PORT, () => console.log(`[auth] HTTP server on http://localhost:${PORT}`));
+    }).catch(e => { console.error("[auth] DB init failed again:", e); process.exit(1); });
+  }, 3000);
 });
