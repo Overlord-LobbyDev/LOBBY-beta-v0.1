@@ -373,14 +373,23 @@ app.get("/servers/search", requireAuth, async (req, res) => {
       `, [req.userId]);
     } else {
       // Search: return servers the user is a member of OR public servers matching the query
+      // Search by name, unique_id, OR individual tag values (case-insensitive)
       r = await pool.query(`
         SELECT s.*,
           (SELECT COUNT(*) FROM server_members WHERE server_id = s.id) AS member_count,
           EXISTS(SELECT 1 FROM server_members WHERE server_id = s.id AND user_id = $1) AS is_member
         FROM servers s
-        WHERE (LOWER(s.name) LIKE $2
-           OR LOWER(s.unique_id) LIKE $2
-           OR LOWER(s.tags::text) LIKE $2)
+        WHERE (
+            LOWER(s.name) LIKE $2
+            OR LOWER(s.unique_id) LIKE $2
+            OR (
+              s.tags IS NOT NULL AND s.tags::text != '' AND s.tags::text != 'null' AND s.tags::text != '[]'
+              AND EXISTS (
+                SELECT 1 FROM json_array_elements_text(s.tags::json) AS t
+                WHERE LOWER(t) LIKE $2
+              )
+            )
+          )
           AND (
             EXISTS(SELECT 1 FROM server_members WHERE server_id = s.id AND user_id = $1)
             OR (s.tags IS NOT NULL AND s.tags::text != '[]' AND s.tags::text != '' AND s.tags::text != 'null')
