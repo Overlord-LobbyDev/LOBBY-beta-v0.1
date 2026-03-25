@@ -585,7 +585,7 @@
   <div class="server-icon" id="groupsNavIcon" title="Groups">👥</div>
   <div class="server-divider"></div>
   <div id="serverIcons"></div>
-  <div class="server-add-btn" title="Create Server" onclick="openModal('createServerModal')">+</div>
+  <div class="server-add-btn" title="Create Lobby" onclick="openModal('createServerModal')">+</div>
   <div class="sidebar-toggle">
     <button class="sidebar-toggle-btn" id="chatSidebarToggle" title="Hide sidebar">◀</button>
   </div>
@@ -634,8 +634,8 @@
 <!-- Create Server -->
 <div class="modal-overlay" id="createServerModal">
   <div class="modal">
-    <h3>Create a Server</h3>
-    <div class="modal-field"><label>Server Name</label><input type="text" id="serverName" placeholder="My Awesome Server" /></div>
+    <h3>Create a Lobby</h3>
+    <div class="modal-field"><label>Lobby Name</label><input type="text" id="serverName" placeholder="My Awesome Lobby" /></div>
     <div class="modal-msg" id="createServerMsg"></div>
     <div class="modal-actions">
       <button class="btn btn-grey" onclick="closeModal('createServerModal')">Cancel</button>
@@ -969,10 +969,10 @@ function renderChannelList(channels, members, server) {
 
   // Server actions
   html += `<div class="channel-section" style="margin-top:8px">
-    <div class="channel-section-label">Server</div>
+    <div class="channel-section-label">Lobby</div>
     <div class="channel-item" onclick="inviteFriendToServer(${server.id})"><span class="ch-icon">👤</span><span class="ch-name">Invite Friends</span></div>
-    ${myServerRole==="owner"?`<div class="channel-item" style="color:var(--danger)" onclick="deleteServer(${server.id})"><span class="ch-icon">🗑</span><span class="ch-name">Delete Server</span></div>`:""}
-    <div class="channel-item" onclick="leaveServer(${server.id})"><span class="ch-icon">🚪</span><span class="ch-name">Leave Server</span></div>
+    ${myServerRole==="owner"?`<div class="channel-item" style="color:var(--danger)" onclick="deleteServer(${server.id})"><span class="ch-icon">🗑</span><span class="ch-name">Delete Lobby</span></div>`:""}
+    <div class="channel-item" onclick="leaveServer(${server.id})"><span class="ch-icon">🚪</span><span class="ch-name">Leave Lobby</span></div>
   </div>`;
 
   content.innerHTML = html;
@@ -1021,17 +1021,17 @@ function memberItem(m, isOnline) {
 
 async function createServer() {
   const name = document.getElementById("serverName").value.trim();
-  if (!name) { showModalMsg("createServerMsg","Enter a server name","error"); return; }
+  if (!name) { showModalMsg("createServerMsg","Enter a lobby name","error"); return; }
   const r = await api("/servers", { method:"POST", body:JSON.stringify({ name }) });
   if (r.error) { showModalMsg("createServerMsg", r.error, "error"); return; }
   closeModal("createServerModal");
   document.getElementById("serverName").value = "";
   await loadServers();
-  showToast(`Server "${name}" created!`, "success");
+  showToast(`Lobby "${name}" created!`, "success");
 }
 
 async function deleteServer(id) {
-  if (!confirm("Delete this server? This cannot be undone.")) return;
+  if (!confirm("Delete this lobby? This cannot be undone.")) return;
   await api(`/servers/${id}`, { method:"DELETE" });
   selectedServer = null;
   await loadServers();
@@ -1039,7 +1039,7 @@ async function deleteServer(id) {
 }
 
 async function leaveServer(id) {
-  if (!confirm("Leave this server?")) return;
+  if (!confirm("Leave this lobby?")) return;
   await api(`/servers/${id}/leave`, { method:"DELETE" });
   selectedServer = null;
   await loadServers();

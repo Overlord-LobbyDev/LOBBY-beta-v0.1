@@ -409,7 +409,7 @@ app.get("/servers/search", requireAuth, async (req, res) => {
 
 app.post("/servers", requireAuth, async (req, res) => {
   const { name, description } = req.body;
-  if (!name || name.trim().length < 2) return res.status(400).json({ error: "Server name must be at least 2 characters" });
+  if (!name || name.trim().length < 2) return res.status(400).json({ error: "Lobby name must be at least 2 characters" });
   try {
     // Generate a unique 6-char alphanumeric ID
     const uniqueId = Math.random().toString(36).slice(2, 8).toUpperCase();
@@ -502,14 +502,14 @@ app.post("/servers/:id/join", requireAuth, async (req, res) => {
       "SELECT tags FROM servers WHERE id = $1",
       [req.params.id]
     );
-    if (!serverRow.rows[0]) return res.status(404).json({ error: "Server not found" });
+    if (!serverRow.rows[0]) return res.status(404).json({ error: "Lobby not found" });
 
     let tags = [];
     try { tags = JSON.parse(serverRow.rows[0].tags || "[]"); } catch {}
     const isPublic = Array.isArray(tags) && tags.length > 0;
 
     if (!isPublic) {
-      return res.status(403).json({ error: "This server is private. You need an invite to join." });
+      return res.status(403).json({ error: "This lobby is private. You need an invite to join." });
     }
 
     await pool.query(
@@ -526,7 +526,7 @@ app.post("/servers/:id/join", requireAuth, async (req, res) => {
 app.delete("/servers/:id", requireAuth, async (req, res) => {
   const r = await pool.query("SELECT owner_id FROM servers WHERE id = $1", [req.params.id]);
   const server = r.rows[0];
-  if (!server) return res.status(404).json({ error: "Server not found" });
+  if (!server) return res.status(404).json({ error: "Lobby not found" });
   const isAdmin = (await pool.query("SELECT is_admin FROM users WHERE id = $1", [req.userId])).rows[0]?.is_admin;
   if (server.owner_id !== req.userId && !isAdmin) return res.status(403).json({ error: "Not authorised" });
   await pool.query("DELETE FROM servers WHERE id = $1", [req.params.id]);
@@ -542,14 +542,14 @@ app.post("/servers/:id/invite", requireAuth, async (req, res) => {
       "SELECT 1 FROM server_members WHERE server_id = $1 AND user_id = $2",
       [req.params.id, req.userId]
     );
-    if (!membership.rows.length) return res.status(403).json({ error: "You are not in this server" });
+    if (!membership.rows.length) return res.status(403).json({ error: "You are not in this lobby" });
 
     // Don't invite someone already in the server
     const already = await pool.query(
       "SELECT 1 FROM server_members WHERE server_id = $1 AND user_id = $2",
       [req.params.id, userId]
     );
-    if (already.rows.length) return res.status(409).json({ error: "User is already in this server" });
+    if (already.rows.length) return res.status(409).json({ error: "User is already in this lobby" });
 
     // Store as a pending invite — recipient must accept
     await pool.query(
@@ -637,7 +637,7 @@ app.delete("/servers/:id/members/:userId", requireAuth, async (req, res) => {
     );
     const targetRole = targetRow.rows[0]?.role;
     if (!targetRole) return res.status(404).json({ error: "Member not found" });
-    if (targetRole === "owner") return res.status(403).json({ error: "Cannot remove the server owner" });
+    if (targetRole === "owner") return res.status(403).json({ error: "Cannot remove the lobby owner" });
     if (requesterRole === "moderator" && targetRole === "moderator") {
       return res.status(403).json({ error: "Moderators cannot remove other moderators" });
     }

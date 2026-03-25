@@ -77,7 +77,7 @@
       display:flex; flex-direction:column; align-items:center;
       gap:4px; flex-shrink:0; width:100%; padding:0 0 4px;
     }
-    /* Scrollable server icons area */
+    /* Scrollable lobby icons area */
     #serverIcons {
       display:flex; flex-direction:column; align-items:center;
       gap:4px; overflow-y:auto; overflow-x:hidden;
@@ -283,7 +283,7 @@
     .channel-item .ch-delete { display:none; font-size:13px; color:var(--danger); }
     .channel-item:hover .ch-delete { display:block; }
 
-    /* Server action section */
+    /* Lobby action section */
     .server-actions {
       margin:8px; border-radius:10px; overflow:hidden;
       border:1px solid rgba(255,255,255,.06);
@@ -755,7 +755,7 @@
     .notif-btn-accept:hover { background:var(--green); color:#fff; }
     .notif-btn-decline { background:rgba(237,66,69,.15); color:var(--danger); }
     .notif-btn-decline:hover { background:var(--danger); color:#fff; }
-    /* ── Server Settings Modal ───────────────────────────────── */
+    /* ── Lobby Settings Modal ───────────────────────────────── */
     .ss-modal {
       width:min(560px,94vw); max-height:85vh; padding:0;
       display:flex; flex-direction:column; overflow:hidden;
@@ -1328,7 +1328,7 @@
       padding:2px 8px; border-radius:99px; flex-shrink:0;
     }
     .gsearch-tag.user { background:rgba(88,101,242,.2); color:#a5b4fc; }
-    .gsearch-tag.community { background:rgba(34,197,94,.15); color:#86efac; }
+    .gsearch-tag.lobby { background:rgba(34,197,94,.15); color:#86efac; }
     .gsearch-empty { padding:20px 14px; font-size:13px; color:var(--text-3); text-align:center; }
     #socialFeed {
       position:fixed; top:72px; right:0; bottom:0;
@@ -1961,7 +1961,7 @@
     .spotlight-card-stats { display:flex; gap:10px; font-size:12px; color:rgba(255,255,255,.7); }
     .spotlight-card-stat { display:flex; align-items:center; gap:3px; }
 
-    /* Communities */
+    /* Lobbies */
     .home-communities-grid { display:grid; grid-template-columns:repeat(auto-fill,minmax(200px,1fr)); gap:14px; }
     .community-card {
       background:var(--bg-2); border-radius:12px; border:1px solid rgba(255,255,255,.08);
@@ -1993,7 +1993,7 @@
     .community-join-btn.joined { background:var(--bg-3); color:var(--text-2); border:1px solid rgba(255,255,255,.1); }
     .community-join-btn.joined:hover { background:rgba(237,66,69,.15); color:var(--danger); }
 
-    /* ── Community tag chips ──────────────────────────── */
+    /* ── Lobby tag chips ──────────────────────────── */
     .tag-chip {
       display:inline-flex; align-items:center; gap:5px;
       background:rgba(88,101,242,.18); border:1px solid rgba(88,101,242,.35);
@@ -2278,7 +2278,7 @@
 
 </div>
 
-<!-- Server list -->
+<!-- Lobby list -->
 <div class="server-list" id="serverList">
   <!-- Fixed top nav -->
   <div class="server-list-top">
@@ -2308,13 +2308,13 @@
     <div class="server-icon" id="groupsNavIcon" title="Groups" style="font-size:0">
       <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
     </div>
-    <div class="server-add-btn" title="Create Server" onclick="openModal('createServerModal')" style="font-size:0">
+    <div class="server-add-btn" title="Create Lobby" onclick="openModal('createServerModal')" style="font-size:0">
       <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
     </div>
     <div class="server-divider"></div>
   </div>
 
-  <!-- Scrollable server icons -->
+  <!-- Scrollable lobby icons -->
   <div id="serverIcons"></div>
 
   <!-- Bottom spacer -->
@@ -2332,14 +2332,14 @@
   <div class="channel-sidebar-header" id="channelSidebarHeader">
     <div class="channel-sidebar-header-top">
       <span id="sidebarTitle">Direct Messages</span>
-      <button class="sidebar-settings-btn" id="sidebarSettingsBtn" title="Server Settings" style="display:none" onclick="if(selectedServer)openServerSettings(selectedServer.id)">
+      <button class="sidebar-settings-btn" id="sidebarSettingsBtn" title="Lobby Settings" style="display:none" onclick="if(selectedServer)openServerSettings(selectedServer.id)">
         <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
       </button>
       <button class="icon-btn" id="sidebarAddFriendBtn" onclick="openModal('addFriendModal')" title="Add Friend">
         <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M16 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="8.5" cy="7" r="4"/><line x1="20" y1="8" x2="20" y2="14"/><line x1="23" y1="11" x2="17" y2="11"/></svg>
       </button>
     </div>
-    <!-- Invite button — only shown in servers -->
+    <!-- Invite button — only shown in lobbies -->
     <button class="sidebar-invite-btn hidden" id="sidebarInviteBtn" onclick="if(selectedServer)inviteFriendToServer(selectedServer.id)">
       <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M16 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="8.5" cy="7" r="4"/><line x1="20" y1="8" x2="20" y2="14"/><line x1="23" y1="11" x2="17" y2="11"/></svg>
       Invite People
@@ -2376,35 +2376,40 @@
   </div>
 </div>
 
-<div class="home-header">
-    <!-- Left: Logo (fixed width) -->
-    <div style="display:flex;align-items:center;gap:0;flex-shrink:0;cursor:default;user-select:none;min-width:160px">
-      <div style="
-        font-family:'Bebas Neue',sans-serif;
-        font-size:32px;
-        letter-spacing:4px;
-        color:transparent;
-        background:linear-gradient(135deg, var(--text-1) 0%, var(--accent) 55%, color-mix(in srgb, var(--accent) 60%, white) 100%);
-        -webkit-background-clip:text;
-        background-clip:text;
-        -webkit-text-fill-color:transparent;
-        text-shadow:none;
-        position:relative;
-        padding:0 2px;
-        line-height:1;
-      ">LOBBY</div>
-      <div style="
-        font-size:8px;font-weight:900;letter-spacing:2px;
-        color:var(--accent);
-        text-transform:uppercase;
-        writing-mode:vertical-rl;
-        transform:rotate(180deg);
-        margin-left:4px;
-        opacity:.7;
-        align-self:center;
-      ">BETA</div>
-    </div>
+<!-- Fixed LOBBY logo — always top-left -->
+<div id="lobbyLogoFixed" onclick="showHomePanel()" style="
+  position:fixed;top:0;left:0;z-index:600;
+  display:flex;align-items:center;gap:0;
+  cursor:pointer;user-select:none;
+  height:72px;padding:0 12px 0 20px;
+">
+  <div style="
+    font-family:'Bebas Neue',sans-serif;
+    font-size:32px;
+    letter-spacing:4px;
+    color:transparent;
+    background:linear-gradient(135deg, var(--text-1) 0%, var(--accent) 55%, color-mix(in srgb, var(--accent) 60%, white) 100%);
+    -webkit-background-clip:text;
+    background-clip:text;
+    -webkit-text-fill-color:transparent;
+    text-shadow:none;
+    position:relative;
+    padding:0 2px;
+    line-height:1;
+  ">LOBBY</div>
+  <div style="
+    font-size:8px;font-weight:900;letter-spacing:2px;
+    color:var(--accent);
+    text-transform:uppercase;
+    writing-mode:vertical-rl;
+    transform:rotate(180deg);
+    margin-left:4px;
+    opacity:.7;
+    align-self:center;
+  ">BETA</div>
+</div>
 
+<div class="home-header">
     <!-- Centre: Search -->
     <div id="globalSearchWrap" style="display:flex;flex-direction:column;align-items:center;gap:3px;">
       <div id="userLobbySubtitle" style="
@@ -2418,7 +2423,7 @@
       ">Welcome to LOBBY</div>
       <div style="position:relative;width:100%;">
         <svg class="gsearch-icon" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
-        <input id="globalSearchInput" placeholder="Search users and communities…" autocomplete="off"
+        <input id="globalSearchInput" placeholder="Search users and lobbies…" autocomplete="off"
           oninput="onGlobalSearch(this.value)"
           onfocus="if(this.value.trim())document.getElementById('globalSearchResults').classList.add('open')" />
         <span id="gsearchKbd">⌘K</span>
@@ -2474,12 +2479,12 @@
       </div>
     </section>
 
-    <!-- ── Communities ── -->
+    <!-- ── Lobbies ── -->
     <section id="homeCommunities">
       <div class="home-section-header">
         <div>
-          <div class="home-section-title">👥 Communities</div>
-          <div class="home-section-sub">Open servers ready for you to join</div>
+          <div class="home-section-title">👥 Lobbies</div>
+          <div class="home-section-sub">Open lobbies ready for you to join</div>
         </div>
         <button class="home-section-btn" onclick="loadCommunities()">↺ Refresh</button>
       </div>
@@ -2590,7 +2595,7 @@
 </div>
 
 <!-- Members sidebar -->
-<!-- Members bar toggle — fixed bottom centre, only shows in servers -->
+<!-- Members bar toggle — fixed bottom centre, only shows in lobbies -->
 <button id="membersToggleBtn" onclick="toggleMembersBar()" title="Toggle members"
   style="display:none;position:fixed;bottom:0;left:50%;transform:translateX(-50%);
          z-index:401;background:var(--bg-2);border:1px solid rgba(255,255,255,.12);
@@ -2635,7 +2640,7 @@
           <input type="file" id="cssIconInput" accept="image/*" style="display:none" onchange="cssPreviewIcon(this)" />
         </div>
         <div style="flex:1;padding-top:28px">
-          <input type="text" id="serverName" placeholder="My Awesome Server" oninput="cssUpdateIconEmoji()" style="
+          <input type="text" id="serverName" placeholder="My Awesome Lobby" oninput="cssUpdateIconEmoji()" style="
             width:100%;background:var(--bg-3);border:1.5px solid rgba(255,255,255,.1);
             border-radius:8px;color:var(--text-1);font-size:15px;font-weight:700;
             font-family:var(--font);padding:9px 13px;outline:none;
@@ -2646,7 +2651,7 @@
       <!-- Description -->
       <div>
         <label style="font-size:11px;font-weight:700;color:var(--text-3);text-transform:uppercase;letter-spacing:.5px;display:block;margin-bottom:6px">Description</label>
-        <textarea id="cssDescription" placeholder="What's this server about?" maxlength="200" style="
+        <textarea id="cssDescription" placeholder="What's this lobby about?" maxlength="200" style="
           width:100%;background:var(--bg-3);border:1.5px solid rgba(255,255,255,.1);
           border-radius:8px;color:var(--text-1);font-size:13px;font-family:var(--font);
           padding:9px 13px;outline:none;resize:none;min-height:70px;line-height:1.5;
@@ -2666,7 +2671,7 @@
           flex:1;background:var(--accent);color:#fff;border:none;
           border-radius:8px;padding:10px;font-size:13px;font-weight:700;
           font-family:var(--font);cursor:pointer;transition:background .15s;
-        " onmouseover="this.style.background='var(--accent-h)'" onmouseout="this.style.background='var(--accent)'">Create Server</button>
+        " onmouseover="this.style.background='var(--accent-h)'" onmouseout="this.style.background='var(--accent)'">Create Lobby</button>
       </div>
 
     </div>
@@ -2685,12 +2690,12 @@
   </div>
 </div>
 
-<!-- ── Server Settings Modal ─────────────────────────────────── -->
+<!-- ── Lobby Settings Modal ─────────────────────────────────── -->
 <div class="modal-overlay" id="serverSettingsModal">
   <div class="modal ss-modal">
     <div class="ss-header">
       <div class="ss-title-wrap">
-        <h3 id="ssServerName">Server Settings</h3>
+        <h3 id="ssServerName">Lobby Settings</h3>
         <span class="ss-uid" id="ssServerUid"></span>
       </div>
       <button class="ss-close" onclick="closeModal('serverSettingsModal')">
@@ -2722,24 +2727,24 @@
         <input type="file" id="ssIconInput" accept="image/*" style="display:none" onchange="ssPreviewIcon(this)"/>
       </div>
       <div class="modal-field">
-        <label>Server Name</label>
-        <input type="text" id="ssName" placeholder="Server name…" maxlength="64"/>
+        <label>Lobby Name</label>
+        <input type="text" id="ssName" placeholder="Lobby name…" maxlength="64"/>
       </div>
       <div class="modal-field">
         <label>Description</label>
-        <textarea id="ssDescription" placeholder="What's this server about?" rows="3" style="resize:vertical;background:var(--bg-0);border:1.5px solid rgba(255,255,255,.08);border-radius:var(--radius);color:var(--text-1);font-size:14px;font-family:var(--font);padding:10px 13px;outline:none;width:100%;"></textarea>
+        <textarea id="ssDescription" placeholder="What's this lobby about?" rows="3" style="resize:vertical;background:var(--bg-0);border:1.5px solid rgba(255,255,255,.08);border-radius:var(--radius);color:var(--text-1);font-size:14px;font-family:var(--font);padding:10px 13px;outline:none;width:100%;"></textarea>
       </div>
       <div class="modal-field">
-        <label>Unique Server ID</label>
+        <label>Unique Lobby ID</label>
         <div style="display:flex;align-items:center;gap:8px">
           <input type="text" id="ssUidDisplay" readonly style="flex:1;cursor:default;opacity:.7"/>
           <button class="btn btn-grey" onclick="ssCopyUid()" style="flex-shrink:0;padding:9px 14px">Copy</button>
         </div>
-        <div style="font-size:11px;color:var(--text-3);margin-top:4px">Users can search <code style="background:var(--bg-3);padding:1px 5px;border-radius:4px">servername#UNIQUEID</code> to find this server directly.</div>
+        <div style="font-size:11px;color:var(--text-3);margin-top:4px">Users can search <code style="background:var(--bg-3);padding:1px 5px;border-radius:4px">lobbyname#UNIQUEID</code> to find this lobby directly.</div>
       </div>
       <!-- Visibility toggle -->
       <div class="modal-field">
-        <label>Server Visibility</label>
+        <label>Lobby Visibility</label>
         <div style="display:flex;gap:10px;margin-top:4px">
           <button id="ssVisPublicBtn" onclick="ssSetVisibility('public')"
             style="flex:1;display:flex;align-items:center;justify-content:center;gap:8px;padding:10px 14px;border-radius:8px;border:1.5px solid rgba(255,255,255,.1);background:var(--bg-3);color:var(--text-2);font-size:13px;font-weight:600;font-family:var(--font);cursor:pointer;transition:all .15s">
@@ -2750,7 +2755,7 @@
             🔒 Private
           </button>
         </div>
-        <div style="font-size:11px;color:var(--text-3);margin-top:6px" id="ssVisHint">Public servers appear in Communities and can be discovered by anyone.</div>
+        <div style="font-size:11px;color:var(--text-3);margin-top:6px" id="ssVisHint">Public lobbies appear in Lobbies and can be discovered by anyone.</div>
       </div>
       <div class="ss-msg" id="ssGeneralMsg"></div>
       <div class="modal-actions">
@@ -2760,7 +2765,7 @@
     </div>
     <!-- Tab: Tags -->
     <div class="ss-pane hidden" id="ss-pane-tags">
-      <p style="font-size:13px;color:var(--text-3);margin-bottom:12px">Add tags so members can find this server when searching. Tags appear on your server's community profile.</p>
+      <p style="font-size:13px;color:var(--text-3);margin-bottom:12px">Add tags so members can find this lobby when searching. Tags appear on your lobby's profile.</p>
       <div class="modal-field">
         <label>Add Tag</label>
         <div style="display:flex;gap:8px">
@@ -2777,7 +2782,7 @@
     </div>
     <!-- Tab: Roles & Members -->
     <div class="ss-pane hidden" id="ss-pane-roles">
-      <p style="font-size:13px;color:var(--text-3);margin-bottom:12px">Grant or revoke moderator access for server members.</p>
+      <p style="font-size:13px;color:var(--text-3);margin-bottom:12px">Grant or revoke moderator access for lobby members.</p>
       <div class="ss-members-list" id="ssMembersList"></div>
       <div class="ss-msg" id="ssRolesMsg"></div>
     </div>
@@ -2823,8 +2828,8 @@
 
 <div class="modal-overlay" id="editCommunityModal">
   <div class="modal" style="max-width:480px;gap:16px">
-    <h3>✏️ Edit Community Card</h3>
-    <p style="font-size:13px;color:var(--text-3)">This is how your server appears in Communities on the home page.</p>
+    <h3>✏️ Edit Lobby Card</h3>
+    <p style="font-size:13px;color:var(--text-3)">This is how your lobby appears in Lobbies on the home page.</p>
 
     <!-- Live preview -->
     <div id="communityPreview" style="border-radius:12px;overflow:hidden;border:1px solid rgba(255,255,255,.1);background:var(--bg-2)">
@@ -2842,14 +2847,14 @@
           </label>
           <span id="previewIconInner">?</span>
         </div>
-        <div id="previewName" style="font-size:15px;font-weight:800;color:var(--text-1);margin-bottom:3px">Server Name</div>
+        <div id="previewName" style="font-size:15px;font-weight:800;color:var(--text-1);margin-bottom:3px">Lobby Name</div>
         <div id="previewDesc" style="font-size:12px;color:var(--text-3);line-height:1.4">No description yet</div>
       </div>
     </div>
 
     <div class="modal-field">
       <label>Description</label>
-      <input type="text" id="communityDesc" placeholder="What's this community about?" maxlength="120"
+      <input type="text" id="communityDesc" placeholder="What's this lobby about?" maxlength="120"
         oninput="document.getElementById('previewDesc').textContent=this.value||'No description yet'" />
     </div>
 
@@ -2870,7 +2875,7 @@
   </div>
 </div>
 
-<!-- ── Community Tag Join Modal ── -->
+<!-- ── Lobby Tag Join Modal ── -->
 <div class="modal-overlay" id="communityTagModal" onclick="if(event.target===this)closeModal('communityTagModal')">
   <div class="modal" style="max-width:380px;padding:0;overflow:hidden" onclick="event.stopPropagation()">
     <div id="ctmBanner" style="height:80px;background:linear-gradient(135deg,var(--accent),var(--bg-0))"></div>
@@ -2884,7 +2889,7 @@
       </div>
       <div id="ctmDesc" style="font-size:13px;color:var(--text-2);margin-bottom:16px;line-height:1.5"></div>
       <div style="display:flex;gap:8px">
-        <button id="ctmJoinBtn" class="community-join-btn" style="flex:1;justify-content:center;padding:10px" onclick="ctmDoJoin()">Join Community</button>
+        <button id="ctmJoinBtn" class="community-join-btn" style="flex:1;justify-content:center;padding:10px" onclick="ctmDoJoin()">Join Lobby</button>
         <button onclick="closeModal('communityTagModal')" style="background:var(--bg-3);color:var(--text-2);border:1px solid rgba(255,255,255,.1);border-radius:8px;padding:10px 16px;font-size:13px;font-family:var(--font);cursor:pointer">Cancel</button>
       </div>
     </div>
@@ -3343,7 +3348,7 @@
     <div style="display:flex;flex:1;min-width:0">
       <button class="feed-tab active" id="feedTabFriends" onclick="switchFeedTab('friends')">👥 Friends</button>
       <button class="feed-tab" id="feedTabPublic" onclick="switchFeedTab('public')">🌐 Public</button>
-      <button class="feed-tab" id="feedTabCommunities" onclick="switchFeedTab('communities')">🏘 Communities</button>
+      <button class="feed-tab" id="feedTabCommunities" onclick="switchFeedTab('communities')">🏘 Lobbies</button>
     </div>
     <button id="feedToggleBtn" title="Hide feed"
       style="margin-left:auto;flex-shrink:0;background:var(--bg-3);border:1px solid rgba(255,255,255,.08);
@@ -3481,7 +3486,7 @@ async function boot() {
     await showDMPanel();
   }
   setTimeout(patchWsForGroups, 1500);
-  // Load any server invites that arrived while offline
+  // Load any lobby invites that arrived while offline
   loadPendingServerInvites();
 }
 
@@ -3492,7 +3497,7 @@ async function loadPendingServerInvites() {
 
     const existingNotifs = loadNotifs();
 
-    // Remove stale server-invite notifs for invites that no longer exist in DB
+    // Remove stale lobby-invite notifs for invites that no longer exist in DB
     const activeServerIds = new Set(invites.map(inv => inv.server_id));
     const pruned = existingNotifs.filter(n =>
       !(n.type === "server" && n.meta?.serverId && !activeServerIds.has(n.meta.serverId))
@@ -3589,7 +3594,7 @@ function updateOnlineDots() {
   });
 }
 
-// ── Servers ───────────────────────────────────────────────────
+// ── Lobbies ───────────────────────────────────────────────────
 async function loadServers() {
   const servers = await api("/servers");
   _allServers = servers || [];
@@ -3735,7 +3740,7 @@ function renderChannelList(channels, members, server) {
     voice.forEach(c => { html += channelItem(c, canManage); }); html += "</div>";
   }
 
-  // Server actions card
+  // Lobby actions card
   const isOwner = myServerRole === "owner";
   const isAloneOwner = isOwner && members.length <= 1;
 
@@ -3743,7 +3748,7 @@ function renderChannelList(channels, members, server) {
     <div class="server-actions">
       ${canManage ? `<div class="server-action-item" onclick="openServerSettings(${server.id})">
         <span class="sa-icon"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg></span>
-        Server Settings
+        Lobby Settings
       </div>` : ""}
       <div class="server-action-item" onclick="inviteFriendToServer(${server.id})">
         <span class="sa-icon"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><line x1="19" y1="8" x2="19" y2="14"/><line x1="22" y1="11" x2="16" y2="11"/></svg></span>
@@ -3751,11 +3756,11 @@ function renderChannelList(channels, members, server) {
       </div>
       ${!isAloneOwner ? `<div class="server-action-item" onclick="leaveServer(${server.id})">
         <span class="sa-icon"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg></span>
-        Leave Server
+        Leave Lobby
       </div>` : ""}
       ${isOwner ? `<div class="server-action-item danger" onclick="deleteServer(${server.id})">
         <span class="sa-icon" style="color:var(--danger)"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/><path d="M10 11v6M14 11v6"/><path d="M9 6V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2"/></svg></span>
-        Delete Server
+        Delete Lobby
       </div>` : ""}
     </div>
   </div>`;
@@ -3869,7 +3874,7 @@ function memberItem(m, isOnline) {
                   && m.id !== me?.id
                   && m.role !== "owner";
   const kickBtn = canKick
-    ? `<button class="member-kick-btn" title="Remove from server"
+    ? `<button class="member-kick-btn" title="Remove from lobby"
         onclick="event.stopPropagation();kickMember(${selectedServer?.id},${m.id},'${m.username.replace(/'/g,"\'")}')">✕</button>`
     : "";
   return `<div class="member-item" data-user-id="${m.id}" onclick="openProfilePanel(${m.id})" title="${m.username} ${tag}${m.role !== 'member' ? ' ('+m.role+')' : ''}">
@@ -3883,11 +3888,11 @@ function memberItem(m, isOnline) {
 }
 
 async function kickMember(serverId, userId, username) {
-  if (!confirm(`Remove ${username} from this server?`)) return;
+  if (!confirm(`Remove ${username} from this lobby?`)) return;
   try {
     const r = await api(`/servers/${serverId}/members/${userId}`, { method: "DELETE" });
     if (r.success) {
-      showToast(`${username} removed from server`, "success");
+      showToast(`${username} removed from lobby`, "success");
       // Re-render members list
       const serverData = await api(`/servers/${serverId}/members`);
       renderMembers(Array.isArray(serverData) ? serverData : (serverData?.members || []));
@@ -3899,7 +3904,7 @@ async function kickMember(serverId, userId, username) {
   }
 }
 
-// ── Create Server helpers ──────────────────────────────────────
+// ── Create Lobby helpers ──────────────────────────────────────
 let cssIconFile = null, cssBannerFile = null;
 
 function cssUpdateIconEmoji() {
@@ -3953,10 +3958,10 @@ async function createServer() {
   cssIconFile = null; cssBannerFile = null;
   await loadServers();
   await loadCommunities();
-  showToast(`Server "${name}" created!`, "success");
+  showToast(`Lobby "${name}" created!`, "success");
 }
 
-// ── Edit Server ────────────────────────────────────────────────
+// ── Edit Lobby ────────────────────────────────────────────────
 
 async function deleteServer(id) {
   let members = [];
@@ -3966,7 +3971,7 @@ async function deleteServer(id) {
     showTransferOwnershipModal(id, others);
     return;
   }
-  if (!confirm("You are the only member. Permanently delete this server?")) return;
+  if (!confirm("You are the only member. Permanently delete this lobby?")) return;
   await api(`/servers/${id}`, { method:"DELETE" });
   selectedServer = null; await loadServers(); showDMPanel();
 }
@@ -3985,7 +3990,7 @@ function showTransferOwnershipModal(serverId, members) {
   el.innerHTML = `
     <div class="modal" style="max-width:420px">
       <h3>Transfer Ownership First</h3>
-      <p style="color:var(--text-3);font-size:13px;line-height:1.5">You must pass ownership to another member before deleting. Select who takes over — they'll become the new owner and the server will then be deleted.</p>
+      <p style="color:var(--text-3);font-size:13px;line-height:1.5">You must pass ownership to another member before deleting. Select who takes over — they'll become the new owner and the lobby will then be deleted.</p>
       <div style="display:flex;flex-direction:column;gap:4px;max-height:220px;overflow-y:auto;padding:4px 0">${memberOptions}</div>
       <div id="transferMsg" style="font-size:12px;color:var(--danger);min-height:16px"></div>
       <div class="modal-actions">
@@ -4023,7 +4028,7 @@ async function confirmTransferAndDelete(serverId) {
     document.getElementById("transferOwnerModal")?.remove();
     _transferSelectedId = null;
     selectedServer = null; await loadServers(); showDMPanel();
-    showToast("Server deleted", "success");
+    showToast("Lobby deleted", "success");
   } catch(e) {
     document.getElementById("transferMsg").textContent = "Something went wrong. Try again.";
     if (btn) { btn.disabled = false; btn.textContent = "Transfer & Delete"; }
@@ -4031,7 +4036,7 @@ async function confirmTransferAndDelete(serverId) {
 }
 
 async function leaveServer(id) {
-  if (!confirm("Leave this server?")) return;
+  if (!confirm("Leave this lobby?")) return;
   await api(`/servers/${id}/leave`, { method:"DELETE" });
   selectedServer = null; await loadServers(); showDMPanel();
 }
@@ -4069,7 +4074,7 @@ async function inviteFriendToServer(serverId) {
     const accepted = (friends || []).filter(f => f.status === "accepted");
     if (!accepted.length) { showToast("You have no friends to invite yet", "error"); return; }
 
-    // Filter out friends already in the server
+    // Filter out friends already in the lobby
     let members = [];
     try {
       const serverData = await api(`/servers/${serverId}/members`);
@@ -4078,7 +4083,7 @@ async function inviteFriendToServer(serverId) {
     const memberIds = new Set(members.map(m => m.user_id || m.id));
     const invitable = accepted.filter(f => !memberIds.has(f.other_id));
 
-    if (!invitable.length) { showToast("All your friends are already in this server!", "info"); return; }
+    if (!invitable.length) { showToast("All your friends are already in this lobby!", "info"); return; }
 
     const server = _allServers?.find(s => s.id === serverId);
 
@@ -5230,7 +5235,7 @@ async function joinVoiceChannel(channelId, channelName) {
   vcChannelId = channelId;
   vcChannelName = channelName;
 
-  // Tell server we joined
+  // Tell backend we joined
   wsSend({ type:"vc-join", channelId, username: me.username, avatarUrl: me.avatarUrl || null });
 
   // Add ourselves to local member list
@@ -5265,7 +5270,7 @@ async function leaveVoiceChannel() {
   hideVcPanel();
   hideVcPip();
   // Don't navigate anywhere — just re-show whichever panel was last active.
-  // If the server sidebar is open, the chat panel is the right home.
+  // If the lobby sidebar is open, the chat panel is the right home.
   // We never force-navigate on leave; the user stays where they were.
   if (currentPanel === "chat" || document.body.classList.contains("sidebar-open")) {
     document.getElementById("homePanel")?.classList.add("hidden");
@@ -5287,7 +5292,7 @@ async function leaveVoiceChannel() {
 }
 
 function refreshChannelListVc() {
-  // Re-render the channel sidebar without a full server reload
+  // Re-render the channel sidebar without a full lobby reload
   if (typeof renderChannelList === "function" && _lastChannels && _lastServer) {
     renderChannelList(_lastChannels, _lastMembers, _lastServer);
   }
@@ -5806,7 +5811,7 @@ function handleNotifAction(id, action, event) {
     if (btn) { btn.disabled = true; btn.textContent = "Joining…"; }
     api(`/servers/${n.meta.serverId}/accept-invite`, { method:"POST" }).then(r => {
       if (r.success) {
-        showToast("Joined server!", "success");
+        showToast("Joined lobby!", "success");
         loadServers();
         el?.remove();
         // Remove from localStorage so it won't reappear on reload
@@ -5815,7 +5820,7 @@ function handleNotifAction(id, action, event) {
         renderNotifBadge();
       } else {
         if (btn) { btn.disabled = false; btn.textContent = "Join"; }
-        showToast(r.error || "Could not join server", "error");
+        showToast(r.error || "Could not join lobby", "error");
       }
     });
   } else if (action === "decline-server" && n?.meta?.serverId) {
@@ -5928,7 +5933,7 @@ renderNotifBadge();
 
 // ── End Notification System ───────────────────────────────────
 
-// ── Server Settings ───────────────────────────────────────────
+// ── Lobby Settings ───────────────────────────────────────────
 let _ssServerId = null;
 let _ssTags = [];
 let _ssBannerFile = null;
@@ -5940,7 +5945,7 @@ async function openServerSettings(serverId) {
   _ssBannerFile = null;
   _ssIconFile = null;
 
-  // Load server data
+  // Load lobby data
   const server = _allServers?.find(s => s.id === serverId) || await api(`/servers/${serverId}`);
   const members = await api(`/servers/${serverId}/members`);
 
@@ -5949,7 +5954,7 @@ async function openServerSettings(serverId) {
   document.getElementById("ssName").value = server.name;
   document.getElementById("ssDescription").value = server.description || "";
 
-  // Unique ID — generate from server id if not already stored
+  // Unique ID — generate from lobby id if not already stored
   const uid = server.unique_id || server.uid || String(serverId).padStart(6,"0");
   document.getElementById("ssUidDisplay").value = uid;
   document.getElementById("ssServerUid").textContent = `#${uid}`;
@@ -6083,11 +6088,11 @@ function ssSetVisibility(vis, silent = false) {
   if (vis === "public") {
     pubBtn.style.cssText  = activeStyle;
     privBtn.style.cssText = inactiveStyle;
-    if (hint) hint.textContent = "🌐 Public — This server appears in Communities and can be discovered by anyone.";
+    if (hint) hint.textContent = "🌐 Public — This lobby appears in Lobbies and can be discovered by anyone.";
   } else {
     pubBtn.style.cssText  = inactiveStyle;
     privBtn.style.cssText = activeStyle.replace("rgba(88,101,242,.15)", "rgba(237,66,69,.12)").replace("var(--accent)", "var(--danger)");
-    if (hint) hint.textContent = "🔒 Private — This server will never appear in Communities or search results.";
+    if (hint) hint.textContent = "🔒 Private — This lobby will never appear in Lobbies or search results.";
   }
 }
 
@@ -6136,7 +6141,7 @@ function ssCopyUid() {
   navigator.clipboard.writeText(`${name}#${val}`).then(() => showToast("Server ID copied!", "success"));
 }
 
-// ── End Server Settings ───────────────────────────────────────
+// ── End Lobby Settings ───────────────────────────────────────
 
 function setupCallSignalling() {
   if (!ws||ws.readyState!==WebSocket.OPEN) { setTimeout(setupCallSignalling,500); return; }
@@ -6186,7 +6191,7 @@ function switchFeedTab(tab) {
   document.getElementById("feedTabPublic").classList.toggle("active",      tab === "public");
   document.getElementById("feedTabCommunities")?.classList.toggle("active", tab === "communities");
 
-  // Communities tab: only server admins/owners can post
+  // Lobbies tab: only lobby admins/owners can post
   const composeBox = document.querySelector(".compose-box");
   if (composeBox) {
     if (tab === "communities") {
@@ -6198,7 +6203,7 @@ function switchFeedTab(tab) {
         const notice = document.getElementById("communityTabNotice") || document.createElement("div");
         notice.id = "communityTabNotice";
         notice.style.cssText = "text-align:center;padding:12px 16px;font-size:12px;color:var(--text-3);background:var(--bg-1);border-top:1px solid rgba(255,255,255,.06)";
-        notice.innerHTML = "🏘 Only community admins can post here — follow communities by joining their servers";
+        notice.innerHTML = "🏘 Only lobby admins can post here — follow lobbies by joining them";
         document.getElementById("socialFeed").appendChild(notice);
       }
     } else {
@@ -6263,7 +6268,7 @@ async function loadFeed(append=false) {
       // Public tab: only posts marked public, from anyone
       return p.visibility === "public";
     } else if (feedTab === "communities") {
-      // Communities tab: posts that have community tags, posted by a server admin/owner
+      // Lobbies tab: posts that have lobby tags, posted by a lobby admin/owner
       const hasTags = p.community_tags && p.community_tags.length > 0;
       const isAdminPost = (_allServers||[]).some(s =>
         s.owner_id === p.user_id || s.created_by === p.user_id || s.user_id === p.user_id);
@@ -6367,7 +6372,7 @@ function renderFeed(posts) {
     const msg = feedTab === "friends"
       ? "No posts from friends yet — add some friends or switch to Public!"
       : feedTab === "communities"
-        ? "No community posts yet — community admins can post here to promote their server"
+        ? "No lobby posts yet — lobby admins can post here to promote their lobby"
         : "No public posts yet — be the first to post!";
     const icon = feedTab === "friends" ? "👥" : feedTab === "communities" ? "🏘" : "🌐";
     container.innerHTML=`<div style="text-align:center;padding:48px;color:var(--text-3)"><div style="font-size:40px;margin-bottom:12px">${icon}</div><div>${msg}</div></div>`;
@@ -6920,7 +6925,7 @@ function onGlobalSearch(val) {
 }
 
 async function runGlobalSearch(q) {
-  // Save to search history for community recommendations
+  // Save to search history for lobby recommendations
   try {
     const hist = JSON.parse(localStorage.getItem("lobby_search_history") || "[]");
     if (!hist.includes(q)) {
@@ -6933,10 +6938,10 @@ async function runGlobalSearch(q) {
   const headers = { Authorization: `Bearer ${token}` };
   const lq = q.toLowerCase();
 
-  // Detect name#uid pattern for direct server lookup
+  // Detect name#uid pattern for direct lobby lookup
   const uidMatch = q.match(/^(.+)#(\w+)$/);
 
-  // Run searches in parallel — backend now returns both member + public servers with is_member flag
+  // Run searches in parallel — backend now returns both member + public lobbies with is_member flag
   const [usersRes, serversRes, friendsRes] = await Promise.allSettled([
     fetch(`${AUTH_URL}/users/search?q=${encodeURIComponent(q)}`, { headers }).then(r => r.ok ? r.json() : []),
     fetch(`${AUTH_URL}/servers/search?q=${encodeURIComponent(uidMatch ? uidMatch[1] : q)}`, { headers }).then(r => r.ok ? r.json() : []),
@@ -6948,7 +6953,7 @@ async function runGlobalSearch(q) {
 
   let servers;
   if (uidMatch) {
-    // Filter by both name and uid for direct server#uid lookup
+    // Filter by both name and uid for direct lobby#uid lookup
     const [, nameQ, uidQ] = uidMatch;
     servers = allSrvs.filter(s =>
       s.name?.toLowerCase().includes(nameQ.toLowerCase()) &&
@@ -6994,9 +6999,9 @@ async function runGlobalSearch(q) {
   }
 
   if (servers.length) {
-    // Show all matching servers (backend returns member + public servers with is_member flag)
+    // Show all matching lobbies (backend returns member + public lobbies with is_member flag)
     if (servers.length) {
-      html += `<div class="gsearch-section-label">👥 Communities</div>`;
+      html += `<div class="gsearch-section-label">👥 Lobbies</div>`;
       html += servers.slice(0, 8).map(s => {
         const icon = s.icon_url ? `<img src="${s.icon_url}"/>` : (s.name||"?").slice(0,2).toUpperCase();
         const count = s.member_count || s.members || 0;
@@ -7165,7 +7170,7 @@ document.addEventListener("click", e => {
 const _origSubmitPost = window.submitPost;
 // Tags are injected into post submission below
 
-// Render community tags in a post card
+// Render lobby tags in a post card
 function renderPostTags(tags) {
   if (!tags || !tags.length) return "";
   return `<div style="display:flex;flex-wrap:wrap;gap:6px;padding:4px 16px 10px">
@@ -7173,7 +7178,7 @@ function renderPostTags(tags) {
   </div>`;
 }
 
-// ── Community Tag Join Modal ───────────────────────────────────
+// ── Lobby Tag Join Modal ───────────────────────────────────
 let _ctmServerId = null;
 function openCommunityTagJoin(id, name, iconUrl, bannerUrl, desc, memberCount) {
   _ctmServerId = id;
@@ -7186,13 +7191,13 @@ function openCommunityTagJoin(id, name, iconUrl, bannerUrl, desc, memberCount) {
   icon.innerHTML = iconUrl ? `<img src="${iconUrl}" style="width:100%;height:100%;object-fit:cover"/>` : (name||"?").slice(0,2).toUpperCase();
   document.getElementById("ctmName").textContent = name;
   document.getElementById("ctmMembers").textContent = `👥 ${memberCount} member${memberCount!==1?"s":""}`;
-  document.getElementById("ctmDesc").textContent = desc || "A community on LOBBY";
+  document.getElementById("ctmDesc").textContent = desc || "A lobby on LOBBY";
   // Check if already joined
   const myServers = _allServers;
   const joined = myServers.find(s => s.id === id);
   const btn = document.getElementById("ctmJoinBtn");
   if (joined) { btn.textContent = "✓ Already a member — Open"; btn.className = "community-join-btn joined"; }
-  else { btn.textContent = "Join Community"; btn.className = "community-join-btn"; }
+  else { btn.textContent = "Join Lobby"; btn.className = "community-join-btn"; }
   openModal("communityTagModal");
 }
 
@@ -7210,7 +7215,7 @@ async function ctmDoJoin() {
       btn.textContent = "✓ Joined!"; btn.className = "community-join-btn joined";
       _allServers = []; // refresh cache
       await loadServers();
-      showToast("Joined community!", "success");
+      showToast("Joined lobby!", "success");
       setTimeout(() => closeModal("communityTagModal"), 800);
     } else {
       showToast(r?.error || "Could not join", "error");
@@ -7235,7 +7240,7 @@ document.getElementById("postBtn").addEventListener("click", async () => {
   btn.disabled=true; btn.textContent="Posting…";
   const formData=new FormData(); formData.append("content",content); formData.append("visibility",visibility);
   if (postImageFile) formData.append("image",postImageFile);
-  // Attach community tags
+  // Attach lobby tags
   if (_selectedTags.length) formData.append("community_tags", JSON.stringify(_selectedTags.map(t=>t.id)));
   const r=await fetch(`${AUTH_URL}/posts`,{ method:"POST", headers:{ Authorization:`Bearer ${feedToken}` }, body:formData }).then(r=>r.json());
   btn.disabled=false; btn.textContent="Post";
@@ -7687,7 +7692,7 @@ function showHomePanel() {
 }
 
 async function showHomeFriendsSidebar() {
-  // Hide the server members bar — it only belongs on server views
+  // Hide the lobby members bar — it only belongs on lobby views
   document.getElementById("membersSidebar").style.display = "none";
   document.getElementById("membersSidebar").classList.remove("open");
   document.body.classList.remove("members-bar-open", "members-visible");
@@ -8146,7 +8151,7 @@ function spotlightUpdateNav() {
   if (next) next.disabled = _spotlightIndex >= _spotlightCount - SPOTLIGHT_VISIBLE;
 }
 
-// ── Communities ───────────────────────────────────────────────
+// ── Lobbies ───────────────────────────────────────────────
 async function loadCommunities() {
   const container = document.getElementById("communitiesList");
   if (!container) return;
@@ -8155,7 +8160,7 @@ async function loadCommunities() {
   try {
     const token = localStorage.getItem("vh_token") || sessionStorage.getItem("vh_token");
 
-    // Fetch all public/discoverable servers (backend returns is_member flag)
+    // Fetch all public/discoverable lobbies (backend returns is_member flag)
     const [myServersRaw, discoverRaw] = await Promise.all([
       api("/servers").catch(() => []),
       fetch(`${AUTH_URL}/servers/search?q=`, { headers:{ Authorization:`Bearer ${token}` }}).then(r => r.ok ? r.json() : []).catch(() => [])
@@ -8167,7 +8172,7 @@ async function loadCommunities() {
       container.innerHTML = `
         <div style="color:var(--text-3);font-size:13px;padding:24px 20px;background:var(--bg-2);border-radius:12px;border:1px dashed rgba(255,255,255,.1);display:flex;align-items:center;gap:14px">
           <span style="font-size:32px">👥</span>
-          <div><div style="font-weight:700;color:var(--text-2);margin-bottom:4px">No public communities yet</div><div>Create a server and set it to Public to appear here</div></div>
+          <div><div style="font-weight:700;color:var(--text-2);margin-bottom:4px">No public lobbies yet</div><div>Create a lobby and set it to Public to appear here</div></div>
           <button class="community-join-btn" style="margin-left:auto;flex-shrink:0" onclick="openModal('createServerModal')">+ Create</button>
         </div>`;
       return;
@@ -8257,12 +8262,12 @@ async function loadCommunities() {
     }).join("");
 
   } catch(e) {
-    container.innerHTML = `<div style="color:var(--text-3);font-size:13px;padding:20px">Could not load communities</div>`;
+    container.innerHTML = `<div style="color:var(--text-3);font-size:13px;padding:20px">Could not load lobbies</div>`;
   }
 }
 
 
-// ── Community card editor ──────────────────────────────────────
+// ── Lobby card editor ──────────────────────────────────────
 let _communityBannerFile = null;
 let _communityIconFile   = null;
 
@@ -8320,7 +8325,7 @@ async function saveCommunityCard() {
     }).then(r=>r.json());
     if (r.error) { showModalMsg("editCommunityMsg", r.error, "error"); return; }
     closeModal("editCommunityModal");
-    showToast("Community card updated!", "success");
+    showToast("Lobby card updated!", "success");
     loadCommunities(); loadServers();
   } catch(e) { showModalMsg("editCommunityMsg", "Failed to save", "error"); }
 }
@@ -8338,7 +8343,7 @@ async function joinCommunity(serverId, btn, name) {
     await loadServers();
     showToast(`Joined ${name}!`, "success");
   } catch(e) {
-    showToast("Could not join community", "error");
+    showToast("Could not join lobby", "error");
   }
 }
 
@@ -8473,7 +8478,7 @@ async function showFullProfilePage(userId) {
   document.getElementById("chatPanel").classList.add("hidden");
   document.getElementById("profilePage").classList.remove("hidden");
 
-  // Hide the server members bar — same behaviour as home
+  // Hide the lobby members bar — same behaviour as home
   document.getElementById("membersSidebar").style.display = "none";
   document.getElementById("membersSidebar").classList.remove("open");
   document.body.classList.remove("members-bar-open", "members-visible");
@@ -9970,7 +9975,7 @@ showHomePanel();
 })();
 // Start with feed sidebar visible
 document.body.classList.add("feed-open");
-// Server list visibility is managed by showHomePanel on initial load
+// Lobby list visibility is managed by showHomePanel on initial load
 </script>
 <script src="client.js"></script>
 <script>
