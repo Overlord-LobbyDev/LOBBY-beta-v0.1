@@ -3648,24 +3648,27 @@ function updateGroupBadge() {
 // ── Check unread DMs on page load ──
 async function checkUnreadDMs() {
   try {
+    console.log("[unread] checking unread DMs...");
     const convos = await api("/dm/conversations");
-    if (!convos || !Array.isArray(convos)) return;
+    console.log("[unread] convos response:", convos);
+    if (!convos || !Array.isArray(convos)) { console.warn("[unread] invalid response, skipping"); return; }
     let totalUnread = 0;
     for (const c of convos) {
       // Skip if the last message was sent by me
-      if (c.from_user_id === me?.id) continue;
+      if (c.from_user_id === me?.id) { console.log("[unread] skipping own msg to", c.other_id); continue; }
       // Check if this conversation has been read
       const lastRead = localStorage.getItem("dm_last_read_" + c.other_id);
       const msgTime = new Date(c.created_at).getTime();
+      console.log("[unread] user", c.other_id, "msgTime:", msgTime, "lastRead:", lastRead);
       if (!lastRead || msgTime > parseInt(lastRead)) {
-        // This conversation has unread messages
         unreadDMs[c.other_id] = (unreadDMs[c.other_id] || 0) + 1;
         totalUnread++;
       }
     }
+    console.log("[unread] totalUnread:", totalUnread, "unreadDMs:", JSON.stringify(unreadDMs));
     if (totalUnread > 0) updateDMBadge();
   } catch (e) {
-    console.error("checkUnreadDMs error:", e);
+    console.error("[unread] checkUnreadDMs error:", e);
   }
 }
 
@@ -4422,7 +4425,6 @@ async function openDM(userId, username, avatarUrl) {
   currentView = { type:"dm", id:userId, name:username };
   // Mark this DM as read
   localStorage.setItem("dm_last_read_" + userId, Date.now().toString());
-  delete unreadDMs[userId]; updateDMBadge();
   delete unreadDMs[userId]; updateDMBadge();
   document.querySelectorAll(".dm-item").forEach(el => el.classList.remove("active"));
   document.querySelector(`.dm-item[data-user-id="${userId}"]`)?.classList.add("active");
