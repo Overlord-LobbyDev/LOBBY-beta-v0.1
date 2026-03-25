@@ -163,8 +163,9 @@ async function initDb() {
       user_id      INTEGER REFERENCES users(id) ON DELETE CASCADE,
       content      TEXT,
       image_url    TEXT DEFAULT NULL,
-      visibility   TEXT DEFAULT 'public', -- public, friends
-      created_at   TIMESTAMPTZ DEFAULT NOW()
+      visibility       TEXT DEFAULT 'public', -- public, friends
+      community_tags   JSONB DEFAULT '[]',
+      created_at       TIMESTAMPTZ DEFAULT NOW()
     );
   `);
 
