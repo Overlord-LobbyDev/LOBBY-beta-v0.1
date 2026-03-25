@@ -233,6 +233,26 @@ app.get("/profile/:id", requireAuth, async (req, res) => {
   } catch(err) { console.error("[GET /profile/:id]", err.message); res.status(500).json({ error: "Profile error: " + err.message }); }
 });
 
+// GET /users/:id/mutual-servers — lobbies both you and another user share
+app.get("/users/:id/mutual-servers", requireAuth, async (req, res) => {
+  try {
+    const otherId = parseInt(req.params.id);
+    if (!otherId || isNaN(otherId)) return res.status(400).json({ error: "Invalid user ID" });
+    const r = await pool.query(
+      `SELECT s.id, s.name, s.icon_url
+       FROM servers s
+       JOIN server_members sm1 ON sm1.server_id = s.id AND sm1.user_id = $1
+       JOIN server_members sm2 ON sm2.server_id = s.id AND sm2.user_id = $2
+       ORDER BY s.name`,
+      [req.userId, otherId]
+    );
+    res.json(r.rows);
+  } catch(err) {
+    console.error("[GET /users/:id/mutual-servers]", err.message);
+    res.status(500).json({ error: "Failed to fetch mutual servers" });
+  }
+});
+
 // ── Friends ──────────────────────────────────────────────────
 
 app.get("/friends", requireAuth, async (req, res) => {
@@ -1473,6 +1493,63 @@ process.on("unhandledRejection", (reason, promise) => {
 });
 process.on("uncaughtException", (err) => {
   console.error("[UNCAUGHT EXCEPTION]", err);
+});
+
+// ── Home Section Order Endpoints ─────────────────────────────────
+app.get("/home/section-order", requireAuth, async (req, res) => {
+  try {
+    const header = req.headers.authorization || "";
+    const payload = jwt.verify(header.slice(7), SECRET);
+    const userId = payload.id;
+
+    const row = await pool.query(
+      "SELECT order_json FROM home_section_order WHERE user_id = $1",
+      [userId]
+    );
+
+    if (row.rows.length === 0) {
+      // Create default order if doesn't exist
+      await pool.query(
+        "INSERT INTO home_section_order (user_id, order_json) VALUES ($1, $2) ON CONFLICT (user_id) DO NOTHING",
+        [userId, JSON.stringify(["homeRecents", "homeSpotlight", "homeCommunities"])]
+      );
+      return res.json(["homeRecents", "homeSpotlight", "homeCommunities"]);
+    }
+
+    const order = JSON.parse(row.rows[0].order_json);
+    res.json(order);
+  } catch (err) {
+    console.error("[home/section-order GET]", err);
+    res.status(500).json({ error: "Failed to get section order" });
+  }
+});
+
+app.post("/home/section-order", requireAuth, async (req, res) => {
+  try {
+    const header = req.headers.authorization || "";
+    const payload = jwt.verify(header.slice(7), SECRET);
+    const userId = payload.id;
+    const { order } = req.body;
+
+    if (!Array.isArray(order) || order.length !== 3) {
+      return res.status(400).json({ error: "Order must be an array of 3 section IDs" });
+    }
+
+    const validIds = new Set(["homeRecents", "homeSpotlight", "homeCommunities"]);
+    if (!order.every(id => validIds.has(id))) {
+      return res.status(400).json({ error: "Invalid section ID in order" });
+    }
+
+    await pool.query(
+      "INSERT INTO home_section_order (user_id, order_json) VALUES ($1, $2) ON CONFLICT (user_id) DO UPDATE SET order_json = $2, updated_at = NOW()",
+      [userId, JSON.stringify(order)]
+    );
+
+    res.json({ success: true, order });
+  } catch (err) {
+    console.error("[home/section-order POST]", err);
+    res.status(500).json({ error: "Failed to save section order" });
+  }
 });
 
 // Express error-catching middleware (must be last, before listen)

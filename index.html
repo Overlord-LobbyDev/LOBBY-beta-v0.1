@@ -1827,8 +1827,36 @@
 
 
     .home-section-header {
-      display:flex; align-items:flex-start; justify-content:space-between;
-      margin-bottom:14px; gap:12px;
+      display:flex; align-items:flex-start; justify-content:space-between; gap:12px;
+      margin-bottom:14px; padding:8px 8px; user-select:none; cursor:grab;
+      border-radius:8px; transition:all .2s cubic-bezier(.34, 1.56, .64, 1);
+      position:relative;
+    }
+    .home-section-header::before {
+      content:"⋮⋮"; color:var(--text-3); font-size:12px; font-weight:900;
+      position:absolute; left:0; top:50%; transform:translateY(-50%);
+      opacity:0; transition:opacity .2s; letter-spacing:-.6px;
+    }
+    .home-section-header:hover {
+      background:rgba(255,255,255,.04); cursor:grab;
+    }
+    .home-section-header:hover::before {
+      opacity:1; color:var(--accent);
+    }
+    .home-section-header.dragging {
+      background:rgba(124,179,255,.1); border:1px solid rgba(124,179,255,.3);
+      box-shadow:0 8px 24px rgba(124,179,255,.15), inset 0 0 0 1px rgba(124,179,255,.2);
+      transform:scale(1.01);
+      cursor:grabbing;
+    }
+    .home-section-header:active { cursor:grabbing; }
+    .home-section-header.drag-over {
+      background:rgba(124,179,255,.12); border-bottom:3px solid var(--accent);
+      box-shadow:0 4px 16px rgba(124,179,255,.2);
+      padding-bottom:10px;
+    }
+    .home-section-header > div:first-child {
+      padding-left:20px;
     }
     .home-section-title { font-size:18px; font-weight:800; color:var(--text-1); letter-spacing:-.2px; }
     .home-section-sub { font-size:12px; color:var(--text-3); margin-top:2px; }
@@ -2498,7 +2526,7 @@
 
     <!-- ── Recents ── -->
     <section id="homeRecents">
-      <div class="home-section-header">
+      <div class="home-section-header" draggable="true">
         <div>
           <div class="home-section-title">🎮 Recently Played</div>
           <div class="home-section-sub">Your recently played games from Steam</div>
@@ -2517,7 +2545,7 @@
 
     <!-- ── Spotlight ── -->
     <section id="homeSpotlight">
-      <div class="home-section-header">
+      <div class="home-section-header" draggable="true">
         <div>
           <div class="home-section-title">🔥 Spotlight</div>
           <div class="home-section-sub">Hottest public posts in the last 48 hours</div>
@@ -2536,7 +2564,7 @@
 
     <!-- ── Lobbies ── -->
     <section id="homeCommunities">
-      <div class="home-section-header">
+      <div class="home-section-header" draggable="true">
         <div>
           <div class="home-section-title">👥 Lobbies</div>
           <div class="home-section-sub">Open lobbies ready for you to join</div>
@@ -3218,6 +3246,11 @@
   from { opacity:0; transform:scale(.92) translateY(16px); }
   to   { opacity:1; transform:scale(1)  translateY(0); }
 }
+@keyframes dropPulse {
+  0% { transform:scale(.99); }
+  50% { transform:scale(1.02); }
+  100% { transform:scale(1); }
+}
 </style>
 
 <div class="modal-overlay" id="outgoingCallModal">
@@ -3841,6 +3874,122 @@ function initServerDrag(container) {
   });
 }
 
+// ── Home Section Drag-to-Reorder ──────────────────────────────────
+function initHomeSecDrag(container) {
+  let dragEl = null, dragOver = null;
+
+  container.addEventListener("dragstart", e => {
+    dragEl = e.target.closest(".home-section-header");
+    if (!dragEl) return;
+    dragEl.classList.add("dragging");
+    e.dataTransfer.effectAllowed = "move";
+    e.dataTransfer.setDragImage(new Image(), 0, 0);
+  });
+
+  container.addEventListener("dragend", e => {
+    if (dragEl) { dragEl.classList.remove("dragging"); dragEl = null; }
+    if (dragOver) { dragOver.classList.remove("drag-over"); dragOver = null; }
+    saveHomeSecOrder();
+  });
+
+  container.addEventListener("dragover", e => {
+    e.preventDefault();
+    const target = e.target.closest(".home-section-header");
+    if (!target || target === dragEl) return;
+    if (dragOver && dragOver !== target) dragOver.classList.remove("drag-over");
+    dragOver = target;
+    dragOver.classList.add("drag-over");
+    
+    // Find parent sections
+    const dragSection = dragEl?.closest("section");
+    const targetSection = target.closest("section");
+    if (dragSection && targetSection) {
+      const parent = dragSection.parentElement;
+      const rect = targetSection.getBoundingClientRect();
+      const midY = rect.top + rect.height / 2;
+      if (e.clientY < midY) {
+        parent.insertBefore(dragSection, targetSection);
+      } else {
+        parent.insertBefore(dragSection, targetSection.nextSibling);
+      }
+    }
+  });
+
+  container.addEventListener("dragleave", e => {
+    if (dragOver && !container.contains(e.relatedTarget)) {
+      dragOver.classList.remove("drag-over");
+      dragOver = null;
+    }
+  });
+
+  container.addEventListener("drop", e => {
+    e.preventDefault();
+    if (dragOver) { 
+      dragOver.classList.remove("drag-over");
+      // Trigger drop animation
+      dragOver.style.animation = "none";
+      setTimeout(() => {
+        dragOver.style.animation = "dropPulse .3s ease-out";
+      }, 10);
+      dragOver = null; 
+    }
+  });
+}
+
+async function saveHomeSecOrder() {
+  try {
+    const homeContent = document.getElementById("homeContent");
+    const sections = [...homeContent.querySelectorAll("section")];
+    const order = sections.map(s => s.id).filter(id => ["homeRecents", "homeSpotlight", "homeCommunities"].includes(id));
+    
+    const token = localStorage.getItem("vh_token");
+    if (!token) return;
+
+    await fetch(`${AUTH_API}/home/section-order`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "Authorization": `Bearer ${token}`
+      },
+      body: JSON.stringify({ order })
+    });
+  } catch (err) {
+    console.error("[home-order-save]", err);
+  }
+}
+
+async function loadHomeSecOrder() {
+  try {
+    const token = localStorage.getItem("vh_token");
+    if (!token) return;
+
+    const res = await fetch(`${AUTH_API}/home/section-order`, {
+      headers: { "Authorization": `Bearer ${token}` }
+    });
+    if (!res.ok) return;
+
+    const order = await res.json();
+    if (!Array.isArray(order)) return;
+
+    // Reorder sections in DOM
+    const homeContent = document.getElementById("homeContent");
+    const sections = new Map();
+    homeContent.querySelectorAll("section").forEach(s => {
+      if (["homeRecents", "homeSpotlight", "homeCommunities"].includes(s.id)) {
+        sections.set(s.id, s);
+      }
+    });
+
+    // Insert sections in the desired order
+    for (const id of order) {
+      const section = sections.get(id);
+      if (section) homeContent.appendChild(section);
+    }
+  } catch (err) {
+    console.error("[home-order-load]", err);
+  }
+}
+
 async function selectServer(server) {
   selectedServer = server;
   delete unreadServers[server.id]; updateServerBadge(server.id);
@@ -3860,10 +4009,23 @@ async function selectServer(server) {
   const sl  = document.getElementById("serverList");
   cs?.classList.add("open");
   document.body.classList.add("sidebar-open");
-  applyChannelResizeStyles();
+  if(typeof applyChannelResizeStyles==="function")applyChannelResizeStyles();
   if (sl) sl.classList.remove("collapsed");
   if (btn) btn.textContent = "◀";
   currentPanel = "chat";
+
+  // Hide social feed sidebar (home only) and show members sidebar (server only)
+  const socialFeed = document.getElementById("socialFeed");
+  const membersSidebar = document.getElementById("membersSidebar");
+  if (socialFeed) {
+    socialFeed.style.display = "none";
+    socialFeed.classList.add("collapsed");
+  }
+  if (membersSidebar) {
+    membersSidebar.style.display = "block";
+    membersSidebar.classList.add("open");
+    document.body.classList.add("members-bar-open", "members-visible");
+  }
 
   const members = await api(`/servers/${server.id}/members`);
   const me_member = members.find(m => m.id === me.id);
@@ -4006,7 +4168,7 @@ function hideMembersBar() {
   const btn = document.getElementById("membersToggleBtn");
   sidebar.classList.remove("open");
   document.body.classList.remove("members-visible");
-  clearMembersResizeStyles();
+  if(typeof clearMembersResizeStyles==="function")clearMembersResizeStyles();
   if (btn) {
     btn.style.bottom = "0";
     btn.querySelector("polyline").setAttribute("points", "2,8 6,4 10,8");
@@ -4020,7 +4182,7 @@ function toggleMembersBar() {
   if (isOpen) {
     sidebar.classList.remove("open");
     document.body.classList.remove("members-visible");
-    clearMembersResizeStyles();
+    if(typeof clearMembersResizeStyles==="function")clearMembersResizeStyles();
     if (btn) {
       btn.style.bottom = "0";
       btn.querySelector("polyline").setAttribute("points", "2,8 6,4 10,8");
@@ -4028,9 +4190,9 @@ function toggleMembersBar() {
   } else {
     sidebar.classList.add("open");
     document.body.classList.add("members-visible");
-    applyMembersResizeStyles();
+    if(typeof applyMembersResizeStyles==="function")applyMembersResizeStyles();
     if (btn) {
-      var h = window._resizeState.membersH || 100;
+      var h = (window._resizeState && window._resizeState.membersH) || 100;
       btn.style.bottom = h + "px";
       btn.querySelector("polyline").setAttribute("points", "2,4 6,8 10,4");
     }
@@ -4610,7 +4772,7 @@ function appendMessage(msg, type) {
     <div class="msg-avatar" style="cursor:pointer" onclick="openProfile(${authorId})">${avatarHtml}</div>
     <div class="msg-body">
       <div class="msg-header">
-        <span class="msg-username" style="cursor:pointer" onclick="openProfile(${authorId})">${msg.username||"Unknown"}</span>
+        <span class="msg-username" style="cursor:pointer" onclick="openProfilePanel(${authorId})" data-user-id="${authorId}">${msg.username||"Unknown"}</span>
         <span class="msg-time">${time}</span>
         ${canDelete?`<button class="msg-delete" onclick="deleteMessage(${msg.id})">🗑 Delete</button>`:""}
       </div>
@@ -6619,8 +6781,8 @@ function renderPost(post) {
   const friendsIcon = `<svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>`;
   return `<div class="post-card" id="post-${post.id}">
     <div class="post-header">
-      <div class="post-avatar" onclick="openProfilePanel(${post.user_id})" style="cursor:pointer">${av}</div>
-      <div><div class="post-author" onclick="openProfilePanel(${post.user_id})">${post.username}</div><div style="font-size:11px;color:var(--text-3)">${time}</div></div>
+      <div class="post-avatar" data-user-id="${post.user_id}" onclick="openProfilePanel(${post.user_id})" style="cursor:pointer">${av}</div>
+      <div><div class="post-author" data-user-id="${post.user_id}" onclick="openProfilePanel(${post.user_id})">${post.username}</div><div style="font-size:11px;color:var(--text-3)">${time}</div></div>
       <span class="post-visibility-badge" style="display:flex;align-items:center;gap:4px">${post.visibility==="friends"?friendsIcon:globeIcon} ${vis}</span>
       ${isMe||feedMe?.is_admin?`<button class="post-delete-btn" onclick="deletePost(${post.id})" title="Delete post">${trashIcon}</button>`:""}
     </div>
@@ -8009,11 +8171,26 @@ function showHomePanel() {
   const sl  = document.getElementById("serverList");
   cs?.classList.add("open");
   document.body.classList.add("sidebar-open");
-  applyChannelResizeStyles();
+  if(typeof applyChannelResizeStyles==="function")applyChannelResizeStyles();
   if (sl) sl.classList.remove("collapsed");
   if (btn) btn.textContent = "◀";
   currentPanel = "home";
   setPageTitle("HOME 🏠");
+  
+  // Show social feed sidebar (home only) and hide members sidebar
+  const socialFeed = document.getElementById("socialFeed");
+  const membersSidebar = document.getElementById("membersSidebar");
+  if (socialFeed) {
+    socialFeed.style.display = "flex";
+    socialFeed.classList.remove("collapsed");
+    if(typeof applySocialResizeStyles==="function")applySocialResizeStyles();
+  }
+  if (membersSidebar) {
+    membersSidebar.style.display = "none";
+    membersSidebar.classList.remove("open");
+    document.body.classList.remove("members-bar-open", "members-visible");
+  }
+  
   showHomeFriendsSidebar();
   if (typeof initFeed === "function" && !feedMe) initFeed();
   if (typeof initHomePage === "function") initHomePage();
@@ -8024,7 +8201,7 @@ async function showHomeFriendsSidebar() {
   document.getElementById("membersSidebar").style.display = "none";
   document.getElementById("membersSidebar").classList.remove("open");
   document.body.classList.remove("members-bar-open", "members-visible");
-  clearMembersResizeStyles();
+  if(typeof clearMembersResizeStyles==="function")clearMembersResizeStyles();
   const mtBtn = document.getElementById("membersToggleBtn");
   if (mtBtn) mtBtn.style.display = "none";
   document.getElementById("sidebarTitle").textContent = "Friends"; setSidebarMode("friends");
@@ -8039,7 +8216,7 @@ async function showHomeFriendsSidebar() {
     html += `<div class="channel-section"><div class="channel-section-label"><span style="display:flex;align-items:center;gap:6px"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><circle cx="12" cy="12" r="3" fill="currentColor"/></svg> Online — ${online.length}</span></div>`;
     online.forEach(f => {
       const av = f.avatar_url ? `<img src="${f.avatar_url}" />` : f.username.slice(0,1).toUpperCase();
-      html += `<div class="dm-item" onclick="openDM(${f.other_id},'${f.username}','${f.avatar_url||''}')"
+      html += `<div class="dm-item" data-user-id="${f.other_id}" onclick="openProfilePanel(${f.other_id})"
         oncontextmenu="showFriendContextMenu(event,${f.id},'${f.username}',${f.other_id})">
         <div class="dm-avatar">${av}<div class="online-dot"></div></div>
         <div style="flex:1;min-width:0">
@@ -8055,7 +8232,7 @@ async function showHomeFriendsSidebar() {
     html += `<div class="channel-section"><div class="channel-section-label"><span style="display:flex;align-items:center;gap:6px"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/></svg> Offline — ${offline.length}</span></div>`;
     offline.forEach(f => {
       const av = f.avatar_url ? `<img src="${f.avatar_url}" />` : f.username.slice(0,1).toUpperCase();
-      html += `<div class="dm-item" style="opacity:.6" onclick="openDM(${f.other_id},'${f.username}','${f.avatar_url||''}')"
+      html += `<div class="dm-item" data-user-id="${f.other_id}" style="opacity:.6" onclick="openProfilePanel(${f.other_id})"
         oncontextmenu="showFriendContextMenu(event,${f.id},'${f.username}',${f.other_id})">
         <div class="dm-avatar">${av}</div>
         <div style="flex:1;min-width:0">
@@ -8086,7 +8263,7 @@ function toggleChatSidebar() {
   document.body.classList.toggle("sidebar-open", !isOpen);
   if (sl) sl.classList.toggle("collapsed", isOpen);
   if (btn) btn.textContent = isOpen ? "▶" : "◀";
-  if (isOpen) { clearChannelResizeStyles(); } else { applyChannelResizeStyles(); }
+  if (isOpen) { if(typeof clearChannelResizeStyles==="function")clearChannelResizeStyles(); } else { if(typeof applyChannelResizeStyles==="function")applyChannelResizeStyles(); }
 }
 
 function showChatPanel() {
@@ -8103,9 +8280,23 @@ function showChatPanel() {
   const sl  = document.getElementById("serverList");
   cs?.classList.add("open");
   document.body.classList.add("sidebar-open");
-  applyChannelResizeStyles();
+  if(typeof applyChannelResizeStyles==="function")applyChannelResizeStyles();
   if (sl) sl.classList.remove("collapsed");
   if (btn) btn.textContent = "◀";
+  
+  // Hide social feed sidebar (home only) and show members sidebar (chat only)
+  const socialFeed = document.getElementById("socialFeed");
+  const membersSidebar = document.getElementById("membersSidebar");
+  if (socialFeed) {
+    socialFeed.style.display = "none";
+    socialFeed.classList.add("collapsed");
+  }
+  if (membersSidebar) {
+    membersSidebar.style.display = "block";
+    membersSidebar.classList.add("open");
+    document.body.classList.add("members-bar-open", "members-visible");
+  }
+  
   if (typeof showDMPanel === "function") showDMPanel();
 }
 
@@ -8131,9 +8322,23 @@ rewireNavIcon("groupsNavIcon", () => {
   const sl  = document.getElementById("serverList");
   cs?.classList.add("open");
   document.body.classList.add("sidebar-open");
-  applyChannelResizeStyles();
+  if(typeof applyChannelResizeStyles==="function")applyChannelResizeStyles();
   if (sl) sl.classList.remove("collapsed");
   if (btn) btn.textContent = "◀";
+  
+  // Hide social feed sidebar (home only) and show members sidebar (chat only)
+  const socialFeed = document.getElementById("socialFeed");
+  const membersSidebar = document.getElementById("membersSidebar");
+  if (socialFeed) {
+    socialFeed.style.display = "none";
+    socialFeed.classList.add("collapsed");
+  }
+  if (membersSidebar) {
+    membersSidebar.style.display = "block";
+    membersSidebar.classList.add("open");
+    document.body.classList.add("members-bar-open", "members-visible");
+  }
+  
   showGroupsPanel();
 });
 
@@ -8219,7 +8424,7 @@ function toggleFeed() {
   document.body.classList.toggle("feed-open",   feedVisible);
   document.body.classList.toggle("feed-closed", !feedVisible);
   if (reopenBtn) reopenBtn.style.display = feedVisible ? "none" : "block";
-  if (feedVisible) { feedThawGifs(); applyFeedResizeStyles(); } else { feedFreezeGifs(); clearFeedResizeStyles(); }
+  if (feedVisible) { feedThawGifs(); if(typeof applyFeedResizeStyles==="function")applyFeedResizeStyles(); } else { feedFreezeGifs(); if(typeof clearFeedResizeStyles==="function")clearFeedResizeStyles(); }
 }
 
 document.getElementById("feedToggleBtn").addEventListener("click", e => { e.stopPropagation(); toggleFeed(); });
@@ -8255,7 +8460,10 @@ if (pendingDM) {
 // ── Home Page ─────────────────────────────────────────────────
 
 async function initHomePage() {
+  await loadHomeSecOrder(); // Load user's preferred section order
   await Promise.all([loadRecents(), loadSpotlight(), loadCommunities()]);
+  const homeContent = document.getElementById("homeContent");
+  if (homeContent) initHomeSecDrag(homeContent); // Enable drag-to-reorder
 }
 
 // ── Recents ───────────────────────────────────────────────────
@@ -8428,7 +8636,7 @@ async function loadSpotlight() {
         <div class="spotlight-card-overlay"></div>
         <div class="spotlight-rank-badge" style="background:${rankBg}">${rankLabel}</div>
         <div class="spotlight-card-body">
-          <div class="spotlight-card-author">
+          <div class="spotlight-card-author" data-user-id="${p.user_id}" onclick="event.stopPropagation();openProfilePanel(${p.user_id})" style="cursor:pointer">
             <div class="spotlight-card-av">${av}</div>
             <span class="spotlight-card-name">${escapeHtml(p.username||"")}</span>
             <span class="spotlight-card-time">${time}</span>
@@ -8811,9 +9019,15 @@ async function showFullProfilePage(userId) {
   document.getElementById("membersSidebar").style.display = "none";
   document.getElementById("membersSidebar").classList.remove("open");
   document.body.classList.remove("members-bar-open", "members-visible");
-  clearMembersResizeStyles();
+  if(typeof clearMembersResizeStyles==="function")clearMembersResizeStyles();
   const mtBtn = document.getElementById("membersToggleBtn");
   if (mtBtn) mtBtn.style.display = "none";
+  
+  const socialFeed = document.getElementById("socialFeed");
+  if (socialFeed) {
+    socialFeed.style.display = "none";
+    socialFeed.classList.add("collapsed");
+  }
 
   // Mark nav icon active
   clearAllNavIcons();
@@ -10719,6 +10933,74 @@ input.sp-slider::-webkit-slider-thumb:hover { transform: scale(1.2); }
 ::-webkit-scrollbar { width: 5px; }
 ::-webkit-scrollbar-thumb { background: var(--bg-3); border-radius: 3px; }
 
+/* Profile hover card */
+.profile-hover-card {
+  position: fixed;
+  background: var(--bg-2);
+  border: 1px solid var(--bg-3);
+  border-radius: 12px;
+  box-shadow: 0 8px 32px rgba(0,0,0,0.3);
+  z-index: 9999;
+  width: 280px;
+  opacity: 0;
+  transform: scale(0.95) translateY(-4px);
+  transition: opacity 0.2s, transform 0.2s;
+  pointer-events: none;
+}
+.profile-hover-card.show {
+  opacity: 1;
+  transform: scale(1) translateY(0);
+  pointer-events: auto;
+}
+.profile-hover-card-banner {
+  width: 100%;
+  height: 60px;
+  background: linear-gradient(135deg, var(--accent), var(--bg-3));
+  border-radius: 12px 12px 0 0;
+  object-fit: cover;
+}
+.profile-hover-card-content {
+  padding: 12px;
+  text-align: center;
+}
+.profile-hover-card-avatar {
+  width: 56px;
+  height: 56px;
+  border-radius: 50%;
+  background: var(--bg-3);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin: -28px auto 8px;
+  border: 3px solid var(--bg-2);
+  font-weight: 600;
+  font-size: 20px;
+  flex-shrink: 0;
+  overflow: hidden;
+}
+.profile-hover-card-avatar img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+.profile-hover-card-name {
+  font-weight: 700;
+  font-size: 14px;
+  color: var(--text-1);
+  margin-bottom: 2px;
+}
+.profile-hover-card-username {
+  font-size: 12px;
+  color: var(--text-3);
+  margin-bottom: 8px;
+}
+.profile-hover-card-status {
+  font-size: 11px;
+  color: var(--text-3);
+  padding-top: 6px;
+  border-top: 1px solid var(--bg-3);
+}
+
 </style>
 <script>
 /* settings-panel.js — inject a slide-in settings drawer */
@@ -11965,6 +12247,169 @@ input.sp-slider::-webkit-slider-thumb:hover { transform: scale(1.2); }
     initResizeHandles();
   }
 })();
+
+/* ── Profile Hover Card System ─────────────────────────────────
+   Uses event delegation so it works on ALL dynamic content
+   automatically — no re-init needed when panels change.
+   ──────────────────────────────────────────────────────────── */
+let hoverCardTimer = null;
+let currentHoveredUserId = null;
+let hoverCardTarget = null;
+
+const hoverCard = document.createElement("div");
+hoverCard.className = "profile-hover-card";
+hoverCard.id = "profileHoverCard";
+document.body.appendChild(hoverCard);
+
+// Find the closest user element from any event target
+function findUserElement(el) {
+  // Walk up the DOM to find an element with data-user-id
+  while (el && el !== document.body) {
+    if (el.dataset && el.dataset.userId) return el;
+    // Check common user-clickable classes
+    if (el.classList && (
+      el.classList.contains("msg-username") ||
+      el.classList.contains("member-item") ||
+      el.classList.contains("dm-item") ||
+      el.classList.contains("post-author") ||
+      el.classList.contains("post-avatar") ||
+      el.classList.contains("spotlight-card-author") ||
+      el.classList.contains("fp-friend-row") ||
+      el.classList.contains("profile-friend-chip")
+    ) && el.dataset && el.dataset.userId) return el;
+    el = el.parentElement;
+  }
+  return null;
+}
+
+async function showProfileHoverCard(element, userId) {
+  if (!userId) return;
+  currentHoveredUserId = userId;
+  
+  try {
+    const _token = localStorage.getItem("vh_token") || sessionStorage.getItem("vh_token");
+    const headers = { Authorization: `Bearer ${_token}` };
+    
+    // Fetch profile and mutual servers in parallel
+    const [profileRes, mutualRes] = await Promise.all([
+      fetch(`${AUTH_URL}/profile/${userId}`, { headers }),
+      fetch(`${AUTH_URL}/users/${userId}/mutual-servers`, { headers }).catch(() => null)
+    ]);
+    if (!profileRes.ok) return;
+    // Make sure user hasn't moved away during fetch
+    if (currentHoveredUserId !== userId) return;
+    
+    const user = await profileRes.json();
+    const mutualServers = mutualRes && mutualRes.ok ? await mutualRes.json() : [];
+    
+    const av = user.avatar_url
+      ? `<img src="${user.avatar_url}"/>`
+      : (user.username||"?").slice(0,1).toUpperCase();
+    
+    const isOnline = onlineUserIds && onlineUserIds.has(userId);
+    const statusEmoji = user.status_emoji || "";
+    const statusText = user.status_text || "";
+    const statusLine = statusEmoji || statusText
+      ? `${statusEmoji} ${statusText}`.trim()
+      : (isOnline ? '<span style="color:#3ba55d">● Online</span>' : '<span style="color:var(--text-3)">○ Offline</span>');
+    
+    // Build shared lobbies HTML
+    let lobbiesHtml = "";
+    if (mutualServers.length > 0) {
+      const lobbyChips = mutualServers.slice(0, 4).map(s => {
+        const icon = s.icon_url
+          ? `<img src="${s.icon_url}" style="width:16px;height:16px;border-radius:4px;object-fit:cover;flex-shrink:0" />`
+          : `<span style="width:16px;height:16px;border-radius:4px;background:var(--accent);display:flex;align-items:center;justify-content:center;font-size:9px;font-weight:700;flex-shrink:0">${(s.name||"?")[0].toUpperCase()}</span>`;
+        return `<div style="display:flex;align-items:center;gap:6px;padding:3px 8px;background:var(--bg-3);border-radius:6px;font-size:11px;color:var(--text-2);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:100%">${icon}<span style="overflow:hidden;text-overflow:ellipsis">${escapeHtml(s.name)}</span></div>`;
+      }).join("");
+      const extra = mutualServers.length > 4 ? `<span style="font-size:10px;color:var(--text-3)">+${mutualServers.length - 4} more</span>` : "";
+      lobbiesHtml = `
+        <div style="padding-top:6px;margin-top:6px;border-top:1px solid var(--bg-3)">
+          <div style="font-size:10px;font-weight:700;color:var(--text-3);text-transform:uppercase;letter-spacing:.5px;margin-bottom:4px">Shared Lobbies</div>
+          <div style="display:flex;flex-wrap:wrap;gap:4px">${lobbyChips}${extra}</div>
+        </div>
+      `;
+    }
+    
+    hoverCard.innerHTML = `
+      <div class="profile-hover-card-banner" style="${user.banner_url ? `background-image:url(${user.banner_url});background-size:cover;background-position:center;` : ''}"></div>
+      <div class="profile-hover-card-content">
+        <div class="profile-hover-card-avatar">${av}</div>
+        <div class="profile-hover-card-name">${escapeHtml(user.display_name || user.username || "User")}</div>
+        <div class="profile-hover-card-username">@${escapeHtml(user.username || "unknown")}</div>
+        <div class="profile-hover-card-status">${statusLine}</div>
+        ${lobbiesHtml}
+      </div>
+    `;
+    
+    // Position card near the element, keep on screen
+    const rect = element.getBoundingClientRect();
+    let x = rect.right + 10;
+    let y = rect.top;
+    // If it would go off right edge, show on left side
+    if (x + 280 > window.innerWidth) x = rect.left - 290;
+    // If it would go off bottom, shift up
+    const cardHeight = mutualServers.length > 0 ? 260 : 200;
+    if (y + cardHeight > window.innerHeight) y = window.innerHeight - cardHeight - 10;
+    if (y < 10) y = 10;
+    
+    hoverCard.style.left = x + "px";
+    hoverCard.style.top = y + "px";
+    hoverCard.classList.add("show");
+  } catch (err) {
+    console.error("Hover card error:", err);
+  }
+}
+
+function hideProfileHoverCard() {
+  hoverCard.classList.remove("show");
+  currentHoveredUserId = null;
+  hoverCardTarget = null;
+  if (hoverCardTimer) { clearTimeout(hoverCardTimer); hoverCardTimer = null; }
+}
+
+// ── Event Delegation: mouseover/mouseout on document ──
+document.addEventListener("mouseover", e => {
+  // Keep hover card visible when mouse moves onto it
+  if (hoverCard.contains(e.target)) return;
+  
+  const el = findUserElement(e.target);
+  if (!el) return;
+  const uid = parseInt(el.dataset.userId);
+  if (!uid || uid === hoverCardTarget) return;
+  
+  // Clear any pending timer
+  if (hoverCardTimer) clearTimeout(hoverCardTimer);
+  hoverCardTarget = uid;
+  
+  hoverCardTimer = setTimeout(() => showProfileHoverCard(el, uid), 600);
+});
+
+document.addEventListener("mouseout", e => {
+  // If moving from user element to hover card (or within it), keep visible
+  if (hoverCard.contains(e.relatedTarget)) return;
+  // If leaving the hover card back to the user element, keep visible
+  if (hoverCard.contains(e.target) && findUserElement(e.relatedTarget)) return;
+  // If leaving the hover card to something else, hide it
+  if (hoverCard.contains(e.target)) {
+    if (hoverCardTimer) { clearTimeout(hoverCardTimer); hoverCardTimer = null; }
+    hideProfileHoverCard();
+    return;
+  }
+  
+  const el = findUserElement(e.target);
+  if (!el) return;
+  
+  // Check if we're moving to a child of the same element (ignore)
+  const related = findUserElement(e.relatedTarget);
+  if (related === el) return;
+  
+  if (hoverCardTimer) { clearTimeout(hoverCardTimer); hoverCardTimer = null; }
+  hideProfileHoverCard();
+});
+
+// Hide card when clicking anywhere (click opens profile instead)
+document.addEventListener("click", () => hideProfileHoverCard());
 </script>
 </body>
 </html>
