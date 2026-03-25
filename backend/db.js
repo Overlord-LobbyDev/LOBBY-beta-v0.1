@@ -18,11 +18,24 @@ async function initDb() {
       username     TEXT UNIQUE NOT NULL,
       password     TEXT NOT NULL,
       avatar_url   TEXT DEFAULT NULL,
-      is_admin     BOOLEAN DEFAULT FALSE,
-      is_banned    BOOLEAN DEFAULT FALSE,
-      banned_until TIMESTAMPTZ DEFAULT NULL,
-      ban_reason   TEXT DEFAULT NULL,
-      created_at   TIMESTAMPTZ DEFAULT NOW()
+      is_admin       BOOLEAN DEFAULT FALSE,
+      is_banned      BOOLEAN DEFAULT FALSE,
+      banned_until   TIMESTAMPTZ DEFAULT NULL,
+      ban_reason     TEXT DEFAULT NULL,
+      bio            TEXT DEFAULT NULL,
+      status         TEXT DEFAULT NULL,
+      banner_url     TEXT DEFAULT NULL,
+      banner_colour  TEXT DEFAULT NULL,
+      display_name   TEXT DEFAULT NULL,
+      status_emoji   TEXT DEFAULT NULL,
+      status_text    TEXT DEFAULT NULL,
+      location       TEXT DEFAULT NULL,
+      website        TEXT DEFAULT NULL,
+      steam_id       TEXT DEFAULT NULL,
+      steam_name     TEXT DEFAULT NULL,
+      steam_avatar   TEXT DEFAULT NULL,
+      post_visibility TEXT DEFAULT 'public',
+      created_at     TIMESTAMPTZ DEFAULT NOW()
     );
   `);
 
@@ -43,9 +56,13 @@ async function initDb() {
     CREATE TABLE IF NOT EXISTS servers (
       id          SERIAL PRIMARY KEY,
       name        TEXT NOT NULL,
-      icon_url    TEXT DEFAULT NULL,
-      owner_id    INTEGER REFERENCES users(id) ON DELETE CASCADE,
-      created_at  TIMESTAMPTZ DEFAULT NOW()
+      icon_url      TEXT DEFAULT NULL,
+      description   TEXT DEFAULT '',
+      unique_id     TEXT DEFAULT NULL,
+      banner_url    TEXT DEFAULT NULL,
+      tags          TEXT DEFAULT NULL,
+      owner_id      INTEGER REFERENCES users(id) ON DELETE CASCADE,
+      created_at    TIMESTAMPTZ DEFAULT NOW()
     );
   `);
 
