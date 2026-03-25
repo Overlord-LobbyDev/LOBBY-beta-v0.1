@@ -97,7 +97,7 @@
       background:var(--bg-2); display:flex; align-items:center; justify-content:center;
       font-size:21px; cursor:pointer;
       transition:border-radius .2s cubic-bezier(0.34,1.56,0.64,1), background .15s, transform .15s, box-shadow .15s;
-      position:relative; overflow:hidden; flex-shrink:0;
+      position:relative; flex-shrink:0;
       box-shadow:0 1px 4px rgba(0,0,0,.2);
     }
     .server-icon::before {
@@ -108,7 +108,7 @@
     }
     .server-icon:hover::before { transform:translateY(-50%) scaleY(1); height:20px; }
     .server-icon.active::before { transform:translateY(-50%) scaleY(1); height:36px; }
-    .server-icon img { width:100%; height:100%; object-fit:cover; border-radius:14px; }
+    .server-icon img { width:100%; height:100%; object-fit:cover; border-radius:14px; overflow:hidden; }
     .server-icon:hover { border-radius:18px; background:var(--accent); transform:translateX(3px); box-shadow:0 4px 16px rgba(0,0,0,.35); }
     .server-icon.active { border-radius:18px; background:var(--accent); transform:translateX(3px); box-shadow:0 4px 16px rgba(88,101,242,.3); }
     .server-icon.drag-over {
@@ -660,7 +660,7 @@
     .vc-pip-resize:hover svg { opacity:1; }
     /* ── Notification System ─────────────────────────────────── */
     .notif-badge {
-      position:absolute; top:2px; right:2px;
+      position:absolute; top:-4px; right:-4px; z-index:50;
       background:var(--danger); color:#fff;
       font-size:9px; font-weight:800; font-family:var(--font);
       min-width:16px; height:16px; border-radius:99px;
@@ -3446,6 +3446,10 @@ let selectedServer = null;
 let pendingFiles   = [];
 let typingTimer    = null;
 let onlineUserIds  = new Set();
+const unreadDMs = {};        // userId → count
+const unreadServers = {};    // serverId → count
+const unreadGroups = {};     // groupId → count
+const channelToServer = {};  // channelId → serverId (built at load)
 let myServerRole   = null;
 
 function authHeaders() {
@@ -3478,6 +3482,7 @@ async function boot() {
   checkAdminStatus();
   await loadUserPanel(me.id);
   connectWS();
+  checkUnreadDMs();
   await loadServers();
   // Populate the sidebar based on which panel is currently showing
   if (currentPanel === "home") {
@@ -3539,10 +3544,19 @@ function connectWS() {
   if (typeof initRTC === "function") initRTC();
   ws.onmessage = async ({ data }) => {
     const msg = JSON.parse(data);
-    if (msg.type === "channel-message" && currentView?.type === "channel" && msg.channelId === currentView.id) {
-      if (msg.message?.user_id !== me?.id) {
-        appendMessage(msg.message, "channel");
-        document.getElementById("msgContainer")?.scrollTo(0, 99999);
+    if (msg.type === "channel-message") {
+      if (currentView?.type === "channel" && msg.channelId === currentView.id) {
+        if (msg.message?.user_id !== me?.id) {
+          appendMessage(msg.message, "channel");
+          document.getElementById("msgContainer")?.scrollTo(0, 99999);
+        }
+      } else if (msg.message?.user_id !== me?.id) {
+        // Track unread for the server this channel belongs to
+        const sId = channelToServer[msg.channelId];
+        if (sId) {
+          unreadServers[sId] = (unreadServers[sId] || 0) + 1;
+          updateServerBadge(sId);
+        }
       }
     }
     if (msg.type === "direct-message") {
@@ -3552,6 +3566,8 @@ function connectWS() {
         appendMessage(msg.message, "dm");
         document.getElementById("msgContainer")?.scrollTo(0, 99999);
       } else if (!isFromMe) {
+        unreadDMs[fromId] = (unreadDMs[fromId] || 0) + 1;
+        updateDMBadge();
         showToast(`💬 ${msg.fromUsername}: ${(msg.message?.content||"").slice(0,40)}`, "success");
       }
     }
@@ -3595,6 +3611,64 @@ function updateOnlineDots() {
 }
 
 // ── Lobbies ───────────────────────────────────────────────────
+// ── Notification badge helpers ──
+function updateDMBadge() {
+  const total = Object.values(unreadDMs).reduce((a, b) => a + b, 0);
+  const icon = document.getElementById("dmServerIcon");
+  if (!icon) return;
+  let badge = icon.querySelector(".notif-badge:not(#notifBadge)");
+  if (total > 0) {
+    if (!badge) { badge = document.createElement("span"); badge.className = "notif-badge"; icon.appendChild(badge); }
+    badge.textContent = total > 99 ? "99+" : total;
+  } else if (badge) { badge.remove(); }
+}
+
+function updateServerBadge(serverId) {
+  const count = unreadServers[serverId] || 0;
+  const icon = document.querySelector(`[data-server-id="${serverId}"]`);
+  if (!icon) return;
+  let badge = icon.querySelector(".notif-badge");
+  if (count > 0) {
+    if (!badge) { badge = document.createElement("span"); badge.className = "notif-badge"; icon.appendChild(badge); }
+    badge.textContent = count > 99 ? "99+" : count;
+  } else if (badge) { badge.remove(); }
+}
+
+function updateGroupBadge() {
+  const total = Object.values(unreadGroups).reduce((a, b) => a + b, 0);
+  const icon = document.getElementById("groupsNavIcon");
+  if (!icon) return;
+  let badge = icon.querySelector(".notif-badge");
+  if (total > 0) {
+    if (!badge) { badge = document.createElement("span"); badge.className = "notif-badge"; icon.appendChild(badge); }
+    badge.textContent = total > 99 ? "99+" : total;
+  } else if (badge) { badge.remove(); }
+}
+
+// ── Check unread DMs on page load ──
+async function checkUnreadDMs() {
+  try {
+    const convos = await api("/dm/conversations");
+    if (!convos || !Array.isArray(convos)) return;
+    let totalUnread = 0;
+    for (const c of convos) {
+      // Skip if the last message was sent by me
+      if (c.from_user_id === me?.id) continue;
+      // Check if this conversation has been read
+      const lastRead = localStorage.getItem("dm_last_read_" + c.other_id);
+      const msgTime = new Date(c.created_at).getTime();
+      if (!lastRead || msgTime > parseInt(lastRead)) {
+        // This conversation has unread messages
+        unreadDMs[c.other_id] = (unreadDMs[c.other_id] || 0) + 1;
+        totalUnread++;
+      }
+    }
+    if (totalUnread > 0) updateDMBadge();
+  } catch (e) {
+    console.error("checkUnreadDMs error:", e);
+  }
+}
+
 async function loadServers() {
   const servers = await api("/servers");
   _allServers = servers || [];
@@ -3613,6 +3687,14 @@ async function loadServers() {
 
   ordered.forEach(s => icons.appendChild(makeServerIcon(s)));
   initServerDrag(icons);
+
+  // Build channel→server mapping for notification routing
+  for (const s of _allServers) {
+    try {
+      const chs = await api(`/servers/${s.id}/channels`);
+      (chs || []).forEach(c => { channelToServer[c.id] = s.id; });
+    } catch(e) {}
+  }
 }
 
 function makeServerIcon(s) {
@@ -3680,6 +3762,7 @@ function initServerDrag(container) {
 
 async function selectServer(server) {
   selectedServer = server;
+  delete unreadServers[server.id]; updateServerBadge(server.id);
   clearAllNavIcons();
   document.querySelectorAll("#serverIcons .server-icon").forEach(el => el.classList.remove("active"));
   document.querySelector(`[data-server-id="${server.id}"]`)?.classList.add("active");
@@ -4337,6 +4420,10 @@ async function removeFriend(id) {
 // ── Open DM ───────────────────────────────────────────────────
 async function openDM(userId, username, avatarUrl) {
   currentView = { type:"dm", id:userId, name:username };
+  // Mark this DM as read
+  localStorage.setItem("dm_last_read_" + userId, Date.now().toString());
+  delete unreadDMs[userId]; updateDMBadge();
+  delete unreadDMs[userId]; updateDMBadge();
   document.querySelectorAll(".dm-item").forEach(el => el.classList.remove("active"));
   document.querySelector(`.dm-item[data-user-id="${userId}"]`)?.classList.add("active");
   renderChatArea({ icon: avatarUrl ? `<img src="${avatarUrl}" style="width:20px;height:20px;border-radius:50%;object-fit:cover"/>` : "💬", name: username, placeholder: `Message ${username}` });
@@ -4560,6 +4647,7 @@ async function createGroup() {
 async function openGroup(groupId, groupName) {
   selectedGroupId = groupId;
   currentView = { type:"group", id:groupId, name:groupName };
+  delete unreadGroups[groupId]; updateGroupBadge();
   wsSend({ type:"subscribe-channel", channelId:`group-${groupId}` });
   const members = await api(`/groups/${groupId}/members`);
   const messages = await api(`/groups/${groupId}/messages`);
@@ -4732,8 +4820,13 @@ function patchWsForGroups() {
   if (!ws) return;
   ws.addEventListener("message",({ data }) => {
     const msg = JSON.parse(data);
-    if (msg.type==="group-message" && currentView?.type==="group" && msg.groupId===currentView.id) {
-      appendMessage(msg.message,"group"); document.getElementById("msgContainer")?.scrollTo(0,99999);
+    if (msg.type==="group-message") {
+      if (currentView?.type==="group" && msg.groupId===currentView.id) {
+        appendMessage(msg.message,"group"); document.getElementById("msgContainer")?.scrollTo(0,99999);
+      } else if (msg.message?.user_id !== me?.id) {
+        unreadGroups[msg.groupId] = (unreadGroups[msg.groupId] || 0) + 1;
+        updateGroupBadge();
+      }
     }
   });
 }

@@ -335,6 +335,37 @@ app.post("/dm/:userId", requireAuth, async (req, res) => {
   res.json(r.rows[0]);
 });
 
+
+// ── DM conversations (for unread badges) ─────────────────────
+app.get("/dm/conversations", requireAuth, async (req, res) => {
+  try {
+    const r = await pool.query(`
+      SELECT DISTINCT ON (other_id)
+        other_id,
+        from_user_id,
+        content,
+        created_at,
+        u.username,
+        u.avatar_url
+      FROM (
+        SELECT
+          CASE WHEN from_user_id = $1 THEN to_user_id ELSE from_user_id END AS other_id,
+          from_user_id,
+          content,
+          created_at
+        FROM direct_messages
+        WHERE from_user_id = $1 OR to_user_id = $1
+      ) sub
+      JOIN users u ON u.id = sub.other_id
+      ORDER BY other_id, created_at DESC
+    `, [req.userId]);
+    res.json(r.rows);
+  } catch (err) {
+    console.error("DM conversations error:", err);
+    res.status(500).json({ error: "Server error" });
+  }
+});
+
 // ── Servers ──────────────────────────────────────────────────
 
 app.get("/servers", requireAuth, async (req, res) => {

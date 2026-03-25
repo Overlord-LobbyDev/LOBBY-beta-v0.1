@@ -26,10 +26,10 @@
       width:48px; height:48px; border-radius:50%;
       background:var(--bg-2); display:flex; align-items:center; justify-content:center;
       font-size:20px; cursor:pointer; transition:border-radius .15s, background .15s;
-      position:relative; overflow:hidden; flex-shrink:0;
+      position:relative; overflow:visible; flex-shrink:0;
       border:2px solid transparent;
     }
-    .server-icon img { width:100%; height:100%; object-fit:cover; }
+    .server-icon img { width:100%; height:100%; object-fit:cover; border-radius:inherit; }
     .server-icon:hover { border-radius:30%; background:var(--accent); }
     .server-icon.active { border-radius:30%; border-color:var(--accent); }
     .server-divider { width:32px; height:2px; background:var(--bg-3); border-radius:1px; }
@@ -292,6 +292,17 @@
     .friend-req-badge {
       background:var(--danger); color:#fff; font-size:10px; font-weight:700;
       padding:1px 5px; border-radius:99px; margin-left:auto;
+    }
+
+    /* ── Notification badges on sidebar icons ── */
+    .notif-badge {
+      position:absolute; bottom:-4px; right:-4px;
+      background:var(--danger); color:#fff;
+      font-size:10px; font-weight:700;
+      min-width:18px; height:18px; border-radius:99px;
+      display:flex; align-items:center; justify-content:center;
+      padding:0 4px; border:3px solid var(--bg-0);
+      z-index:1; pointer-events:none; box-sizing:border-box;
     }
 
     /* ── Modals ── */
@@ -798,6 +809,43 @@ let typingTimer    = null;
 let onlineUserIds  = new Set();
 let myServerRole   = null; // role in currently selected server
 
+// ── Notification badge tracking ──
+const unreadDMs = {};        // userId → count
+const unreadServers = {};    // serverId → count
+const unreadGroups = {};     // groupId → count
+const channelToServer = {};  // channelId → serverId
+
+function updateDMBadge() {
+  const total = Object.values(unreadDMs).reduce((a, b) => a + b, 0);
+  const icon = document.getElementById("dmServerIcon");
+  let badge = icon.querySelector(".notif-badge");
+  if (total > 0) {
+    if (!badge) { badge = document.createElement("span"); badge.className = "notif-badge"; icon.appendChild(badge); }
+    badge.textContent = total > 99 ? "99+" : total;
+  } else if (badge) { badge.remove(); }
+}
+
+function updateServerBadge(serverId) {
+  const count = unreadServers[serverId] || 0;
+  const icon = document.querySelector(`[data-server-id="${serverId}"]`);
+  if (!icon) return;
+  let badge = icon.querySelector(".notif-badge");
+  if (count > 0) {
+    if (!badge) { badge = document.createElement("span"); badge.className = "notif-badge"; icon.appendChild(badge); }
+    badge.textContent = count > 99 ? "99+" : count;
+  } else if (badge) { badge.remove(); }
+}
+
+function updateGroupBadge() {
+  const total = Object.values(unreadGroups).reduce((a, b) => a + b, 0);
+  const icon = document.getElementById("groupsNavIcon");
+  let badge = icon.querySelector(".notif-badge");
+  if (total > 0) {
+    if (!badge) { badge = document.createElement("span"); badge.className = "notif-badge"; icon.appendChild(badge); }
+    badge.textContent = total > 99 ? "99+" : total;
+  } else if (badge) { badge.remove(); }
+}
+
 function authHeaders() { return { Authorization: `Bearer ${token}`, "Content-Type": "application/json" }; }
 function api(path, opts={}) {
   return fetch(`${AUTH_URL}${path}`, { ...opts, headers: { ...authHeaders(), ...(opts.headers||{}) } }).then(r => r.json());
@@ -857,11 +905,20 @@ function connectWS() {
   ws.onclose = () => setTimeout(connectWS, 3000); // auto-reconnect
   ws.onmessage = async ({ data }) => {
     const msg = JSON.parse(data);
-    if (msg.type === "channel-message" && currentView?.type === "channel" && msg.channelId === currentView.id) {
-      // Only append if not from me (sender already appended locally)
-      if (msg.message?.user_id !== me?.id) {
-        appendMessage(msg.message, "channel");
-        document.getElementById("msgContainer")?.scrollTo(0, 99999);
+    if (msg.type === "channel-message") {
+      if (currentView?.type === "channel" && msg.channelId === currentView.id) {
+        // Only append if not from me (sender already appended locally)
+        if (msg.message?.user_id !== me?.id) {
+          appendMessage(msg.message, "channel");
+          document.getElementById("msgContainer")?.scrollTo(0, 99999);
+        }
+      } else if (msg.message?.user_id !== me?.id) {
+        // Not viewing this channel — increment unread badge on the server icon
+        const sId = channelToServer[msg.channelId];
+        if (sId) {
+          unreadServers[sId] = (unreadServers[sId] || 0) + 1;
+          updateServerBadge(sId);
+        }
       }
     }
     if (msg.type === "direct-message") {
@@ -871,7 +928,10 @@ function connectWS() {
       if (!isFromMe && currentView?.type === "dm" && fromId === currentView.id) {
         appendMessage(msg.message, "dm");
         document.getElementById("msgContainer")?.scrollTo(0, 99999);
-      } else if (!isFromMe && currentView?.type !== "dm") {
+      } else if (!isFromMe) {
+        // Track unread DM and show badge
+        unreadDMs[fromId] = (unreadDMs[fromId] || 0) + 1;
+        updateDMBadge();
         showToast(`💬 ${msg.fromUsername}: ${(msg.message?.content||"").slice(0,40)}`, "success");
       }
     }
@@ -913,7 +973,7 @@ async function loadServers() {
   const servers = await api("/servers");
   const icons = document.getElementById("serverIcons");
   icons.innerHTML = "";
-  (servers || []).forEach(s => {
+  for (const s of (servers || [])) {
     const el = document.createElement("div");
     el.className = "server-icon";
     el.title = s.name;
@@ -921,11 +981,21 @@ async function loadServers() {
     el.innerHTML = s.icon_url ? `<img src="${s.icon_url}" />` : s.name.slice(0,2).toUpperCase();
     el.onclick = () => selectServer(s);
     icons.appendChild(el);
-  });
+    // Re-apply badge if there are unread messages
+    if (unreadServers[s.id]) updateServerBadge(s.id);
+    // Build channel→server mapping for notification routing
+    try {
+      const chs = await api(`/servers/${s.id}/channels`);
+      (chs || []).forEach(ch => { channelToServer[ch.id] = s.id; });
+    } catch(e) {}
+  }
 }
 
 async function selectServer(server) {
   selectedServer = server;
+  // Clear unread badge for this server
+  delete unreadServers[server.id];
+  updateServerBadge(server.id);
   document.querySelectorAll(".server-icon").forEach(el => el.classList.remove("active"));
   document.getElementById("dmServerIcon").classList.remove("active");
   document.querySelector(`[data-server-id="${server.id}"]`)?.classList.add("active");
@@ -1196,6 +1266,9 @@ async function removeFriend(id) {
 // ── Open DM ───────────────────────────────────────────────────
 async function openDM(userId, username, avatarUrl) {
   currentView = { type:"dm", id:userId, name:username };
+  // Clear unread badge for this user
+  delete unreadDMs[userId];
+  updateDMBadge();
   document.querySelectorAll(".dm-item").forEach(el => el.classList.remove("active"));
   document.querySelector(`.dm-item[data-user-id="${userId}"]`)?.classList.add("active");
 
@@ -1548,6 +1621,9 @@ async function createGroup() {
 
 async function openGroup(groupId, groupName) {
   selectedGroupId = groupId;
+  // Clear unread badge for this group
+  delete unreadGroups[groupId];
+  updateGroupBadge();
   currentView = { type:"group", id:groupId, name:groupName };
 
   // Subscribe to group channel
@@ -1815,9 +1891,14 @@ function patchWsForGroups() {
   if (!ws) return;
   ws.addEventListener("message", ({ data }) => {
     const msg = JSON.parse(data);
-    if (msg.type === "group-message" && currentView?.type === "group" && msg.groupId === currentView.id) {
-      appendMessage(msg.message, "group");
-      document.getElementById("msgContainer")?.scrollTo(0, 99999);
+    if (msg.type === "group-message") {
+      if (currentView?.type === "group" && msg.groupId === currentView.id) {
+        appendMessage(msg.message, "group");
+        document.getElementById("msgContainer")?.scrollTo(0, 99999);
+      } else if (msg.message?.user_id !== me?.id) {
+        unreadGroups[msg.groupId] = (unreadGroups[msg.groupId] || 0) + 1;
+        updateGroupBadge();
+      }
     }
   });
 }
