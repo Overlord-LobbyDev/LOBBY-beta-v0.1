@@ -665,18 +665,24 @@ app.delete("/servers/:serverId/channels/:channelId", requireAuth, async (req, re
 // ── Channel Messages ─────────────────────────────────────────
 
 app.get("/channels/:id/messages", requireAuth, async (req, res) => {
-  const r = await pool.query(`
-    SELECT m.*, u.username, u.avatar_url,
-      COALESCE(json_agg(a.*) FILTER (WHERE a.id IS NOT NULL), '[]') AS attachments
-    FROM messages m
-    JOIN users u ON u.id = m.user_id
-    LEFT JOIN attachments a ON a.message_id = m.id
-    WHERE m.channel_id = $1
-    GROUP BY m.id, u.username, u.avatar_url
-    ORDER BY m.created_at ASC
-    LIMIT 100
-  `, [req.params.id]);
-  res.json(r.rows);
+  try {
+    const r = await pool.query(`
+      SELECT m.id, m.channel_id, m.content, m.created_at, m.user_id,
+        u.username, u.avatar_url,
+        COALESCE(json_agg(a.*) FILTER (WHERE a.id IS NOT NULL), '[]') AS attachments
+      FROM messages m
+      JOIN users u ON u.id = m.user_id
+      LEFT JOIN attachments a ON a.message_id = m.id
+      WHERE m.channel_id = $1
+      GROUP BY m.id, m.channel_id, m.content, m.created_at, m.user_id, u.username, u.avatar_url
+      ORDER BY m.created_at ASC
+      LIMIT 100
+    `, [req.params.id]);
+    res.json(r.rows);
+  } catch (err) {
+    console.error("[channel messages error]", err.message);
+    res.status(500).json({ error: "Failed to load messages" });
+  }
 });
 
 app.post("/channels/:id/messages", requireAuth, async (req, res) => {
