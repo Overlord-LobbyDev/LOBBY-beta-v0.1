@@ -175,10 +175,7 @@ app.post("/avatar", requireAuth, (req, res) => {
 });
 
 const bannerUpload = multer({
-  storage: multer.diskStorage({
-    destination: AVATAR_DIR,
-    filename: (req, file, cb) => cb(null, `banner_${req.userId}${path.extname(file.originalname).toLowerCase()}`)
-  }),
+  storage: multer.memoryStorage(),
   limits: { fileSize: 50 * 1024 * 1024 },
   fileFilter: (req, file, cb) => cb(null, /image\//.test(file.mimetype))
 });
@@ -414,10 +411,7 @@ app.post("/servers/:id/icon", requireAuth, (req, res) => {
 
 // PATCH /servers/:id — update name/description/tags/banner/icon (owner or moderator)
 const serverPatchUpload = multer({
-  storage: multer.diskStorage({
-    destination: SERVER_ICON_DIR,
-    filename: (req, file, cb) => cb(null, `${Date.now()}-${file.fieldname}${path.extname(file.originalname).toLowerCase()}`)
-  }),
+  storage: multer.memoryStorage(),
   limits: { fileSize: 50 * 1024 * 1024 },
   fileFilter: (req, file, cb) => cb(null, /image\//.test(file.mimetype))
 });
@@ -879,10 +873,7 @@ app.post("/groups/:id/messages", requireAuth, async (req, res) => {
 // ── Social Feed ──────────────────────────────────────────────
 
 const postImageUpload = multer({
-  storage: multer.diskStorage({
-    destination: UPLOAD_DIR,
-    filename: (req, file, cb) => cb(null, `post_${Date.now()}${path.extname(file.originalname).toLowerCase()}`)
-  }),
+  storage: multer.memoryStorage(),
   limits: { fileSize: 100 * 1024 * 1024 },
   fileFilter: (req, file, cb) => cb(null, /image\/|video\//.test(file.mimetype))
 });
