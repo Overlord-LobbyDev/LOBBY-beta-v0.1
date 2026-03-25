@@ -7390,9 +7390,12 @@ async function toggleComments(postId) {
 }
 
 async function loadComments(postId) {
+  console.log(`[comment] Loading comments for post ${postId}`);
   const comments = await feedApi(`/posts/${postId}/comments`);
+  console.log(`[comment] Got comments:`, comments);
   const list = document.getElementById(`comment-list-${postId}`);
-  if (!comments || !comments.length) {
+  if (!comments || comments.error || !Array.isArray(comments) || !comments.length) {
+    if (comments?.error) console.error(`[comment] Load error:`, comments.error, comments.detail||"");
     list.innerHTML = `<div style="font-size:13px;color:var(--text-3);padding:4px">No comments yet</div>`;
     return;
   }
@@ -7630,10 +7633,22 @@ async function deleteComment(commentId, postId) {
 
 async function submitComment(postId) {
   const input=document.getElementById(`comment-input-${postId}`); const content=input.value.trim(); if (!content) return;
-  input.value="";
-  await feedApi(`/posts/${postId}/comments`,{ method:"POST", headers:{ Authorization:`Bearer ${feedToken}`,"Content-Type":"application/json" }, body:JSON.stringify({ content }) });
-  await loadComments(postId);
-  const btn=document.querySelector(`#post-${postId} .post-action-btn:nth-child(2) span`); if (btn) btn.textContent=parseInt(btn.textContent||0)+1;
+  try {
+    console.log(`[comment] Submitting comment on post ${postId}: "${content.slice(0,50)}"`);
+    const result = await feedApi(`/posts/${postId}/comments`,{ method:"POST", headers:{ Authorization:`Bearer ${feedToken}`,"Content-Type":"application/json" }, body:JSON.stringify({ content }) });
+    console.log(`[comment] POST result:`, result);
+    if (result.error) {
+      console.error(`[comment] Server error:`, result.error, result.detail||"");
+      alert(`Comment failed: ${result.detail || result.error}`);
+      return;
+    }
+    input.value="";
+    await loadComments(postId);
+    const btn=document.querySelector(`#post-${postId} .post-action-btn:nth-child(2) span`); if (btn) btn.textContent=parseInt(btn.textContent||0)+1;
+  } catch(err) {
+    console.error(`[comment] Exception:`, err);
+    alert(`Comment failed: ${err.message}`);
+  }
 }
 
 async function deletePost(postId) {

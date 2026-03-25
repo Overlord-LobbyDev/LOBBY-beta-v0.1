@@ -1031,18 +1031,25 @@ app.get("/posts/:id/comments", requireAuth, async (req, res) => {
 });
 
 app.post("/posts/:id/comments", requireAuth, async (req, res) => {
-  const { content, parent_comment_id } = req.body;
-  if (!content?.trim()) return res.status(400).json({ error: "Comment cannot be empty" });
-  const r = await pool.query(
-    "INSERT INTO post_comments (post_id, user_id, content, parent_comment_id) VALUES ($1,$2,$3,$4) RETURNING *",
-    [req.params.id, req.userId, content.trim(), parent_comment_id || null]
-  );
-  // Return with username + avatar for immediate render
-  const full = await pool.query(
-    "SELECT c.*, u.username, u.avatar_url FROM post_comments c JOIN users u ON u.id = c.user_id WHERE c.id = $1",
-    [r.rows[0].id]
-  );
-  res.json(full.rows[0]);
+  try {
+    const { content, parent_comment_id } = req.body;
+    if (!content?.trim()) return res.status(400).json({ error: "Comment cannot be empty" });
+    console.log(`[comments] POST /posts/${req.params.id}/comments by user ${req.userId}: "${content.trim().slice(0,50)}"`);
+    const r = await pool.query(
+      "INSERT INTO post_comments (post_id, user_id, content, parent_comment_id) VALUES ($1,$2,$3,$4) RETURNING *",
+      [req.params.id, req.userId, content.trim(), parent_comment_id || null]
+    );
+    // Return with username + avatar for immediate render
+    const full = await pool.query(
+      "SELECT c.*, u.username, u.avatar_url FROM post_comments c JOIN users u ON u.id = c.user_id WHERE c.id = $1",
+      [r.rows[0].id]
+    );
+    console.log(`[comments] Comment ${full.rows[0].id} created successfully`);
+    res.json(full.rows[0]);
+  } catch (err) {
+    console.error(`[comments] POST error:`, err.message || err);
+    res.status(500).json({ error: "Failed to create comment", detail: err.message });
+  }
 });
 
 app.delete("/posts/:postId/comments/:commentId", requireAuth, async (req, res) => {
