@@ -1,6 +1,6 @@
 {
   "name": "lobby",
-  "version": "1.0.0",
+  "version": "1.0.5",
   "description": "LOBBY — Your Gaming Social Hub",
   "main": "main.js",
   "scripts": {

@@ -198,6 +198,82 @@ ipcMain.handle("vc-pip-action", (event, action) => {
   if (mainWin) mainWin.webContents.send("vc-pip-action", action);
 });
 
+// ── Auto-Updater IPC ──────────────────────────────────────────
+const https = require("https");
+const http = require("http");
+const fs = require("fs");
+const os = require("os");
+const { execFile } = require("child_process");
+
+ipcMain.handle("get-app-version", () => {
+  return app.getVersion();
+});
+
+ipcMain.handle("download-update", async (event, downloadUrl, fileName) => {
+  const tmpDir = os.tmpdir();
+  const filePath = path.join(tmpDir, fileName);
+  const sender = event.sender;
+
+  return new Promise((resolve) => {
+    const doDownload = (url) => {
+      const proto = url.startsWith("https") ? https : http;
+      proto.get(url, { headers: { "User-Agent": "LOBBY-Updater" } }, (response) => {
+        // Handle redirects (GitHub uses them for asset downloads)
+        if (response.statusCode >= 300 && response.statusCode < 400 && response.headers.location) {
+          doDownload(response.headers.location);
+          return;
+        }
+
+        if (response.statusCode !== 200) {
+          resolve({ success: false, error: `HTTP ${response.statusCode}` });
+          return;
+        }
+
+        const totalBytes = parseInt(response.headers["content-length"], 10) || 0;
+        let downloaded = 0;
+        const fileStream = fs.createWriteStream(filePath);
+
+        response.on("data", (chunk) => {
+          downloaded += chunk.length;
+          if (totalBytes > 0) {
+            const percent = (downloaded / totalBytes) * 100;
+            try { sender.send("update-download-progress", { percent }); } catch(e) {}
+          }
+        });
+
+        response.pipe(fileStream);
+
+        fileStream.on("finish", () => {
+          fileStream.close(() => {
+            // Launch the installer and quit the app
+            try {
+              execFile(filePath, { detached: true, stdio: "ignore" }).unref();
+              setTimeout(() => app.quit(), 1500);
+              resolve({ success: true });
+            } catch(e) {
+              // Fallback: open the file with the OS
+              shell.openPath(filePath).then(() => {
+                setTimeout(() => app.quit(), 1500);
+                resolve({ success: true });
+              }).catch(err => {
+                resolve({ success: false, error: err.message });
+              });
+            }
+          });
+        });
+
+        fileStream.on("error", (err) => {
+          resolve({ success: false, error: err.message });
+        });
+      }).on("error", (err) => {
+        resolve({ success: false, error: err.message });
+      });
+    };
+
+    doDownload(downloadUrl);
+  });
+});
+
 app.whenReady().then(() => {
   if (process.platform === "win32") app.setAppUserModelId("com.lobby.app");
   createWindow();
