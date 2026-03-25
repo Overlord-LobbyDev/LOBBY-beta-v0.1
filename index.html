@@ -3429,15 +3429,11 @@
 <script>
 const AUTH_URL = "https://lobby-auth-server.onrender.com";
 const FEED_AUTH_URL = "https://lobby-auth-server.onrender.com";
-const PRESETS = ["#5865f2","#eb459e","#ed4245","#fee75c","#57f287","#00b0f4","#f47fff","#ff7b7d","#23a55a","#1e1f22"];
 let feedToken = null;
 let feedMe = null;
 let postImageFile = null;
 const _wsToken = localStorage.getItem("vh_token") || sessionStorage.getItem("vh_token");
-console.log("=== INDEX.HTML INIT ===");
-console.log("_wsToken found:", !!_wsToken);
-if (_wsToken) console.log("Token preview:", _wsToken.substring(0, 20) + "...");
-if (!_wsToken) { console.log("NO TOKEN - REDIRECTING TO LOGIN"); window.location.href = "login.html"; }
+if (!_wsToken) { window.location.href = "login.html"; }
 
 let me = null;
 let ws = null;
@@ -3458,20 +3454,11 @@ function api(path, opts={}) {
 
 // ── Boot ─────────────────────────────────────────────────────
 async function boot() {
-  console.log("BOOT: Starting...");
-  try { 
-    me = await api("/me");
-    console.log("BOOT: /me response:", me);
-  } catch(e) { 
-    console.error("BOOT: API call failed:", e); 
-    return; 
-  }
+  try { me = await api("/me"); } catch(e) { console.error("Boot failed:", e); return; }
   if (!me || me.error) {
-    console.error("BOOT: /me returned error or null:", me);
     document.getElementById("myPanelName").textContent = "Not connected";
     return;
   }
-  console.log("BOOT: User loaded successfully:", me.username);
   document.getElementById("myPanelName").textContent = me.username;
   // Show unique lobby tag derived from user ID
   const tagEl = document.getElementById("myPanelLobbyTag");
@@ -7453,7 +7440,7 @@ async function handleMentionInput(input, postId) {
   drop.style.display = "block";
   drop.innerHTML = candidates.slice(0,6).map((u,i) => {
     const av = u.avatar ? `<img src="${u.avatar}" />` : u.username.slice(0,1).toUpperCase();
-    return `<div class="mention-option" onmousedown="insertMention('${u.username}','${input.id}','${commentId}')">
+    return `<div class="mention-option" onmousedown="insertMention('${u.username}','${input.id}','${commentId}')"}>
       <div class="mention-avatar">${av}</div>
       <span>@${u.username}</span>
     </div>`;
@@ -7560,7 +7547,7 @@ async function loadUserPanel(userId) {
   const t = localStorage.getItem("vh_token") || sessionStorage.getItem("vh_token");
   if (!t || !userId) return;
   try {
-    const data = await fetch("https://lobby-auth-server.onrender.com/profile/" + userId, {
+    const data = await fetch("http://localhost:3001/profile/" + userId, {
       headers: { Authorization: "Bearer " + t }
     }).then(r => r.json());
     if (data.error) return;
@@ -7613,7 +7600,7 @@ async function loadUserPanel(userId) {
 async function checkAdminStatus() {
   const t=localStorage.getItem("vh_token")||sessionStorage.getItem("vh_token"); if (!t) return;
   try {
-    const r=await fetch("https://lobby-auth-server.onrender.com/me",{ headers:{ Authorization:"Bearer "+t } }).then(r=>r.json());
+    const r=await fetch("http://localhost:3001/me",{ headers:{ Authorization:"Bearer "+t } }).then(r=>r.json());
     if (r.is_admin) {
       document.getElementById("adminBtn").style.display="flex";
       document.getElementById("adminPanelBtn").style.display="flex";
@@ -11280,7 +11267,7 @@ async function handleMentionInput(input, postId) {
   drop.style.display = "block";
   drop.innerHTML = candidates.slice(0,6).map((u,i) => {
     const av = u.avatar ? `<img src="${u.avatar}" />` : u.username.slice(0,1).toUpperCase();
-    return `<div class="mention-option" onmousedown="insertMention('${u.username}','${input.id}','${commentId}')">
+    return `<div class="mention-option" onmousedown="insertMention('${u.username}','${input.id}','${commentId}')"}>
       <div class="mention-avatar">${av}</div>
       <span>@${u.username}</span>
     </div>`;
@@ -11387,7 +11374,7 @@ async function loadUserPanel(userId) {
   const t = localStorage.getItem("vh_token") || sessionStorage.getItem("vh_token");
   if (!t || !userId) return;
   try {
-    const data = await fetch("https://lobby-auth-server.onrender.com/profile/" + userId, {
+    const data = await fetch("http://localhost:3001/profile/" + userId, {
       headers: { Authorization: "Bearer " + t }
     }).then(r => r.json());
     if (data.error) return;
@@ -11440,7 +11427,7 @@ async function loadUserPanel(userId) {
 async function checkAdminStatus() {
   const t=localStorage.getItem("vh_token")||sessionStorage.getItem("vh_token"); if (!t) return;
   try {
-    const r=await fetch("https://lobby-auth-server.onrender.com/me",{ headers:{ Authorization:"Bearer "+t } }).then(r=>r.json());
+    const r=await fetch("http://localhost:3001/me",{ headers:{ Authorization:"Bearer "+t } }).then(r=>r.json());
     if (r.is_admin) {
       document.getElementById("adminBtn").style.display="flex";
       document.getElementById("adminPanelBtn").style.display="flex";
@@ -13679,8 +13666,8 @@ showHomePanel();
 // Start with feed sidebar visible
 document.body.classList.add("feed-open");
 // Server list visibility is managed by showHomePanel on initial load
-})();
 </script>
+<script src="client.js"></script>
 <script>
 // Restore saved theme immediately before render to avoid flash
 (function() {
@@ -14910,7 +14897,7 @@ input.sp-slider::-webkit-slider-thumb:hover { transform: scale(1.2); }
     const tok = token();
     if (!tok) { spShowMsg("spSteamMsg", "Not logged in", "error"); return; }
 
-    const steamUrl = `https://lobby-auth-server.onrender.com/steam/auth?token=${encodeURIComponent(tok)}`;
+    const steamUrl = `http://localhost:3001/steam/auth?token=${encodeURIComponent(tok)}`;
     spShowMsg("spSteamMsg", "Opening Steam login…", "");
 
     // Method 1: Electron IPC (most reliable in Electron)

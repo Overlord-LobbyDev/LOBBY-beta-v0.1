@@ -367,13 +367,13 @@
         return;
       }
 
-      if (remember) localStorage.setItem("vh_token", data.token);
-      else          sessionStorage.setItem("vh_token", data.token);
+      localStorage.setItem("vh_token", data.token);
+      sessionStorage.setItem("vh_token", data.token);
       
       // DEBUG: Log what was saved
-      console.log("Token saved to", remember ? "localStorage" : "sessionStorage");
+      console.log("✅ Token saved to BOTH localStorage and sessionStorage");
       console.log("Token value:", data.token);
-      console.log("localStorage check:", localStorage.getItem("vh_token"));
+      console.log("localStorage retrieved:", localStorage.getItem("vh_token"));
 
       // Small delay to ensure token is saved before redirect
       setTimeout(() => {
