@@ -102,7 +102,7 @@ app.post("/register", async (req, res) => {
   try {
     const hash = await bcrypt.hash(password, SALT_ROUNDS);
     const r = await pool.query(
-      "INSERT INTO users (username, password) VALUES ($1, $2) RETURNING id, username, avatar_url, is_admin",
+      "INSERT INTO users (username, password_hash) VALUES ($1, $2) RETURNING id, username, avatar_url, is_admin",
       [username.trim(), hash]
     );
     const user  = r.rows[0];
