@@ -1330,6 +1330,69 @@ app.get("/steam/recent", requireAuth, async (req, res) => {
   }
 });
 
+// GET /steam/recent/:userId — get recently played games + achievements for any user
+app.get("/steam/recent/:userId", requireAuth, async (req, res) => {
+  const { userId } = req.params;
+  const userRow = await pool.query("SELECT steam_id FROM users WHERE id = $1", [userId]);
+  const steam_id = userRow.rows[0]?.steam_id;
+  if (!steam_id) return res.json([]);
+  if (!STEAM_KEY) return res.status(503).json({ error: "Steam API key not configured" });
+  try {
+    // Fetch recently played games
+    const gamesRes = await fetch(
+      `https://api.steampowered.com/IPlayerService/GetRecentlyPlayedGames/v1/?key=${STEAM_KEY}&steamid=${steam_id}&count=10`
+    );
+    const gamesData = await gamesRes.json();
+    const games = gamesData?.response?.games || [];
+
+    // Fetch achievements for all games in parallel
+    const enriched = await Promise.all(games.map(async (g) => {
+      let achievements = [];
+      try {
+          const [schemaRes, playerRes] = await Promise.all([
+            fetch(`https://api.steampowered.com/ISteamUserStats/GetSchemaForGame/v2/?key=${STEAM_KEY}&appid=${g.appid}`),
+            fetch(`https://api.steampowered.com/ISteamUserStats/GetPlayerAchievements/v1/?key=${STEAM_KEY}&steamid=${steam_id}&appid=${g.appid}`)
+          ]);
+          const schema = await schemaRes.json();
+          const player = await playerRes.json();
+          const schemaAchs = schema?.game?.availableGameStats?.achievements || [];
+          const playerAchs = (player?.playerstats?.achievements || [])
+            .filter(a => a.achieved === 1)
+            .sort((a, b) => b.unlocktime - a.unlocktime)
+            .slice(0, 5);
+          achievements = playerAchs.map(pa => {
+            const meta = schemaAchs.find(s => s.name === pa.apiname) || {};
+            return {
+              apiname:     pa.apiname,
+              name:        meta.displayName || pa.apiname,
+              description: meta.description || "",
+              icon:        meta.icon || "",
+              unlocktime:  pa.unlocktime,
+            };
+          });
+        } catch(e) {}
+
+      const hoursRecent = g.playtime_2weeks  ? (g.playtime_2weeks  / 60).toFixed(1) : null;
+      const hoursTotal  = g.playtime_forever ? (g.playtime_forever / 60).toFixed(1) : "0";
+
+      return {
+        appid:       g.appid,
+        name:        g.name,
+        header_img:  `https://cdn.cloudflare.steamstatic.com/steam/apps/${g.appid}/header.jpg`,
+        capsule_img: `https://cdn.cloudflare.steamstatic.com/steam/apps/${g.appid}/library_600x900.jpg`,
+        hours_recent: hoursRecent,
+        hours_total:  hoursTotal,
+        achievements,
+      };
+    }));
+
+    res.json(enriched);
+  } catch (err) {
+    console.error("[steam/recent/:userId]", err);
+    res.status(500).json({ error: "Could not reach Steam API" });
+  }
+});
+
 // ── Global error handlers ────────────────────────────────────
 process.on("unhandledRejection", (reason, promise) => {
   console.error("[UNHANDLED REJECTION]", reason);

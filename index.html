@@ -9022,7 +9022,8 @@ async function renderFpSteam() {
       return;
     }
 
-    const games = await fetch(`${AUTH_URL}/steam/recent`, { headers:{ Authorization:`Bearer ${token}` }}).then(r=>r.json()).catch(()=>[]);
+    const steamUrl = fpIsOwn ? `${AUTH_URL}/steam/recent` : `${AUTH_URL}/steam/recent/${fpUserId}`;
+    const games = await fetch(steamUrl, { headers:{ Authorization:`Bearer ${token}` }}).then(r=>r.json()).catch(()=>[]);
     const list = Array.isArray(games) ? games.slice(0, 100) : [];
 
     if (!list.length) {
@@ -9873,18 +9874,16 @@ async function renderProfileGames(body) {
     return;
   }
 
-  // Fetch games — try user-specific endpoint first, fall back to own
+  // Fetch games — use token-based endpoint for own profile, user-specific for others
+  const isOwn = profilePanelUserId === me?.id;
   let games = [];
   try {
-    const res = await fetch(`${AUTH_URL}/steam/recent/${profilePanelUserId}`, { headers: { Authorization: `Bearer ${token}` } });
+    const url = isOwn
+      ? `${AUTH_URL}/steam/recent`
+      : `${AUTH_URL}/steam/recent/${profilePanelUserId}`;
+    const res = await fetch(url, { headers: { Authorization: `Bearer ${token}` } });
     if (res.ok) games = await res.json();
   } catch(e) {}
-  if (!Array.isArray(games) || !games.length) {
-    try {
-      const res = await fetch(`${AUTH_URL}/steam/recent`, { headers: { Authorization: `Bearer ${token}` } });
-      if (res.ok) games = await res.json();
-    } catch(e) {}
-  }
 
   if (!Array.isArray(games) || !games.length) {
     body.innerHTML = `<div style="text-align:center;padding:32px;color:var(--text-3)">
