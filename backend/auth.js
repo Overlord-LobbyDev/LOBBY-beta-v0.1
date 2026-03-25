@@ -233,6 +233,21 @@ app.get("/profile/:id", requireAuth, async (req, res) => {
   } catch(err) { console.error("[GET /profile/:id]", err.message); res.status(500).json({ error: "Profile error: " + err.message }); }
 });
 
+// PUT /presence — set user's presence status (online, dnd, invisible)
+app.put("/presence", requireAuth, async (req, res) => {
+  try {
+    const { status } = req.body;
+    if (!["online", "dnd", "invisible"].includes(status)) {
+      return res.status(400).json({ error: "Invalid status. Must be: online, dnd, invisible" });
+    }
+    await pool.query("UPDATE users SET presence_status = $1 WHERE id = $2", [status, req.userId]);
+    res.json({ ok: true, status });
+  } catch(err) {
+    console.error("[PUT /presence]", err.message);
+    res.status(500).json({ error: "Failed to set presence" });
+  }
+});
+
 // GET /users/:id/mutual-servers — lobbies both you and another user share
 app.get("/users/:id/mutual-servers", requireAuth, async (req, res) => {
   try {

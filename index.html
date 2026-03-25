@@ -360,7 +360,25 @@
     .user-panel-avatar img { width:100%; height:100%; object-fit:cover; }
     .user-panel-info { flex:1; min-width:0; overflow:hidden; }
     .user-panel-name { font-size:15px; font-weight:800; color:var(--text-1); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; letter-spacing:-.2px; }
-    .user-panel-status { font-size:11px; color:var(--green); margin-top:1px; }
+    .user-panel-status { font-size:11px; color:var(--green); margin-top:1px; cursor:pointer; position:relative; user-select:none; }
+    .user-panel-status:hover { opacity:.8; }
+    .status-dropdown {
+      display:none; position:absolute; bottom:100%; left:0; margin-bottom:8px;
+      background:var(--bg-2); border:1px solid rgba(255,255,255,.1); border-radius:8px;
+      padding:6px; min-width:180px; z-index:999; box-shadow:0 8px 24px rgba(0,0,0,.4);
+    }
+    .status-dropdown.open { display:block; }
+    .status-dropdown-item {
+      display:flex; align-items:center; gap:8px; padding:8px 10px; border-radius:6px;
+      cursor:pointer; font-size:13px; color:var(--text-2); transition:background .1s;
+    }
+    .status-dropdown-item:hover { background:var(--bg-3); color:var(--text-1); }
+    .status-dropdown-item.active { background:rgba(88,101,242,.15); color:var(--accent); }
+    .status-dot { width:10px; height:10px; border-radius:50%; flex-shrink:0; }
+    .status-dot.online { background:#3ba55d; }
+    .status-dot.dnd { background:#ed4245; }
+    .status-dot.invisible { background:#747f8d; }
+    .status-dropdown-divider { height:1px; background:rgba(255,255,255,.06); margin:4px 0; }
     .icon-btn {
       flex:1; background:transparent; color:var(--text-3); font-size:16px;
       cursor:pointer; padding:7px 0; border-radius:6px; border:none;
@@ -380,8 +398,15 @@
     .chat-header-actions { margin-left:auto; display:flex; gap:6px; }
 
     .messages { flex:1; overflow-y:auto; padding:16px; display:flex; flex-direction:column; gap:2px; }
-    .message-group { display:flex; gap:12px; padding:4px 0; margin-top:8px; }
-    .message-group:hover { background:rgba(0,0,0,.06); border-radius:6px; }
+    .message-group { display:flex; gap:12px; padding:6px 16px; margin-top:0; position:relative; }
+    .message-group:hover { background:rgba(255,255,255,.02); }
+    .message-group.msg-new-author { margin-top:16px; padding-top:16px; border-top:1px solid rgba(255,255,255,.06); }
+    .message-group.msg-new-author:first-child { border-top:none; margin-top:0; }
+    .message-group.msg-continuation { padding-top:1px; padding-bottom:1px; }
+    .message-group.msg-continuation .msg-avatar { visibility:hidden; width:40px; height:0; margin:0; overflow:hidden; }
+    .message-group.msg-continuation .msg-header { display:none; }
+    .message-group.msg-continuation:hover .msg-compact-time { display:inline; }
+    .msg-compact-time { display:none; font-size:10px; color:var(--text-3); position:absolute; left:4px; top:50%; transform:translateY(-50%); font-variant-numeric:tabular-nums; }
     .msg-avatar {
       width:40px; height:40px; border-radius:50%;
       background:var(--accent); display:flex; align-items:center; justify-content:center;
@@ -2447,7 +2472,21 @@
           </button>
         </div>
         <div style="display:flex;align-items:center;gap:6px;margin-top:1px;">
-          <div class="user-panel-status">● Online</div>
+          <div class="user-panel-status" id="myStatusBtn" onclick="toggleStatusDropdown(event)">
+            <span id="myStatusDot">●</span> <span id="myStatusLabel">Online</span>
+            <div class="status-dropdown" id="statusDropdown">
+              <div class="status-dropdown-item active" data-status="online" onclick="setMyStatus('online',event)">
+                <span class="status-dot online"></span> Online
+              </div>
+              <div class="status-dropdown-item" data-status="dnd" onclick="setMyStatus('dnd',event)">
+                <span class="status-dot dnd"></span> Do Not Disturb
+              </div>
+              <div class="status-dropdown-divider"></div>
+              <div class="status-dropdown-item" data-status="invisible" onclick="setMyStatus('invisible',event)">
+                <span class="status-dot invisible"></span> Invisible
+              </div>
+            </div>
+          </div>
           <span id="myPanelLobbyTag" style="font-size:10px;font-weight:700;color:var(--accent);letter-spacing:.3px;opacity:.85;"></span>
         </div>
       </div>
@@ -4766,9 +4805,20 @@ function appendMessage(msg, type) {
     return `<a class="msg-file" href="${a.url}" target="_blank" download>📎 ${a.filename} <span style="color:var(--text-3);font-size:11px">${size}</span></a>`;
   }).join("");
   const canDelete = isMe || me.is_admin === true || (currentView.type === "channel" && (myServerRole === "owner" || myServerRole === "moderator"));
+
+  // Determine if this is a continuation of the previous message
+  const lastMsg = container.lastElementChild;
+  const lastAuthorId = lastMsg?.dataset?.authorId;
+  const lastTime = lastMsg?.dataset?.time;
+  const isContinuation = lastAuthorId && parseInt(lastAuthorId) === authorId
+    && lastTime && (new Date(msg.created_at).getTime() - parseInt(lastTime)) < 5 * 60 * 1000; // 5 min window
+
   const div = document.createElement("div");
-  div.className = "message-group";
+  div.className = "message-group " + (isContinuation ? "msg-continuation" : "msg-new-author");
+  div.dataset.authorId = authorId;
+  div.dataset.time = new Date(msg.created_at).getTime();
   div.innerHTML = `
+    ${isContinuation ? `<span class="msg-compact-time">${time}</span>` : ""}
     <div class="msg-avatar" style="cursor:pointer" onclick="openProfile(${authorId})">${avatarHtml}</div>
     <div class="msg-body">
       <div class="msg-header">
@@ -5100,7 +5150,7 @@ document.addEventListener("click", hideFriendContextMenu);
 document.addEventListener("contextmenu", e => { if (!e.target.closest(".dm-item")) hideFriendContextMenu(); });
 
 document.getElementById("ctxCall").addEventListener("click", async () => { if (!ctxUserId) return; const uid=ctxUserId, uname=ctxUsername; hideFriendContextMenu(); await startDirectCall(uid, uname); });
-document.getElementById("ctxSendMessage").addEventListener("click", () => { if (ctxUserId && ctxUsername) openDM(ctxUserId, ctxUsername, ""); hideFriendContextMenu(); });
+document.getElementById("ctxSendMessage").addEventListener("click", async () => { if (ctxUserId && ctxUsername) { hideFriendContextMenu(); await showDMPanel(); openDM(ctxUserId, ctxUsername, ""); } else { hideFriendContextMenu(); } });
 document.getElementById("ctxViewProfile").addEventListener("click", () => { if (ctxUserId) openProfile(ctxUserId); hideFriendContextMenu(); });
 document.getElementById("ctxRemoveFriend").addEventListener("click", async () => {
   if (!ctxFriendId) return;
@@ -10932,6 +10982,66 @@ input.sp-slider::-webkit-slider-thumb:hover { transform: scale(1.2); }
 
 ::-webkit-scrollbar { width: 5px; }
 ::-webkit-scrollbar-thumb { background: var(--bg-3); border-radius: 3px; }
+
+/* ── Status management ────────────────────────────────────── */
+let myPresenceStatus = localStorage.getItem("vh_presence_status") || "online";
+
+function toggleStatusDropdown(e) {
+  e.stopPropagation();
+  document.getElementById("statusDropdown").classList.toggle("open");
+}
+
+document.addEventListener("click", () => {
+  document.getElementById("statusDropdown")?.classList.remove("open");
+});
+
+async function setMyStatus(status, e) {
+  if (e) e.stopPropagation();
+  myPresenceStatus = status;
+  localStorage.setItem("vh_presence_status", status);
+  updateMyStatusUI();
+  document.getElementById("statusDropdown").classList.remove("open");
+
+  // Save to server
+  const _token = localStorage.getItem("vh_token") || sessionStorage.getItem("vh_token");
+  try {
+    await fetch(`${AUTH_URL}/presence`, {
+      method: "PUT",
+      headers: { "Content-Type": "application/json", Authorization: `Bearer ${_token}` },
+      body: JSON.stringify({ status })
+    });
+  } catch(err) { console.error("Failed to set status:", err); }
+
+  // Broadcast via WebSocket
+  if (ws && ws.readyState === 1) {
+    ws.send(JSON.stringify({ type: "presence-update", status }));
+  }
+}
+
+function updateMyStatusUI() {
+  const dot = document.getElementById("myStatusDot");
+  const label = document.getElementById("myStatusLabel");
+  const statusBtn = document.getElementById("myStatusBtn");
+  if (!dot || !label) return;
+  const configs = {
+    online:    { dot: "●", color: "var(--green,#3ba55d)", label: "Online" },
+    dnd:       { dot: "⛔", color: "#ed4245", label: "Do Not Disturb" },
+    invisible: { dot: "●", color: "#747f8d", label: "Invisible" }
+  };
+  const cfg = configs[myPresenceStatus] || configs.online;
+  dot.textContent = cfg.dot;
+  dot.style.color = cfg.color;
+  label.textContent = cfg.label;
+  statusBtn.style.color = cfg.color;
+
+  // Update active state in dropdown
+  document.querySelectorAll(".status-dropdown-item").forEach(el => {
+    el.classList.toggle("active", el.dataset.status === myPresenceStatus);
+  });
+}
+
+// Init status on load
+setTimeout(() => { updateMyStatusUI(); }, 100);
 
 /* Profile hover card */
 .profile-hover-card {

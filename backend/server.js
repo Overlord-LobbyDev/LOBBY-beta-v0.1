@@ -39,9 +39,12 @@ function broadcast(senderId, msg) {
 }
 
 function broadcastOnlineStatus() {
-  const onlineUsers = [...clients.values()].map(c => ({
-    id: c.peerId, userId: c.userId, username: c.username, avatarUrl: c.avatarUrl
-  }));
+  const onlineUsers = [...clients.values()]
+    .filter(c => c.presenceStatus !== "invisible")
+    .map(c => ({
+      id: c.peerId, userId: c.userId, username: c.username, avatarUrl: c.avatarUrl,
+      presenceStatus: c.presenceStatus || "online"
+    }));
   const json = JSON.stringify({ type: "online-users", users: onlineUsers });
   for (const client of clients.values()) {
     if (client.ws.readyState === 1) client.ws.send(json);
@@ -73,7 +76,8 @@ wss.on("connection", (ws, req) => {
     ...user,
     subscribedChannels: new Set(),
     vcChannelId: null,   // voice channel this client is currently in
-    vcServerId: null    // server the voice channel belongs to
+    vcServerId: null,    // server the voice channel belongs to
+    presenceStatus: "online"
   });
   console.log(`[+] ${user.username} connected — total: ${clients.size}`);
 
@@ -280,6 +284,14 @@ wss.on("connection", (ws, req) => {
           }));
         }
       }
+      return;
+    }
+
+    // ── Presence status update ───────────────────────────
+    if (msg.type === "presence-update") {
+      const client = clients.get(user.peerId);
+      if (client) client.presenceStatus = msg.status || "online";
+      broadcastOnlineStatus();
       return;
     }
 

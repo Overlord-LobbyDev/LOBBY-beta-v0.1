@@ -235,6 +235,16 @@ async function initDb() {
     );
   `);
 
+  // Home section order (user preference for Recently Played, Spotlight, Lobbies)
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS home_section_order (
+      id         SERIAL PRIMARY KEY,
+      user_id    INTEGER REFERENCES users(id) ON DELETE CASCADE UNIQUE,
+      order_json TEXT DEFAULT '["homeRecents","homeSpotlight","homeCommunities"]',
+      updated_at TIMESTAMPTZ DEFAULT NOW()
+    );
+  `);
+
   // Add visibility column to users for profile privacy
   const alters = [
     "ALTER TABLE users ADD COLUMN IF NOT EXISTS password       TEXT DEFAULT ''",
@@ -262,6 +272,7 @@ async function initDb() {
     "ALTER TABLE servers ADD COLUMN IF NOT EXISTS tags         TEXT DEFAULT '[]'",
     "ALTER TABLE servers ADD COLUMN IF NOT EXISTS unique_id    TEXT DEFAULT NULL",
     "ALTER TABLE server_members ADD COLUMN IF NOT EXISTS role  TEXT DEFAULT 'member'",
+    "ALTER TABLE users ADD COLUMN IF NOT EXISTS presence_status VARCHAR(20) DEFAULT 'online'",
   ];
   for (const sql of alters) await pool.query(sql).catch(() => {});
 
