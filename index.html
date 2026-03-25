@@ -2383,6 +2383,7 @@
 
 <!-- Channel sidebar — root level, NOT inside #chatPanel -->
 <div class="channel-sidebar">
+  <div class="resize-handle resize-handle-right" id="channelResizeHandle"></div>
   <div class="channel-sidebar-header" id="channelSidebarHeader">
     <div class="channel-sidebar-header-top">
       <span id="sidebarTitle">Direct Messages</span>
@@ -2664,7 +2665,7 @@
   </svg>
 </button>
 
-<div class="members-sidebar" id="membersSidebar" style="display:none"></div>
+<div class="members-sidebar" id="membersSidebar" style="display:none"><div class="resize-handle resize-handle-top" id="membersResizeHandle"></div></div>
 
 <!-- ── Modals ── -->
 <div class="modal-overlay" id="createServerModal">
@@ -3398,6 +3399,7 @@
 
 <!-- ── Persistent Social Feed Sidebar (global, always mounted) ── -->
 <div id="socialFeed">
+  <div class="resize-handle resize-handle-left" id="feedResizeHandle"></div>
   <div id="feedHeader" style="display:flex;align-items:center;position:sticky;top:0;z-index:10;background:var(--bg-1);border-bottom:1px solid rgba(255,255,255,.1);padding:0 8px 0 0;gap:6px">
     <div style="display:flex;flex:1;min-width:0">
       <button class="feed-tab active" id="feedTabFriends" onclick="switchFeedTab('friends')">👥 Friends</button>
@@ -3858,6 +3860,7 @@ async function selectServer(server) {
   const sl  = document.getElementById("serverList");
   cs?.classList.add("open");
   document.body.classList.add("sidebar-open");
+  applyChannelResizeStyles();
   if (sl) sl.classList.remove("collapsed");
   if (btn) btn.textContent = "◀";
   currentPanel = "chat";
@@ -4003,6 +4006,7 @@ function hideMembersBar() {
   const btn = document.getElementById("membersToggleBtn");
   sidebar.classList.remove("open");
   document.body.classList.remove("members-visible");
+  clearMembersResizeStyles();
   if (btn) {
     btn.style.bottom = "0";
     btn.querySelector("polyline").setAttribute("points", "2,8 6,4 10,8");
@@ -4016,6 +4020,7 @@ function toggleMembersBar() {
   if (isOpen) {
     sidebar.classList.remove("open");
     document.body.classList.remove("members-visible");
+    clearMembersResizeStyles();
     if (btn) {
       btn.style.bottom = "0";
       btn.querySelector("polyline").setAttribute("points", "2,8 6,4 10,8");
@@ -4023,8 +4028,10 @@ function toggleMembersBar() {
   } else {
     sidebar.classList.add("open");
     document.body.classList.add("members-visible");
+    applyMembersResizeStyles();
     if (btn) {
-      btn.style.bottom = "100px";
+      var h = window._resizeState.membersH || 100;
+      btn.style.bottom = h + "px";
       btn.querySelector("polyline").setAttribute("points", "2,4 6,8 10,4");
     }
   }
@@ -8002,6 +8009,7 @@ function showHomePanel() {
   const sl  = document.getElementById("serverList");
   cs?.classList.add("open");
   document.body.classList.add("sidebar-open");
+  applyChannelResizeStyles();
   if (sl) sl.classList.remove("collapsed");
   if (btn) btn.textContent = "◀";
   currentPanel = "home";
@@ -8016,6 +8024,7 @@ async function showHomeFriendsSidebar() {
   document.getElementById("membersSidebar").style.display = "none";
   document.getElementById("membersSidebar").classList.remove("open");
   document.body.classList.remove("members-bar-open", "members-visible");
+  clearMembersResizeStyles();
   const mtBtn = document.getElementById("membersToggleBtn");
   if (mtBtn) mtBtn.style.display = "none";
   document.getElementById("sidebarTitle").textContent = "Friends"; setSidebarMode("friends");
@@ -8077,6 +8086,7 @@ function toggleChatSidebar() {
   document.body.classList.toggle("sidebar-open", !isOpen);
   if (sl) sl.classList.toggle("collapsed", isOpen);
   if (btn) btn.textContent = isOpen ? "▶" : "◀";
+  if (isOpen) { clearChannelResizeStyles(); } else { applyChannelResizeStyles(); }
 }
 
 function showChatPanel() {
@@ -8093,6 +8103,7 @@ function showChatPanel() {
   const sl  = document.getElementById("serverList");
   cs?.classList.add("open");
   document.body.classList.add("sidebar-open");
+  applyChannelResizeStyles();
   if (sl) sl.classList.remove("collapsed");
   if (btn) btn.textContent = "◀";
   if (typeof showDMPanel === "function") showDMPanel();
@@ -8120,6 +8131,7 @@ rewireNavIcon("groupsNavIcon", () => {
   const sl  = document.getElementById("serverList");
   cs?.classList.add("open");
   document.body.classList.add("sidebar-open");
+  applyChannelResizeStyles();
   if (sl) sl.classList.remove("collapsed");
   if (btn) btn.textContent = "◀";
   showGroupsPanel();
@@ -8207,7 +8219,7 @@ function toggleFeed() {
   document.body.classList.toggle("feed-open",   feedVisible);
   document.body.classList.toggle("feed-closed", !feedVisible);
   if (reopenBtn) reopenBtn.style.display = feedVisible ? "none" : "block";
-  if (feedVisible) feedThawGifs(); else feedFreezeGifs();
+  if (feedVisible) { feedThawGifs(); applyFeedResizeStyles(); } else { feedFreezeGifs(); clearFeedResizeStyles(); }
 }
 
 document.getElementById("feedToggleBtn").addEventListener("click", e => { e.stopPropagation(); toggleFeed(); });
@@ -8799,6 +8811,7 @@ async function showFullProfilePage(userId) {
   document.getElementById("membersSidebar").style.display = "none";
   document.getElementById("membersSidebar").classList.remove("open");
   document.body.classList.remove("members-bar-open", "members-visible");
+  clearMembersResizeStyles();
   const mtBtn = document.getElementById("membersToggleBtn");
   if (mtBtn) mtBtn.style.display = "none";
 
@@ -10492,6 +10505,32 @@ input.sp-slider::-webkit-slider-thumb:hover { transform: scale(1.2); }
 ::-webkit-scrollbar { width: 5px; }
 ::-webkit-scrollbar-thumb { background: var(--bg-3); border-radius: 3px; }
 
+/* ── Resize handles ── */
+.resize-handle {
+  position:absolute; z-index:9999;
+  background:transparent;
+  transition:background .15s;
+}
+.resize-handle:hover, .resize-handle.active {
+  background:var(--accent);
+}
+.resize-handle-right {
+  top:0; right:-3px; width:6px; height:100%;
+  cursor:col-resize;
+}
+.resize-handle-left {
+  top:0; left:-3px; width:6px; height:100%;
+  cursor:col-resize;
+}
+.resize-handle-top {
+  left:0; top:-3px; width:100%; height:6px;
+  cursor:row-resize;
+}
+body.resizing-col { cursor:col-resize !important; }
+body.resizing-col * { cursor:col-resize !important; user-select:none !important; }
+body.resizing-row { cursor:row-resize !important; }
+body.resizing-row * { cursor:row-resize !important; user-select:none !important; }
+
 </style>
 <script>
 // Settings panel wired via settingspanel IIFE
@@ -11746,6 +11785,186 @@ input.sp-slider::-webkit-slider-thumb:hover { transform: scale(1.2); }
     init();
   }
 
+</script>
+<script>
+// ── Sidebar Resize System ──
+(function() {
+
+  // --- Resize style helpers ---
+  // These clear or reapply inline styles set by drag-resize when sidebars toggle
+  window._resizeState = { channelW: null, feedW: null, membersH: null };
+
+  window.clearChannelResizeStyles = function() {
+    ['homePanel','chatPanel','profilePage','vcPanel'].forEach(function(id) {
+      var el = document.getElementById(id);
+      if (el) el.style.left = '';
+    });
+    var hdr = document.querySelector('.home-header');
+    if (hdr) hdr.style.left = '';
+    var mb = document.querySelector('.members-sidebar');
+    if (mb) mb.style.left = '';
+  };
+
+  window.applyChannelResizeStyles = function() {
+    var w = window._resizeState.channelW;
+    if (!w) return;
+    var panelLeft = (80 + w) + 'px';
+    ['homePanel','chatPanel','profilePage','vcPanel'].forEach(function(id) {
+      var el = document.getElementById(id);
+      if (el) el.style.left = panelLeft;
+    });
+    var hdr = document.querySelector('.home-header');
+    if (hdr) hdr.style.left = '72px';
+    var mb = document.querySelector('.members-sidebar');
+    if (mb) mb.style.left = panelLeft;
+  };
+
+  window.clearFeedResizeStyles = function() {
+    ['homePanel','chatPanel','profilePage','vcPanel'].forEach(function(id) {
+      var el = document.getElementById(id);
+      if (el) el.style.right = '';
+    });
+    var hdr = document.querySelector('.home-header');
+    if (hdr) hdr.style.right = '';
+    var mb = document.querySelector('.members-sidebar');
+    if (mb) mb.style.right = '';
+  };
+
+  window.applyFeedResizeStyles = function() {
+    var w = window._resizeState.feedW;
+    if (!w) return;
+    var panelRight = w + 'px';
+    ['homePanel','chatPanel','profilePage','vcPanel'].forEach(function(id) {
+      var el = document.getElementById(id);
+      if (el) el.style.right = panelRight;
+    });
+    var hdr = document.querySelector('.home-header');
+    if (hdr) hdr.style.right = panelRight;
+    var mb = document.querySelector('.members-sidebar');
+    if (mb) mb.style.right = panelRight;
+  };
+
+  window.clearMembersResizeStyles = function() {
+    var cp = document.getElementById('chatPanel');
+    var pp = document.getElementById('profilePage');
+    if (cp) cp.style.paddingBottom = '';
+    if (pp) pp.style.paddingBottom = '';
+    var cc = document.querySelector('.call-controls');
+    if (cc) cc.style.bottom = '';
+    var mb = document.querySelector('.members-sidebar');
+    if (mb) mb.style.height = '';
+  };
+
+  window.applyMembersResizeStyles = function() {
+    var h = window._resizeState.membersH;
+    if (!h) return;
+    var mb = document.querySelector('.members-sidebar');
+    if (mb) mb.style.height = h + 'px';
+    var cp = document.getElementById('chatPanel');
+    var pp = document.getElementById('profilePage');
+    if (cp) cp.style.paddingBottom = h + 'px';
+    if (pp) pp.style.paddingBottom = h + 'px';
+    var cc = document.querySelector('.members-visible #chatPanel .call-controls');
+    if (cc) cc.style.bottom = (h - 36) + 'px';
+  };
+
+  function initResizeHandles() {
+    const channelSidebar = document.querySelector('.channel-sidebar');
+    const socialFeed = document.getElementById('socialFeed');
+    const membersSidebar = document.querySelector('.members-sidebar');
+
+    function updateChannelWidth(w) {
+      window._resizeState.channelW = w;
+      channelSidebar.style.width = w + 'px';
+      const panelLeft = (80 + w) + 'px';
+      if (document.body.classList.contains('sidebar-open') || channelSidebar.classList.contains('open')) {
+        ['homePanel','chatPanel','profilePage','vcPanel'].forEach(id => {
+          const el = document.getElementById(id);
+          if (el) el.style.left = panelLeft;
+        });
+        const hdr = document.querySelector('.home-header');
+        if (hdr) hdr.style.left = '72px';
+        if (membersSidebar) membersSidebar.style.left = panelLeft;
+      }
+    }
+
+    function updateFeedWidth(w) {
+      window._resizeState.feedW = w;
+      socialFeed.style.width = w + 'px';
+      const panelRight = w + 'px';
+      if (document.body.classList.contains('feed-open')) {
+        ['homePanel','chatPanel','profilePage','vcPanel'].forEach(id => {
+          const el = document.getElementById(id);
+          if (el) el.style.right = panelRight;
+        });
+        const hdr = document.querySelector('.home-header');
+        if (hdr) hdr.style.right = panelRight;
+        if (membersSidebar) membersSidebar.style.right = panelRight;
+      }
+    }
+
+    function updateMembersHeight(h) {
+      window._resizeState.membersH = h;
+      membersSidebar.style.height = h + 'px';
+      const pb = h + 'px';
+      const chatPanel = document.getElementById('chatPanel');
+      const profilePage = document.getElementById('profilePage');
+      if (chatPanel) chatPanel.style.paddingBottom = pb;
+      if (profilePage) profilePage.style.paddingBottom = pb;
+      const callControls = document.querySelector('.members-visible #chatPanel .call-controls');
+      if (callControls) callControls.style.bottom = (h - 36) + 'px';
+    }
+
+    function setupDrag(handle, axis, onMove) {
+      if (!handle) return;
+      handle.addEventListener('mousedown', function(e) {
+        e.preventDefault();
+        const cursorClass = axis === 'x' ? 'resizing-col' : 'resizing-row';
+        document.body.classList.add(cursorClass);
+        handle.classList.add('active');
+        function onMouseMove(e2) { onMove(e2); }
+        function onMouseUp() {
+          document.body.classList.remove(cursorClass);
+          handle.classList.remove('active');
+          document.removeEventListener('mousemove', onMouseMove);
+          document.removeEventListener('mouseup', onMouseUp);
+        }
+        document.addEventListener('mousemove', onMouseMove);
+        document.addEventListener('mouseup', onMouseUp);
+      });
+    }
+
+    const chHandle = document.getElementById('channelResizeHandle');
+    if (chHandle && channelSidebar) {
+      setupDrag(chHandle, 'x', function(e) {
+        const newW = Math.min(450, Math.max(180, e.clientX - 80));
+        updateChannelWidth(newW);
+      });
+    }
+
+    const fdHandle = document.getElementById('feedResizeHandle');
+    if (fdHandle && socialFeed) {
+      setupDrag(fdHandle, 'x', function(e) {
+        const newW = Math.min(900, Math.max(280, window.innerWidth - e.clientX));
+        updateFeedWidth(newW);
+      });
+    }
+
+    const mbHandle = document.getElementById('membersResizeHandle');
+    if (mbHandle && membersSidebar) {
+      setupDrag(mbHandle, 'y', function(e) {
+        const newH = Math.min(300, Math.max(60, window.innerHeight - e.clientY));
+        updateMembersHeight(newH);
+      });
+    }
+  }
+
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', initResizeHandles);
+  } else {
+    initResizeHandles();
+  }
+})();
 </script>
 </body>
 </html>
