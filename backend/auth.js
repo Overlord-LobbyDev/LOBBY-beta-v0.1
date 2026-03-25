@@ -219,12 +219,14 @@ app.patch("/profile/password", requireAuth, async (req, res) => {
 
 app.get("/profile/:id", requireAuth, async (req, res) => {
   try {
+    const id = parseInt(req.params.id);
+    if (!id || isNaN(id)) return res.status(400).json({ error: "Invalid user ID" });
     const r = await pool.query(
       `SELECT id, username, avatar_url, bio, status, banner_url, banner_colour,
               display_name, status_emoji, status_text, location, website,
               created_at AS joined_at, steam_id, steam_name, steam_avatar
        FROM users WHERE id = $1`,
-      [req.params.id]
+      [id]
     );
     if (!r.rows[0]) return res.status(404).json({ error: "User not found" });
     res.json(r.rows[0]);
@@ -1297,6 +1299,20 @@ app.get("/steam/recent", requireAuth, async (req, res) => {
     console.error("[steam/recent]", err);
     res.status(500).json({ error: "Could not reach Steam API" });
   }
+});
+
+// ── Global error handlers ────────────────────────────────────
+process.on("unhandledRejection", (reason, promise) => {
+  console.error("[UNHANDLED REJECTION]", reason);
+});
+process.on("uncaughtException", (err) => {
+  console.error("[UNCAUGHT EXCEPTION]", err);
+});
+
+// Express error-catching middleware (must be last, before listen)
+app.use((err, req, res, next) => {
+  console.error(`[EXPRESS ERROR] ${req.method} ${req.url}:`, err);
+  if (!res.headersSent) res.status(500).json({ error: "Internal server error" });
 });
 
 // ── Start ────────────────────────────────────────────────────
