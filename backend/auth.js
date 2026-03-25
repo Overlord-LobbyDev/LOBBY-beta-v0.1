@@ -233,12 +233,12 @@ app.get("/profile/:id", requireAuth, async (req, res) => {
   } catch(err) { console.error("[GET /profile/:id]", err.message); res.status(500).json({ error: "Profile error: " + err.message }); }
 });
 
-// PUT /presence — set user's presence status (online, dnd, invisible)
+// PUT /presence — set user's presence status (online, away, dnd, invisible)
 app.put("/presence", requireAuth, async (req, res) => {
   try {
     const { status } = req.body;
-    if (!["online", "dnd", "invisible"].includes(status)) {
-      return res.status(400).json({ error: "Invalid status. Must be: online, dnd, invisible" });
+    if (!["online", "away", "dnd", "invisible"].includes(status)) {
+      return res.status(400).json({ error: "Invalid status. Must be: online, away, dnd, invisible" });
     }
     await pool.query("UPDATE users SET presence_status = $1 WHERE id = $2", [status, req.userId]);
     res.json({ ok: true, status });

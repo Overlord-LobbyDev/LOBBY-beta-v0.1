@@ -377,6 +377,7 @@
     .status-dot { width:10px; height:10px; border-radius:50%; flex-shrink:0; }
     .status-dot.online { background:#3ba55d; }
     .status-dot.dnd { background:#ed4245; }
+    .status-dot.away { background:#faa61a; }
     .status-dot.invisible { background:#747f8d; }
     .status-dropdown-divider { height:1px; background:rgba(255,255,255,.06); margin:4px 0; }
     .icon-btn {
@@ -2478,6 +2479,9 @@
               <div class="status-dropdown-item active" data-status="online" onclick="setMyStatus('online',event)">
                 <span class="status-dot online"></span> Online
               </div>
+              <div class="status-dropdown-item" data-status="away" onclick="setMyStatus('away',event)">
+                <span class="status-dot away"></span> Away
+              </div>
               <div class="status-dropdown-item" data-status="dnd" onclick="setMyStatus('dnd',event)">
                 <span class="status-dot dnd"></span> Do Not Disturb
               </div>
@@ -2739,19 +2743,20 @@
   <div class="modal" style="width:min(420px,90vw);padding:0;overflow:hidden;gap:0">
 
     <!-- Banner -->
-    <div id="cssBannerPreview" onclick="document.getElementById('cssBannerInput').click()" style="
-      height:100px; background:linear-gradient(135deg,var(--accent),var(--bg-0));
+    <div id="cssBannerPreview" style="
+      height:110px; background:linear-gradient(135deg,var(--accent),var(--bg-0));
       position:relative; cursor:pointer; overflow:hidden;
     ">
-      <div style="position:absolute;inset:0;display:flex;align-items:center;justify-content:center;color:rgba(255,255,255,.45);font-size:12px;gap:5px;pointer-events:none">🖼 Click to set banner</div>
+      <div id="cssBannerUploadHint" style="position:absolute;inset:0;display:flex;align-items:center;justify-content:center;color:rgba(255,255,255,.45);font-size:12px;gap:5px;pointer-events:none">🖼 Click to set banner</div>
+      <div id="cssBannerDragHint" style="display:none;position:absolute;inset:0;align-items:center;justify-content:center;color:rgba(255,255,255,.65);font-size:11px;gap:6px;pointer-events:none;background:rgba(0,0,0,.15);opacity:0;transition:opacity .2s">↔ Drag to reposition · Click to change</div>
       <input type="file" id="cssBannerInput" accept="image/*" style="display:none" onchange="cssPreviewBanner(this)" />
     </div>
 
     <!-- Body -->
-    <div style="padding:20px 24px 24px; display:flex; flex-direction:column; gap:14px">
+    <div style="padding:16px 24px 24px; display:flex; flex-direction:column; gap:14px">
 
       <!-- Icon + Name -->
-      <div style="display:flex;gap:14px;align-items:center;margin-top:-36px">
+      <div style="display:flex;gap:14px;align-items:center;">
         <div id="cssIconPreview" onclick="document.getElementById('cssIconInput').click()" style="
           width:56px;height:56px;border-radius:14px;background:var(--accent);
           display:flex;align-items:center;justify-content:center;
@@ -2834,6 +2839,7 @@
     <div class="ss-pane" id="ss-pane-general">
       <div class="ss-banner-wrap">
         <div class="ss-banner-preview" id="ssBannerPreview"></div>
+        <div id="ssBannerDragHint" style="display:none;position:absolute;inset:0;align-items:center;justify-content:center;color:rgba(255,255,255,.65);font-size:11px;gap:6px;pointer-events:none;background:rgba(0,0,0,.15);opacity:0;transition:opacity .2s">↔ Drag to reposition</div>
         <button class="ss-upload-btn" onclick="document.getElementById('ssBannerInput').click()">
           <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
           Change Banner
@@ -3574,6 +3580,7 @@ let selectedServer = null;
 let pendingFiles   = [];
 let typingTimer    = null;
 let onlineUserIds  = new Set();
+let onlineUserStatus = new Map(); // userId -> presenceStatus ("online","away","dnd")
 const unreadDMs = {};        // userId → count
 const unreadServers = {};    // serverId → count
 const unreadGroups = {};     // groupId → count
@@ -3689,7 +3696,16 @@ async function loadPendingServerInvites() {
 function connectWS() {
   const _t = localStorage.getItem("vh_token") || sessionStorage.getItem("vh_token");
   ws = new WebSocket(`wss://lobby-websocket-server.onrender.com?token=${encodeURIComponent(_t)}`);
-  ws.onopen = () => { console.log("[ws] connected"); if (typeof setupCallSignalling==="function") setupCallSignalling(); if (typeof setupVoiceChannel==="function") setupVoiceChannel(); };
+  ws.onopen = () => {
+    console.log("[ws] connected");
+    // Restore saved presence status on (re)connect
+    const _savedStatus = localStorage.getItem("vh_presence_status") || "online";
+    if (_savedStatus !== "online") {
+      ws.send(JSON.stringify({ type: "presence-update", status: _savedStatus }));
+    }
+    if (typeof setupCallSignalling==="function") setupCallSignalling();
+    if (typeof setupVoiceChannel==="function") setupVoiceChannel();
+  };
   ws.onclose = () => setTimeout(connectWS, 3000);
   if (typeof initRTC === "function") initRTC();
   ws.onmessage = async ({ data }) => {
@@ -3723,6 +3739,8 @@ function connectWS() {
     }
     if (msg.type === "online-users") {
       onlineUserIds = new Set(msg.users.map(u => u.userId));
+      onlineUserStatus = new Map();
+      msg.users.forEach(u => onlineUserStatus.set(u.userId, u.presenceStatus || "online"));
       updateOnlineDots();
       if (document.getElementById("sidebarTitle")?.textContent === "Friends") showHomeFriendsSidebar();
     }
@@ -3753,10 +3771,17 @@ function connectWS() {
 function wsSend(obj) { if (ws?.readyState === 1) ws.send(JSON.stringify(obj)); }
 
 function updateOnlineDots() {
+  const statusColors = { online: "#3ba55d", away: "#faa61a", dnd: "#ed4245" };
   document.querySelectorAll("[data-user-id]").forEach(el => {
     const uid = parseInt(el.dataset.userId);
     const dot = el.querySelector(".online-dot");
-    if (dot) dot.style.display = onlineUserIds.has(uid) ? "block" : "none";
+    if (!dot) return;
+    const isOnline = onlineUserIds.has(uid);
+    dot.style.display = isOnline ? "block" : "none";
+    if (isOnline) {
+      const st = onlineUserStatus.get(uid) || "online";
+      dot.style.background = statusColors[st] || statusColors.online;
+    }
   });
 }
 
@@ -4180,21 +4205,34 @@ function channelItem(c, canManage) {
 
 function renderMembers(members) {
   const sidebar = document.getElementById("membersSidebar");
-  const online  = members.filter(m => onlineUserIds.has(m.id));
+  const online  = members.filter(m => onlineUserIds.has(m.id) && (onlineUserStatus.get(m.id) || "online") === "online");
+  const away    = members.filter(m => onlineUserIds.has(m.id) && onlineUserStatus.get(m.id) === "away");
+  const dnd     = members.filter(m => onlineUserIds.has(m.id) && onlineUserStatus.get(m.id) === "dnd");
   const offline = members.filter(m => !onlineUserIds.has(m.id));
 
   let html = `
     <div style="display:flex;align-items:center;gap:4px;flex-shrink:0;margin-right:16px;border-right:1px solid rgba(255,255,255,.08);padding-right:16px;">
       <span style="font-size:11px;font-weight:700;color:var(--text-3);letter-spacing:.8px;text-transform:uppercase;white-space:nowrap;">👥 Members</span>
-
     </div>`;
 
+  const totalOnline = online.length + away.length + dnd.length;
+
   if (online.length) {
-    html += `<div class="members-section-label">● Online ${online.length}</div>`;
+    html += `<div class="members-section-label" style="color:#3ba55d">● Online ${online.length}</div>`;
     online.forEach(m => { html += memberItem(m, true); });
   }
-  if (offline.length) {
+  if (away.length) {
     if (online.length) html += `<div style="width:1px;height:44px;background:rgba(255,255,255,.08);margin:0 8px;flex-shrink:0"></div>`;
+    html += `<div class="members-section-label" style="color:#faa61a">🌙 Away ${away.length}</div>`;
+    away.forEach(m => { html += memberItem(m, true, "away"); });
+  }
+  if (dnd.length) {
+    if (online.length || away.length) html += `<div style="width:1px;height:44px;background:rgba(255,255,255,.08);margin:0 8px;flex-shrink:0"></div>`;
+    html += `<div class="members-section-label" style="color:#ed4245">⛔ Do Not Disturb ${dnd.length}</div>`;
+    dnd.forEach(m => { html += memberItem(m, true, "dnd"); });
+  }
+  if (offline.length) {
+    if (totalOnline) html += `<div style="width:1px;height:44px;background:rgba(255,255,255,.08);margin:0 8px;flex-shrink:0"></div>`;
     html += `<div class="members-section-label" style="color:var(--text-3)">○ Offline ${offline.length}</div>`;
     offline.forEach(m => { html += memberItem(m, false); });
   }
@@ -4238,9 +4276,12 @@ function toggleMembersBar() {
   }
 }
 
-function memberItem(m, isOnline) {
+function memberItem(m, isOnline, statusOverride) {
   const avatarHtml = m.avatar_url ? `<img src="${m.avatar_url}" />` : m.username.slice(0,1).toUpperCase();
-  const dot = isOnline ? `<div class="online-dot"></div>` : "";
+  const statusColors = { online: "#3ba55d", away: "#faa61a", dnd: "#ed4245" };
+  const st = statusOverride || onlineUserStatus.get(m.id) || "online";
+  const dotColor = statusColors[st] || statusColors.online;
+  const dot = isOnline ? `<div class="online-dot" style="background:${dotColor}"></div>` : "";
   const tag = lobbyTagFromId(m.id);
   const canKick = (myServerRole === "owner" || myServerRole === "moderator")
                   && m.id !== me?.id
@@ -4279,11 +4320,74 @@ async function kickMember(serverId, userId, username) {
 // ── Create Lobby helpers ──────────────────────────────────────
 let cssIconFile = null, cssBannerFile = null;
 
+// Wire banner click: open file picker when clicking (unless user just finished a drag)
+document.addEventListener("DOMContentLoaded", () => {
+  const cssBannerEl = document.getElementById("cssBannerPreview");
+  if (cssBannerEl) {
+    cssBannerEl.dataset.inputId = "cssBannerInput";
+    cssBannerEl.dataset.dragHintId = "cssBannerDragHint";
+    cssBannerEl.addEventListener("click", e => {
+      // If user dragged (moved >3px), don't open file picker
+      if (cssBannerEl._bannerDragMoved) { cssBannerEl._bannerDragMoved = false; return; }
+      document.getElementById("cssBannerInput")?.click();
+    });
+  }
+});
+
 function cssUpdateIconEmoji() {
   const name = document.getElementById("serverName")?.value || "";
   const el = document.getElementById("cssIconEmoji");
   if (el && !cssIconFile) el.textContent = name.slice(0,2).toUpperCase() || "🎮";
 }
+// ── Banner drag-to-reposition ─────────────────────────────────
+function _initBannerDrag(el) {
+  if (el._bannerDragBound) return;
+  el._bannerDragBound = true;
+  let dragging = false, sx = 0, sy = 0, px = 50, py = 50;
+
+  el.addEventListener("mousedown", e => {
+    if (!el._hasBanner || e.button !== 0) return;
+    dragging = true;
+    el._bannerDragMoved = false;
+    sx = e.clientX; sy = e.clientY;
+    px = parseFloat(el.dataset.bgX ?? "50");
+    py = parseFloat(el.dataset.bgY ?? "50");
+    el.style.cursor = "grabbing";
+    e.preventDefault();
+  });
+
+  el.addEventListener("mouseenter", () => {
+    if (el._hasBanner) {
+      const dh = document.getElementById(el.dataset.dragHintId || "cssBannerDragHint");
+      if (dh) { dh.style.display = "flex"; requestAnimationFrame(() => dh.style.opacity = "1"); }
+    }
+  });
+  el.addEventListener("mouseleave", () => {
+    const dh = document.getElementById(el.dataset.dragHintId || "cssBannerDragHint");
+    if (dh) { dh.style.opacity = "0"; setTimeout(() => { dh.style.display = "none"; }, 200); }
+  });
+
+  document.addEventListener("mousemove", e => {
+    if (!dragging) return;
+    const dx = e.clientX - sx;
+    const dy = e.clientY - sy;
+    if (Math.abs(dx) > 3 || Math.abs(dy) > 3) el._bannerDragMoved = true;
+    // Scale movement: larger image = slower drag for finer control
+    const sensitivity = 0.3;
+    px = Math.max(0, Math.min(100, px - dx * sensitivity));
+    py = Math.max(0, Math.min(100, py - dy * sensitivity));
+    el.style.backgroundPosition = `${px}% ${py}%`;
+    sx = e.clientX; sy = e.clientY;
+    el.dataset.bgX = px; el.dataset.bgY = py;
+  });
+
+  document.addEventListener("mouseup", () => {
+    if (!dragging) return;
+    dragging = false;
+    el.style.cursor = el._hasBanner ? "grab" : "pointer";
+  });
+}
+
 function cssPreviewBanner(input) {
   const file = input.files[0]; if (!file) return;
   cssBannerFile = file;
@@ -4291,8 +4395,18 @@ function cssPreviewBanner(input) {
   const el = document.getElementById("cssBannerPreview");
   el.style.backgroundImage = `url(${url})`;
   el.style.backgroundSize = "cover";
-  el.style.backgroundPosition = "center";
-  el.querySelector("div").style.display = "none";
+  el.style.backgroundPosition = "50% 50%";
+  el.dataset.bgX = "50"; el.dataset.bgY = "50";
+  el.dataset.inputId = "cssBannerInput";
+  el.dataset.dragHintId = "cssBannerDragHint";
+  el._hasBanner = true;
+  el.style.cursor = "grab";
+  // Swap hints
+  const uploadHint = document.getElementById("cssBannerUploadHint");
+  if (uploadHint) uploadHint.style.display = "none";
+  const dragHint = document.getElementById("cssBannerDragHint");
+  if (dragHint) dragHint.style.display = "none"; // will show on hover
+  _initBannerDrag(el);
 }
 function cssPreviewIcon(input) {
   const file = input.files[0]; if (!file) return;
@@ -4328,6 +4442,20 @@ async function createServer() {
   document.getElementById("serverName").value = "";
   document.getElementById("cssDescription").value = "";
   cssIconFile = null; cssBannerFile = null;
+  // Reset banner preview
+  const _cBanner = document.getElementById("cssBannerPreview");
+  if (_cBanner) {
+    _cBanner.style.backgroundImage = "";
+    _cBanner.style.background = "linear-gradient(135deg,var(--accent),var(--bg-0))";
+    _cBanner.style.cursor = "pointer";
+    _cBanner._hasBanner = false;
+    _cBanner._bannerDragBound = false;
+    delete _cBanner.dataset.bgX; delete _cBanner.dataset.bgY;
+  }
+  const _cUploadHint = document.getElementById("cssBannerUploadHint");
+  if (_cUploadHint) _cUploadHint.style.display = "flex";
+  const _cDragHint = document.getElementById("cssBannerDragHint");
+  if (_cDragHint) { _cDragHint.style.display = "none"; _cDragHint.style.opacity = "0"; }
   await loadServers();
   await loadCommunities();
   showToast(`Lobby "${name}" created!`, "success");
@@ -6395,8 +6523,23 @@ async function openServerSettings(serverId) {
   // Banner & icon preview
   const bannerEl = document.getElementById("ssBannerPreview");
   const iconEl   = document.getElementById("ssIconPreview");
-  bannerEl.style.backgroundImage = server.banner_url ? `url(${server.banner_url})` : "none";
-  bannerEl.style.background = server.banner_url ? "" : "var(--bg-3)";
+  if (server.banner_url) {
+    bannerEl.style.backgroundImage = `url(${server.banner_url})`;
+    bannerEl.style.background = "";
+    bannerEl.style.backgroundPosition = "50% 50%";
+    bannerEl.dataset.bgX = "50"; bannerEl.dataset.bgY = "50";
+    bannerEl.dataset.inputId = "ssBannerInput";
+    bannerEl.dataset.dragHintId = "ssBannerDragHint";
+    bannerEl._hasBanner = true;
+    bannerEl._bannerDragBound = false; // reset so drag reinitialises
+    bannerEl.style.cursor = "grab";
+    _initBannerDrag(bannerEl);
+  } else {
+    bannerEl.style.backgroundImage = "none";
+    bannerEl.style.background = "var(--bg-3)";
+    bannerEl._hasBanner = false;
+    bannerEl.style.cursor = "default";
+  }
   if (server.icon_url) {
     iconEl.style.backgroundImage = `url(${server.icon_url})`;
     iconEl.textContent = "";
@@ -6451,6 +6594,13 @@ function ssPreviewBanner(input) {
   reader.onload = e => {
     const el = document.getElementById("ssBannerPreview");
     el.style.backgroundImage = `url(${e.target.result})`;
+    el.style.backgroundPosition = "50% 50%";
+    el.dataset.bgX = "50"; el.dataset.bgY = "50";
+    el.dataset.inputId = "ssBannerInput";
+    el.dataset.dragHintId = "ssBannerDragHint";
+    el._hasBanner = true;
+    el.style.cursor = "grab";
+    _initBannerDrag(el);
   };
   reader.readAsDataURL(file);
 }
@@ -11025,6 +11175,7 @@ function updateMyStatusUI() {
   if (!dot || !label) return;
   const configs = {
     online:    { dot: "●", color: "var(--green,#3ba55d)", label: "Online" },
+    away:      { dot: "🌙", color: "#faa61a", label: "Away" },
     dnd:       { dot: "⛔", color: "#ed4245", label: "Do Not Disturb" },
     invisible: { dot: "●", color: "#747f8d", label: "Invisible" }
   };
