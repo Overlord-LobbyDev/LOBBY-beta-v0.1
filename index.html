@@ -446,7 +446,7 @@
     }
     .members-sidebar.open { transform:translateY(0); }
     .members-sidebar::-webkit-scrollbar { display:none; }
-    body.sidebar-open .members-sidebar { left:332px; }
+    body.sidebar-open .members-sidebar { left:340px; }
     body.feed-open .members-sidebar { right:min(620px,40vw); }
     /* Push chat panel content up when members bar is open */
     .members-visible #chatPanel { padding-bottom:100px; }
@@ -519,6 +519,15 @@
     .btn { padding:9px 18px; border-radius:var(--radius); border:none; font-size:14px; font-weight:600; font-family:var(--font); cursor:pointer; transition:background .15s; }
     .btn-primary { background:var(--accent); color:#fff; }
     .btn-primary:hover { background:var(--accent-h); }
+    /* ── Button loading state ──────────────────────────────── */
+    .btn-loading { pointer-events:none; opacity:.7; position:relative; }
+    .btn-loading .btn-spinner { display:inline-block; width:14px; height:14px; border:2px solid rgba(255,255,255,.3); border-top-color:#fff; border-radius:50%; animation:btn-spin .6s linear infinite; vertical-align:middle; margin-right:6px; }
+    @keyframes btn-spin { to { transform:rotate(360deg); } }
+    /* For dark/ghost buttons the spinner adapts */
+    .btn-grey.btn-loading .btn-spinner, .fp-btn-ghost.btn-loading .btn-spinner { border-color:rgba(255,255,255,.2); border-top-color:var(--text-1); }
+    /* Small buttons (friend accept/decline) */
+    .small-btn.btn-loading { opacity:.6; pointer-events:none; }
+    .small-btn.btn-loading .btn-spinner { width:10px; height:10px; margin-right:4px; }
     .btn-grey { background:var(--bg-3); color:var(--text-2); }
     .btn-grey:hover { background:var(--bg-0); }
     .btn-danger { background:var(--danger); color:#fff; }
@@ -1494,6 +1503,49 @@
     .post-action-btn svg { flex-shrink:0; transition:transform .15s; }
     .post-action-btn:hover svg { transform:scale(1.2); }
     .post-action-btn.liked:hover svg { transform:scale(1.3); }
+
+    /* ── Reaction system ── */
+    .reaction-bar { display:flex; align-items:center; gap:4px; flex-wrap:wrap; }
+    .reaction-pill {
+      display:inline-flex; align-items:center; gap:4px;
+      padding:4px 8px; border-radius:12px; font-size:13px;
+      background:rgba(255,255,255,.06); border:1px solid rgba(255,255,255,.08);
+      cursor:pointer; transition:all .15s; user-select:none; font-family:var(--font);
+      color:var(--text-2);
+    }
+    .reaction-pill:hover { background:rgba(255,255,255,.12); transform:translateY(-1px); }
+    .reaction-pill.mine { background:rgba(88,101,242,.25); border-color:rgba(88,101,242,.5); color:var(--text-1); }
+    .reaction-pill .r-emoji { font-size:15px; line-height:1; }
+    .reaction-pill .r-count { font-size:12px; font-weight:600; }
+    .reaction-add-btn {
+      display:inline-flex; align-items:center; justify-content:center;
+      width:28px; height:28px; border-radius:50%; font-size:14px;
+      background:rgba(255,255,255,.06); border:1px solid rgba(255,255,255,.08);
+      cursor:pointer; transition:all .15s; color:var(--text-3); position:relative;
+    }
+    .reaction-add-btn:hover { background:rgba(255,255,255,.12); color:var(--text-1); transform:scale(1.1); }
+    .emoji-picker-popup {
+      display:none; position:absolute; bottom:36px; left:0; z-index:999;
+      background:var(--bg-1); border:1px solid rgba(255,255,255,.12);
+      border-radius:12px; padding:8px; box-shadow:0 8px 32px rgba(0,0,0,.5);
+      width:260px;
+    }
+    .emoji-picker-popup.open { display:block; }
+    .emoji-picker-popup .emoji-grid {
+      display:grid; grid-template-columns:repeat(7, 1fr); gap:2px;
+    }
+    .emoji-picker-popup .emoji-opt {
+      width:34px; height:34px; display:flex; align-items:center; justify-content:center;
+      font-size:20px; border-radius:8px; cursor:pointer; transition:background .12s, transform .12s;
+      border:none; background:none;
+    }
+    .emoji-picker-popup .emoji-opt:hover { background:rgba(255,255,255,.12); transform:scale(1.2); }
+    .emoji-picker-popup .emoji-search {
+      width:100%; padding:6px 10px; margin-bottom:6px; border-radius:8px;
+      border:1px solid rgba(255,255,255,.1); background:var(--bg-0);
+      color:var(--text-1); font-size:13px; font-family:var(--font); outline:none;
+    }
+    .emoji-picker-popup .emoji-search:focus { border-color:var(--accent); }
     .post-delete-btn {
       margin-left:auto; background:none; border:none; color:var(--text-3);
       font-size:13px; cursor:pointer; padding:6px 10px; border-radius:6px;
@@ -1748,6 +1800,7 @@
     .fp-post-btn:hover { background:rgba(255,255,255,.07); color:var(--text-1); transform:translateY(-1px); }
     .fp-post-btn:active { transform:scale(.95); }
     .fp-post-btn.liked { color:#f87171; }
+    .fp-post-actions .reaction-bar { margin-right:4px; }
     .fp-post-btn:hover svg { transform:scale(1.15); }
     .fp-post-btn svg { transition:transform .15s; flex-shrink:0; }
 
@@ -2247,6 +2300,7 @@
     }
     .profile-post-btn:hover { background:rgba(255,255,255,.07); color:var(--text-1); }
     .profile-post-btn.liked { color:#f87171; }
+    .profile-post-actions .reaction-bar { margin-right:4px; }
 
     /* Edit mode */
     .profile-edit-field { display:flex; flex-direction:column; gap:6px; margin-bottom:14px; }
@@ -2667,7 +2721,7 @@
           padding:10px 18px;font-size:13px;font-family:var(--font);cursor:pointer;
           transition:background .15s;
         " onmouseover="this.style.background='var(--bg-2)'" onmouseout="this.style.background='var(--bg-3)'">Cancel</button>
-        <button onclick="createServer()" style="
+        <button onclick="withLoading(this, () => createServer())" style="
           flex:1;background:var(--accent);color:#fff;border:none;
           border-radius:8px;padding:10px;font-size:13px;font-weight:700;
           font-family:var(--font);cursor:pointer;transition:background .15s;
@@ -2760,7 +2814,7 @@
       <div class="ss-msg" id="ssGeneralMsg"></div>
       <div class="modal-actions">
         <button class="btn btn-grey" onclick="closeModal('serverSettingsModal')">Cancel</button>
-        <button class="btn btn-primary" onclick="ssSaveGeneral()">Save Changes</button>
+        <button class="btn btn-primary" onclick="withLoading(this, () => ssSaveGeneral())">Save Changes</button>
       </div>
     </div>
     <!-- Tab: Tags -->
@@ -2777,7 +2831,7 @@
       <div class="ss-msg" id="ssTagMsg"></div>
       <div class="modal-actions">
         <button class="btn btn-grey" onclick="closeModal('serverSettingsModal')">Cancel</button>
-        <button class="btn btn-primary" onclick="ssSaveTags()">Save Tags</button>
+        <button class="btn btn-primary" onclick="withLoading(this, () => ssSaveTags())">Save Tags</button>
       </div>
     </div>
     <!-- Tab: Roles & Members -->
@@ -2804,7 +2858,7 @@
     <div class="modal-msg" id="createChannelMsg"></div>
     <div class="modal-actions">
       <button class="btn btn-grey" onclick="closeModal('createChannelModal')">Cancel</button>
-      <button class="btn btn-primary" onclick="createChannel()">Create</button>
+      <button class="btn btn-primary" onclick="withLoading(this, () => createChannel())">Create</button>
     </div>
   </div>
 </div>
@@ -2821,7 +2875,7 @@
     <div class="modal-msg" id="createGroupMsg"></div>
     <div class="modal-actions">
       <button class="btn btn-grey" onclick="closeModal('createGroupModal')">Cancel</button>
-      <button class="btn btn-primary" onclick="createGroup()">Create Group</button>
+      <button class="btn btn-primary" onclick="withLoading(this, () => createGroup())">Create Group</button>
     </div>
   </div>
 </div>
@@ -2862,7 +2916,7 @@
     <div class="modal-msg" id="editCommunityMsg"></div>
     <div class="modal-actions">
       <button class="btn btn-grey" onclick="closeModal('editCommunityModal')">Cancel</button>
-      <button class="btn btn-primary" onclick="saveCommunityCard()">💾 Save</button>
+      <button class="btn btn-primary" onclick="withLoading(this, () => saveCommunityCard())">💾 Save</button>
     </div>
   </div>
 </div>
@@ -3460,6 +3514,28 @@ function api(path, opts={}) {
   return fetch(`${FEED_AUTH_URL}${path}`, { ...opts, headers: { ...authHeaders(), ...(opts.headers||{}) } }).then(r => r.json());
 }
 
+// ── Button loading helper ────────────────────────────────────
+// Prevents double-clicks and shows a spinner while an async action runs.
+// Usage: onclick="withLoading(this, () => createServer())"
+// Or wrap any button element programmatically.
+async function withLoading(btn, fn) {
+  if (!btn || btn.classList.contains("btn-loading")) return;
+  btn.classList.add("btn-loading");
+  btn.disabled = true;
+  const origHTML = btn.innerHTML;
+  btn.innerHTML = '<span class="btn-spinner"></span>' + origHTML;
+  try {
+    await fn();
+  } catch(err) {
+    console.error("[withLoading] error:", err);
+  } finally {
+    btn.classList.remove("btn-loading");
+    btn.disabled = false;
+    btn.innerHTML = origHTML;
+  }
+}
+window.withLoading = withLoading;
+
 // ── Boot ─────────────────────────────────────────────────────
 async function boot() {
   try { me = await api("/me"); } catch(e) { console.error("Boot failed:", e); return; }
@@ -3579,7 +3655,7 @@ function connectWS() {
     if (msg.type === "typing") showTyping(msg);
     if (msg.type === "friend-request") {
       showToast(`👤 ${msg.fromUsername} sent you a friend request!`, "success");
-      notifyFriendRequest(msg.fromUsername, msg.fromAvatarUrl || null, msg.friendId || null);
+      notifyFriendRequest(msg.fromUsername, msg.fromAvatarUrl || null, msg.friendId || null, msg.fromId || null);
       if (document.getElementById("sidebarTitle")?.textContent === "Direct Messages") await showDMPanel();
     }
     if (msg.type === "friend-accepted") {
@@ -3791,9 +3867,9 @@ async function selectServer(server) {
   myServerRole = me_member?.role || "member";
   const channels = await api(`/servers/${server.id}/channels`);
   renderChannelList(channels, members, server);
-  // Show members toggle button (bar starts hidden, arrow points up)
+  // Show members toggle button and open members bar by default (arrow points down = "collapse")
   const mtBtn = document.getElementById("membersToggleBtn");
-  if (mtBtn) { mtBtn.style.display = "flex"; mtBtn.style.bottom = "0"; mtBtn.querySelector("polyline").setAttribute("points","2,8 6,4 10,8"); }
+  if (mtBtn) { mtBtn.style.display = "flex"; mtBtn.style.bottom = "100px"; mtBtn.querySelector("polyline").setAttribute("points","2,4 6,8 10,4"); }
 }
 
 function renderChannelList(channels, members, server) {
@@ -3836,15 +3912,15 @@ function renderChannelList(channels, members, server) {
         <span class="sa-icon"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg></span>
         Lobby Settings
       </div>` : ""}
-      <div class="server-action-item" onclick="inviteFriendToServer(${server.id})">
+      <div class="server-action-item" onclick="withLoading(this, () => inviteFriendToServer(${server.id}))">
         <span class="sa-icon"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><line x1="19" y1="8" x2="19" y2="14"/><line x1="22" y1="11" x2="16" y2="11"/></svg></span>
         Invite Friends
       </div>
-      ${!isAloneOwner ? `<div class="server-action-item" onclick="leaveServer(${server.id})">
+      ${!isAloneOwner ? `<div class="server-action-item" onclick="withLoading(this, () => leaveServer(${server.id}))">
         <span class="sa-icon"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg></span>
         Leave Lobby
       </div>` : ""}
-      ${isOwner ? `<div class="server-action-item danger" onclick="deleteServer(${server.id})">
+      ${isOwner ? `<div class="server-action-item danger" onclick="withLoading(this, () => deleteServer(${server.id}))">
         <span class="sa-icon" style="color:var(--danger)"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/><path d="M10 11v6M14 11v6"/><path d="M9 6V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2"/></svg></span>
         Delete Lobby
       </div>` : ""}
@@ -3854,7 +3930,9 @@ function renderChannelList(channels, members, server) {
   content.innerHTML = html;
   renderMembers(members);
   document.getElementById("membersSidebar").style.display = "flex";
+  document.getElementById("membersSidebar").classList.add("open");
   document.body.classList.add("members-bar-open");
+  document.body.classList.add("members-visible");
 }
 
 function channelItem(c, canManage) {
@@ -4320,8 +4398,8 @@ async function showDMPanel() {
       const av = f.avatar_url ? `<img src="${f.avatar_url}" />` : f.username.slice(0,1).toUpperCase();
       html += `<div class="friend-req-item"><div class="dm-avatar">${av}</div><span style="font-size:14px">${f.username}</span>
         <div class="friend-req-actions">
-          <button class="small-btn small-btn-green" onclick="acceptFriend(${f.id})">✓</button>
-          <button class="small-btn small-btn-red" onclick="declineFriend(${f.id})">✕</button>
+          <button class="small-btn small-btn-green" onclick="withLoading(this, () => acceptFriend(${f.id}))">✓</button>
+          <button class="small-btn small-btn-red" onclick="withLoading(this, () => declineFriend(${f.id}))">✕</button>
         </div></div>`;
     });
     html += "</div>";
@@ -5889,18 +5967,55 @@ function handleNotifAction(id, action, event) {
   if (n) { n.read = true; saveNotifs(notifs); renderNotifBadge(); }
   const el = document.getElementById(`notif-${id}`);
 
-  if (action === "accept-friend" && n?.meta?.friendId) {
-    acceptFriend(n.meta.friendId);
-    el?.remove();
-  } else if (action === "decline-friend" && n?.meta?.friendId) {
-    declineFriend(n.meta.friendId);
-    el?.remove();
+  if (action === "accept-friend" && n) {
+    (async () => {
+      try {
+        let fId = n.meta?.friendId;
+        // Fallback: look up the pending request from this sender
+        if (!fId && n.meta?.fromId) {
+          const friends = await api("/friends");
+          const pending = friends.find(f => f.other_id === n.meta.fromId && f.status === "pending");
+          if (pending) fId = pending.id;
+        }
+        if (fId) {
+          await acceptFriend(fId);
+        } else {
+          showToast("Could not find friend request — it may have expired", "error");
+        }
+      } catch(err) { console.error("[notif] accept-friend error:", err); }
+      el?.remove();
+      const updated = loadNotifs().filter(x => x.id != id);
+      saveNotifs(updated); renderNotifBadge();
+    })();
+  } else if (action === "decline-friend" && n) {
+    (async () => {
+      try {
+        let fId = n.meta?.friendId;
+        if (!fId && n.meta?.fromId) {
+          const friends = await api("/friends");
+          const pending = friends.find(f => f.other_id === n.meta.fromId && f.status === "pending");
+          if (pending) fId = pending.id;
+        }
+        if (fId) {
+          await declineFriend(fId);
+        } else {
+          showToast("Could not find friend request — it may have expired", "error");
+        }
+      } catch(err) { console.error("[notif] decline-friend error:", err); }
+      el?.remove();
+      const updated = loadNotifs().filter(x => x.id != id);
+      saveNotifs(updated); renderNotifBadge();
+    })();
   } else if (action === "accept-group" && n?.meta?.groupId) {
     api(`/groups/${n.meta.groupId}/accept`, { method:"POST" }).then(() => {
       showToast("Joined group!", "success"); el?.remove();
+      const updated = loadNotifs().filter(x => x.id != id);
+      saveNotifs(updated); renderNotifBadge();
     });
   } else if (action === "decline-group" && n?.meta?.groupId) {
     el?.remove();
+    const updated = loadNotifs().filter(x => x.id != id);
+    saveNotifs(updated); renderNotifBadge();
   } else if (action === "accept-server" && n?.meta?.serverId) {
     const btn = event?.target;
     if (btn) { btn.disabled = true; btn.textContent = "Joining…"; }
@@ -5950,7 +6065,7 @@ function clearAllNotifs() {
 }
 
 // ── Notification triggers ────────────────────────────────────
-function notifyFriendRequest(fromUsername, fromAvatarUrl, friendId) {
+function notifyFriendRequest(fromUsername, fromAvatarUrl, friendId, fromId) {
   pushNotif({
     type: "friend",
     icon: "👤",
@@ -5960,7 +6075,7 @@ function notifyFriendRequest(fromUsername, fromAvatarUrl, friendId) {
       { label: "Accept", style: "notif-btn-accept", action: "accept-friend" },
       { label: "Decline", style: "notif-btn-decline", action: "decline-friend" }
     ],
-    meta: { friendId }
+    meta: { friendId, fromId, fromUsername }
   });
 }
 
@@ -6489,7 +6604,7 @@ function renderPost(post) {
   const av = post.avatar_url ? `<img src="${post.avatar_url}" />` : post.username.slice(0,1).toUpperCase();
   const time = new Date(post.created_at).toLocaleDateString("en-GB",{ day:"numeric", month:"short" }) + " · " + new Date(post.created_at).toLocaleTimeString([],{ hour:"2-digit", minute:"2-digit" });
   const vis = post.visibility==="friends" ? "Friends only" : "Public";
-  const heartIcon = `<svg width="15" height="15" viewBox="0 0 24 24" fill="${post.liked_by_me?'currentColor':'none'}" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"/></svg>`;
+  const reactionsHtml = renderReactionBar(post);
   const commentIcon = `<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>`;
   const shareIcon = `<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 12v8a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-8"/><polyline points="16 6 12 2 8 6"/><line x1="12" y1="2" x2="12" y2="15"/></svg>`;
   const trashIcon = `<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14H6L5 6"/><path d="M10 11v6"/><path d="M14 11v6"/><path d="M9 6V4h6v2"/></svg>`;
@@ -6506,9 +6621,7 @@ function renderPost(post) {
     ${post.image_url?`<img class="post-image" src="${post.image_url}" onclick="openLightbox('${post.image_url}')" />`:""}
     ${post.community_tags?.length ? renderPostTags(post.community_tags) : ""}
     <div class="post-actions">
-      <button class="post-action-btn ${post.liked_by_me?"liked":""}" onclick="toggleLike(${post.id},this)">
-        ${heartIcon} <span class="like-count">${post.like_count||0}</span>
-      </button>
+      ${reactionsHtml}
       <button class="post-action-btn" onclick="toggleComments(${post.id})">${commentIcon} <span>${post.comment_count||0}</span></button>
       <button class="post-action-btn" onclick="sharePost(${post.id})">${shareIcon} Share</button>
     </div>
@@ -7340,7 +7453,7 @@ document.getElementById("postBtn").addEventListener("click", async () => {
   const r=await fetch(`${AUTH_URL}/posts`,{ method:"POST", headers:{ Authorization:`Bearer ${feedToken}` }, body:formData }).then(r=>r.json());
   btn.disabled=false; btn.textContent="Post";
   if (r.error) { alert(r.error); return; }
-  r.username=feedMe.username; r.avatar_url=feedMe.avatarUrl; r.like_count=0; r.comment_count=0; r.liked_by_me=false;
+  r.username=feedMe.username; r.avatar_url=feedMe.avatarUrl; r.reactions=[]; r.my_reaction=null; r.reaction_count=0; r.comment_count=0;
   // Attach tag data for immediate render
   if (_selectedTags.length) r.community_tags = _selectedTags.map(t=>({id:t.id,name:t.name,icon_url:t.iconUrl}));
   const container=document.getElementById("feedPosts"); const empty=container.querySelector("[style*='padding:48px']"); if (empty) container.innerHTML="";
@@ -7365,14 +7478,111 @@ document.getElementById("postBtn").addEventListener("click", async () => {
   _selectedTags=[]; renderTagChips();
 });
 
-async function toggleLike(postId, btn) {
-  const r=await feedApi(`/posts/${postId}/like`,{ method:"POST" });
-  const countEl=btn.querySelector(".like-count"); const current=parseInt(countEl.textContent)||0;
-  const hFilled=`<svg width="15" height="15" viewBox="0 0 24 24" fill="currentColor" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"/></svg>`;
-  const hEmpty=`<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"/></svg>`;
-  if (r.liked) { btn.innerHTML=`${hFilled} <span class="like-count">${current+1}</span>`; btn.classList.add("liked"); }
-  else { btn.innerHTML=`${hEmpty} <span class="like-count">${Math.max(0,current-1)}</span>`; btn.classList.remove("liked"); }
+// ── Reaction system ──
+const EMOJI_LIST = [
+  '👍','👎','❤️','🔥','😂','😮','😢','😡','🎉','🚀',
+  '💯','👀','🤔','💀','🙌','👏','💪','✨','🥳','😍',
+  '🤣','😎','🥺','😤','🫡','🤝','💔','🙏','😈','👻',
+  '💩','🤡','😴','🥱','🤮','🤯','🫠','❄️','☀️','⭐',
+  '🍕','🎮','🎵','📸'
+];
+
+function renderReactionBar(post, prefix = '') {
+  const reactions = Array.isArray(post.reactions) ? post.reactions : [];
+  const myReaction = post.my_reaction || null;
+  const postId = post.id;
+  const uid = prefix + postId;
+
+  let pills = reactions.map(r => {
+    const isMine = r.emoji === myReaction;
+    return `<span class="reaction-pill ${isMine?'mine':''}" onclick="toggleReaction(${postId},'${r.emoji}','${uid}')" title="${r.emoji} ${r.count}">
+      <span class="r-emoji">${r.emoji}</span><span class="r-count">${r.count}</span>
+    </span>`;
+  }).join('');
+
+  return `<div class="reaction-bar" id="rbar-${uid}">
+    ${pills}
+    <span class="reaction-add-btn" onclick="openEmojiPicker(event,${postId},'${uid}')" title="Add reaction">
+      😀
+      <div class="emoji-picker-popup" id="epicker-${uid}" onclick="event.stopPropagation()">
+        <input class="emoji-search" placeholder="Search emoji…" oninput="filterEmojis(this,'${uid}')" />
+        <div class="emoji-grid" id="egrid-${uid}">
+          ${EMOJI_LIST.map(e => `<button class="emoji-opt" onclick="pickEmoji(event,${postId},'${e}','${uid}')">${e}</button>`).join('')}
+        </div>
+      </div>
+    </span>
+  </div>`;
 }
+
+async function toggleReaction(postId, emoji, uid) {
+  const r = await feedApi(`/posts/${postId}/react`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ emoji })
+  });
+  // Refresh the reaction bar from server
+  await refreshReactionBar(postId, uid);
+}
+
+async function refreshReactionBar(postId, uid) {
+  const data = await feedApi(`/posts/${postId}/reactions`);
+  const bar = document.getElementById(`rbar-${uid}`);
+  if (!bar) return;
+  const reactions = data.reactions || [];
+  const myReaction = data.my_reaction || null;
+
+  let pills = reactions.map(r => {
+    const isMine = r.emoji === myReaction;
+    return `<span class="reaction-pill ${isMine?'mine':''}" onclick="toggleReaction(${postId},'${r.emoji}','${uid}')" title="${r.emoji} ${r.count}">
+      <span class="r-emoji">${r.emoji}</span><span class="r-count">${r.count}</span>
+    </span>`;
+  }).join('');
+
+  bar.innerHTML = `${pills}
+    <span class="reaction-add-btn" onclick="openEmojiPicker(event,${postId},'${uid}')" title="Add reaction">
+      😀
+      <div class="emoji-picker-popup" id="epicker-${uid}" onclick="event.stopPropagation()">
+        <input class="emoji-search" placeholder="Search emoji…" oninput="filterEmojis(this,'${uid}')" />
+        <div class="emoji-grid" id="egrid-${uid}">
+          ${EMOJI_LIST.map(e => `<button class="emoji-opt" onclick="pickEmoji(event,${postId},'${e}','${uid}')">${e}</button>`).join('')}
+        </div>
+      </div>
+    </span>`;
+}
+
+function openEmojiPicker(event, postId, uid) {
+  event.stopPropagation();
+  // Close any other open pickers
+  document.querySelectorAll('.emoji-picker-popup.open').forEach(el => el.classList.remove('open'));
+  const picker = document.getElementById(`epicker-${uid}`);
+  if (picker) {
+    picker.classList.toggle('open');
+    const input = picker.querySelector('.emoji-search');
+    if (input) { input.value = ''; filterEmojis(input, uid); setTimeout(() => input.focus(), 50); }
+  }
+}
+
+function filterEmojis(input, uid) {
+  const q = input.value.toLowerCase();
+  const grid = document.getElementById(`egrid-${uid}`);
+  if (!grid) return;
+  grid.querySelectorAll('.emoji-opt').forEach(btn => {
+    btn.style.display = (!q || btn.textContent.includes(q)) ? '' : 'none';
+  });
+}
+
+async function pickEmoji(event, postId, emoji, uid) {
+  event.stopPropagation();
+  // Close picker
+  const picker = document.getElementById(`epicker-${uid}`);
+  if (picker) picker.classList.remove('open');
+  await toggleReaction(postId, emoji, uid);
+}
+
+// Close emoji pickers when clicking outside
+document.addEventListener('click', () => {
+  document.querySelectorAll('.emoji-picker-popup.open').forEach(el => el.classList.remove('open'));
+});
 
 async function toggleComments(postId) {
   const el = document.getElementById(`comments-${postId}`);
@@ -8163,7 +8373,7 @@ async function loadSpotlight() {
     const cutoff = Date.now() - 48 * 60 * 60 * 1000;
     const hot = posts
       .filter(p => new Date(p.created_at).getTime() > cutoff)
-      .map(p => ({ ...p, score: (p.like_count||0) * 2 + (p.comment_count||0) }))
+      .map(p => ({ ...p, score: (p.reaction_count||0) * 2 + (p.comment_count||0) }))
       .sort((a,b) => b.score - a.score)
       .slice(0, 24);
 
@@ -8213,7 +8423,7 @@ async function loadSpotlight() {
           </div>
           ${p.content ? `<div class="spotlight-card-content">${escapeHtml(p.content)}</div>` : ""}
           <div class="spotlight-card-stats">
-            <span class="spotlight-card-stat">&#10084; ${p.like_count||0}</span>
+            <span class="spotlight-card-stat">${(p.reactions||[]).length ? (p.reactions||[]).map(r=>r.emoji).slice(0,3).join('') : '❤️'} ${p.reaction_count||0}</span>
             <span class="spotlight-card-stat">&#128172; ${p.comment_count||0}</span>
             ${isReel ? `<span class="spotlight-card-stat" style="color:#a78bfa">&#9654; Reel</span>` : ""}
           </div>
@@ -8483,10 +8693,7 @@ function openSpotlightFocus(post) {
       </div>
       ${post.content ? `<div style="font-size:15px;color:var(--text-2);line-height:1.6;margin-bottom:14px;word-break:break-word">${escapeHtml(post.content)}</div>` : ""}
       <div style="display:flex;gap:4px;border-top:1px solid rgba(255,255,255,.08);padding-top:10px">
-        <button class="post-action-btn ${post.liked_by_me?"liked":""}" onclick="spotlightToggleLike(${post.id},this)">
-          <svg width="15" height="15" viewBox="0 0 24 24" fill="${post.liked_by_me?'currentColor':'none'}" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"/></svg>
-          <span id="slFocusLikes">${post.like_count||0}</span>
-        </button>
+        ${renderReactionBar(post, 'sl-')}
         <button class="post-action-btn" onclick="spotlightToggleComments(${post.id})">
           <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
           <span>${post.comment_count||0}</span>
@@ -8536,7 +8743,7 @@ async function submitCommentSl(postId) {
   await loadSpotlightComments(postId);
 }
 
-function spotlightToggleLike(postId, btn) { toggleLike(postId, btn); }
+// spotlightToggleLike removed — reactions are now handled by toggleReaction()
 
 function spotlightToggleComments(postId) {
   const el = document.getElementById("slFocusComments");
@@ -8648,12 +8855,12 @@ async function renderFullProfilePage() {
       } else if (rel && rel.status === "pending" && rel.is_sender) {
         friendBtnHtml = `<button class="fp-btn fp-btn-ghost" disabled>⏳ Pending</button>`;
       } else if (rel && rel.status === "pending") {
-        friendBtnHtml = `<button class="fp-btn fp-btn-primary" onclick="acceptFriend(${rel.id})">✓ Accept Request</button>`;
+        friendBtnHtml = `<button class="fp-btn fp-btn-primary" onclick="withLoading(this, () => acceptFriend(${rel.id}))">✓ Accept Request</button>`;
       } else if (isPrivate) {
         // Private account — no Add Friend button, show lock indicator
         friendBtnHtml = `<button class="fp-btn fp-btn-ghost" style="opacity:.6;cursor:not-allowed" disabled title="This account is private — they must invite you">🔒 Private Account</button>`;
       } else {
-        friendBtnHtml = `<button class="fp-btn fp-btn-primary" onclick="sendFriendRequest(${fpUserId},'${fpData.username}')">👤 Add Friend</button>`;
+        friendBtnHtml = `<button class="fp-btn fp-btn-primary" onclick="withLoading(this, () => sendFriendRequest(${fpUserId},'${fpData.username}'))">👤 Add Friend</button>`;
       }
     } catch(e) {}
     actions = `${friendBtnHtml}
@@ -8969,7 +9176,7 @@ async function renderFpRight() {
   const postsHtml = allowed.map(p => {
     const time = new Date(p.created_at).toLocaleDateString("en-GB",{day:"numeric",month:"short"}) + " · " + new Date(p.created_at).toLocaleTimeString([],{hour:"2-digit",minute:"2-digit"});
     const visIcon = p.visibility==="friends"?"👥":"🌐";
-    const hrt = `<svg width="14" height="14" viewBox="0 0 24 24" fill="${p.liked_by_me?'currentColor':'none'}" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"/></svg>`;
+    const fpReactHtml = renderReactionBar(p, 'fp-');
     const cmt = `<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>`;
     const shr = `<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 12v8a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-8"/><polyline points="16 6 12 2 8 6"/><line x1="12" y1="2" x2="12" y2="15"/></svg>`;
     return `<div class="fp-post" id="fp-post-${p.id}" style="width:100%">
@@ -8985,7 +9192,7 @@ async function renderFpRight() {
       ${p.content?`<div class="fp-post-content">${escapeHtml(p.content)}</div>`:""}
       ${p.image_url?`<img class="fp-post-image" src="${p.image_url}" onclick="openLightbox('${p.image_url}')" />`:""}
       <div class="fp-post-actions">
-        <button class="fp-post-btn ${p.liked_by_me?"liked":""}" onclick="toggleLike(${p.id},this)">${hrt} <span>${p.like_count||0}</span></button>
+        ${fpReactHtml}
         <button class="fp-post-btn" onclick="toggleComments(${p.id})">${cmt} <span>${p.comment_count||0}</span></button>
         <button class="fp-post-btn" onclick="sharePost(${p.id})">${shr} Share</button>
       </div>
@@ -9251,7 +9458,7 @@ function fpEnterEditMode() {
             <input class="fp-edit-input" id="fpEditWebsite" value="${escapeHtml(fpData.website||"")}" placeholder="https://" maxlength="128" />
           </div>
           <div style="display:flex;gap:8px;margin-top:4px">
-            <button class="fp-btn fp-btn-primary" onclick="fpSaveEdits()" style="flex:1">💾 Save</button>
+            <button class="fp-btn fp-btn-primary" onclick="withLoading(this, () => fpSaveEdits())" style="flex:1">💾 Save</button>
             <button class="fp-btn fp-btn-ghost" onclick="renderFpLeft()" style="flex:0 0 auto">Cancel</button>
           </div>
           <div id="fpEditMsg" style="display:none;font-size:13px;text-align:center;margin-top:4px"></div>
@@ -9637,11 +9844,11 @@ async function loadProfilePanel(userId) {
       } else if (rel && rel.status === "pending" && rel.is_sender) {
         friendBtn = `<button class="profile-btn profile-btn-secondary" disabled>⏳ Pending</button>`;
       } else if (rel && rel.status === "pending") {
-        friendBtn = `<button class="profile-btn profile-btn-primary" onclick="acceptFriend(${rel.id})">✓ Accept</button>`;
+        friendBtn = `<button class="profile-btn profile-btn-primary" onclick="withLoading(this, () => acceptFriend(${rel.id}))">✓ Accept</button>`;
       } else if (isPrivate) {
         friendBtn = `<button class="profile-btn profile-btn-secondary" style="opacity:.6;cursor:not-allowed" disabled>🔒 Private Account</button>`;
       } else {
-        friendBtn = `<button class="profile-btn profile-btn-primary" onclick="sendFriendRequest(${userId},'${profileData.username}');document.getElementById('addFriendMsg').style.display='none'">👤 Add Friend</button>`;
+        friendBtn = `<button class="profile-btn profile-btn-primary" onclick="withLoading(this, () => { sendFriendRequest(${userId},'${profileData.username}'); document.getElementById('addFriendMsg').style.display='none'; })">👤 Add Friend</button>`;
       }
     } catch(e) {}
     actionsEl.innerHTML = `
@@ -9744,7 +9951,7 @@ async function renderProfilePosts(body) {
 function renderProfilePost(p) {
   const time = new Date(p.created_at).toLocaleDateString("en-GB", { day:"numeric", month:"short" }) + " · " + new Date(p.created_at).toLocaleTimeString([], { hour:"2-digit", minute:"2-digit" });
   const visIcon = p.visibility === "friends" ? "👥" : "🌐";
-  const heartSvg = `<svg width="13" height="13" viewBox="0 0 24 24" fill="${p.liked_by_me?'currentColor':'none'}" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"/></svg>`;
+  const profReactHtml = renderReactionBar(p, 'prof-');
   const cmtSvg  = `<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>`;
   return `<div class="profile-post-card">
     <div class="profile-post-header">
@@ -9754,7 +9961,7 @@ function renderProfilePost(p) {
     ${p.content ? `<div class="profile-post-content">${escapeHtml(p.content)}</div>` : ""}
     ${p.image_url ? `<img class="profile-post-image" src="${p.image_url}" onclick="openLightbox('${p.image_url}')" />` : ""}
     <div class="profile-post-actions">
-      <button class="profile-post-btn ${p.liked_by_me ? "liked" : ""}" onclick="toggleLike(${p.id},this)">${heartSvg} ${p.like_count || 0}</button>
+      ${profReactHtml}
       <button class="profile-post-btn">${cmtSvg} ${p.comment_count || 0}</button>
     </div>
   </div>`;
@@ -9815,7 +10022,7 @@ async function renderProfileAbout(body) {
       <input class="profile-edit-input" id="peWebsite" value="${escapeHtml(profileData.website || "")}" placeholder="https://yoursite.com" maxlength="128" />
     </div>
     <div style="display:flex;gap:8px;margin-top:4px">
-      <button class="profile-btn profile-btn-primary" onclick="saveProfileChanges()" style="flex:1">💾 Save Changes</button>
+      <button class="profile-btn profile-btn-primary" onclick="withLoading(this, () => saveProfileChanges())" style="flex:1">💾 Save Changes</button>
       <button class="profile-btn profile-btn-secondary" onclick="switchProfileTab('posts')" style="flex:0 0 auto">Cancel</button>
     </div>
     <div id="profileSaveMsg" style="margin-top:8px;font-size:13px;text-align:center;display:none"></div>`;

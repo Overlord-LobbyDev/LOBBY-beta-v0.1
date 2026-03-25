@@ -973,9 +973,10 @@ app.get("/feed", requireAuth, async (req, res) => {
 
   const r = await pool.query(`
     SELECT p.*, u.username, u.avatar_url,
-      (SELECT COUNT(*) FROM post_likes WHERE post_id = p.id) AS like_count,
       (SELECT COUNT(*) FROM post_comments WHERE post_id = p.id) AS comment_count,
-      EXISTS(SELECT 1 FROM post_likes WHERE post_id = p.id AND user_id = $1) AS liked_by_me
+      (SELECT COALESCE(json_agg(json_build_object('emoji', sub.emoji, 'count', sub.cnt)), '[]'::json) FROM (SELECT emoji, COUNT(*)::int AS cnt FROM post_reactions WHERE post_id = p.id GROUP BY emoji ORDER BY cnt DESC) sub) AS reactions,
+      (SELECT emoji FROM post_reactions WHERE post_id = p.id AND user_id = $1) AS my_reaction,
+      (SELECT COUNT(*) FROM post_reactions WHERE post_id = p.id) AS reaction_count
     FROM posts p
     JOIN users u ON u.id = p.user_id
     WHERE ${whereClause}
@@ -1010,15 +1011,49 @@ app.delete("/posts/:id", requireAuth, async (req, res) => {
   res.json({ success: true });
 });
 
-app.post("/posts/:id/like", requireAuth, async (req, res) => {
-  const existing = await pool.query("SELECT id FROM post_likes WHERE post_id=$1 AND user_id=$2", [req.params.id, req.userId]);
+// Toggle a reaction on a post (send same emoji again to remove it)
+app.post("/posts/:id/react", requireAuth, async (req, res) => {
+  const { emoji } = req.body;
+  if (!emoji) return res.status(400).json({ error: "emoji is required" });
+  const postId = req.params.id;
+
+  const existing = await pool.query(
+    "SELECT id, emoji FROM post_reactions WHERE post_id=$1 AND user_id=$2",
+    [postId, req.userId]
+  );
+
   if (existing.rows.length) {
-    await pool.query("DELETE FROM post_likes WHERE post_id=$1 AND user_id=$2", [req.params.id, req.userId]);
-    res.json({ liked: false });
+    if (existing.rows[0].emoji === emoji) {
+      // Same emoji → remove reaction
+      await pool.query("DELETE FROM post_reactions WHERE post_id=$1 AND user_id=$2", [postId, req.userId]);
+      return res.json({ reacted: false, emoji: null });
+    } else {
+      // Different emoji → update reaction
+      await pool.query("UPDATE post_reactions SET emoji=$1 WHERE post_id=$2 AND user_id=$3", [emoji, postId, req.userId]);
+      return res.json({ reacted: true, emoji });
+    }
   } else {
-    await pool.query("INSERT INTO post_likes (post_id, user_id) VALUES ($1,$2)", [req.params.id, req.userId]);
-    res.json({ liked: true });
+    // No existing reaction → insert
+    await pool.query("INSERT INTO post_reactions (post_id, user_id, emoji) VALUES ($1,$2,$3)", [postId, req.userId, emoji]);
+    return res.json({ reacted: true, emoji });
   }
+});
+
+// Get reactions summary for a post
+app.get("/posts/:id/reactions", requireAuth, async (req, res) => {
+  const postId = req.params.id;
+  const counts = await pool.query(
+    "SELECT emoji, COUNT(*)::int AS count FROM post_reactions WHERE post_id=$1 GROUP BY emoji ORDER BY count DESC",
+    [postId]
+  );
+  const mine = await pool.query(
+    "SELECT emoji FROM post_reactions WHERE post_id=$1 AND user_id=$2",
+    [postId, req.userId]
+  );
+  res.json({
+    reactions: counts.rows,
+    my_reaction: mine.rows[0]?.emoji || null
+  });
 });
 
 app.get("/posts/:id/comments", requireAuth, async (req, res) => {
@@ -1098,9 +1133,10 @@ app.get("/profile/:id/posts", requireAuth, async (req, res) => {
   try {
   const r = await pool.query(`
     SELECT p.*, u.username, u.avatar_url,
-      (SELECT COUNT(*) FROM post_likes WHERE post_id = p.id) AS like_count,
       (SELECT COUNT(*) FROM post_comments WHERE post_id = p.id) AS comment_count,
-      EXISTS(SELECT 1 FROM post_likes WHERE post_id = p.id AND user_id = $2) AS liked_by_me
+      (SELECT COALESCE(json_agg(json_build_object('emoji', sub.emoji, 'count', sub.cnt)), '[]'::json) FROM (SELECT emoji, COUNT(*)::int AS cnt FROM post_reactions WHERE post_id = p.id GROUP BY emoji ORDER BY cnt DESC) sub) AS reactions,
+      (SELECT emoji FROM post_reactions WHERE post_id = p.id AND user_id = $2) AS my_reaction,
+      (SELECT COUNT(*) FROM post_reactions WHERE post_id = p.id) AS reaction_count
     FROM posts p
     JOIN users u ON u.id = p.user_id
     WHERE p.user_id = $1

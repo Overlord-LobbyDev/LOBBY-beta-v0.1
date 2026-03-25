@@ -186,15 +186,32 @@ async function initDb() {
     );
   `);
 
-  // Post likes
+  // Post reactions (replaces post_likes)
   await pool.query(`
-    CREATE TABLE IF NOT EXISTS post_likes (
+    CREATE TABLE IF NOT EXISTS post_reactions (
       id         SERIAL PRIMARY KEY,
       post_id    INTEGER REFERENCES posts(id) ON DELETE CASCADE,
       user_id    INTEGER REFERENCES users(id) ON DELETE CASCADE,
+      emoji      TEXT NOT NULL DEFAULT '❤️',
+      created_at TIMESTAMPTZ DEFAULT NOW(),
       UNIQUE(post_id, user_id)
     );
   `);
+
+  // One-time migration: copy post_likes → post_reactions as ❤️, then drop old table
+  const likesTableExists = await pool.query(`
+    SELECT 1 FROM information_schema.tables
+    WHERE table_name = 'post_likes'
+  `);
+  if (likesTableExists.rows.length) {
+    await pool.query(`
+      INSERT INTO post_reactions (post_id, user_id, emoji)
+      SELECT post_id, user_id, '❤️' FROM post_likes
+      ON CONFLICT (post_id, user_id) DO NOTHING
+    `).catch(() => {});
+    await pool.query(`DROP TABLE IF EXISTS post_likes`).catch(() => {});
+    console.log("[db] Migrated post_likes → post_reactions");
+  }
 
   // Post comments
   await pool.query(`
