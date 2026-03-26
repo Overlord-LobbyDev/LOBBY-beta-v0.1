@@ -1610,6 +1610,11 @@ async function showGroupsPanel() {
   document.getElementById("groupsNavIcon").classList.add("active");
   document.getElementById("sidebarTitle").textContent = "Groups";
   document.getElementById("membersSidebar").style.display = "none";
+  
+  // Hide social feed when entering groups
+  const socialFeed = document.getElementById("socialFeed");
+  if (socialFeed) { socialFeed.style.display = "none"; socialFeed.classList.add("collapsed"); }
+  
   document.getElementById("chatMain").innerHTML = `<div class="empty-state"><div class="empty-icon">👥</div><h3>Your Groups</h3><p>Select a group to chat or start a call</p></div>`;
 
   const groups = await api("/groups");
@@ -1625,7 +1630,7 @@ async function showGroupsPanel() {
     groups.forEach(g => {
       const icon = g.icon_url ? `<img src="${g.icon_url}" style="width:32px;height:32px;border-radius:50%;object-fit:cover"/>` : "👥";
       const safeName = (g.name||'').replace(/\\/g,'\\\\').replace(/'/g,"\\'").replace(/\n/g,'\\n').replace(/\r/g,'');
-      html += `<div class="dm-item" onclick="openGroup(${g.id},'${safeName}')">
+      html += `<div class="dm-item" data-group-id="${g.id}" onclick="openGroup(${g.id},'${safeName}')">
         <div class="dm-avatar" style="font-size:18px">${icon}</div>
         <div style="flex:1;min-width:0">
           <div style="font-size:14px;font-weight:600">${escapeHtml(g.name)}</div>
@@ -1675,70 +1680,79 @@ async function createGroup() {
   await showGroupsPanel();
 }
 
-async function openGroup(groupId, groupName) {
-  try {
-    selectedGroupId = groupId;
-    delete unreadGroups[groupId];
-    updateGroupBadge();
-    currentView = { type:"group", id:groupId, name:groupName };
-    wsSend({ type:"subscribe-channel", channelId:`group-${groupId}` });
-    // Ensure correct panels visible
-    document.getElementById("homePanel")?.classList.add("hidden");
-    document.getElementById("chatPanel")?.classList.remove("hidden");
-    document.getElementById("profilePage")?.classList.add("hidden");
-    document.getElementById("vcPanel")?.classList.add("hidden");
-    let members = [], messages = [];
-    try { members = await api(`/groups/${groupId}/members`) || []; } catch(e) { console.error("[openGroup] members fetch failed:", e); }
-    try { messages = await api(`/groups/${groupId}/messages`) || []; } catch(e) { console.error("[openGroup] messages fetch failed:", e); }
-    if (!Array.isArray(members)) members = [];
-    if (!Array.isArray(messages)) messages = [];
-    const main = document.getElementById("chatMain");
-    main.innerHTML = `
-      <div class="call-layout" id="callLayout">
-        <div class="call-area" id="callArea">
-          <div class="call-header">
-            <span>👥 ${escapeHtml(groupName)}</span>
-            <button class="btn btn-primary" style="margin-left:auto;padding:6px 16px;font-size:13px" onclick="joinGroupCall(${groupId})">📞 Join Call</button>
-          </div>
-          <div class="call-grid count-${Math.min(members.length,5)}" id="callGrid">
-            ${members.map(m => memberCallTile(m, false)).join("")}
-          </div>
-          <div class="call-controls" id="callControls" style="display:none">
-            <button class="call-btn" id="gcMuteBtn" onclick="toggleGroupMute()" title="Mute">🎙</button>
-            <button class="call-btn" id="gcCamBtn" onclick="toggleGroupCam()" title="Camera">📷</button>
-            <button class="call-btn" id="gcScreenBtn" onclick="toggleGroupScreen()" title="Share Screen">🖥</button>
-            <button class="call-btn leave" onclick="leaveGroupCall()">📵 Leave Call</button>
+function openGroup(groupId, groupName) {
+  console.log("[openGroup] called", groupId, groupName);
+  selectedGroupId = groupId;
+  currentView = { type:"group", id:groupId, name:groupName };
+  delete unreadGroups[groupId]; updateGroupBadge();
+  try { wsSend({ type:"subscribe-channel", channelId:`group-${groupId}` }); } catch(e) { console.warn("[openGroup] wsSend err:", e); }
+
+  // Highlight clicked group in sidebar
+  document.querySelectorAll(".dm-item").forEach(el => el.classList.remove("active"));
+  document.querySelectorAll(`.dm-item[data-group-id="${groupId}"]`).forEach(el => el.classList.add("active"));
+
+  // IMMEDIATELY show chatPanel and render the group chat UI shell
+  document.getElementById("homePanel")?.classList.add("hidden");
+  document.getElementById("chatPanel")?.classList.remove("hidden");
+  document.getElementById("profilePage")?.classList.add("hidden");
+  document.getElementById("vcPanel")?.classList.add("hidden");
+
+  const safeName = escapeHtml(groupName);
+  const main = document.getElementById("chatMain");
+  main.innerHTML = `
+    <div class="call-layout" id="callLayout">
+      <div class="call-area" id="callArea">
+        <div class="call-header">
+          <span>👥 ${safeName}</span>
+          <button class="btn btn-primary" style="margin-left:auto;padding:6px 16px;font-size:13px" onclick="joinGroupCall(${groupId})">📞 Join Call</button>
+        </div>
+        <div class="call-grid" id="callGrid"><div style="color:var(--text-3);padding:24px;text-align:center">Loading members…</div></div>
+        <div class="call-controls" id="callControls" style="display:none">
+          <button class="call-btn" id="gcMuteBtn" onclick="toggleGroupMute()">🎙</button>
+          <button class="call-btn" id="gcCamBtn" onclick="toggleGroupCam()">📷</button>
+          <button class="call-btn" id="gcScreenBtn" onclick="toggleGroupScreen()">🖥</button>
+          <button class="call-btn leave" onclick="leaveGroupCall()">📵 Leave Call</button>
+        </div>
+      </div>
+      <div class="call-chat-panel">
+        <div class="chat-header">
+          <span class="chat-header-icon">#</span><span class="chat-header-name">${safeName}</span>
+          <div style="margin-left:auto;display:flex;gap:6px">
+            <button class="icon-btn" onclick="addMemberToGroup(${groupId})">👤+</button>
+            <button class="icon-btn" onclick="leaveGroupPermanently(${groupId})" style="color:var(--danger)">🚪</button>
           </div>
         </div>
-        <div class="call-chat-panel">
-          <div class="chat-header">
-            <span class="chat-header-icon">#</span>
-            <span class="chat-header-name">${escapeHtml(groupName)}</span>
-            <div style="margin-left:auto;display:flex;gap:6px">
-              <button class="icon-btn" onclick="addMemberToGroup(${groupId})" title="Add member">👤+</button>
-              <button class="icon-btn" onclick="leaveGroupPermanently(${groupId})" title="Leave group" style="color:var(--danger)">🚪</button>
-            </div>
+        <div class="messages" id="msgContainer"><div style="color:var(--text-3);padding:24px;text-align:center">Loading messages…</div></div>
+        <div class="typing-indicator" id="typingIndicator"></div>
+        <div class="chat-input-wrap">
+          <div id="attachPreview" class="attach-preview"></div>
+          <div class="chat-input-box">
+            <button class="attach-btn" onclick="document.getElementById('fileInput').click()">📎</button>
+            <textarea class="chat-input" id="chatInput" placeholder="Message ${safeName}" rows="1"
+              oninput="autoResize(this);sendTyping()"
+              onkeydown="if(event.key==='Enter'&&!event.shiftKey){event.preventDefault();sendMessage()}"></textarea>
+            <button class="send-btn" onclick="sendMessage()">➤</button>
           </div>
-          <div class="messages" id="msgContainer"></div>
-          <div class="typing-indicator" id="typingIndicator"></div>
-          <div class="chat-input-wrap">
-            <div id="attachPreview" class="attach-preview"></div>
-            <div class="chat-input-box">
-              <button class="attach-btn" onclick="document.getElementById('fileInput').click()">📎</button>
-              <textarea class="chat-input" id="chatInput" placeholder="Message ${escapeHtml(groupName)}" rows="1"
-                oninput="autoResize(this);sendTyping()"
-                onkeydown="if(event.key==='Enter'&&!event.shiftKey){event.preventDefault();sendMessage()}"
-              ></textarea>
-              <button class="send-btn" onclick="sendMessage()">➤</button>
-            </div>
         </div>
       </div>
     </div>`;
+  console.log("[openGroup] UI shell rendered, now loading data...");
+  _loadGroupDataChat(groupId);
+}
 
+async function _loadGroupDataChat(groupId) {
+  try {
+    let members = [], messages = [];
+    try { members = await api(`/groups/${groupId}/members`) || []; } catch(e) { console.error("[openGroup] members fetch:", e); }
+    try { messages = await api(`/groups/${groupId}/messages`) || []; } catch(e) { console.error("[openGroup] messages fetch:", e); }
+    if (!Array.isArray(members)) members = [];
+    if (!Array.isArray(messages)) messages = [];
+    if (selectedGroupId !== groupId) return;
+    const grid = document.getElementById("callGrid");
+    if (grid) { grid.className = `call-grid count-${Math.min(members.length,5)}`; grid.innerHTML = members.map(m => memberCallTile(m, false)).join(""); }
     const container = document.getElementById("msgContainer");
-    messages.forEach(m => appendMessage(m, "group"));
-    container.scrollTop = container.scrollHeight;
-  } catch(err) { console.error("[openGroup] error:", err); showToast("Could not open group", "error"); }
+    if (container) { container.innerHTML = ""; messages.forEach(m => appendMessage(m, "group")); container.scrollTop = container.scrollHeight; }
+  } catch(err) { console.error("[openGroup] _loadGroupDataChat error:", err); }
 }
 
 function memberCallTile(member, isInCall) {
