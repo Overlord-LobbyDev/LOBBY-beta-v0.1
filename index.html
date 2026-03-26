@@ -5178,10 +5178,6 @@ async function showGroupsPanel() {
   document.body.classList.remove("members-visible");
   document.body.classList.remove("members-bar-open");
   
-  // Hide social feed when entering groups
-  const socialFeed = document.getElementById("socialFeed");
-  if (socialFeed) { socialFeed.style.display = "none"; socialFeed.classList.add("collapsed"); }
-  
   document.getElementById("chatMain").innerHTML = `<div class="empty-state"><div class="empty-icon">👥</div><h3>Your Groups</h3><p>Select a group to chat or start a call</p></div>`;
   const groups = await api("/groups");
   let html = `<div class="channel-section"><div class="channel-section-label">Groups <button class="channel-add" onclick="openCreateGroupModal()">+</button></div>`;
@@ -5235,54 +5231,55 @@ function openGroup(groupId, groupName) {
   const allItems = document.querySelectorAll(".dm-item");
   allItems.forEach(el => { if (el.getAttribute("data-group-id") === String(groupId)) el.classList.add("active"); });
 
-  // IMMEDIATELY show chatPanel and render the group chat UI shell
+  // IMMEDIATELY show chatPanel
   document.getElementById("homePanel")?.classList.add("hidden");
   document.getElementById("chatPanel")?.classList.remove("hidden");
   document.getElementById("profilePage")?.classList.add("hidden");
   document.getElementById("vcPanel")?.classList.add("hidden");
 
   const safeName = escapeHtml(groupName);
-  const chatMain = document.getElementById("chatMain");
-  chatMain.innerHTML = `
-    <div class="call-layout" id="callLayout">
-      <div class="call-area" id="callArea">
-        <div class="call-header">
-          <span>👥 ${safeName}</span>
-          <button class="btn btn-primary" style="margin-left:auto;padding:6px 16px;font-size:13px" onclick="joinGroupCall(${groupId})">📞 Join Call</button>
-        </div>
-        <div class="call-grid" id="callGrid"><div style="color:var(--text-3);padding:24px;text-align:center">Loading members…</div></div>
-        <div class="call-controls" id="callControls" style="display:none">
-          <button class="call-btn" id="gcMuteBtn" onclick="toggleGroupMute()">🎙</button>
-          <button class="call-btn" id="gcCamBtn" onclick="toggleGroupCam()">📷</button>
-          <button class="call-btn" id="gcScreenBtn" onclick="toggleGroupScreen()">🖥</button>
-          <button class="call-btn leave" onclick="leaveGroupCall()">📵 Leave Call</button>
-        </div>
+
+  // Use standard chat layout (same as lobbies) with a join-call bar
+  document.getElementById("chatMain").innerHTML = `
+    <div class="chat-header">
+      <span class="chat-header-icon">👥</span><span class="chat-header-name">${safeName}</span>
+      <div style="margin-left:auto;display:flex;align-items:center;gap:8px">
+        <button class="btn btn-primary" style="padding:5px 14px;font-size:12px;border-radius:6px;display:flex;align-items:center;gap:5px" onclick="joinGroupCall(${groupId})">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6A19.79 19.79 0 0 1 2.12 4.18 2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72c.127.96.361 1.903.7 2.81a2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45c.907.339 1.85.573 2.81.7A2 2 0 0 1 22 16.92z"/></svg>
+          Join Call
+        </button>
+        <button class="icon-btn" title="Add Member" onclick="addMemberToGroup(${groupId})" style="font-size:16px">👤+</button>
+        <button class="icon-btn" title="Leave Group" onclick="leaveGroupPermanently(${groupId})" style="color:var(--danger);font-size:16px">🚪</button>
       </div>
-      <div class="call-chat-panel">
-        <div class="chat-header">
-          <span class="chat-header-icon">#</span><span class="chat-header-name">${safeName}</span>
-          <div style="margin-left:auto;display:flex;gap:6px">
-            <button class="icon-btn" onclick="addMemberToGroup(${groupId})">👤+</button>
-            <button class="icon-btn" onclick="leaveGroupPermanently(${groupId})" style="color:var(--danger)">🚪</button>
-          </div>
-        </div>
-        <div class="messages" id="msgContainer"><div style="color:var(--text-3);padding:24px;text-align:center">Loading messages…</div></div>
-        <div class="typing-indicator" id="typingIndicator"></div>
-        <div class="chat-input-wrap">
-          <div id="attachPreview" class="attach-preview"></div>
-          <div class="chat-input-box">
-            <button class="attach-btn" onclick="document.getElementById('fileInput').click()">📎</button>
-            <textarea class="chat-input" id="chatInput" placeholder="Message ${safeName}" rows="1"
-              oninput="autoResize(this);sendTyping();handleMentionTyping(this,selectedServer?'lobby':'feed')"
-              onkeydown="if(event.key==='Enter'&&!event.shiftKey){event.preventDefault();sendMessage()}"></textarea>
-            <button class="send-btn" onclick="sendMessage()">➤</button>
-          </div>
-        </div>
+    </div>
+    <div class="messages" id="msgContainer"><div style="color:var(--text-3);padding:24px;text-align:center">Loading messages…</div></div>
+    <div class="typing-indicator" id="typingIndicator"></div>
+    <div class="chat-input-wrap">
+      <div id="attachPreview" class="attach-preview"></div>
+      <div class="chat-input-box">
+        <button class="attach-btn" onclick="document.getElementById('fileInput').click()">📎</button>
+        <textarea class="chat-input" id="chatInput" placeholder="Message ${safeName}" rows="1"
+          oninput="autoResize(this);sendTyping();handleMentionTyping(this,selectedServer?'lobby':'feed')"
+          onkeydown="if(event.key==='Enter'&&!event.shiftKey){event.preventDefault();sendMessage()}"></textarea>
+        <button class="send-btn" onclick="sendMessage()">➤</button>
       </div>
     </div>`;
-  console.log("[openGroup] UI shell rendered, now loading data...");
 
-  // Load members and messages asynchronously AFTER the UI is visible
+  // Show call grid area (hidden until call is joined)
+  // The call layout is added dynamically when joinGroupCall is invoked
+
+  // Show members sidebar like lobbies do
+  const membersSidebar = document.getElementById("membersSidebar");
+  if (membersSidebar) {
+    membersSidebar.style.display = "block";
+    membersSidebar.classList.add("open");
+    membersSidebar.innerHTML = `<div style="display:flex;align-items:center;gap:4px;flex-shrink:0;margin-right:16px;border-right:1px solid rgba(255,255,255,.08);padding-right:16px;">
+      <span style="font-size:11px;font-weight:700;color:var(--text-3);letter-spacing:.8px;text-transform:uppercase;white-space:nowrap;">👥 Members</span>
+    </div><div style="color:var(--text-3);font-size:12px;padding:8px">Loading…</div>`;
+    document.body.classList.add("members-bar-open", "members-visible");
+  }
+
+  console.log("[openGroup] UI shell rendered, now loading data...");
   _loadGroupData(groupId);
 }
 
@@ -5295,9 +5292,43 @@ async function _loadGroupData(groupId) {
     if (!Array.isArray(messages)) messages = [];
     // Only update if we're still viewing this group
     if (selectedGroupId !== groupId) return;
-    // Update call grid with member tiles
-    const grid = document.getElementById("callGrid");
-    if (grid) { grid.className = `call-grid count-${Math.min(members.length,5)}`; grid.innerHTML = members.map(m => memberCallTile(m, false)).join(""); }
+
+    // Render members in the members sidebar (same style as lobbies)
+    const sidebar = document.getElementById("membersSidebar");
+    if (sidebar) {
+      const online  = members.filter(m => onlineUserIds.has(m.id));
+      const offline = members.filter(m => !onlineUserIds.has(m.id));
+      let html = `<div style="display:flex;align-items:center;gap:4px;flex-shrink:0;margin-right:16px;border-right:1px solid rgba(255,255,255,.08);padding-right:16px;">
+        <span style="font-size:11px;font-weight:700;color:var(--text-3);letter-spacing:.8px;text-transform:uppercase;white-space:nowrap;">👥 Members — ${members.length}</span>
+      </div>`;
+      if (online.length) {
+        html += `<div class="members-section-label" style="color:#3ba55d">● Online ${online.length}</div>`;
+        online.forEach(m => {
+          const avatarHtml = m.avatar_url ? `<img src="${m.avatar_url}" />` : m.username.slice(0,1).toUpperCase();
+          html += `<div class="member-item" data-user-id="${m.id}" onclick="openProfilePanel(${m.id})" title="${m.username}">
+            <div class="member-avatar">${avatarHtml}<div class="online-dot" style="background:#3ba55d"></div></div>
+            <div style="display:flex;flex-direction:column;min-width:0;flex:1;">
+              <div class="member-name" style="color:var(--text-2)">${m.username}</div>
+            </div>
+          </div>`;
+        });
+      }
+      if (offline.length) {
+        if (online.length) html += `<div style="width:1px;height:44px;background:rgba(255,255,255,.08);margin:0 8px;flex-shrink:0"></div>`;
+        html += `<div class="members-section-label" style="color:var(--text-3)">○ Offline ${offline.length}</div>`;
+        offline.forEach(m => {
+          const avatarHtml = m.avatar_url ? `<img src="${m.avatar_url}" />` : m.username.slice(0,1).toUpperCase();
+          html += `<div class="member-item" data-user-id="${m.id}" onclick="openProfilePanel(${m.id})" title="${m.username}">
+            <div class="member-avatar" style="opacity:0.4">${avatarHtml}</div>
+            <div style="display:flex;flex-direction:column;min-width:0;flex:1;">
+              <div class="member-name" style="color:var(--text-3)">${m.username}</div>
+            </div>
+          </div>`;
+        });
+      }
+      sidebar.innerHTML = html;
+    }
+
     // Update messages
     const container = document.getElementById("msgContainer");
     if (container) { container.innerHTML = ""; messages.forEach(m => appendMessage(m, "group")); container.scrollTop = container.scrollHeight; }
@@ -5317,24 +5348,61 @@ async function joinGroupCall(groupId) {
     catch(e2) { showToast("Could not access microphone","error"); return; }
   }
   groupCallActive = true;
-  const myTile = document.getElementById(`calltile-${me.id}`);
-  if (myTile) { myTile.innerHTML = `<video id="callvideo-${me.id}" autoplay playsinline muted></video><div class="tile-name">${me.username} (you)</div>`; document.getElementById(`callvideo-${me.id}`).srcObject = groupLocalStream; }
-  document.querySelector(".call-header button").style.display = "none";
-  document.getElementById("callControls").style.display = "flex";
+
+  // Inject the call area above the messages area
+  let callArea = document.getElementById("groupCallArea");
+  if (!callArea) {
+    callArea = document.createElement("div");
+    callArea.id = "groupCallArea";
+    callArea.style.cssText = "background:var(--bg-1);border-bottom:1px solid rgba(255,255,255,.08);padding:10px;display:flex;flex-direction:column;gap:8px;";
+    callArea.innerHTML = `
+      <div class="call-grid" id="callGrid" style="display:flex;flex-wrap:wrap;gap:8px;justify-content:center;padding:6px">
+        <div class="call-tile" id="calltile-${me.id}" style="width:120px;height:100px;border-radius:8px;overflow:hidden;background:var(--bg-2);display:flex;flex-direction:column;align-items:center;justify-content:center;position:relative">
+          <video id="callvideo-${me.id}" autoplay playsinline muted style="width:100%;height:100%;object-fit:cover"></video>
+          <div class="tile-name" style="position:absolute;bottom:4px;font-size:11px;color:#fff;text-shadow:0 1px 3px rgba(0,0,0,.6)">${me.username} (you)</div>
+        </div>
+      </div>
+      <div class="call-controls" id="callControls" style="display:flex;justify-content:center;gap:8px;padding:4px 0">
+        <button class="call-btn" id="gcMuteBtn" onclick="toggleGroupMute()" style="padding:6px 12px;border-radius:6px;background:var(--bg-3);border:none;color:var(--text-1);cursor:pointer;font-size:16px">🎙</button>
+        <button class="call-btn" id="gcCamBtn" onclick="toggleGroupCam()" style="padding:6px 12px;border-radius:6px;background:var(--bg-3);border:none;color:var(--text-1);cursor:pointer;font-size:16px">📷</button>
+        <button class="call-btn" id="gcScreenBtn" onclick="toggleGroupScreen()" style="padding:6px 12px;border-radius:6px;background:var(--bg-3);border:none;color:var(--text-1);cursor:pointer;font-size:16px">🖥</button>
+        <button class="call-btn leave" onclick="leaveGroupCall()" style="padding:6px 12px;border-radius:6px;background:var(--danger);border:none;color:#fff;cursor:pointer;font-size:13px">📵 Leave</button>
+      </div>`;
+    // Insert after the chat-header
+    const chatHeader = document.getElementById("chatMain")?.querySelector(".chat-header");
+    if (chatHeader && chatHeader.nextSibling) chatHeader.parentNode.insertBefore(callArea, chatHeader.nextSibling);
+    else document.getElementById("chatMain")?.prepend(callArea);
+  }
+
+  document.getElementById(`callvideo-${me.id}`).srcObject = groupLocalStream;
   wsSend({ type:"group-call-join", groupId });
   ws.addEventListener("message", handleGroupCallWS);
 }
 
 async function handleGroupCallWS({ data }) {
   const msg = JSON.parse(data);
-  if (msg.type==="group-call-join" && msg.groupId===selectedGroupId) await createGroupOffer(msg.peerId);
+  if (msg.type==="group-call-join" && msg.groupId===selectedGroupId) {
+    // Add a tile for the remote peer in the call grid
+    const grid = document.getElementById("callGrid");
+    if (grid && !document.getElementById(`calltile-${peerUserIdFromPeerId(msg.peerId)}`)) {
+      const uid = peerUserIdFromPeerId(msg.peerId);
+      const tile = document.createElement("div");
+      tile.className = "call-tile";
+      tile.id = `calltile-${uid}`;
+      tile.style.cssText = "width:120px;height:100px;border-radius:8px;overflow:hidden;background:var(--bg-2);display:flex;flex-direction:column;align-items:center;justify-content:center;position:relative";
+      tile.innerHTML = `<div class="tile-avatar-placeholder" style="width:48px;height:48px;border-radius:50%;background:var(--bg-3);display:flex;align-items:center;justify-content:center;font-size:18px;color:var(--text-2)">${(msg.username||"?").slice(0,1).toUpperCase()}</div>
+        <div class="tile-name" style="position:absolute;bottom:4px;font-size:11px;color:#fff;text-shadow:0 1px 3px rgba(0,0,0,.6)">${msg.username||"Peer"}</div>`;
+      grid.appendChild(tile);
+    }
+    await createGroupOffer(msg.peerId);
+  }
   if (msg.type==="group-offer") await handleGroupOffer(msg);
   if (msg.type==="group-answer") await groupCallPeers[msg.from]?.setRemoteDescription(msg.answer);
   if (msg.type==="group-candidate") await groupCallPeers[msg.from]?.addIceCandidate(new RTCIceCandidate(msg.candidate)).catch(()=>{});
   if (msg.type==="group-call-leave") {
     groupCallPeers[msg.peerId]?.close(); delete groupCallPeers[msg.peerId];
     const tile = document.getElementById(`calltile-${peerUserIdFromPeerId(msg.peerId)}`);
-    if (tile) { tile.querySelector("video")?.remove(); tile.classList.remove("speaking"); }
+    if (tile) tile.remove();
   }
 }
 
@@ -5479,7 +5547,10 @@ function leaveGroupCall() {
   wsSend({ type:"group-call-leave", groupId:selectedGroupId });
   Object.values(groupCallPeers).forEach(pc=>pc.close()); Object.keys(groupCallPeers).forEach(k=>delete groupCallPeers[k]);
   groupLocalStream?.getTracks().forEach(t=>t.stop()); groupLocalStream=null; groupCallActive=false;
-  ws.removeEventListener("message",handleGroupCallWS); openGroup(selectedGroupId,currentView.name);
+  ws.removeEventListener("message",handleGroupCallWS);
+  // Remove the call area instead of re-rendering the whole group
+  const callArea = document.getElementById("groupCallArea");
+  if (callArea) callArea.remove();
 }
 
 async function addMemberToGroup(groupId) {

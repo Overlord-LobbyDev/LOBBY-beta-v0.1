@@ -1,4 +1,4 @@
-<!DOCTYPE html>
+     <!DOCTYPE html>
 <html lang="en">
 <head>
   <meta charset="UTF-8" />
@@ -218,6 +218,16 @@
       background: rgba(255,255,255,.07);
       margin: 4px 0;
     }
+
+    .case-sensitive-warning {
+      font-size: 12px;
+      color: var(--text-2);
+      background: rgba(88,101,242,.1);
+      border-left: 2px solid var(--accent);
+      padding: 8px 10px;
+      border-radius: 4px;
+      margin: -12px 0 8px 0;
+    }
   </style>
   <script src="nav.js"></script>
 </head>
@@ -247,6 +257,7 @@
       <label for="loginPassword">Password</label>
       <input type="password" id="loginPassword" placeholder="Enter your password" autocomplete="current-password" />
     </div>
+    <div class="case-sensitive-warning">⚠️ Your username and password are <strong>BOTH case sensitive</strong></div>
     <label class="remember">
       <input type="checkbox" id="rememberMe" checked />
       Keep me signed in
