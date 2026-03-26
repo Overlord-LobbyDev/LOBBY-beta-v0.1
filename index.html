@@ -3624,6 +3624,79 @@
 <script>
 const AUTH_URL = "https://lobby-auth-server.onrender.com";
 const FEED_AUTH_URL = "https://lobby-auth-server.onrender.com";
+
+// ── Sound Manager ─────────────────────────────────────────────
+const LobbySound = (() => {
+  const sounds = {};
+  const soundFiles = {
+    messageSent:     "sounds/message_sent.wav",
+    messageReceived: "sounds/message_received.wav",
+    notification:    "sounds/notification.wav",
+    callIncoming:    "sounds/call_incoming.wav",
+    callOutgoing:    "sounds/call_outgoing.wav",
+    vcJoin:          "sounds/vc_join.wav",
+    vcLeave:         "sounds/vc_leave.wav"
+  };
+  let muted = localStorage.getItem("lobby_sounds_muted") === "true";
+  let volume = parseFloat(localStorage.getItem("lobby_sounds_volume") || "0.5");
+
+  // Pre-load all sounds
+  for (const [key, src] of Object.entries(soundFiles)) {
+    try {
+      const audio = new Audio(src);
+      audio.preload = "auto";
+      audio.volume = volume;
+      audio.addEventListener("error", (e) => console.warn(`[Sound] Failed to load ${src}:`, e.message || e));
+      sounds[key] = audio;
+    } catch(e) { console.warn(`[Sound] Could not create audio for ${src}:`, e); }
+  }
+
+  function play(name) {
+    if (muted) return;
+    const s = sounds[name];
+    if (!s) { console.warn(`[Sound] Unknown sound: ${name}`); return; }
+    // Clone the audio so overlapping plays work
+    try {
+      const clone = s.cloneNode();
+      clone.volume = volume;
+      clone.play().catch(e => console.warn(`[Sound] Play failed (${name}):`, e.message));
+    } catch(e) { console.warn(`[Sound] Clone/play error (${name}):`, e); }
+  }
+
+  function loop(name) {
+    if (muted) return;
+    const s = sounds[name];
+    if (!s) return;
+    s.volume = volume;
+    s.loop = true;
+    s.currentTime = 0;
+    s.play().catch(e => console.warn(`[Sound] Loop failed (${name}):`, e.message));
+  }
+
+  function stop(name) {
+    const s = sounds[name];
+    if (!s) return;
+    s.loop = false;
+    s.pause();
+    s.currentTime = 0;
+  }
+
+  function setVolume(v) {
+    volume = Math.max(0, Math.min(1, v));
+    localStorage.setItem("lobby_sounds_volume", String(volume));
+    for (const s of Object.values(sounds)) s.volume = volume;
+  }
+
+  function toggleMute() {
+    muted = !muted;
+    localStorage.setItem("lobby_sounds_muted", String(muted));
+    if (muted) for (const s of Object.values(sounds)) { s.pause(); s.currentTime = 0; }
+    return muted;
+  }
+
+  return { play, loop, stop, setVolume, toggleMute, get muted() { return muted; }, get volume() { return volume; } };
+})();
+window.LobbySound = LobbySound;
 let feedToken = null;
 let feedMe = null;
 let postImageFile = null;
@@ -3825,6 +3898,7 @@ function connectWS() {
       if (currentView?.type === "channel" && msg.channelId === currentView.id) {
         if (msg.message?.user_id !== me?.id) {
           appendMessage(msg.message, "channel");
+          LobbySound.play("messageReceived");
           document.getElementById("msgContainer")?.scrollTo(0, 99999);
         }
       } else if (msg.message?.user_id !== me?.id) {
@@ -3841,10 +3915,12 @@ function connectWS() {
       const isFromMe = fromId === me?.id;
       if (!isFromMe && currentView?.type === "dm" && fromId === currentView.id) {
         appendMessage(msg.message, "dm");
+        LobbySound.play("messageReceived");
         document.getElementById("msgContainer")?.scrollTo(0, 99999);
       } else if (!isFromMe) {
         unreadDMs[fromId] = (unreadDMs[fromId] || 0) + 1;
         updateDMBadge();
+        LobbySound.play("messageReceived");
         showToast(`💬 ${msg.fromUsername}: ${(msg.message?.content||"").slice(0,40)}`, "success");
       }
     }
@@ -3857,24 +3933,29 @@ function connectWS() {
     }
     if (msg.type === "typing") showTyping(msg);
     if (msg.type === "friend-request") {
+      LobbySound.play("notification");
       showToast(`👤 ${msg.fromUsername} sent you a friend request!`, "success");
       notifyFriendRequest(msg.fromUsername, msg.fromAvatarUrl || null, msg.friendId || null, msg.fromId || null);
       if (document.getElementById("sidebarTitle")?.textContent === "Direct Messages") await showDMPanel();
       if (document.getElementById("sidebarTitle")?.textContent === "Friends") showHomeFriendsSidebar();
     }
     if (msg.type === "friend-accepted") {
+      LobbySound.play("notification");
       showToast(`✅ ${msg.fromUsername} accepted your friend request!`, "success");
       notifyFriendAccepted(msg.fromUsername, msg.fromAvatarUrl || null);
       if (document.getElementById("sidebarTitle")?.textContent === "Direct Messages") await showDMPanel();
       if (document.getElementById("sidebarTitle")?.textContent === "Friends") showHomeFriendsSidebar();
     }
     if (msg.type === "group-invite") {
+      LobbySound.play("notification");
       notifyGroupInvite(msg.fromUsername, msg.groupName, msg.groupId);
     }
     if (msg.type === "server-invite") {
+      LobbySound.play("notification");
       notifyServerInvite(msg.fromUsername, msg.serverName, msg.serverId, msg.fromAvatarUrl);
     }
     if (msg.type === "mention") {
+      LobbySound.play("notification");
       notifyMention(msg.fromUsername, msg.fromAvatarUrl || null, msg.context, msg.postId);
     }
   };
@@ -5049,6 +5130,7 @@ async function sendMessage() {
   else if (currentView.type === "group") wsSend({ type:"group-message", groupId:currentView.id, message:savedMessage });
   else wsSend({ type:"direct-message", toUserId:currentView.id, message:savedMessage });
   appendMessage(savedMessage, currentView.type);
+  LobbySound.play("messageSent");
   const container = document.getElementById("msgContainer");
   if (container) container.scrollTop = container.scrollHeight;
 }
@@ -5178,6 +5260,16 @@ async function showGroupsPanel() {
   document.body.classList.remove("members-visible");
   document.body.classList.remove("members-bar-open");
   
+  // Show social feed sidebar (same as home view)
+  const socialFeed = document.getElementById("socialFeed");
+  if (socialFeed) {
+    socialFeed.style.display = "flex";
+    socialFeed.classList.remove("collapsed");
+    document.body.classList.add("feed-open");
+    document.body.classList.remove("feed-closed");
+    if(typeof applySocialResizeStyles==="function")applySocialResizeStyles();
+  }
+  
   document.getElementById("chatMain").innerHTML = `<div class="empty-state"><div class="empty-icon">👥</div><h3>Your Groups</h3><p>Select a group to chat or start a call</p></div>`;
   const groups = await api("/groups");
   let html = `<div class="channel-section"><div class="channel-section-label">Groups <button class="channel-add" onclick="openCreateGroupModal()">+</button></div>`;
@@ -5205,6 +5297,7 @@ async function openCreateGroupModal() {
 }
 
 let selectedGroupId = null;
+let selectedGroupOwnerId = null;
 const groupCallPeers = {};
 let groupLocalStream = null;
 let groupCallActive  = false;
@@ -5239,17 +5332,23 @@ function openGroup(groupId, groupName) {
 
   const safeName = escapeHtml(groupName);
 
-  // Use standard chat layout (same as lobbies) with a join-call bar
+  // Use standard chat layout (same as lobbies)
   document.getElementById("chatMain").innerHTML = `
-    <div class="chat-header">
+    <div class="chat-header" style="display:flex;align-items:center;gap:10px;padding:0 16px;height:48px;">
       <span class="chat-header-icon">👥</span><span class="chat-header-name">${safeName}</span>
-      <div style="margin-left:auto;display:flex;align-items:center;gap:8px">
-        <button class="btn btn-primary" style="padding:5px 14px;font-size:12px;border-radius:6px;display:flex;align-items:center;gap:5px" onclick="joinGroupCall(${groupId})">
-          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6A19.79 19.79 0 0 1 2.12 4.18 2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72c.127.96.361 1.903.7 2.81a2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45c.907.339 1.85.573 2.81.7A2 2 0 0 1 22 16.92z"/></svg>
-          Join Call
+      <div style="margin-left:auto;display:flex;align-items:center;gap:6px;padding-right:80px;">
+        <button onclick="joinGroupCall(${groupId})" title="Join Call" style="display:flex;align-items:center;gap:5px;padding:5px 12px;font-size:12px;font-weight:600;border-radius:6px;border:1px solid rgba(255,255,255,.1);background:rgba(255,255,255,.05);color:var(--text-2);cursor:pointer;transition:all .15s ease;font-family:var(--font);" onmouseover="this.style.background='rgba(255,255,255,.1)'" onmouseout="this.style.background='rgba(255,255,255,.05)'">
+          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6A19.79 19.79 0 0 1 2.12 4.18 2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72c.127.96.361 1.903.7 2.81a2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45c.907.339 1.85.573 2.81.7A2 2 0 0 1 22 16.92z"/></svg>
+          Call
         </button>
-        <button class="icon-btn" title="Add Member" onclick="addMemberToGroup(${groupId})" style="font-size:16px">👤+</button>
-        <button class="icon-btn" title="Leave Group" onclick="leaveGroupPermanently(${groupId})" style="color:var(--danger);font-size:16px">🚪</button>
+        <button onclick="addMemberToGroup(${groupId})" title="Add Member" style="display:flex;align-items:center;gap:5px;padding:5px 12px;font-size:12px;font-weight:600;border-radius:6px;border:1px solid rgba(255,255,255,.1);background:rgba(255,255,255,.05);color:var(--text-2);cursor:pointer;transition:all .15s ease;font-family:var(--font);" onmouseover="this.style.background='rgba(255,255,255,.1)'" onmouseout="this.style.background='rgba(255,255,255,.05)'">
+          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><line x1="19" y1="8" x2="19" y2="14"/><line x1="22" y1="11" x2="16" y2="11"/></svg>
+          Add
+        </button>
+        <button id="groupLeaveBtn" onclick="leaveGroupPermanently(${groupId})" title="Leave Group" style="display:flex;align-items:center;gap:5px;padding:5px 12px;font-size:12px;font-weight:600;border-radius:6px;border:1px solid rgba(237,66,69,.2);background:rgba(237,66,69,.08);color:#ed4245;cursor:pointer;transition:all .15s ease;font-family:var(--font);" onmouseover="this.style.background='rgba(237,66,69,.18)'" onmouseout="this.style.background='rgba(237,66,69,.08)'">
+          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>
+          Leave
+        </button>
       </div>
     </div>
     <div class="messages" id="msgContainer"><div style="color:var(--text-3);padding:24px;text-align:center">Loading messages…</div></div>
@@ -5268,16 +5367,15 @@ function openGroup(groupId, groupName) {
   // Show call grid area (hidden until call is joined)
   // The call layout is added dynamically when joinGroupCall is invoked
 
-  // Show members sidebar like lobbies do
+  // Show members sidebar immediately (same as lobbies), data populates async
   const membersSidebar = document.getElementById("membersSidebar");
   if (membersSidebar) {
-    membersSidebar.style.display = "block";
+    membersSidebar.style.display = "flex";
     membersSidebar.classList.add("open");
-    membersSidebar.innerHTML = `<div style="display:flex;align-items:center;gap:4px;flex-shrink:0;margin-right:16px;border-right:1px solid rgba(255,255,255,.08);padding-right:16px;">
-      <span style="font-size:11px;font-weight:700;color:var(--text-3);letter-spacing:.8px;text-transform:uppercase;white-space:nowrap;">👥 Members</span>
-    </div><div style="color:var(--text-3);font-size:12px;padding:8px">Loading…</div>`;
     document.body.classList.add("members-bar-open", "members-visible");
   }
+  const mtBtn = document.getElementById("membersToggleBtn");
+  if (mtBtn) { mtBtn.style.display = "flex"; mtBtn.style.bottom = "100px"; mtBtn.querySelector("polyline").setAttribute("points","2,4 6,8 10,4"); }
 
   console.log("[openGroup] UI shell rendered, now loading data...");
   _loadGroupData(groupId);
@@ -5293,41 +5391,23 @@ async function _loadGroupData(groupId) {
     // Only update if we're still viewing this group
     if (selectedGroupId !== groupId) return;
 
-    // Render members in the members sidebar (same style as lobbies)
-    const sidebar = document.getElementById("membersSidebar");
-    if (sidebar) {
-      const online  = members.filter(m => onlineUserIds.has(m.id));
-      const offline = members.filter(m => !onlineUserIds.has(m.id));
-      let html = `<div style="display:flex;align-items:center;gap:4px;flex-shrink:0;margin-right:16px;border-right:1px solid rgba(255,255,255,.08);padding-right:16px;">
-        <span style="font-size:11px;font-weight:700;color:var(--text-3);letter-spacing:.8px;text-transform:uppercase;white-space:nowrap;">👥 Members — ${members.length}</span>
-      </div>`;
-      if (online.length) {
-        html += `<div class="members-section-label" style="color:#3ba55d">● Online ${online.length}</div>`;
-        online.forEach(m => {
-          const avatarHtml = m.avatar_url ? `<img src="${m.avatar_url}" />` : m.username.slice(0,1).toUpperCase();
-          html += `<div class="member-item" data-user-id="${m.id}" onclick="openProfilePanel(${m.id})" title="${m.username}">
-            <div class="member-avatar">${avatarHtml}<div class="online-dot" style="background:#3ba55d"></div></div>
-            <div style="display:flex;flex-direction:column;min-width:0;flex:1;">
-              <div class="member-name" style="color:var(--text-2)">${m.username}</div>
-            </div>
-          </div>`;
-        });
+    // Detect ownership from the groups list
+    const groups = await api("/groups");
+    const group = (groups || []).find(g => g.id === groupId);
+    selectedGroupOwnerId = group?.owner_id || null;
+    
+    // Update Leave/Delete button based on ownership
+    const leaveBtn = document.getElementById("groupLeaveBtn");
+    if (leaveBtn) {
+      if (selectedGroupOwnerId === me.id) {
+        leaveBtn.innerHTML = `<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/><path d="M10 11v6M14 11v6"/><path d="M9 6V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2"/></svg> Delete`;
+      } else {
+        leaveBtn.innerHTML = `<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg> Leave`;
       }
-      if (offline.length) {
-        if (online.length) html += `<div style="width:1px;height:44px;background:rgba(255,255,255,.08);margin:0 8px;flex-shrink:0"></div>`;
-        html += `<div class="members-section-label" style="color:var(--text-3)">○ Offline ${offline.length}</div>`;
-        offline.forEach(m => {
-          const avatarHtml = m.avatar_url ? `<img src="${m.avatar_url}" />` : m.username.slice(0,1).toUpperCase();
-          html += `<div class="member-item" data-user-id="${m.id}" onclick="openProfilePanel(${m.id})" title="${m.username}">
-            <div class="member-avatar" style="opacity:0.4">${avatarHtml}</div>
-            <div style="display:flex;flex-direction:column;min-width:0;flex:1;">
-              <div class="member-name" style="color:var(--text-3)">${m.username}</div>
-            </div>
-          </div>`;
-        });
-      }
-      sidebar.innerHTML = html;
     }
+
+    // Render members in the sidebar (sidebar already visible from openGroup)
+    renderMembers(members);
 
     // Update messages
     const container = document.getElementById("msgContainer");
@@ -5566,8 +5646,29 @@ async function addMemberToGroup(groupId) {
 }
 
 async function leaveGroupPermanently(groupId) {
-  if (!confirm("Leave this group?")) return;
-  await api(`/groups/${groupId}/members/${me.id}`,{ method:"DELETE" }); showGroupsPanel();
+  // Fetch group info to check ownership
+  const groups = await api("/groups");
+  const group = (groups || []).find(g => g.id === groupId);
+  const isOwner = group && group.owner_id === me.id;
+  
+  if (isOwner) {
+    // Owner gets option to delete the group entirely
+    const members = await api(`/groups/${groupId}/members`) || [];
+    if (members.length <= 1) {
+      if (!confirm("You're the only member. Delete this group?")) return;
+    } else {
+      if (!confirm(`Delete this group for all ${members.length} members? This cannot be undone.`)) return;
+    }
+    const r = await api(`/groups/${groupId}`, { method: "DELETE" });
+    if (r?.error) { showToast(r.error, "error"); return; }
+    showToast("Group deleted", "success");
+  } else {
+    if (!confirm("Leave this group?")) return;
+    const r = await api(`/groups/${groupId}/members/${me.id}`, { method: "DELETE" });
+    if (r?.error) { showToast(r.error, "error"); return; }
+    showToast("Left group", "success");
+  }
+  showGroupsPanel();
 }
 
 function patchWsForGroups() {
@@ -5576,9 +5677,11 @@ function patchWsForGroups() {
     const msg = JSON.parse(data);
     if (msg.type==="group-message") {
       if (currentView?.type==="group" && msg.groupId===currentView.id) {
+        if (msg.message?.user_id !== me?.id) LobbySound.play("messageReceived");
         appendMessage(msg.message,"group"); document.getElementById("msgContainer")?.scrollTo(0,99999);
       } else if (msg.message?.user_id !== me?.id) {
         unreadGroups[msg.groupId] = (unreadGroups[msg.groupId] || 0) + 1;
+        LobbySound.play("messageReceived");
         updateGroupBadge();
       }
     }
@@ -5654,6 +5757,7 @@ async function startDirectCall(userId, username) {
   }
   callActive=true; callTargetId=userId; callTargetName=username;
   openOutgoingCallModal(username, null); showFloatingCallBar(username, null, "Calling…");
+  LobbySound.loop("callOutgoing");
   const targetPeerId = `u${userId}`;
   wsSend({ type:"call-invite", to:targetPeerId, fromUsername:me.username });
   let waited=0;
@@ -5682,6 +5786,7 @@ function hideFloatingCallBar() { document.getElementById("floatingCallBar").styl
 
 async function handleIncomingCall(msg) {
   if (callActive) { wsSend({ type:"call-decline", to:msg.from }); return; }
+  LobbySound.loop("callIncoming");
   showIncomingCallModal(msg.fromUsername||"Unknown", null, msg.from);
 }
 
@@ -5700,6 +5805,7 @@ function showIncomingCallModal(fromUsername, fromAvatarUrl, fromPeerId) {
   acceptBtn.replaceWith(acceptBtn.cloneNode(true)); declineBtn.replaceWith(declineBtn.cloneNode(true));
   document.getElementById("acceptCallBtn").addEventListener("click", async () => {
     clearInterval(incomingTimer); closeIncomingCallModal();
+    LobbySound.stop("callIncoming");
     try {
       try { callStream=await navigator.mediaDevices.getUserMedia({ audio:true, video:true }); }
       catch { callStream=await navigator.mediaDevices.getUserMedia({ audio:true }); }
@@ -5734,6 +5840,7 @@ function createCallPeerConnection(peerId) {
 async function endCall() { if (!callActive) return; forceEndCall(); }
 
 async function forceEndCall() {
+  LobbySound.stop("callIncoming"); LobbySound.stop("callOutgoing");
   callActive=false;
   Object.values(callPeers).forEach(pc=>pc.close()); Object.keys(callPeers).forEach(k=>delete callPeers[k]);
   callStream?.getTracks().forEach(t=>t.stop()); callStream=null;
@@ -6134,11 +6241,13 @@ async function joinVoiceChannel(channelId, channelName) {
 
   showVcPanel(channelName);
   refreshChannelListVc();
+  LobbySound.play("vcJoin");
   showToast(`Joined 🔊 ${channelName}`, "success");
 }
 
 async function leaveVoiceChannel() {
   if (vcChannelId === null) return;
+  LobbySound.play("vcLeave");
   wsSend({ type:"vc-leave", channelId:vcChannelId });
   // Remove self from local list
   if (vcChannelMembers[vcChannelId]) {
@@ -6259,6 +6368,7 @@ function setupVcSignalling() {
 
     // ── Someone joined the VC ──
     if (msg.type === "vc-joined") {
+      LobbySound.play("vcJoin");
       const cid = msg.channelId;
       if (!vcChannelMembers[cid]) vcChannelMembers[cid] = [];
       if (!vcChannelMembers[cid].find(m => m.userId === msg.userId)) {
@@ -6281,6 +6391,7 @@ function setupVcSignalling() {
 
     // ── Someone left the VC ──
     if (msg.type === "vc-left") {
+      LobbySound.play("vcLeave");
       const cid = msg.channelId;
       if (vcChannelMembers[cid]) {
         vcChannelMembers[cid] = vcChannelMembers[cid].filter(m => m.userId !== msg.userId);
@@ -7133,7 +7244,7 @@ function setupCallSignalling() {
   ws.addEventListener("message", async ({ data }) => {
     const msg = JSON.parse(data);
     if (msg.type==="call-invite") { if (me&&msg.from===`u${me.id}`) return; await handleIncomingCall(msg); return; }
-    if (msg.type==="call-accept") { closeOutgoingCallModal(); showFloatingCallBar(callTargetName,null,"Connecting…"); const pc=createCallPeerConnection(msg.from); const offer=await pc.createOffer(); await pc.setLocalDescription(offer); wsSend({ type:"call-offer", offer:pc.localDescription, to:msg.from }); return; }
+    if (msg.type==="call-accept") { LobbySound.stop("callOutgoing"); closeOutgoingCallModal(); showFloatingCallBar(callTargetName,null,"Connecting…"); const pc=createCallPeerConnection(msg.from); const offer=await pc.createOffer(); await pc.setLocalDescription(offer); wsSend({ type:"call-offer", offer:pc.localDescription, to:msg.from }); return; }
     if (msg.type==="call-decline") { closeOutgoingCallModal(); showToast(`${callTargetName} declined the call`,"error"); forceEndCall(); return; }
     if (msg.type==="call-offer") { const pc=createCallPeerConnection(msg.from); await pc.setRemoteDescription(msg.offer); const answer=await pc.createAnswer(); await pc.setLocalDescription(answer); wsSend({ type:"call-answer", answer:pc.localDescription, to:msg.from }); return; }
     if (msg.type==="call-answer") { await callPeers[msg.from]?.setRemoteDescription(msg.answer); return; }
@@ -8996,9 +9107,6 @@ rewireNavIcon("groupsNavIcon", () => {
   clearAllNavIcons();
   document.getElementById("groupsNavIcon")?.classList.add("active");
   currentPanel = "chat";
-  // Hide social feed when entering groups
-  const socialFeed = document.getElementById("socialFeed");
-  if (socialFeed) { socialFeed.style.display = "none"; socialFeed.classList.add("collapsed"); }
   const cs  = document.querySelector(".channel-sidebar");
   const btn = document.getElementById("chatSidebarToggle");
   const sl  = document.getElementById("serverList");
@@ -9007,14 +9115,6 @@ rewireNavIcon("groupsNavIcon", () => {
   if(typeof applyChannelResizeStyles==="function")applyChannelResizeStyles();
   if (sl) sl.classList.remove("collapsed");
   if (btn) btn.textContent = "◀";
-  
-  // Show members sidebar (groups view) — feed stays visible globally
-  const membersSidebar = document.getElementById("membersSidebar");
-  if (membersSidebar) {
-    membersSidebar.style.display = "block";
-    membersSidebar.classList.add("open");
-    document.body.classList.add("members-bar-open", "members-visible");
-  }
   
   showGroupsPanel();
 });
@@ -11774,6 +11874,7 @@ setTimeout(() => { updateMyStatusUI(); }, 100);
       <button class="sp-nav-btn" data-sp="steam">🎮 Steam</button>
       <div class="sp-nav-label" style="margin-top:10px">App Settings</div>
       <button class="sp-nav-btn" data-sp="audiovideo">🎙 Audio & Video</button>
+      <button class="sp-nav-btn" data-sp="sounds">🔔 Sounds</button>
       <button class="sp-nav-btn" data-sp="updates">🔄 Updates</button>
     </nav>
 
@@ -12033,6 +12134,47 @@ setTimeout(() => { updateMyStatusUI(); }, 100);
         </div>
         <button class="sp-save-btn" id="spSaveAV">Save Audio & Video</button>
         <div class="sp-msg" id="spAVMsg"></div>
+      </div>
+
+      <!-- ── Sounds ── -->
+      <div class="sp-section" id="sp-sounds">
+        <h2>Sounds</h2>
+        <p style="color:var(--text-2);font-size:13px;margin-bottom:20px">Control notification and UI sound effects.</p>
+
+        <div class="sp-form-group">
+          <label class="sp-label" style="display:flex;align-items:center;justify-content:space-between;">
+            Enable Sounds
+            <label style="position:relative;display:inline-block;width:44px;height:24px;cursor:pointer;margin:0">
+              <input type="checkbox" id="spSoundEnabled" style="opacity:0;width:0;height:0;position:absolute"
+                onchange="LobbySound.toggleMute();this.checked=!LobbySound.muted;document.getElementById('spSoundStatus').textContent=LobbySound.muted?'Off':'On'">
+              <span style="position:absolute;inset:0;background:var(--bg-3);border-radius:24px;transition:background .2s"></span>
+              <span id="spSoundToggleKnob" style="position:absolute;top:3px;left:3px;width:18px;height:18px;background:#fff;border-radius:50%;transition:transform .2s;pointer-events:none"></span>
+            </label>
+          </label>
+          <span id="spSoundStatus" style="font-size:12px;color:var(--text-3)">On</span>
+        </div>
+
+        <div class="sp-form-group">
+          <label class="sp-label">Sound Volume <span id="spSoundVolLabel" style="color:var(--text-2);font-weight:400;text-transform:none;letter-spacing:0;font-size:12px">50%</span></label>
+          <div class="sp-volume-row">
+            <span class="sp-volume-icon">🔇</span>
+            <div class="sp-volume-wrap"><input type="range" class="sp-slider" id="spSoundVol" min="0" max="100" value="50" /></div>
+            <span class="sp-volume-icon">🔊</span>
+          </div>
+        </div>
+
+        <div style="margin-top:20px;display:flex;flex-direction:column;gap:8px">
+          <label class="sp-label">Test Sounds</label>
+          <div style="display:flex;flex-wrap:wrap;gap:8px">
+            <button class="sp-save-btn" style="padding:6px 14px;font-size:12px;margin:0" onclick="LobbySound.play('messageSent')">Message Sent</button>
+            <button class="sp-save-btn" style="padding:6px 14px;font-size:12px;margin:0" onclick="LobbySound.play('messageReceived')">Message Received</button>
+            <button class="sp-save-btn" style="padding:6px 14px;font-size:12px;margin:0" onclick="LobbySound.play('notification')">Notification</button>
+            <button class="sp-save-btn" style="padding:6px 14px;font-size:12px;margin:0" onclick="LobbySound.play('vcJoin')">VC Join</button>
+            <button class="sp-save-btn" style="padding:6px 14px;font-size:12px;margin:0" onclick="LobbySound.play('vcLeave')">VC Leave</button>
+            <button class="sp-save-btn" style="padding:6px 14px;font-size:12px;margin:0" onclick="LobbySound.play('callIncoming')">Incoming Ring</button>
+            <button class="sp-save-btn" style="padding:6px 14px;font-size:12px;margin:0" onclick="LobbySound.stop('callIncoming');LobbySound.stop('callOutgoing')">Stop Ringing</button>
+          </div>
+        </div>
       </div>
 
       <!-- ── Updates ── -->
@@ -12437,6 +12579,40 @@ setTimeout(() => { updateMyStatusUI(); }, 100);
     updateSliderFill(inSlider); updateSliderFill(outSlider);
     inSlider.oninput  = () => { document.getElementById("spInputVolLabel").textContent  = `${inSlider.value}%`;  updateSliderFill(inSlider); };
     outSlider.oninput = () => { document.getElementById("spOutputVolLabel").textContent = `${outSlider.value}%`; updateSliderFill(outSlider); };
+
+    // ── Sound settings init ──
+    const soundVol = Math.round(LobbySound.volume * 100);
+    const soundSlider = document.getElementById("spSoundVol");
+    const soundToggle = document.getElementById("spSoundEnabled");
+    const soundKnob = document.getElementById("spSoundToggleKnob");
+    if (soundSlider) {
+      soundSlider.value = soundVol;
+      document.getElementById("spSoundVolLabel").textContent = `${soundVol}%`;
+      updateSliderFill(soundSlider);
+      soundSlider.oninput = () => {
+        const v = parseInt(soundSlider.value);
+        document.getElementById("spSoundVolLabel").textContent = `${v}%`;
+        LobbySound.setVolume(v / 100);
+        updateSliderFill(soundSlider);
+      };
+    }
+    if (soundToggle) {
+      soundToggle.checked = !LobbySound.muted;
+      document.getElementById("spSoundStatus").textContent = LobbySound.muted ? "Off" : "On";
+      if (soundKnob) {
+        soundKnob.style.transform = LobbySound.muted ? "translateX(0)" : "translateX(20px)";
+        soundKnob.parentElement.querySelector("span").style.background = LobbySound.muted ? "var(--bg-3)" : "var(--accent)";
+      }
+      soundToggle.onchange = () => {
+        LobbySound.toggleMute();
+        soundToggle.checked = !LobbySound.muted;
+        document.getElementById("spSoundStatus").textContent = LobbySound.muted ? "Off" : "On";
+        if (soundKnob) {
+          soundKnob.style.transform = LobbySound.muted ? "translateX(0)" : "translateX(20px)";
+          soundKnob.parentElement.querySelector("span").style.background = LobbySound.muted ? "var(--bg-3)" : "var(--accent)";
+        }
+      };
+    }
   }
 
   function populateSel(id, devices, saved) {
