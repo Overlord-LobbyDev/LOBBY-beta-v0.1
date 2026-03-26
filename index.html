@@ -363,9 +363,9 @@
     .user-panel-status { font-size:11px; color:var(--green); margin-top:1px; cursor:pointer; position:relative; user-select:none; }
     .user-panel-status:hover { opacity:.8; }
     .status-dropdown {
-      display:none; position:absolute; bottom:100%; left:0; margin-bottom:8px;
-      background:var(--bg-2); border:1px solid rgba(255,255,255,.1); border-radius:8px;
-      padding:6px; min-width:180px; z-index:999; box-shadow:0 8px 24px rgba(0,0,0,.4);
+      display:none; position:fixed; border-radius:8px;
+      background:var(--bg-2); border:1px solid rgba(255,255,255,.1);
+      padding:6px; min-width:180px; z-index:9999; box-shadow:0 8px 24px rgba(0,0,0,.4);
     }
     .status-dropdown.open { display:block; }
     .status-dropdown-item {
@@ -983,6 +983,46 @@
     .floating-btn.active { background:var(--danger); color:#fff; }
     .floating-btn.leave { background:var(--danger); color:#fff; }
     .floating-btn.leave:hover { background:#c03537; }
+    .floating-btn.expand { background:var(--accent); color:#fff; }
+    .floating-btn.expand:hover { background:var(--accent-h,#4752c4); }
+
+    /* ── Video Call Overlay ──────────────────────────────────────── */
+    #callVideoOverlay {
+      display:none; position:fixed; inset:0; z-index:9997;
+      background:var(--bg-0); flex-direction:column; overflow:hidden;
+    }
+    #callVideoOverlay.open { display:flex; }
+    #callVideoOverlay .call-overlay-videos {
+      flex:1; display:flex; align-items:center; justify-content:center;
+      position:relative; background:#111; overflow:hidden;
+    }
+    #callRemoteVideo {
+      width:100%; height:100%; object-fit:contain; background:#000;
+    }
+    #callLocalVideo {
+      position:absolute; bottom:16px; right:16px; width:220px; height:auto;
+      aspect-ratio:16/9; border-radius:12px; object-fit:cover;
+      border:2px solid rgba(255,255,255,.15); background:#000; z-index:2;
+      box-shadow:0 8px 24px rgba(0,0,0,.6); cursor:move;
+    }
+    .call-overlay-bar {
+      display:flex; align-items:center; justify-content:center; gap:8px;
+      padding:12px; background:var(--bg-1); border-top:1px solid rgba(255,255,255,.06);
+    }
+    .call-overlay-bar .floating-btn { width:44px; height:44px; font-size:18px; }
+    .call-overlay-name {
+      position:absolute; top:16px; left:16px; z-index:2;
+      font-size:14px; font-weight:700; color:#fff;
+      background:rgba(0,0,0,.6); padding:6px 14px; border-radius:8px;
+    }
+    .call-overlay-minimize {
+      position:absolute; top:16px; right:16px; z-index:2;
+      background:rgba(0,0,0,.6); border:none; color:#fff; font-size:16px;
+      width:36px; height:36px; border-radius:8px; cursor:pointer;
+      display:flex; align-items:center; justify-content:center;
+      transition:background .15s;
+    }
+    .call-overlay-minimize:hover { background:rgba(255,255,255,.15); }
 
     .call-modal {
       background:var(--bg-1); border-radius:16px; padding:36px 48px;
@@ -1643,7 +1683,7 @@
       position:absolute; bottom:calc(100% + 4px); left:36px; right:0;
       background:var(--bg-0); border:1px solid rgba(255,255,255,.1);
       border-radius:8px; box-shadow:0 4px 16px rgba(0,0,0,.4);
-      z-index:100; max-height:160px; overflow-y:auto;
+      z-index:100; max-height:260px; overflow-y:auto;
     }
     .mention-option {
       display:flex; align-items:center; gap:8px; padding:8px 12px;
@@ -3391,10 +3431,27 @@
     </div>
   </div>
   <div class="floating-call-controls">
+    <button class="floating-btn expand" id="fcExpandBtn" title="Expand Video">🔳</button>
     <button class="floating-btn" id="fcMuteBtn" title="Mute">🎙</button>
     <button class="floating-btn" id="fcCamBtn" title="Camera">📷</button>
     <button class="floating-btn" id="fcScreenBtn" title="Screen Share">🖥</button>
     <button class="floating-btn leave" id="fcLeaveBtn" title="Leave Call">📵</button>
+  </div>
+</div>
+
+<!-- Video Call Overlay — shown during active 1-1 calls -->
+<div id="callVideoOverlay">
+  <div class="call-overlay-videos">
+    <div class="call-overlay-name" id="callOverlayName"></div>
+    <button class="call-overlay-minimize" id="callOverlayMinimize" title="Minimize">▽</button>
+    <video id="callRemoteVideo" autoplay playsinline></video>
+    <video id="callLocalVideo" autoplay playsinline muted></video>
+  </div>
+  <div class="call-overlay-bar">
+    <button class="floating-btn" id="coMuteBtn" title="Mute">🎙</button>
+    <button class="floating-btn" id="coCamBtn" title="Camera">📷</button>
+    <button class="floating-btn" id="coScreenBtn" title="Screen Share">🖥</button>
+    <button class="floating-btn leave" id="coLeaveBtn" title="End Call">📵</button>
   </div>
 </div>
 
@@ -3539,7 +3596,7 @@
       <div class="profile-online-ring" id="profileOnlineRing" style="display:none"></div>
     </div>
     <div class="profile-name" id="profileName">Loading…</div>
-    <div style="display:flex;align-items:center;justify-content:center;gap:8px;flex-wrap:wrap;">
+    <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;">
       <div class="profile-username" id="profileUsernameTag">@username</div>
       <span id="profileLobbyTag" style="font-size:12px;font-weight:700;color:var(--accent);background:rgba(88,101,242,.15);padding:2px 9px;border-radius:99px;border:1px solid rgba(88,101,242,.3);letter-spacing:.3px;cursor:default;" title="Unique Lobby ID"></span>
     </div>
@@ -3577,6 +3634,7 @@ let me = null;
 let ws = null;
 let currentView    = null;
 let selectedServer = null;
+let cachedServerMembers = []; // cached for @mention autocomplete in lobby chat
 let pendingFiles   = [];
 let typingTimer    = null;
 let onlineUserIds  = new Set();
@@ -3648,8 +3706,61 @@ async function boot() {
     await showDMPanel();
   }
   setTimeout(patchWsForGroups, 1500);
-  // Load any lobby invites that arrived while offline
+  // Load any invites / friend requests that arrived while offline
   loadPendingServerInvites();
+  syncPendingFriendRequestNotifs();
+}
+
+async function syncPendingFriendRequestNotifs() {
+  try {
+    const friends = await api("/friends");
+    if (!Array.isArray(friends)) return;
+    const pending = friends.filter(f => f.status === "pending" && !f.is_sender);
+    if (!pending.length) return;
+
+    const existingNotifs = loadNotifs();
+
+    // Remove stale friend-request notifs for requests that no longer exist
+    const activeFriendIds = new Set(pending.map(f => f.id));
+    const activeFromIds   = new Set(pending.map(f => f.other_id));
+    const pruned = existingNotifs.filter(n => {
+      if (n.type !== "friend" || !n.actions?.length) return true; // keep non-friend-request notifs
+      // If this friend request notif doesn't match any active pending request, remove it
+      const matchById = n.meta?.friendId && activeFriendIds.has(n.meta.friendId);
+      const matchByFrom = n.meta?.fromId && activeFromIds.has(n.meta.fromId);
+      return matchById || matchByFrom;
+    });
+    if (pruned.length !== existingNotifs.length) saveNotifs(pruned);
+
+    // Push a notif for any pending request that doesn't already have one
+    const alreadyNotifiedByFriendId = new Set(
+      pruned.filter(n => n.type === "friend" && n.meta?.friendId).map(n => n.meta.friendId)
+    );
+    const alreadyNotifiedByFromId = new Set(
+      pruned.filter(n => n.type === "friend" && n.meta?.fromId).map(n => n.meta.fromId)
+    );
+
+    pending.forEach(f => {
+      if (alreadyNotifiedByFriendId.has(f.id) || alreadyNotifiedByFromId.has(f.other_id)) return;
+      const av = f.avatar_url || null;
+      pushNotif({
+        type: "friend",
+        icon: "👤",
+        iconUrl: av,
+        text: `<b>${escapeHtml(f.username)}</b> sent you a friend request`,
+        actions: [
+          { label: "Accept",  style: "notif-btn-accept",  action: "accept-friend"  },
+          { label: "Decline", style: "notif-btn-decline", action: "decline-friend" }
+        ],
+        meta: { friendId: f.id, fromId: f.other_id, fromUsername: f.username }
+      });
+    });
+
+    renderNotifBadge();
+    if (notifPanelOpen) renderNotifPanel();
+  } catch(e) {
+    console.error("[syncPendingFriendRequestNotifs]", e);
+  }
 }
 
 async function loadPendingServerInvites() {
@@ -3749,6 +3860,7 @@ function connectWS() {
       showToast(`👤 ${msg.fromUsername} sent you a friend request!`, "success");
       notifyFriendRequest(msg.fromUsername, msg.fromAvatarUrl || null, msg.friendId || null, msg.fromId || null);
       if (document.getElementById("sidebarTitle")?.textContent === "Direct Messages") await showDMPanel();
+      if (document.getElementById("sidebarTitle")?.textContent === "Friends") showHomeFriendsSidebar();
     }
     if (msg.type === "friend-accepted") {
       showToast(`✅ ${msg.fromUsername} accepted your friend request!`, "success");
@@ -4078,13 +4190,8 @@ async function selectServer(server) {
   if (btn) btn.textContent = "◀";
   currentPanel = "chat";
 
-  // Hide social feed sidebar (home only) and show members sidebar (server only)
-  const socialFeed = document.getElementById("socialFeed");
+  // Show members sidebar (server view) — feed stays visible globally
   const membersSidebar = document.getElementById("membersSidebar");
-  if (socialFeed) {
-    socialFeed.style.display = "none";
-    socialFeed.classList.add("collapsed");
-  }
   if (membersSidebar) {
     membersSidebar.style.display = "block";
     membersSidebar.classList.add("open");
@@ -4092,6 +4199,7 @@ async function selectServer(server) {
   }
 
   const members = await api(`/servers/${server.id}/members`);
+  cachedServerMembers = members || [];
   const me_member = members.find(m => m.id === me.id);
   myServerRole = me_member?.role || "member";
   const channels = await api(`/servers/${server.id}/channels`);
@@ -4811,9 +4919,25 @@ async function sendFriendRequest(friendId, username) {
   if (r.error) { showModalMsg("addFriendMsg", r.error, "error"); return; }
   // Pass the request id so the recipient can accept/decline from the notification
   wsSend({ type:"friend-request", toUserId: friendId, friendId: r.id || null });
+
+  // Update the modal message if visible
   const el = document.getElementById("addFriendMsg");
-  el.textContent = `Friend request sent to ${username}!`;
-  el.style.background = "rgba(35,165,90,.15)"; el.style.color = "#57f287"; el.style.display = "block";
+  if (el) {
+    el.textContent = `Friend request sent to ${username}!`;
+    el.style.background = "rgba(35,165,90,.15)"; el.style.color = "#57f287"; el.style.display = "block";
+  }
+
+  // Update any "Add Friend" button in profile sidebar / friend page to show Pending
+  document.querySelectorAll(`[data-addfriend-uid="${friendId}"]`).forEach(btn => {
+    btn.textContent = "⏳ Pending";
+    btn.disabled = true;
+    btn.classList.remove("profile-btn-primary", "fp-btn-primary");
+    btn.classList.add("profile-btn-secondary", "fp-btn-ghost");
+    btn.onclick = null;
+    btn.removeAttribute("data-addfriend-uid");
+  });
+
+  showToast(`Friend request sent to ${username}!`, "success");
 }
 
 async function acceptFriend(id) {
@@ -4821,12 +4945,19 @@ async function acceptFriend(id) {
   const req = friends.find(f => f.id === id);
   await api(`/friends/${id}/accept`, { method:"PATCH" });
   if (req) wsSend({ type:"friend-accepted", toUserId: req.other_id });
-  showToast("Friend request accepted!", "success"); await showDMPanel();
+  showToast("Friend request accepted!", "success");
+  // Refresh whichever sidebar is active
+  const title = document.getElementById("sidebarTitle")?.textContent;
+  if (title === "Friends") await showHomeFriendsSidebar();
+  else await showDMPanel();
 }
 
 async function declineFriend(id) {
   await api(`/friends/${id}/decline`, { method:"PATCH" });
-  showToast("Friend request declined", ""); await showDMPanel();
+  showToast("Friend request declined", "");
+  const title = document.getElementById("sidebarTitle")?.textContent;
+  if (title === "Friends") await showHomeFriendsSidebar();
+  else await showDMPanel();
 }
 
 async function removeFriend(id) {
@@ -4875,7 +5006,7 @@ function renderChatArea({ icon, name, placeholder, readonly = false }) {
       <div class="chat-input-box">
         <button class="attach-btn" onclick="document.getElementById('fileInput').click()">📎</button>
         <textarea class="chat-input" id="chatInput" placeholder="${placeholder}" rows="1"
-          oninput="autoResize(this);sendTyping()"
+          oninput="autoResize(this);sendTyping();handleMentionTyping(this,selectedServer?'lobby':'feed')"
           onkeydown="if(event.key==='Enter'&&!event.shiftKey){event.preventDefault();sendMessage()}"></textarea>
         <button class="send-btn" onclick="sendMessage()">➤</button>
       </div></div>`}`;
@@ -4890,6 +5021,9 @@ async function sendMessage() {
   const content = input?.value.trim() || "";
   if (!content && !pendingFiles.length) return;
   input.value = ""; input.style.height = "auto";
+  // Close mention dropdown
+  const mDrop = document.getElementById("mentionDropGlobal");
+  if (mDrop) mDrop.style.display = "none";
   let savedMessage;
   if (currentView.type === "dm") savedMessage = await api(`/dm/${currentView.id}`, { method:"POST", body:JSON.stringify({ content }) });
   else if (currentView.type === "group") savedMessage = await api(`/groups/${currentView.id}/messages`, { method:"POST", body:JSON.stringify({ content }) });
@@ -4954,7 +5088,7 @@ function appendMessage(msg, type) {
         <span class="msg-time">${time}</span>
         ${canDelete?`<button class="msg-delete" onclick="deleteMessage(${msg.id})">🗑 Delete</button>`:""}
       </div>
-      ${msg.content?`<div class="msg-content">${escapeHtml(msg.content)}</div>`:""}
+      ${msg.content?`<div class="msg-content">${highlightMentions(escapeHtml(msg.content))}</div>`:""}
       ${attachHtml?`<div class="msg-attachments">${attachHtml}</div>`:""}
     </div>`;
   container.appendChild(div);
@@ -4963,7 +5097,12 @@ function appendMessage(msg, type) {
 async function deleteMessage(id) {
   if (!currentView) return;
   if (currentView.type === "channel") await api(`/channels/${currentView.id}/messages/${id}`, { method:"DELETE" });
-  const messages = currentView.type === "channel" ? await api(`/channels/${currentView.id}/messages`) : await api(`/dm/${currentView.id}`);
+  else if (currentView.type === "group") await api(`/groups/${currentView.id}/messages/${id}`, { method:"DELETE" });
+  else await api(`/dm/${currentView.id}/messages/${id}`, { method:"DELETE" });
+  let messages;
+  if (currentView.type === "channel") messages = await api(`/channels/${currentView.id}/messages`);
+  else if (currentView.type === "group") messages = await api(`/groups/${currentView.id}/messages`);
+  else messages = await api(`/dm/${currentView.id}`);
   const container = document.getElementById("msgContainer");
   container.innerHTML = ""; (messages||[]).forEach(m => appendMessage(m, currentView.type));
 }
@@ -5010,6 +5149,7 @@ function openLightbox(src) {
 }
 
 function escapeHtml(str) { return (str||"").replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/\n/g,"<br/>"); }
+function jsEsc(str) { return (str||'').replace(/\\/g,'\\\\').replace(/'/g,"\\'").replace(/\n/g,'\\n').replace(/\r/g,''); }
 function openModal(id)  { document.getElementById(id).classList.add("open"); }
 function closeModal(id) { document.getElementById(id).classList.remove("open"); }
 document.querySelectorAll(".modal-overlay").forEach(o => o.addEventListener("click", e => { if (e.target===o) o.classList.remove("open"); }));
@@ -5039,8 +5179,9 @@ async function showGroupsPanel() {
   } else {
     groups.forEach(g => {
       const icon = g.icon_url ? `<img src="${g.icon_url}" style="width:32px;height:32px;border-radius:50%;object-fit:cover"/>` : "👥";
-      html += `<div class="dm-item" onclick="openGroup(${g.id},'${g.name}')"><div class="dm-avatar" style="font-size:18px">${icon}</div>
-        <div style="flex:1;min-width:0"><div style="font-size:14px;font-weight:600">${g.name}</div><div style="font-size:11px;color:var(--text-3)">${g.member_count} members</div></div></div>`;
+      const safeName = jsEsc(g.name);
+      html += `<div class="dm-item" onclick="openGroup(${g.id},'${safeName}')"><div class="dm-avatar" style="font-size:18px">${icon}</div>
+        <div style="flex:1;min-width:0"><div style="font-size:14px;font-weight:600">${escapeHtml(g.name)}</div><div style="font-size:11px;color:var(--text-3)">${g.member_count} members</div></div></div>`;
     });
   }
   html += "</div>";
@@ -5108,7 +5249,7 @@ async function openGroup(groupId, groupName) {
           <div class="chat-input-box">
             <button class="attach-btn" onclick="document.getElementById('fileInput').click()">📎</button>
             <textarea class="chat-input" id="chatInput" placeholder="Message ${groupName}" rows="1"
-              oninput="autoResize(this);sendTyping()"
+              oninput="autoResize(this);sendTyping();handleMentionTyping(this,selectedServer?'lobby':'feed')"
               onkeydown="if(event.key==='Enter'&&!event.shiftKey){event.preventDefault();sendMessage()}"></textarea>
             <button class="send-btn" onclick="sendMessage()">➤</button>
           </div>
@@ -5157,15 +5298,42 @@ function peerUserIdFromPeerId(peerId) { return peerId.startsWith("u") ? parseInt
 function createGroupPeerConnection(peerId) {
   const pc = new RTCPeerConnection({ iceServers:[{ urls:"stun:stun.l.google.com:19302" }] });
   groupCallPeers[peerId] = pc;
+  // Add all local tracks
   groupLocalStream?.getTracks().forEach(t => pc.addTrack(t, groupLocalStream));
+  // Ensure a video transceiver exists even for audio-only joins (for later screenshare)
+  const hasVideoSender = pc.getSenders().some(s => s.track?.kind === "video");
+  if (!hasVideoSender) {
+    pc.addTransceiver("video", { direction: "sendrecv" });
+  }
   pc.onicecandidate = ({ candidate }) => { if (candidate) wsSend({ type:"group-candidate", candidate, to:peerId }); };
   pc.ontrack = e => {
     const uid = peerUserIdFromPeerId(peerId);
     const tile = document.getElementById(`calltile-${uid}`);
     if (!tile) return;
-    let vid = tile.querySelector("video");
-    if (!vid) { tile.innerHTML = `<video id="callvideo-${uid}" autoplay playsinline></video><div class="tile-name">${tile.querySelector(".tile-name")?.textContent||peerId}</div>`; vid = tile.querySelector("video"); }
-    vid.srcObject = e.streams[0];
+    const tileName = tile.querySelector(".tile-name")?.textContent || peerId;
+    // Only show video element if the track is video
+    if (e.track.kind === "video") {
+      let vid = tile.querySelector("video");
+      if (!vid) { tile.innerHTML = `<video id="callvideo-${uid}" autoplay playsinline></video><div class="tile-name">${tileName}</div>`; vid = tile.querySelector("video"); }
+      vid.srcObject = e.streams[0];
+    } else if (e.track.kind === "audio") {
+      // Create a hidden audio element for remote audio
+      let audioEl = document.getElementById(`callaudio-${uid}`);
+      if (!audioEl) { audioEl = document.createElement("audio"); audioEl.id = `callaudio-${uid}`; audioEl.autoplay = true; tile.appendChild(audioEl); }
+      audioEl.srcObject = e.streams[0];
+    }
+  };
+  // Handle renegotiation (e.g. when screenshare starts)
+  let makingOffer = false;
+  pc.onnegotiationneeded = async () => {
+    try {
+      makingOffer = true;
+      const offer = await pc.createOffer();
+      if (pc.signalingState !== "stable") return;
+      await pc.setLocalDescription(offer);
+      wsSend({ type: "group-offer", offer: pc.localDescription, to: peerId });
+    } catch(e) { console.error("group renegotiation error", e); }
+    finally { makingOffer = false; }
   };
   return pc;
 }
@@ -5177,7 +5345,11 @@ async function createGroupOffer(peerId) {
 }
 
 async function handleGroupOffer(msg) {
-  const pc = createGroupPeerConnection(msg.from);
+  // Support renegotiation — reuse existing peer connection if one exists
+  let pc = groupCallPeers[msg.from];
+  if (!pc) {
+    pc = createGroupPeerConnection(msg.from);
+  }
   await pc.setRemoteDescription(msg.offer);
   const answer = await pc.createAnswer(); await pc.setLocalDescription(answer);
   wsSend({ type:"group-answer", answer:pc.localDescription, to:msg.from });
@@ -5191,11 +5363,39 @@ function toggleGroupMute() {
   document.getElementById("gcMuteBtn").textContent = enabled ? "🎙" : "🔇";
 }
 
-function toggleGroupCam() {
+async function toggleGroupCam() {
   if (!groupLocalStream) return;
-  const tracks = groupLocalStream.getVideoTracks(); const enabled = !tracks[0]?.enabled;
-  tracks.forEach(t => t.enabled = enabled);
-  document.getElementById("gcCamBtn").classList.toggle("active",!enabled);
+  const tracks = groupLocalStream.getVideoTracks();
+  if (tracks.length) {
+    // Toggle existing camera tracks
+    const enabled = !tracks[0].enabled;
+    tracks.forEach(t => t.enabled = enabled);
+    document.getElementById("gcCamBtn").classList.toggle("active", !enabled);
+    // Update own video tile
+    const myVid = document.getElementById(`callvideo-${me.id}`);
+    if (myVid) myVid.srcObject = enabled ? groupLocalStream : null;
+  } else {
+    // Audio-only join — try to start camera now
+    try {
+      const camStream = await navigator.mediaDevices.getUserMedia({ video: true });
+      const camTrack = camStream.getVideoTracks()[0];
+      groupLocalStream.addTrack(camTrack);
+      // Replace null video track on all peers
+      function findGroupVideoSender(pc) {
+        return pc.getSenders().find(s => s.track?.kind === "video")
+          || pc.getSenders().find(s => s.track === null && pc.getTransceivers().some(t => t.sender === s && t.receiver?.track?.kind === "video"));
+      }
+      Object.values(groupCallPeers).forEach(pc => { const s = findGroupVideoSender(pc); if (s) s.replaceTrack(camTrack); });
+      // Show in own tile
+      let myVid = document.getElementById(`callvideo-${me.id}`);
+      if (!myVid) {
+        const myTile = document.getElementById(`calltile-${me.id}`);
+        if (myTile) { myTile.innerHTML = `<video id="callvideo-${me.id}" autoplay playsinline muted></video><div class="tile-name">${me.username} (you)</div>`; myVid = document.getElementById(`callvideo-${me.id}`); }
+      }
+      if (myVid) myVid.srcObject = groupLocalStream;
+      document.getElementById("gcCamBtn").classList.remove("active");
+    } catch(e) { showToast("Could not access camera", "error"); }
+  }
 }
 
 async function toggleGroupScreen() {
@@ -5207,13 +5407,24 @@ async function toggleGroupScreen() {
     });
     if (!screenStream) return;
     const screenTrack = screenStream.getVideoTracks()[0];
-    Object.values(groupCallPeers).forEach(pc => { const s=pc.getSenders().find(s=>s.track?.kind==="video"); s?.replaceTrack(screenTrack); });
-    const myVid = document.getElementById(`callvideo-${me.id}`); if (myVid) myVid.srcObject = screenStream;
+    // Find video sender — may have null track if audio-only joined
+    function findGroupVideoSender(pc) {
+      return pc.getSenders().find(s => s.track?.kind === "video")
+        || pc.getSenders().find(s => s.track === null && pc.getTransceivers().some(t => t.sender === s && t.receiver?.track?.kind === "video"));
+    }
+    Object.values(groupCallPeers).forEach(pc => { const s = findGroupVideoSender(pc); if (s) s.replaceTrack(screenTrack); });
+    // Show screenshare in own tile
+    let myVid = document.getElementById(`callvideo-${me.id}`);
+    if (!myVid) {
+      const myTile = document.getElementById(`calltile-${me.id}`);
+      if (myTile) { myTile.innerHTML = `<video id="callvideo-${me.id}" autoplay playsinline muted></video><div class="tile-name">${me.username} (you)</div>`; myVid = document.getElementById(`callvideo-${me.id}`); }
+    }
+    if (myVid) myVid.srcObject = screenStream;
     document.getElementById("gcScreenBtn").classList.add("active");
     screenTrack.onended = () => {
-      const camTrack = groupLocalStream.getVideoTracks()[0];
-      Object.values(groupCallPeers).forEach(pc => { const s=pc.getSenders().find(s=>s.track?.kind==="video"); s?.replaceTrack(camTrack); });
-      if (myVid) myVid.srcObject = groupLocalStream;
+      const camTrack = groupLocalStream?.getVideoTracks()[0] || null;
+      Object.values(groupCallPeers).forEach(pc => { const s = findGroupVideoSender(pc); if (s) s.replaceTrack(camTrack); });
+      if (myVid) myVid.srcObject = camTrack ? groupLocalStream : null;
       document.getElementById("gcScreenBtn").classList.remove("active");
     };
   } catch(e) { console.error(e); }
@@ -5336,7 +5547,15 @@ async function startDirectCall(userId, username) {
   }, 1000);
 }
 
+function showCallLocalVideo() {
+  const localVid = document.getElementById("callLocalVideo");
+  if (localVid && callStream) localVid.srcObject = callStream;
+}
 function showFloatingCallBar(name, avatarUrl, status) {
+  // Also set up the video overlay name and local video
+  const overlayName = document.getElementById("callOverlayName");
+  if (overlayName) overlayName.textContent = name;
+  showCallLocalVideo();
   document.getElementById("floatingCallName").textContent = name;
   document.getElementById("floatingCallStatus").textContent = status;
   const av = document.getElementById("floatingCallAvatar");
@@ -5385,9 +5604,12 @@ function createCallPeerConnection(peerId) {
   callStream?.getTracks().forEach(t => pc.addTrack(t, callStream));
   pc.onicecandidate = ({ candidate }) => { if (candidate) wsSend({ type:"call-candidate", candidate, to:peerId }); };
   pc.ontrack = e => {
-    let remoteVid = document.getElementById(`callvid-${peerId}`);
-    if (!remoteVid) { remoteVid=document.createElement("video"); remoteVid.id=`callvid-${peerId}`; remoteVid.autoplay=true; remoteVid.playsInline=true; remoteVid.style.display="none"; document.body.appendChild(remoteVid); }
-    remoteVid.srcObject = e.streams[0]; document.getElementById("floatingCallStatus").textContent = "● Connected";
+    // Show remote stream in the video overlay
+    const remoteVid = document.getElementById("callRemoteVideo");
+    if (remoteVid) remoteVid.srcObject = e.streams[0];
+    document.getElementById("floatingCallStatus").textContent = "● Connected";
+    // Open the video overlay
+    document.getElementById("callVideoOverlay")?.classList.add("open");
   };
   pc.onconnectionstatechange = () => { if (["disconnected","failed","closed"].includes(pc.connectionState)) endCall(); };
   return pc;
@@ -5400,6 +5622,10 @@ async function forceEndCall() {
   Object.values(callPeers).forEach(pc=>pc.close()); Object.keys(callPeers).forEach(k=>delete callPeers[k]);
   callStream?.getTracks().forEach(t=>t.stop()); callStream=null;
   document.querySelectorAll("[id^='callvid-']").forEach(el=>el.remove());
+  // Close video overlay and clean up video elements
+  document.getElementById("callVideoOverlay")?.classList.remove("open");
+  const remoteVid = document.getElementById("callRemoteVideo"); if (remoteVid) remoteVid.srcObject = null;
+  const localVid = document.getElementById("callLocalVideo"); if (localVid) localVid.srcObject = null;
   hideFloatingCallBar();
   const fcMute=document.getElementById("fcMuteBtn"), fcCam=document.getElementById("fcCamBtn"), fcScreen=document.getElementById("fcScreenBtn");
   if (fcMute)   { fcMute.classList.remove("active");   fcMute.textContent="🎙"; }
@@ -5434,16 +5660,37 @@ document.getElementById("fcScreenBtn").addEventListener("click", async () => {
 });
 document.getElementById("fcLeaveBtn").addEventListener("click", endCall);
 
+// ── Video Call Overlay controls ──
+document.getElementById("fcExpandBtn")?.addEventListener("click", () => {
+  document.getElementById("callVideoOverlay")?.classList.add("open");
+  showCallLocalVideo();
+});
+document.getElementById("callOverlayMinimize")?.addEventListener("click", () => {
+  document.getElementById("callVideoOverlay")?.classList.remove("open");
+});
+// Mirror overlay buttons to floating bar buttons
+document.getElementById("coMuteBtn")?.addEventListener("click", () => document.getElementById("fcMuteBtn")?.click());
+document.getElementById("coCamBtn")?.addEventListener("click", () => document.getElementById("fcCamBtn")?.click());
+document.getElementById("coScreenBtn")?.addEventListener("click", () => document.getElementById("fcScreenBtn")?.click());
+document.getElementById("coLeaveBtn")?.addEventListener("click", () => { document.getElementById("callVideoOverlay")?.classList.remove("open"); endCall(); });
+
 // ── Voice Channel System ──────────────────────────────────────
 let vcChannelId = null;       // channel id we're currently in
 let vcChannelName = "";
+let vcServer = null;          // server object the VC belongs to
 let vcStream = null;
 let vcScreenStream = null;    // active screenshare stream (self)
 let vcCamStream = null;       // active camera stream (self)
 let vcPeers = {};             // peerId → RTCPeerConnection
+let vcVideoStreams = {};      // peerId → MediaStream (remote video)
 let vcChannelMembers = {};    // channelId → [{userId,username,avatarUrl,muted}]
 
-function showVcPanel(name) {
+async function showVcPanel(name) {
+  // Always switch to the VC's server so the sidebar shows channels, not friends
+  if (vcServer) {
+    await selectServer(vcServer);
+  }
+  // Now show the VC panel (selectServer shows chatPanel, so hide it)
   document.getElementById("homePanel").classList.add("hidden");
   document.getElementById("chatPanel").classList.add("hidden");
   document.getElementById("profilePage").classList.add("hidden");
@@ -5496,9 +5743,13 @@ function pushVcPipData() {
 }
 
 // Wire up actions coming back from the native pip window
+let vcPipClosingByExpand = false;   // flag to prevent leave when expanding back
 if (window.electronAPI?.onVcPipAction) {
   window.electronAPI.onVcPipAction(action => {
-    if (action === "expand") showVcPanel(vcChannelName);
+    if (action === "expand") {
+      vcPipClosingByExpand = true;   // tell the close-handler NOT to leave
+      showVcPanel(vcChannelName);
+    }
     if (action === "mute")   document.getElementById("vcMuteBtn")?.click();
     if (action === "screen") document.getElementById("vcScreenBtn")?.click();
     if (action === "leave")  leaveVoiceChannel();
@@ -5506,6 +5757,10 @@ if (window.electronAPI?.onVcPipAction) {
 }
 if (window.electronAPI?.onVcPipClosed) {
   window.electronAPI.onVcPipClosed(() => {
+    if (vcPipClosingByExpand) {
+      vcPipClosingByExpand = false;   // reset the flag
+      return;                         // don't leave — user just expanded back
+    }
     // pip was closed externally — treat as leave
     leaveVoiceChannel();
   });
@@ -5554,14 +5809,11 @@ function renderVcPip() {
     if (!tile) return;
     const peerId = m.isSelf ? null : `vc${m.userId}`;
 
-    // Remote: grab audio element's srcObject if it has video
+    // Remote: use vcVideoStreams for video (stored by ontrack handler)
     if (!m.isSelf && peerId) {
-      const audioEl = document.getElementById(`vcaudio-${peerId}`);
-      if (audioEl?.srcObject) {
-        const stream = audioEl.srcObject;
-        if (stream.getVideoTracks().some(t => t.readyState === "live")) {
-          injectVideoIntoTile(tile, stream);
-        }
+      const remoteVideoStream = vcVideoStreams[peerId];
+      if (remoteVideoStream?.getVideoTracks().some(t => t.readyState === "live")) {
+        injectVideoIntoTile(tile, remoteVideoStream);
       }
     }
     // Self video — prefer screenshare over webcam
@@ -5700,12 +5952,12 @@ function renderVcGrid() {
       }
     } else {
       const peerId = `vc${m.userId}`;
-      const audioEl = document.getElementById(`vcaudio-${peerId}`);
-      const remoteStream = audioEl?.srcObject;
-      const hasRemoteVideo = remoteStream?.getVideoTracks().some(t => t.readyState === "live");
+      // Use vcVideoStreams for remote video (stored by ontrack handler)
+      const remoteVideoStream = vcVideoStreams[peerId];
+      const hasRemoteVideo = remoteVideoStream?.getVideoTracks().some(t => t.readyState === "live");
       // Remote camera replaces avatar; screenshare is an extra tile
       if (hasRemoteVideo) {
-        tiles.push({ type:"camera", member:m, stream:remoteStream });
+        tiles.push({ type:"camera", member:m, stream:remoteVideoStream });
       } else {
         tiles.push({ type:"avatar", member:m, stream:null });
       }
@@ -5754,6 +6006,7 @@ async function joinVoiceChannel(channelId, channelName) {
 
   vcChannelId = channelId;
   vcChannelName = channelName;
+  vcServer = selectedServer;    // remember which server this VC belongs to
 
   // Tell backend we joined
   wsSend({ type:"vc-join", channelId, username: me.username, avatarUrl: me.avatarUrl || null });
@@ -5778,6 +6031,7 @@ async function leaveVoiceChannel() {
   // Close all peer connections
   Object.values(vcPeers).forEach(pc => pc.close());
   vcPeers = {};
+  vcVideoStreams = {};
   vcStream?.getTracks().forEach(t => t.stop());
   vcStream = null;
   vcScreenStream?.getTracks().forEach(t => t.stop());
@@ -5787,6 +6041,7 @@ async function leaveVoiceChannel() {
   const leftName = vcChannelName;
   vcChannelId = null;
   vcChannelName = "";
+  vcServer = null;
   hideVcPanel();
   hideVcPip();
   // Don't navigate anywhere — just re-show whichever panel was last active.
@@ -5818,24 +6073,40 @@ function refreshChannelListVc() {
   }
 }
 
+// Helper: find the video sender on a PC (may have null track from sendrecv transceiver)
+function findVideoSender(pc) {
+  let sender = pc.getSenders().find(s => s.track?.kind === "video");
+  if (sender) return sender;
+  const transceiver = pc.getTransceivers().find(t => t.receiver?.track?.kind === "video" && t.sender);
+  return transceiver?.sender || null;
+}
+
 function createVcPeerConnection(peerId) {
   const pc = new RTCPeerConnection({ iceServers:[{ urls:"stun:stun.l.google.com:19302" }] });
   vcPeers[peerId] = pc;
   // Add audio tracks from vcStream
   if (vcStream) vcStream.getAudioTracks().forEach(t => pc.addTrack(t, vcStream));
-  // Add video track if cam or screen is already active
+  // Add video track if cam or screen is already active, otherwise sendrecv transceiver
   const activeVideoStream = vcScreenStream || vcCamStream;
   if (activeVideoStream) {
     activeVideoStream.getVideoTracks().forEach(t => pc.addTrack(t, activeVideoStream));
   } else {
-    // Add a recvonly video transceiver so remote can send video to us
-    pc.addTransceiver("video", { direction: "recvonly" });
+    // sendrecv so either side can start sending video later via replaceTrack
+    pc.addTransceiver("video", { direction: "sendrecv" });
   }
   pc.onicecandidate = ({ candidate }) => { if (candidate) wsSend({ type:"vc-candidate", candidate, to:peerId, channelId:vcChannelId }); };
+  // Renegotiation handler — fires when addTrack is called after connection is live
+  pc.onnegotiationneeded = async () => {
+    try {
+      if (pc.signalingState !== "stable") return;
+      const offer = await pc.createOffer();
+      await pc.setLocalDescription(offer);
+      wsSend({ type:"vc-offer", offer:pc.localDescription, to:peerId, channelId:vcChannelId });
+    } catch(e) { console.error("[vc] renegotiation error:", e); }
+  };
   pc.ontrack = e => {
     const stream = e.streams[0] || new MediaStream([e.track]);
     if (e.track.kind === "audio") {
-      // Audio element — reuse or create
       let audio = document.getElementById(`vcaudio-${peerId}`);
       if (!audio) {
         audio = document.createElement("audio");
@@ -5845,12 +6116,19 @@ function createVcPeerConnection(peerId) {
       audio.srcObject = stream;
       audio.play().catch(() => {});
     }
-    // Refresh PiP so video tile appears if stream has video
+    if (e.track.kind === "video") {
+      vcVideoStreams[peerId] = stream;
+      // Re-render when track state changes
+      e.track.onended  = () => { delete vcVideoStreams[peerId]; renderVcGrid(); renderVcPip(); };
+      e.track.onmute   = () => { renderVcGrid(); renderVcPip(); };
+      e.track.onunmute = () => { renderVcGrid(); renderVcPip(); };
+    }
+    renderVcGrid();
     renderVcPip();
   };
   pc.onconnectionstatechange = () => {
     if (["disconnected","failed","closed"].includes(pc.connectionState)) {
-      pc.close(); delete vcPeers[peerId];
+      pc.close(); delete vcPeers[peerId]; delete vcVideoStreams[peerId];
       document.getElementById(`vcaudio-${peerId}`)?.remove();
     }
   };
@@ -5892,7 +6170,7 @@ function setupVcSignalling() {
         vcChannelMembers[cid] = vcChannelMembers[cid].filter(m => m.userId !== msg.userId);
       }
       const peerId = `vc${msg.userId}`;
-      vcPeers[peerId]?.close(); delete vcPeers[peerId];
+      vcPeers[peerId]?.close(); delete vcPeers[peerId]; delete vcVideoStreams[peerId];
       document.getElementById(`vcaudio-${peerId}`)?.remove();
       if (cid === vcChannelId) renderVcGrid();
       refreshChannelListVc();
@@ -5910,7 +6188,13 @@ function setupVcSignalling() {
     // ── WebRTC signalling ──
     if (msg.type === "vc-offer") {
       if (!vcChannelId) return;
-      const pc = createVcPeerConnection(msg.from);
+      // Support renegotiation — reuse existing PC if present
+      let pc = vcPeers[msg.from];
+      if (!pc) pc = createVcPeerConnection(msg.from);
+      // Handle glare: if we're also in the middle of offering, rollback
+      if (pc.signalingState !== "stable") {
+        await pc.setLocalDescription({ type: "rollback" });
+      }
       await pc.setRemoteDescription(msg.offer);
       const answer = await pc.createAnswer();
       await pc.setLocalDescription(answer);
@@ -5970,8 +6254,10 @@ document.addEventListener("DOMContentLoaded", () => {
   function stopCamera() {
     vcCamStream?.getTracks().forEach(t => t.stop());
     vcCamStream = null;
+    // Use replaceTrack(null) instead of removeTrack to avoid needing renegotiation
     Object.values(vcPeers).forEach(pc => {
-      pc.getSenders().filter(s => s.track?.kind === "video").forEach(s => pc.removeTrack(s));
+      const sender = findVideoSender(pc);
+      if (sender && sender.track) sender.replaceTrack(null);
     });
     const btn = document.getElementById("vcCamBtn");
     btn?.classList.remove("active");
@@ -5989,8 +6275,9 @@ document.addEventListener("DOMContentLoaded", () => {
       vcCamStream = await navigator.mediaDevices.getUserMedia({ audio:false, video:videoConstraints });
       const videoTrack = vcCamStream.getVideoTracks()[0];
       Object.values(vcPeers).forEach(pc => {
-        const existing = pc.getSenders().find(s => s.track?.kind === "video");
-        if (existing) existing.replaceTrack(videoTrack);
+        // Use findVideoSender to find sender even if its track is null (from sendrecv transceiver)
+        const sender = findVideoSender(pc);
+        if (sender) sender.replaceTrack(videoTrack);
         else pc.addTrack(videoTrack, vcCamStream);
       });
       document.getElementById("vcCamBtn")?.classList.add("active");
@@ -6039,8 +6326,10 @@ document.addEventListener("DOMContentLoaded", () => {
   function stopScreenShare() {
     vcScreenStream?.getTracks().forEach(t => t.stop());
     vcScreenStream = null;
+    // Use replaceTrack(null) instead of removeTrack to avoid needing renegotiation
     Object.values(vcPeers).forEach(pc => {
-      pc.getSenders().filter(s => s.track?.kind === "video").forEach(s => pc.removeTrack(s));
+      const sender = findVideoSender(pc);
+      if (sender && sender.track) sender.replaceTrack(null);
     });
     document.getElementById("vcScreenBtn")?.classList.remove("active");
     document.getElementById("vcScreenBtnLabel") && (document.getElementById("vcScreenBtnLabel").textContent = "Share");
@@ -6072,13 +6361,14 @@ document.addEventListener("DOMContentLoaded", () => {
       vcScreenStream = screenStream;
 
       Object.values(vcPeers).forEach(pc => {
-        const existing = pc.getSenders().find(s => s.track?.kind === "video");
-        if (existing) {
-          existing.replaceTrack(screenTrack);
-          const params = existing.getParameters();
+        // Use findVideoSender to find sender even if its track is null (from sendrecv transceiver)
+        const sender = findVideoSender(pc);
+        if (sender) {
+          sender.replaceTrack(screenTrack);
+          const params = sender.getParameters();
           if (!params.encodings) params.encodings = [{}];
           params.encodings[0].maxBitrate = q.bitrate;
-          existing.setParameters(params).catch(()=>{});
+          sender.setParameters(params).catch(()=>{});
         } else {
           pc.addTrack(screenTrack, screenStream);
         }
@@ -6997,7 +7287,7 @@ function renderPost(post) {
     <div class="post-comments" id="comments-${post.id}">
       <div id="comment-list-${post.id}"></div>
       <div class="comment-input-row">
-        <input class="comment-input" id="comment-input-${post.id}" placeholder="Write a comment…" onkeydown="if(event.key==='Enter'){submitComment(${post.id})}" />
+        <input class="comment-input" id="comment-input-${post.id}" placeholder="Write a comment… (@ to mention)" onkeydown="if(event.key==='Enter'){submitComment(${post.id})}" oninput="handleMentionTyping(this,'feed',${post.id})" />
         <button class="comment-send-btn" onclick="submitComment(${post.id})">➤</button>
       </div>
     </div>
@@ -7588,7 +7878,7 @@ async function runGlobalSearch(q) {
           ? 'background:rgba(88,101,242,.15);color:var(--accent)'
           : 'background:rgba(67,181,129,.15);color:#43b581;cursor:pointer';
         const tagLabel = isMember ? '\u2713 Member' : '+ Join';
-        return `<div class="gsearch-item" onclick="globalSearchSelectServer(${s.id},'${escapeHtml(s.name)}','${s.icon_url||""}','${s.banner_url||""}','${escapeHtml(s.description||"")}',${count})">
+        return `<div class="gsearch-item" onclick="globalSearchSelectServer(${s.id},'${jsEsc(s.name)}','${jsEsc(s.icon_url||"")}','${jsEsc(s.banner_url||"")}','${jsEsc(s.description||"")}',${count})">
           <div class="gsearch-av square">${icon}</div>
           <div>
             <div class="gsearch-name">${escapeHtml(s.name)} <span style="font-size:10px;color:var(--text-3);font-weight:400">#${uid}</span></div>
@@ -7751,7 +8041,7 @@ const _origSubmitPost = window.submitPost;
 function renderPostTags(tags) {
   if (!tags || !tags.length) return "";
   return `<div style="display:flex;flex-wrap:wrap;gap:6px;padding:4px 16px 10px">
-    ${tags.map(t => `<span class="post-tag-chip" onclick="openCommunityTagJoin(${t.id},'${escapeHtml(t.name)}','${t.icon_url||""}','${t.banner_url||""}','${escapeHtml(t.description||"")}',${t.member_count||0})">@ ${escapeHtml(t.name)}</span>`).join("")}
+    ${tags.map(t => `<span class="post-tag-chip" onclick="openCommunityTagJoin(${t.id},'${jsEsc(t.name)}','${jsEsc(t.icon_url||"")}','${jsEsc(t.banner_url||"")}','${jsEsc(t.description||"")}',${t.member_count||0})">@ ${escapeHtml(t.name)}</span>`).join("")}
   </div>`;
 }
 
@@ -8110,51 +8400,63 @@ function showReplyBox(commentId, postId, username) {
   }, 50);
 }
 
-async function handleMentionInput(input, postId) {
-  const val = input.value;
-  const commentId = input.id.replace("reply-input-","");
-  const drop = document.getElementById(`mention-drop-${commentId}`);
-  if (!drop) return;
+// ── Unified @mention autocomplete ─────────────────────────────
+let _mentionTarget = null; // input currently being @-mentioned into
 
-  // Find @ at cursor
+async function handleMentionTyping(input, source, postId) {
+  // source: 'feed' = friends + commenters, 'lobby' = server members, 'dm' = friends only
+  const drop = document.getElementById("mentionDropGlobal");
+  if (!drop) return;
+  const val = input.value;
   const cursor = input.selectionStart;
   const textBefore = val.slice(0, cursor);
   const mentionMatch = textBefore.match(/@(\w*)$/);
 
-  if (!mentionMatch) { drop.style.display="none"; return; }
+  if (!mentionMatch) { drop.style.display="none"; _mentionTarget=null; return; }
 
+  _mentionTarget = input;
   const query = mentionMatch[1].toLowerCase();
+  let candidates = [];
 
-  // Get candidates: friends + commenters on this post
-  const [friends, comments] = await Promise.all([
-    feedApi("/friends"),
-    feedApi(`/posts/${postId}/comments`)
-  ]);
-
-  const friendNames = (friends||[]).filter(f=>f.status==="accepted").map(f=>({ username:f.username, avatar:f.avatar_url }));
-  const commenterNames = (comments||[]).map(c=>({ username:c.username, avatar:c.avatar_url }));
-
-  // Deduplicate
-  const seen = new Set();
-  const candidates = [...friendNames, ...commenterNames].filter(u => {
-    if (seen.has(u.username)) return false;
-    seen.add(u.username); return true;
-  }).filter(u => u.username.toLowerCase().startsWith(query) && u.username !== feedMe?.username);
+  if (source === "lobby") {
+    // Use cached server members
+    candidates = (cachedServerMembers||[])
+      .filter(m => m.username.toLowerCase().startsWith(query) && m.id !== me.id)
+      .map(m => ({ username:m.username, avatar:m.avatar_url }));
+  } else {
+    // Friends + commenters for feed/post context
+    const fetches = [feedApi("/friends")];
+    if (postId) fetches.push(feedApi(`/posts/${postId}/comments`));
+    const [friends, comments] = await Promise.all(fetches);
+    const friendNames = (friends||[]).filter(f=>f.status==="accepted").map(f=>({ username:f.username, avatar:f.avatar_url }));
+    const commenterNames = (comments||[]).map(c=>({ username:c.username, avatar:c.avatar_url }));
+    const seen = new Set();
+    candidates = [...friendNames, ...commenterNames].filter(u => {
+      if (seen.has(u.username)) return false;
+      seen.add(u.username); return true;
+    }).filter(u => u.username.toLowerCase().startsWith(query) && u.username !== (feedMe?.username || me?.username));
+  }
 
   if (!candidates.length) { drop.style.display="none"; return; }
 
+  // Position dropdown above the input
+  const rect = input.getBoundingClientRect();
+  drop.style.left = rect.left + "px";
+  drop.style.bottom = (window.innerHeight - rect.top + 4) + "px";
+  drop.style.width = Math.max(rect.width, 200) + "px";
   drop.style.display = "block";
-  drop.innerHTML = candidates.slice(0,6).map((u,i) => {
+
+  drop.innerHTML = candidates.slice(0,8).map(u => {
     const av = u.avatar ? `<img src="${u.avatar}" />` : u.username.slice(0,1).toUpperCase();
-    return `<div class="mention-option" onmousedown="insertMention('${u.username}','${input.id}','${commentId}')"}>
+    return `<div class="mention-option" onmousedown="insertMentionGlobal('${jsEsc(u.username)}')">
       <div class="mention-avatar">${av}</div>
-      <span>@${u.username}</span>
+      <span>@${escapeHtml(u.username)}</span>
     </div>`;
   }).join("");
 }
 
-function insertMention(username, inputId, commentId) {
-  const input = document.getElementById(inputId);
+function insertMentionGlobal(username) {
+  const input = _mentionTarget;
   if (!input) return;
   const val = input.value;
   const cursor = input.selectionStart;
@@ -8162,9 +8464,43 @@ function insertMention(username, inputId, commentId) {
   input.value = textBefore + val.slice(cursor);
   input.focus();
   input.selectionStart = input.selectionEnd = textBefore.length;
-  const drop = document.getElementById(`mention-drop-${commentId}`);
-  if (drop) drop.style.display = "none";
+  document.getElementById("mentionDropGlobal").style.display = "none";
+  _mentionTarget = null;
+  // fire input event so autoResize etc. still work on textareas
+  input.dispatchEvent(new Event("input", { bubbles:true }));
 }
+
+// Legacy wrapper for reply inputs that already call handleMentionInput
+async function handleMentionInput(input, postId) { return handleMentionTyping(input, "feed", postId); }
+function insertMention(username, inputId, commentId) {
+  _mentionTarget = document.getElementById(inputId);
+  insertMentionGlobal(username);
+}
+
+// Hide mention dropdown on click outside
+document.addEventListener("click", e => {
+  const drop = document.getElementById("mentionDropGlobal");
+  if (drop && !drop.contains(e.target) && e.target !== _mentionTarget) drop.style.display = "none";
+});
+
+// Keyboard navigation for mention dropdown (Escape closes, Up/Down to navigate, Enter/Tab to select)
+document.addEventListener("keydown", e => {
+  const drop = document.getElementById("mentionDropGlobal");
+  if (!drop || drop.style.display === "none") return;
+  const opts = drop.querySelectorAll(".mention-option");
+  if (!opts.length) return;
+  let idx = [...opts].findIndex(o => o.classList.contains("active"));
+
+  if (e.key === "Escape") { drop.style.display = "none"; e.preventDefault(); return; }
+  if (e.key === "ArrowDown") { e.preventDefault(); idx = (idx+1) % opts.length; }
+  else if (e.key === "ArrowUp") { e.preventDefault(); idx = idx <= 0 ? opts.length-1 : idx-1; }
+  else if (e.key === "Enter" || e.key === "Tab") {
+    if (idx >= 0 && opts[idx]) { e.preventDefault(); opts[idx].dispatchEvent(new MouseEvent("mousedown")); return; }
+  } else return;
+
+  opts.forEach(o => o.classList.remove("active"));
+  if (opts[idx]) opts[idx].classList.add("active");
+});
 
 async function submitReply(parentCommentId, postId) {
   const input = document.getElementById(`reply-input-${parentCommentId}`);
@@ -8211,6 +8547,7 @@ async function deleteComment(commentId, postId) {
 }
 
 async function submitComment(postId) {
+  const mDrop=document.getElementById("mentionDropGlobal"); if(mDrop) mDrop.style.display="none";
   const input=document.getElementById(`comment-input-${postId}`); const content=input.value.trim(); if (!content) return;
   try {
     console.log(`[comment] Submitting comment on post ${postId}: "${content.slice(0,50)}"`);
@@ -8407,10 +8744,36 @@ async function showHomeFriendsSidebar() {
   document.getElementById("sidebarTitle").textContent = "Friends"; setSidebarMode("friends");
   const friends = await api("/friends");
   const accepted = (friends || []).filter(f => f.status === "accepted");
+  const pending  = (friends || []).filter(f => f.status === "pending" && !f.is_sender);
+  const sent     = (friends || []).filter(f => f.status === "pending" && f.is_sender);
   const online  = accepted.filter(f => onlineUserIds.has(f.other_id));
   const offline = accepted.filter(f => !onlineUserIds.has(f.other_id));
 
   let html = "";
+
+  // ── Incoming friend requests ──
+  if (pending.length) {
+    html += `<div class="channel-section"><div class="channel-section-label">Friend Requests <span class="friend-req-badge">${pending.length}</span></div>`;
+    pending.forEach(f => {
+      const av = f.avatar_url ? `<img src="${f.avatar_url}" />` : f.username.slice(0,1).toUpperCase();
+      html += `<div class="friend-req-item"><div class="dm-avatar">${av}</div><span style="font-size:14px">${f.username}</span>
+        <div class="friend-req-actions">
+          <button class="small-btn small-btn-green" onclick="withLoading(this, () => acceptFriend(${f.id}))">✓</button>
+          <button class="small-btn small-btn-red" onclick="withLoading(this, () => declineFriend(${f.id}))">✕</button>
+        </div></div>`;
+    });
+    html += "</div>";
+  }
+
+  // ── Sent (outgoing) requests ──
+  if (sent.length) {
+    html += `<div class="channel-section"><div class="channel-section-label">Pending</div>`;
+    sent.forEach(f => {
+      const av = f.avatar_url ? `<img src="${f.avatar_url}" />` : f.username.slice(0,1).toUpperCase();
+      html += `<div class="dm-item"><div class="dm-avatar">${av}</div><span>${f.username}</span><span style="font-size:11px;color:var(--text-3);margin-left:auto">Pending</span></div>`;
+    });
+    html += "</div>";
+  }
 
   if (online.length) {
     html += `<div class="channel-section"><div class="channel-section-label"><span style="display:flex;align-items:center;gap:6px"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><circle cx="12" cy="12" r="3" fill="currentColor"/></svg> Online — ${online.length}</span></div>`;
@@ -8484,13 +8847,8 @@ function showChatPanel() {
   if (sl) sl.classList.remove("collapsed");
   if (btn) btn.textContent = "◀";
   
-  // Hide social feed sidebar (home only) and show members sidebar (chat only)
-  const socialFeed = document.getElementById("socialFeed");
+  // Show members sidebar (chat view) — feed stays visible globally
   const membersSidebar = document.getElementById("membersSidebar");
-  if (socialFeed) {
-    socialFeed.style.display = "none";
-    socialFeed.classList.add("collapsed");
-  }
   if (membersSidebar) {
     membersSidebar.style.display = "block";
     membersSidebar.classList.add("open");
@@ -8514,9 +8872,13 @@ rewireNavIcon("groupsNavIcon", () => {
   document.getElementById("homePanel").classList.add("hidden");
   document.getElementById("chatPanel").classList.remove("hidden");
   document.getElementById("profilePage").classList.add("hidden");
+  document.getElementById("vcPanel")?.classList.add("hidden");
   clearAllNavIcons();
   document.getElementById("groupsNavIcon")?.classList.add("active");
   currentPanel = "chat";
+  // Hide social feed when entering groups
+  const socialFeed = document.getElementById("socialFeed");
+  if (socialFeed) { socialFeed.style.display = "none"; socialFeed.classList.add("collapsed"); }
   const cs  = document.querySelector(".channel-sidebar");
   const btn = document.getElementById("chatSidebarToggle");
   const sl  = document.getElementById("serverList");
@@ -8526,13 +8888,8 @@ rewireNavIcon("groupsNavIcon", () => {
   if (sl) sl.classList.remove("collapsed");
   if (btn) btn.textContent = "◀";
   
-  // Hide social feed sidebar (home only) and show members sidebar (chat only)
-  const socialFeed = document.getElementById("socialFeed");
+  // Show members sidebar (groups view) — feed stays visible globally
   const membersSidebar = document.getElementById("membersSidebar");
-  if (socialFeed) {
-    socialFeed.style.display = "none";
-    socialFeed.classList.add("collapsed");
-  }
   if (membersSidebar) {
     membersSidebar.style.display = "block";
     membersSidebar.classList.add("open");
@@ -8983,7 +9340,7 @@ async function loadCommunities() {
         : "";
       const joinBtn = isMember
         ? `<button class="community-join-btn joined" onclick="event.stopPropagation();showChatPanel();setTimeout(()=>{},300)">→ Open</button>`
-        : `<button class="community-join-btn" onclick="event.stopPropagation();openCommunityTagJoin(${s.id},'${escapeHtml(s.name||"")}','${s.icon_url||""}','${s.banner_url||""}','${escapeHtml(desc)}',${memberCount})">+ Join</button>`;
+        : `<button class="community-join-btn" onclick="event.stopPropagation();openCommunityTagJoin(${s.id},'${jsEsc(s.name||"")}','${jsEsc(s.icon_url||"")}','${jsEsc(s.banner_url||"")}','${jsEsc(desc)}',${memberCount})">+ Join</button>`;
       return `<div class="community-card">
         <div class="community-card-banner" style="${bannerStyle};position:relative">
           ${relevanceBadge}
@@ -9124,7 +9481,7 @@ function openSpotlightFocus(post) {
       <div id="slFocusComments" style="display:none;flex-direction:column;gap:8px;margin-top:10px">
         <div id="comment-list-sl-${post.id}"></div>
         <div class="comment-input-row">
-          <input class="comment-input" id="comment-input-sl-${post.id}" placeholder="Write a comment…" onkeydown="if(event.key==='Enter'){submitCommentSl(${post.id})}" />
+          <input class="comment-input" id="comment-input-sl-${post.id}" placeholder="Write a comment… (@ to mention)" onkeydown="if(event.key==='Enter'){submitCommentSl(${post.id})}" oninput="handleMentionTyping(this,'feed',${post.id})" />
           <button class="comment-send-btn" onclick="submitCommentSl(${post.id})">➤</button>
         </div>
       </div>
@@ -9223,11 +9580,7 @@ async function showFullProfilePage(userId) {
   const mtBtn = document.getElementById("membersToggleBtn");
   if (mtBtn) mtBtn.style.display = "none";
   
-  const socialFeed = document.getElementById("socialFeed");
-  if (socialFeed) {
-    socialFeed.style.display = "none";
-    socialFeed.classList.add("collapsed");
-  }
+  // Feed stays visible globally
 
   // Mark nav icon active
   clearAllNavIcons();
@@ -9287,7 +9640,7 @@ async function renderFullProfilePage() {
         // Private account — no Add Friend button, show lock indicator
         friendBtnHtml = `<button class="fp-btn fp-btn-ghost" style="opacity:.6;cursor:not-allowed" disabled title="This account is private — they must invite you">🔒 Private Account</button>`;
       } else {
-        friendBtnHtml = `<button class="fp-btn fp-btn-primary" onclick="withLoading(this, () => sendFriendRequest(${fpUserId},'${fpData.username}'))">👤 Add Friend</button>`;
+        friendBtnHtml = `<button class="fp-btn fp-btn-primary" data-addfriend-uid="${fpUserId}" onclick="withLoading(this, () => sendFriendRequest(${fpUserId},'${fpData.username}'))">👤 Add Friend</button>`;
       }
     } catch(e) {}
     actions = `${friendBtnHtml}
@@ -9626,7 +9979,7 @@ async function renderFpRight() {
       <div class="post-comments" id="comments-${p.id}">
         <div id="comment-list-${p.id}"></div>
         <div class="comment-input-row">
-          <input class="comment-input" id="comment-input-${p.id}" placeholder="Write a comment…" onkeydown="if(event.key==='Enter'){submitComment(${p.id})}" />
+          <input class="comment-input" id="comment-input-${p.id}" placeholder="Write a comment… (@ to mention)" onkeydown="if(event.key==='Enter'){submitComment(${p.id})}" oninput="handleMentionTyping(this,'feed',${p.id})" />
           <button class="comment-send-btn" onclick="submitComment(${p.id})">➤</button>
         </div>
       </div>
@@ -10275,7 +10628,7 @@ async function loadProfilePanel(userId) {
       } else if (isPrivate) {
         friendBtn = `<button class="profile-btn profile-btn-secondary" style="opacity:.6;cursor:not-allowed" disabled>🔒 Private Account</button>`;
       } else {
-        friendBtn = `<button class="profile-btn profile-btn-primary" onclick="withLoading(this, () => { sendFriendRequest(${userId},'${profileData.username}'); document.getElementById('addFriendMsg').style.display='none'; })">👤 Add Friend</button>`;
+        friendBtn = `<button class="profile-btn profile-btn-primary" data-addfriend-uid="${userId}" onclick="withLoading(this, () => { sendFriendRequest(${userId},'${profileData.username}'); document.getElementById('addFriendMsg').style.display='none'; })">👤 Add Friend</button>`;
       }
     } catch(e) {}
     actionsEl.innerHTML = `
@@ -11132,13 +11485,22 @@ input.sp-slider::-webkit-slider-thumb:hover { transform: scale(1.2); }
 
 ::-webkit-scrollbar { width: 5px; }
 ::-webkit-scrollbar-thumb { background: var(--bg-3); border-radius: 3px; }
+</style>
 
+<script>
 /* ── Status management ────────────────────────────────────── */
 let myPresenceStatus = localStorage.getItem("vh_presence_status") || "online";
 
 function toggleStatusDropdown(e) {
   e.stopPropagation();
-  document.getElementById("statusDropdown").classList.toggle("open");
+  const dd = document.getElementById("statusDropdown");
+  const btn = document.getElementById("myStatusBtn");
+  dd.classList.toggle("open");
+  if (dd.classList.contains("open")) {
+    const rect = btn.getBoundingClientRect();
+    dd.style.left = rect.left + "px";
+    dd.style.bottom = (window.innerHeight - rect.top + 8) + "px";
+  }
 }
 
 document.addEventListener("click", () => {
@@ -11193,7 +11555,9 @@ function updateMyStatusUI() {
 
 // Init status on load
 setTimeout(() => { updateMyStatusUI(); }, 100);
+</script>
 
+<style>
 /* Profile hover card */
 .profile-hover-card {
   position: fixed;
@@ -12672,5 +13036,7 @@ document.addEventListener("mouseout", e => {
 // Hide card when clicking anywhere (click opens profile instead)
 document.addEventListener("click", () => hideProfileHoverCard());
 </script>
+<!-- Global @mention autocomplete dropdown -->
+<div id="mentionDropGlobal" class="mention-dropdown" style="display:none;position:fixed;z-index:10000;min-width:200px;max-width:280px"></div>
 </body>
 </html>

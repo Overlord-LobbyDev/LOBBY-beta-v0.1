@@ -400,6 +400,44 @@
     .floating-btn.active { background: var(--danger); color: #fff; }
     .floating-btn.leave { background: var(--danger); color: #fff; }
     .floating-btn.leave:hover { background: #c03537; }
+    .floating-btn.expand { background: var(--accent); color: #fff; }
+    .floating-btn.expand:hover { background: var(--accent-h,#4752c4); }
+
+    /* ── Video Call Overlay ── */
+    #callVideoOverlay {
+      display:none; position:fixed; inset:0; z-index:9997;
+      background:var(--bg-0); flex-direction:column; overflow:hidden;
+    }
+    #callVideoOverlay.open { display:flex; }
+    #callVideoOverlay .call-overlay-videos {
+      flex:1; display:flex; align-items:center; justify-content:center;
+      position:relative; background:#111; overflow:hidden;
+    }
+    #callRemoteVideo { width:100%; height:100%; object-fit:contain; background:#000; }
+    #callLocalVideo {
+      position:absolute; bottom:16px; right:16px; width:220px; height:auto;
+      aspect-ratio:16/9; border-radius:12px; object-fit:cover;
+      border:2px solid rgba(255,255,255,.15); background:#000; z-index:2;
+      box-shadow:0 8px 24px rgba(0,0,0,.6);
+    }
+    .call-overlay-bar {
+      display:flex; align-items:center; justify-content:center; gap:8px;
+      padding:12px; background:var(--bg-1); border-top:1px solid rgba(255,255,255,.06);
+    }
+    .call-overlay-bar .floating-btn { width:44px; height:44px; font-size:18px; }
+    .call-overlay-name {
+      position:absolute; top:16px; left:16px; z-index:2;
+      font-size:14px; font-weight:700; color:#fff;
+      background:rgba(0,0,0,.6); padding:6px 14px; border-radius:8px;
+    }
+    .call-overlay-minimize {
+      position:absolute; top:16px; right:16px; z-index:2;
+      background:rgba(0,0,0,.6); border:none; color:#fff; font-size:16px;
+      width:36px; height:36px; border-radius:8px; cursor:pointer;
+      display:flex; align-items:center; justify-content:center;
+      transition:background .15s;
+    }
+    .call-overlay-minimize:hover { background:rgba(255,255,255,.15); }
 
     /* ── In-app call modals ── */
     .call-modal {
@@ -779,10 +817,27 @@
     </div>
   </div>
   <div class="floating-call-controls">
+    <button class="floating-btn expand" id="fcExpandBtn" title="Expand Video">🔳</button>
     <button class="floating-btn" id="fcMuteBtn" title="Mute">🎙</button>
     <button class="floating-btn" id="fcCamBtn" title="Camera">📷</button>
     <button class="floating-btn" id="fcScreenBtn" title="Screen Share">🖥</button>
     <button class="floating-btn leave" id="fcLeaveBtn" title="Leave Call">📵</button>
+  </div>
+</div>
+
+<!-- Video Call Overlay — shown during active 1-1 calls -->
+<div id="callVideoOverlay">
+  <div class="call-overlay-videos">
+    <div class="call-overlay-name" id="callOverlayName"></div>
+    <button class="call-overlay-minimize" id="callOverlayMinimize" title="Minimize">▽</button>
+    <video id="callRemoteVideo" autoplay playsinline></video>
+    <video id="callLocalVideo" autoplay playsinline muted></video>
+  </div>
+  <div class="call-overlay-bar">
+    <button class="floating-btn" id="coMuteBtn" title="Mute">🎙</button>
+    <button class="floating-btn" id="coCamBtn" title="Camera">📷</button>
+    <button class="floating-btn" id="coScreenBtn" title="Screen Share">🖥</button>
+    <button class="floating-btn leave" id="coLeaveBtn" title="End Call">📵</button>
   </div>
 </div>
 <div id="friendContextMenu" class="context-menu">
@@ -2070,7 +2125,15 @@ async function startDirectCall(userId, username) {
   log(`Calling ${username}…`);
 }
 
+function showCallLocalVideo() {
+  const localVid = document.getElementById("callLocalVideo");
+  if (localVid && callStream) localVid.srcObject = callStream;
+}
 function showFloatingCallBar(name, avatarUrl, status) {
+  // Also set up the video overlay name and local video
+  const overlayName = document.getElementById("callOverlayName");
+  if (overlayName) overlayName.textContent = name;
+  showCallLocalVideo();
   const bar = document.getElementById("floatingCallBar");
   document.getElementById("floatingCallName").textContent = name;
   document.getElementById("floatingCallStatus").textContent = status;
@@ -2179,18 +2242,12 @@ function createCallPeerConnection(peerId) {
   };
 
   pc.ontrack = e => {
-    // Show remote stream — create a hidden video element
-    let remoteVid = document.getElementById(`callvid-${peerId}`);
-    if (!remoteVid) {
-      remoteVid = document.createElement("video");
-      remoteVid.id = `callvid-${peerId}`;
-      remoteVid.autoplay = true;
-      remoteVid.playsInline = true;
-      remoteVid.style.display = "none";
-      document.body.appendChild(remoteVid);
-    }
-    remoteVid.srcObject = e.streams[0];
+    // Show remote stream in the video overlay
+    const remoteVid = document.getElementById("callRemoteVideo");
+    if (remoteVid) remoteVid.srcObject = e.streams[0];
     document.getElementById("floatingCallStatus").textContent = "● Connected";
+    // Open the video overlay
+    document.getElementById("callVideoOverlay")?.classList.add("open");
   };
 
   pc.onconnectionstatechange = () => {
@@ -2220,6 +2277,11 @@ async function forceEndCall() {
 
   // Remove remote video elements
   document.querySelectorAll("[id^='callvid-']").forEach(el => el.remove());
+
+  // Close video overlay and clean up
+  document.getElementById("callVideoOverlay")?.classList.remove("open");
+  const remoteVid = document.getElementById("callRemoteVideo"); if (remoteVid) remoteVid.srcObject = null;
+  const localVid = document.getElementById("callLocalVideo"); if (localVid) localVid.srcObject = null;
 
   hideFloatingCallBar();
 
@@ -2297,6 +2359,19 @@ document.getElementById("fcScreenBtn").addEventListener("click", async () => {
 });
 
 document.getElementById("fcLeaveBtn").addEventListener("click", endCall);
+
+// ── Video Call Overlay controls ──
+document.getElementById("fcExpandBtn")?.addEventListener("click", () => {
+  document.getElementById("callVideoOverlay")?.classList.add("open");
+  showCallLocalVideo();
+});
+document.getElementById("callOverlayMinimize")?.addEventListener("click", () => {
+  document.getElementById("callVideoOverlay")?.classList.remove("open");
+});
+document.getElementById("coMuteBtn")?.addEventListener("click", () => document.getElementById("fcMuteBtn")?.click());
+document.getElementById("coCamBtn")?.addEventListener("click", () => document.getElementById("fcCamBtn")?.click());
+document.getElementById("coScreenBtn")?.addEventListener("click", () => document.getElementById("fcScreenBtn")?.click());
+document.getElementById("coLeaveBtn")?.addEventListener("click", () => { document.getElementById("callVideoOverlay")?.classList.remove("open"); endCall(); });
 
 // ── Hook call signalling into WS ──────────────────────────────
 function setupCallSignalling() {

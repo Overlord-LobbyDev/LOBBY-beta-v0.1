@@ -973,6 +973,21 @@ app.post("/groups/:id/messages", requireAuth, async (req, res) => {
   res.json(r.rows[0]);
 });
 
+app.delete("/groups/:id/messages/:msgId", requireAuth, async (req, res) => {
+  try {
+    // Allow message author or group owner to delete
+    const msg = await pool.query("SELECT user_id FROM group_messages WHERE id = $1 AND group_id = $2", [req.params.msgId, req.params.id]);
+    if (!msg.rows[0]) return res.status(404).json({ error: "Message not found" });
+    const group = await pool.query("SELECT owner_id FROM group_chats WHERE id = $1", [req.params.id]);
+    if (msg.rows[0].user_id !== req.userId && group.rows[0]?.owner_id !== req.userId) {
+      return res.status(403).json({ error: "Not authorized" });
+    }
+    await pool.query("DELETE FROM attachments WHERE group_msg_id = $1", [req.params.msgId]);
+    await pool.query("DELETE FROM group_messages WHERE id = $1", [req.params.msgId]);
+    res.json({ success: true });
+  } catch(err) { console.error("[DELETE group msg]", err.message); res.status(500).json({ error: "Server error" }); }
+});
+
 // ── Social Feed ──────────────────────────────────────────────
 
 const postImageUpload = multer({
