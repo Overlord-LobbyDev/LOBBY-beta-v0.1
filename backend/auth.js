@@ -817,10 +817,10 @@ app.post("/upload", requireAuth, (req, res) => {
 });
 
 app.post("/attachments", requireAuth, async (req, res) => {
-  const { messageId, dmId, url, filename, mimeType, sizeBytes } = req.body;
+  const { messageId, dmId, groupMsgId, url, filename, mimeType, sizeBytes } = req.body;
   const r = await pool.query(
-    "INSERT INTO attachments (message_id, dm_id, url, filename, mime_type, size_bytes) VALUES ($1,$2,$3,$4,$5,$6) RETURNING *",
-    [messageId || null, dmId || null, url, filename, mimeType, sizeBytes]
+    "INSERT INTO attachments (message_id, dm_id, group_msg_id, url, filename, mime_type, size_bytes) VALUES ($1,$2,$3,$4,$5,$6,$7) RETURNING *",
+    [messageId || null, dmId || null, groupMsgId || null, url, filename, mimeType, sizeBytes]
   );
   res.json(r.rows[0]);
 });

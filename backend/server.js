@@ -273,6 +273,15 @@ wss.on("connection", (ws, req) => {
       return;
     }
 
+    // ── Group call: WebRTC signalling ──────────────────────
+    if (["group-offer","group-answer","group-candidate"].includes(msg.type)) {
+      const target = clients.get(msg.to);
+      if (target?.ws.readyState === 1) {
+        target.ws.send(JSON.stringify({ ...msg, from: user.peerId }));
+      }
+      return;
+    }
+
     // ── Group chat message ───────────────────────────────
     if (msg.type === "group-message") {
       for (const [id, client] of clients) {
