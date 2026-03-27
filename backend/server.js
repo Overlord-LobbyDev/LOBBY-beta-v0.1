@@ -75,8 +75,9 @@ wss.on("connection", (ws, req) => {
     ws,
     ...user,
     subscribedChannels: new Set(),
-    vcChannelId: null,   // voice channel this client is currently in
-    vcServerId: null,    // server the voice channel belongs to
+    vcChannelId: null,
+    vcServerId: null,
+    groupCallId: null,
     presenceStatus: "online"
   });
   console.log(`[+] ${user.username} connected — total: ${clients.size}`);
@@ -246,14 +247,26 @@ wss.on("connection", (ws, req) => {
 
     // ── Group call: join/leave ────────────────────────────
     if (msg.type === "group-call-join") {
-      for (const [id, client] of clients) {
-        if (id !== user.peerId && client.ws.readyState === 1) {
-          client.ws.send(JSON.stringify({
+      const groupChannelId = `group-${msg.groupId}`;
+      const joinerClient = clients.get(user.peerId);
+      if (joinerClient) joinerClient.groupCallId = msg.groupId;
+
+      // Tell the joiner who is already in the call
+      const existingPeers = [...clients.values()]
+        .filter(c => c.groupCallId === msg.groupId && c.peerId !== user.peerId)
+        .map(c => ({ peerId: c.peerId, userId: c.userId, username: c.username, avatarUrl: c.avatarUrl || null }));
+      ws.send(JSON.stringify({ type: "group-call-peers", groupId: msg.groupId, peers: existingPeers }));
+
+      // Notify only members of this group (subscribed to its channel)
+      for (const [id, c] of clients) {
+        if (id !== user.peerId && c.subscribedChannels.has(groupChannelId) && c.ws.readyState === 1) {
+          c.ws.send(JSON.stringify({
             type: "group-call-join",
             groupId: msg.groupId,
             peerId: user.peerId,
+            userId: user.userId,
             username: user.username,
-            avatarUrl: user.avatarUrl
+            avatarUrl: user.avatarUrl || null
           }));
         }
       }
@@ -261,12 +274,17 @@ wss.on("connection", (ws, req) => {
     }
 
     if (msg.type === "group-call-leave") {
-      for (const [id, client] of clients) {
-        if (id !== user.peerId && client.ws.readyState === 1) {
-          client.ws.send(JSON.stringify({
+      const leavingClient = clients.get(user.peerId);
+      if (leavingClient) leavingClient.groupCallId = null;
+
+      const groupChannelId = `group-${msg.groupId}`;
+      for (const [id, c] of clients) {
+        if (id !== user.peerId && c.subscribedChannels.has(groupChannelId) && c.ws.readyState === 1) {
+          c.ws.send(JSON.stringify({
             type: "group-call-leave",
             groupId: msg.groupId,
-            peerId: user.peerId
+            peerId: user.peerId,
+            userId: user.userId
           }));
         }
       }
@@ -387,15 +405,28 @@ wss.on("connection", (ws, req) => {
   });
 
   ws.on("close", () => {
-    // If the user was in a voice channel, notify others before removing
     const client = clients.get(user.peerId);
+
+    // Notify VC members if user was in a voice channel
     if (client?.vcChannelId) {
       const channelId = client.vcChannelId;
       for (const [id, c] of clients) {
         if (id !== user.peerId && c.ws.readyState === 1) {
+          c.ws.send(JSON.stringify({ type: "vc-left", channelId, userId: user.userId }));
+        }
+      }
+    }
+
+    // Notify group call members if user was in a group call
+    if (client?.groupCallId) {
+      const groupId = client.groupCallId;
+      const groupChannelId = `group-${groupId}`;
+      for (const [id, c] of clients) {
+        if (id !== user.peerId && c.subscribedChannels.has(groupChannelId) && c.ws.readyState === 1) {
           c.ws.send(JSON.stringify({
-            type: "vc-left",
-            channelId: channelId,
+            type: "group-call-leave",
+            groupId,
+            peerId: user.peerId,
             userId: user.userId
           }));
         }

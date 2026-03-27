@@ -1,4 +1,4 @@
-     <!DOCTYPE html>
+<!DOCTYPE html>
 <html lang="en">
 <head>
   <meta charset="UTF-8" />
@@ -384,15 +384,7 @@
       localStorage.setItem("vh_token", data.token);
       sessionStorage.setItem("vh_token", data.token);
       
-      // DEBUG: Log what was saved
-      console.log("✅ Token saved to BOTH localStorage and sessionStorage");
-      console.log("Token value:", data.token);
-      console.log("localStorage retrieved:", localStorage.getItem("vh_token"));
-
-      // Small delay to ensure token is saved before redirect
-      setTimeout(() => {
-        launchApp(data.token, data.user.isAdmin);
-      }, 100);
+      launchApp(data.token, data.user.isAdmin);
     } catch {
       showMsg("loginMsg", "Could not reach auth server. Is it running?", "error");
       btn.disabled = false;
@@ -455,7 +447,7 @@
   // ── Launch app (admin → admin panel, user → main app) ──────
   function launchApp(token, isAdmin) {
     localStorage.setItem("vh_token", token);
-    window.location.href = isAdmin ? "admin.html" : "index.html";
+    smoothNavigate(isAdmin ? "admin.html" : "index.html", "up");
   }
 </script>
 </body>

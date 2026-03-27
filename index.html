@@ -2592,7 +2592,7 @@
         <input id="globalSearchInput" placeholder="Search users and lobbies…" autocomplete="off"
           oninput="onGlobalSearch(this.value)"
           onfocus="if(this.value.trim())document.getElementById('globalSearchResults').classList.add('open')" />
-        <span id="gsearchKbd">Ctrl+K</span>
+        <span id="gsearchKbd">⌘K</span>
         <div id="globalSearchResults"></div>
       </div>
     </div>
@@ -5498,8 +5498,17 @@ async function handleGroupCallWS({ data }) {
     return;
   }
   if (msg.type==="group-offer") await handleGroupOffer(msg);
-  if (msg.type==="group-answer") await groupCallPeers[msg.from]?.setRemoteDescription(msg.answer);
-  if (msg.type==="group-candidate") await groupCallPeers[msg.from]?.addIceCandidate(new RTCIceCandidate(msg.candidate)).catch(()=>{});
+  if (msg.type==="group-answer") { await groupCallPeers[msg.from]?.setRemoteDescription(msg.answer); await drainGroupCandidates(msg.from); }
+  if (msg.type==="group-candidate") {
+    const pc = groupCallPeers[msg.from];
+    if (pc && pc.remoteDescription && pc.remoteDescription.type) {
+      await pc.addIceCandidate(new RTCIceCandidate(msg.candidate)).catch(() => {});
+    } else {
+      if (!_groupCandidateQueue[msg.from]) _groupCandidateQueue[msg.from] = [];
+      _groupCandidateQueue[msg.from].push(msg.candidate);
+    }
+    return;
+  }
   if (msg.type==="group-call-leave") {
     const leavePeerId = msg.peerId || `u${msg.userId}`;
     groupCallPeers[leavePeerId]?.close(); delete groupCallPeers[leavePeerId];
@@ -5512,13 +5521,20 @@ async function handleGroupCallWS({ data }) {
 function peerUserIdFromPeerId(peerId) { return peerId.startsWith("u") ? parseInt(peerId.slice(1)) : null; }
 
 function createGroupPeerConnection(peerId) {
-  const pc = new RTCPeerConnection({ iceServers:[{ urls:"stun:stun.l.google.com:19302" }] });
+  const pc = new RTCPeerConnection({ iceServers:[
+    { urls:"stun:stun.l.google.com:19302" },
+    { urls:"stun:stun1.l.google.com:19302" }
+  ]});
   groupCallPeers[peerId] = pc;
-  // Add all local tracks
-  groupLocalStream?.getTracks().forEach(t => pc.addTrack(t, groupLocalStream));
-  // Ensure a video transceiver exists even for audio-only joins (for later screenshare)
-  const hasVideoSender = pc.getSenders().some(s => s.track?.kind === "video");
-  if (!hasVideoSender) {
+  _groupCandidateQueue[peerId] = [];
+  // Add audio tracks
+  groupLocalStream?.getAudioTracks().forEach(t => pc.addTrack(t, groupLocalStream));
+  // Add active video track (cam or screen) so late joiners see it immediately
+  const activeVideoStream = groupScreenStream || groupCamStream;
+  if (activeVideoStream) {
+    activeVideoStream.getVideoTracks().forEach(t => pc.addTrack(t, activeVideoStream));
+  } else {
+    // No video yet — add sendrecv transceiver so we can replaceTrack later
     pc.addTransceiver("video", { direction: "sendrecv" });
   }
   pc.onicecandidate = ({ candidate }) => { if (candidate) wsSend({ type:"group-candidate", candidate, to:peerId, groupId:selectedGroupId }); };
@@ -5533,10 +5549,17 @@ function createGroupPeerConnection(peerId) {
       if (!vid) { tile.innerHTML = `<video id="callvideo-${uid}" autoplay playsinline></video><div class="tile-name">${tileName}</div>`; vid = tile.querySelector("video"); }
       vid.srcObject = e.streams[0];
     } else if (e.track.kind === "audio") {
-      // Create a hidden audio element for remote audio
+      // Append to body — NOT the tile, so it survives tile re-renders
       let audioEl = document.getElementById(`callaudio-${uid}`);
-      if (!audioEl) { audioEl = document.createElement("audio"); audioEl.id = `callaudio-${uid}`; audioEl.autoplay = true; tile.appendChild(audioEl); }
-      audioEl.srcObject = e.streams[0];
+      if (!audioEl) {
+        audioEl = document.createElement("audio");
+        audioEl.id = `callaudio-${uid}`;
+        audioEl.autoplay = true;
+        audioEl.style.display = "none";
+        document.body.appendChild(audioEl);
+      }
+      audioEl.srcObject = e.streams[0] || new MediaStream([e.track]);
+      audioEl.play().catch(() => {});
     }
   };
   // Handle renegotiation (e.g. when screenshare starts)
@@ -5941,6 +5964,15 @@ let vcStream = null;
 let vcScreenStream = null;    // active screenshare stream (self)
 let vcCamStream = null;       // active camera stream (self)
 let vcPeers = {};             // peerId → RTCPeerConnection
+const _vcCandidateQueue = {}; // peerId → queued ICE candidates before remote description
+
+async function drainVcCandidates(peerId) {
+  const queue = _vcCandidateQueue[peerId] || [];
+  _vcCandidateQueue[peerId] = [];
+  for (const c of queue) {
+    await vcPeers[peerId]?.addIceCandidate(new RTCIceCandidate(c)).catch(() => {});
+  }
+}
 let vcVideoStreams = {};      // peerId → MediaStream (remote video)
 let vcChannelMembers = {};    // channelId → [{userId,username,avatarUrl,muted}]
 
@@ -6345,6 +6377,7 @@ function findVideoSender(pc) {
 function createVcPeerConnection(peerId) {
   const pc = new RTCPeerConnection({ iceServers:[{ urls:"stun:stun.l.google.com:19302" }] });
   vcPeers[peerId] = pc;
+  _vcCandidateQueue[peerId] = [];
   // Add audio tracks from vcStream
   if (vcStream) vcStream.getAudioTracks().forEach(t => pc.addTrack(t, vcStream));
   // Add video track if cam or screen is already active, otherwise sendrecv transceiver
@@ -6459,6 +6492,7 @@ function setupVcSignalling() {
         await pc.setLocalDescription({ type: "rollback" });
       }
       await pc.setRemoteDescription(msg.offer);
+      await drainVcCandidates(msg.from);
       const answer = await pc.createAnswer();
       await pc.setLocalDescription(answer);
       wsSend({ type:"vc-answer", answer:pc.localDescription, to:msg.from, channelId:vcChannelId });
@@ -6466,10 +6500,17 @@ function setupVcSignalling() {
     }
     if (msg.type === "vc-answer") {
       await vcPeers[msg.from]?.setRemoteDescription(msg.answer);
+      await drainVcCandidates(msg.from);
       return;
     }
     if (msg.type === "vc-candidate") {
-      await vcPeers[msg.from]?.addIceCandidate(new RTCIceCandidate(msg.candidate)).catch(()=>{});
+      const pc = vcPeers[msg.from];
+      if (pc && pc.remoteDescription && pc.remoteDescription.type) {
+        await pc.addIceCandidate(new RTCIceCandidate(msg.candidate)).catch(() => {});
+      } else {
+        if (!_vcCandidateQueue[msg.from]) _vcCandidateQueue[msg.from] = [];
+        _vcCandidateQueue[msg.from].push(msg.candidate);
+      }
       return;
     }
 

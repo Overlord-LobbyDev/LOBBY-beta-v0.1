@@ -1,7 +1,7 @@
 {
   "name": "lobby",
-  "version": "1.2.1",
-  "description": "LOBBY — Your Gaming Social Hub",
+  "version": "1.2.2",
+  "description": "LOBBY \u2014 Your Gaming Social Hub",
   "main": "main.js",
   "scripts": {
     "start": "electron .",
@@ -15,14 +15,18 @@
     "icon": "icon.ico",
     "win": {
       "icon": "icon.ico",
-      "target": "nsis"
+      "target": "nsis",
+      "requestedExecutionLevel": "asInvoker"
     },
     "nsis": {
       "oneClick": false,
       "allowToChangeInstallationDirectory": true,
       "createDesktopShortcut": true,
       "createStartMenuShortcut": true,
-      "shortcutName": "LOBBY"
+      "shortcutName": "LOBBY",
+      "deleteAppDataOnUninstall": false,
+      "perMachine": false,
+      "uninstallDisplayName": "LOBBY"
     }
   },
   "dependencies": {

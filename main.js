@@ -245,15 +245,29 @@ ipcMain.handle("download-update", async (event, downloadUrl, fileName) => {
 
         fileStream.on("finish", () => {
           fileStream.close(() => {
-            // Launch the installer and quit the app
             try {
-              execFile(filePath, { detached: true, stdio: "ignore" }).unref();
-              setTimeout(() => app.quit(), 1500);
+              // Get the current install directory so the silent installer
+              // reinstalls to the same location without prompting
+              const installDir = path.dirname(path.dirname(app.getPath("exe")));
+
+              // /S = silent mode (no UI, auto-uninstalls old version)
+              // /D = install directory (must be last arg for NSIS)
+              const args = ["/S", `/D=${installDir}`];
+
+              const child = require("child_process").spawn(filePath, args, {
+                detached: true,
+                stdio: "ignore",
+                windowsHide: false,
+              });
+              child.unref();
+
+              // Give the installer a moment to start, then quit
+              setTimeout(() => app.quit(), 2000);
               resolve({ success: true });
             } catch(e) {
-              // Fallback: open the file with the OS
+              // Fallback: launch installer normally if silent mode fails
               shell.openPath(filePath).then(() => {
-                setTimeout(() => app.quit(), 1500);
+                setTimeout(() => app.quit(), 2000);
                 resolve({ success: true });
               }).catch(err => {
                 resolve({ success: false, error: err.message });
