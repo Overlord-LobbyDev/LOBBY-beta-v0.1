@@ -3642,19 +3642,25 @@ const LobbySound = (() => {
 
   // Pre-load all sounds
   for (const [key, src] of Object.entries(soundFiles)) {
-    const audio = new Audio(src);
-    audio.preload = "auto";
-    audio.volume = volume;
-    sounds[key] = audio;
+    try {
+      const audio = new Audio(src);
+      audio.preload = "auto";
+      audio.volume = volume;
+      audio.addEventListener("error", (e) => console.warn(`[Sound] Failed to load ${src}:`, e.message || e));
+      sounds[key] = audio;
+    } catch(e) { console.warn(`[Sound] Could not create audio for ${src}:`, e); }
   }
 
   function play(name) {
     if (muted) return;
     const s = sounds[name];
-    if (!s) return;
-    s.volume = volume;
-    s.currentTime = 0;
-    s.play().catch(() => {});
+    if (!s) { console.warn(`[Sound] Unknown sound: ${name}`); return; }
+    // Clone the audio so overlapping plays work
+    try {
+      const clone = s.cloneNode();
+      clone.volume = volume;
+      clone.play().catch(e => console.warn(`[Sound] Play failed (${name}):`, e.message));
+    } catch(e) { console.warn(`[Sound] Clone/play error (${name}):`, e); }
   }
 
   function loop(name) {
@@ -3664,7 +3670,7 @@ const LobbySound = (() => {
     s.volume = volume;
     s.loop = true;
     s.currentTime = 0;
-    s.play().catch(() => {});
+    s.play().catch(e => console.warn(`[Sound] Loop failed (${name}):`, e.message));
   }
 
   function stop(name) {
@@ -5449,33 +5455,56 @@ async function joinGroupCall(groupId) {
   }
 
   document.getElementById(`callvideo-${me.id}`).srcObject = groupLocalStream;
-  wsSend({ type:"group-call-join", groupId });
+  wsSend({ type:"group-call-join", groupId, peerId:`u${me.id}`, username:me.username, avatarUrl:me.avatar_url||"" });
+  ws.removeEventListener("message", handleGroupCallWS);
   ws.addEventListener("message", handleGroupCallWS);
 }
 
 async function handleGroupCallWS({ data }) {
   const msg = JSON.parse(data);
   if (msg.type==="group-call-join" && msg.groupId===selectedGroupId) {
-    // Add a tile for the remote peer in the call grid
+    const joinPeerId = msg.peerId || `u${msg.userId}`;
+    const uid = msg.userId || peerUserIdFromPeerId(msg.peerId);
+    if (!uid || joinPeerId === `u${me.id}`) return; // ignore own echo
     const grid = document.getElementById("callGrid");
-    if (grid && !document.getElementById(`calltile-${peerUserIdFromPeerId(msg.peerId)}`)) {
-      const uid = peerUserIdFromPeerId(msg.peerId);
+    if (grid && !document.getElementById(`calltile-${uid}`)) {
       const tile = document.createElement("div");
       tile.className = "call-tile";
       tile.id = `calltile-${uid}`;
       tile.style.cssText = "width:120px;height:100px;border-radius:8px;overflow:hidden;background:var(--bg-2);display:flex;flex-direction:column;align-items:center;justify-content:center;position:relative";
-      tile.innerHTML = `<div class="tile-avatar-placeholder" style="width:48px;height:48px;border-radius:50%;background:var(--bg-3);display:flex;align-items:center;justify-content:center;font-size:18px;color:var(--text-2)">${(msg.username||"?").slice(0,1).toUpperCase()}</div>
-        <div class="tile-name" style="position:absolute;bottom:4px;font-size:11px;color:#fff;text-shadow:0 1px 3px rgba(0,0,0,.6)">${msg.username||"Peer"}</div>`;
+      const av = msg.avatarUrl ? `<img src="${msg.avatarUrl}" style="width:100%;height:100%;object-fit:cover"/>` : `<div class="tile-avatar-placeholder" style="width:48px;height:48px;border-radius:50%;background:var(--bg-3);display:flex;align-items:center;justify-content:center;font-size:18px;color:var(--text-2)">${(msg.username||"?").slice(0,1).toUpperCase()}</div>`;
+      tile.innerHTML = `${av}<div class="tile-name" style="position:absolute;bottom:4px;font-size:11px;color:#fff;text-shadow:0 1px 3px rgba(0,0,0,.6)">${msg.username||"Peer"}</div>`;
       grid.appendChild(tile);
     }
-    await createGroupOffer(msg.peerId);
+    await createGroupOffer(joinPeerId);
+  }
+  if (msg.type==="group-call-peers" && msg.groupId===selectedGroupId) {
+    // Server told us who's already in the call — create tiles and send them offers
+    for (const peer of (msg.peers || [])) {
+      if (!peer.peerId || peer.peerId === `u${me.id}`) continue;
+      const uid = peer.userId || peerUserIdFromPeerId(peer.peerId);
+      const grid = document.getElementById("callGrid");
+      if (grid && uid && !document.getElementById(`calltile-${uid}`)) {
+        const tile = document.createElement("div");
+        tile.className = "call-tile";
+        tile.id = `calltile-${uid}`;
+        tile.style.cssText = "width:120px;height:100px;border-radius:8px;overflow:hidden;background:var(--bg-2);display:flex;flex-direction:column;align-items:center;justify-content:center;position:relative";
+        const av = peer.avatarUrl ? `<img src="${peer.avatarUrl}" style="width:100%;height:100%;object-fit:cover"/>` : `<div class="tile-avatar-placeholder" style="width:48px;height:48px;border-radius:50%;background:var(--bg-3);display:flex;align-items:center;justify-content:center;font-size:18px;color:var(--text-2)">${(peer.username||"?").slice(0,1).toUpperCase()}</div>`;
+        tile.innerHTML = `${av}<div class="tile-name" style="position:absolute;bottom:4px;font-size:11px;color:#fff;text-shadow:0 1px 3px rgba(0,0,0,.6)">${peer.username||"Peer"}</div>`;
+        grid.appendChild(tile);
+      }
+      await createGroupOffer(peer.peerId);
+    }
+    return;
   }
   if (msg.type==="group-offer") await handleGroupOffer(msg);
   if (msg.type==="group-answer") await groupCallPeers[msg.from]?.setRemoteDescription(msg.answer);
   if (msg.type==="group-candidate") await groupCallPeers[msg.from]?.addIceCandidate(new RTCIceCandidate(msg.candidate)).catch(()=>{});
   if (msg.type==="group-call-leave") {
-    groupCallPeers[msg.peerId]?.close(); delete groupCallPeers[msg.peerId];
-    const tile = document.getElementById(`calltile-${peerUserIdFromPeerId(msg.peerId)}`);
+    const leavePeerId = msg.peerId || `u${msg.userId}`;
+    groupCallPeers[leavePeerId]?.close(); delete groupCallPeers[leavePeerId];
+    const leaveUid = msg.userId || peerUserIdFromPeerId(msg.peerId);
+    const tile = document.getElementById(`calltile-${leaveUid}`);
     if (tile) tile.remove();
   }
 }
@@ -5492,7 +5521,7 @@ function createGroupPeerConnection(peerId) {
   if (!hasVideoSender) {
     pc.addTransceiver("video", { direction: "sendrecv" });
   }
-  pc.onicecandidate = ({ candidate }) => { if (candidate) wsSend({ type:"group-candidate", candidate, to:peerId }); };
+  pc.onicecandidate = ({ candidate }) => { if (candidate) wsSend({ type:"group-candidate", candidate, to:peerId, groupId:selectedGroupId }); };
   pc.ontrack = e => {
     const uid = peerUserIdFromPeerId(peerId);
     const tile = document.getElementById(`calltile-${uid}`);
@@ -5532,6 +5561,19 @@ async function createGroupOffer(peerId) {
 }
 
 async function handleGroupOffer(msg) {
+  // Ensure a tile exists for this peer
+  const uid = msg.userId || peerUserIdFromPeerId(msg.from);
+  if (uid) {
+    const grid = document.getElementById("callGrid");
+    if (grid && !document.getElementById(`calltile-${uid}`)) {
+      const tile = document.createElement("div");
+      tile.className = "call-tile";
+      tile.id = `calltile-${uid}`;
+      tile.style.cssText = "width:120px;height:100px;border-radius:8px;overflow:hidden;background:var(--bg-2);display:flex;flex-direction:column;align-items:center;justify-content:center;position:relative";
+      tile.innerHTML = `<div class="tile-avatar-placeholder" style="width:48px;height:48px;border-radius:50%;background:var(--bg-3);display:flex;align-items:center;justify-content:center;font-size:18px;color:var(--text-2)">${(msg.fromUsername||"?").slice(0,1).toUpperCase()}</div><div class="tile-name" style="position:absolute;bottom:4px;font-size:11px;color:#fff;text-shadow:0 1px 3px rgba(0,0,0,.6)">${msg.fromUsername||"Peer"}</div>`;
+      grid.appendChild(tile);
+    }
+  }
   // Support renegotiation — reuse existing peer connection if one exists
   let pc = groupCallPeers[msg.from];
   if (!pc) {
@@ -5539,7 +5581,7 @@ async function handleGroupOffer(msg) {
   }
   await pc.setRemoteDescription(msg.offer);
   const answer = await pc.createAnswer(); await pc.setLocalDescription(answer);
-  wsSend({ type:"group-answer", answer:pc.localDescription, to:msg.from });
+  wsSend({ type:"group-answer", answer:pc.localDescription, to:msg.from, groupId:selectedGroupId });
 }
 
 function toggleGroupMute() {
@@ -5701,9 +5743,9 @@ function hideFriendContextMenu() {
 document.addEventListener("click", hideFriendContextMenu);
 document.addEventListener("contextmenu", e => { if (!e.target.closest(".dm-item")) hideFriendContextMenu(); });
 
-document.getElementById("ctxCall").addEventListener("click", async () => { if (!ctxUserId) return; const uid=ctxUserId, uname=ctxUsername; hideFriendContextMenu(); await startDirectCall(uid, uname); });
-document.getElementById("ctxSendMessage").addEventListener("click", async () => { if (ctxUserId && ctxUsername) { hideFriendContextMenu(); await showDMPanel(); openDM(ctxUserId, ctxUsername, ""); } else { hideFriendContextMenu(); } });
-document.getElementById("ctxViewProfile").addEventListener("click", () => { if (ctxUserId) openProfile(ctxUserId); hideFriendContextMenu(); });
+document.getElementById("ctxCall").addEventListener("click", async (e) => { e.stopPropagation(); const uid=ctxUserId, uname=ctxUsername; hideFriendContextMenu(); if (uid && uname) await startDirectCall(uid, uname); });
+document.getElementById("ctxSendMessage").addEventListener("click", async (e) => { e.stopPropagation(); const uid=ctxUserId, uname=ctxUsername; hideFriendContextMenu(); if (uid && uname) { showChatPanel(); await showDMPanel(); await openDM(uid, uname, ""); } });
+document.getElementById("ctxViewProfile").addEventListener("click", (e) => { e.stopPropagation(); const uid=ctxUserId; hideFriendContextMenu(); if (uid) openProfile(uid); });
 document.getElementById("ctxRemoveFriend").addEventListener("click", async () => {
   if (!ctxFriendId) return;
   if (!confirm(`Remove ${ctxUsername} as a friend?`)) { hideFriendContextMenu(); return; }
@@ -6226,7 +6268,7 @@ async function joinVoiceChannel(channelId, channelName) {
   vcServer = selectedServer;    // remember which server this VC belongs to
 
   // Tell backend we joined
-  wsSend({ type:"vc-join", channelId, username: me.username, avatarUrl: me.avatarUrl || null });
+  wsSend({ type:"vc-join", channelId, userId: me.id, username: me.username, avatarUrl: me.avatarUrl || null });
 
   // Add ourselves to local member list
   if (!vcChannelMembers[channelId]) vcChannelMembers[channelId] = [];
@@ -11868,6 +11910,7 @@ setTimeout(() => { updateMyStatusUI(); }, 100);
       <button class="sp-nav-btn" data-sp="steam">🎮 Steam</button>
       <div class="sp-nav-label" style="margin-top:10px">App Settings</div>
       <button class="sp-nav-btn" data-sp="audiovideo">🎙 Audio & Video</button>
+      <button class="sp-nav-btn" data-sp="sounds">🔔 Sounds</button>
       <button class="sp-nav-btn" data-sp="updates">🔄 Updates</button>
     </nav>
 
@@ -12127,6 +12170,47 @@ setTimeout(() => { updateMyStatusUI(); }, 100);
         </div>
         <button class="sp-save-btn" id="spSaveAV">Save Audio & Video</button>
         <div class="sp-msg" id="spAVMsg"></div>
+      </div>
+
+      <!-- ── Sounds ── -->
+      <div class="sp-section" id="sp-sounds">
+        <h2>Sounds</h2>
+        <p style="color:var(--text-2);font-size:13px;margin-bottom:20px">Control notification and UI sound effects.</p>
+
+        <div class="sp-form-group">
+          <label class="sp-label" style="display:flex;align-items:center;justify-content:space-between;">
+            Enable Sounds
+            <label style="position:relative;display:inline-block;width:44px;height:24px;cursor:pointer;margin:0">
+              <input type="checkbox" id="spSoundEnabled" style="opacity:0;width:0;height:0;position:absolute"
+                onchange="LobbySound.toggleMute();this.checked=!LobbySound.muted;document.getElementById('spSoundStatus').textContent=LobbySound.muted?'Off':'On'">
+              <span style="position:absolute;inset:0;background:var(--bg-3);border-radius:24px;transition:background .2s"></span>
+              <span id="spSoundToggleKnob" style="position:absolute;top:3px;left:3px;width:18px;height:18px;background:#fff;border-radius:50%;transition:transform .2s;pointer-events:none"></span>
+            </label>
+          </label>
+          <span id="spSoundStatus" style="font-size:12px;color:var(--text-3)">On</span>
+        </div>
+
+        <div class="sp-form-group">
+          <label class="sp-label">Sound Volume <span id="spSoundVolLabel" style="color:var(--text-2);font-weight:400;text-transform:none;letter-spacing:0;font-size:12px">50%</span></label>
+          <div class="sp-volume-row">
+            <span class="sp-volume-icon">🔇</span>
+            <div class="sp-volume-wrap"><input type="range" class="sp-slider" id="spSoundVol" min="0" max="100" value="50" /></div>
+            <span class="sp-volume-icon">🔊</span>
+          </div>
+        </div>
+
+        <div style="margin-top:20px;display:flex;flex-direction:column;gap:8px">
+          <label class="sp-label">Test Sounds</label>
+          <div style="display:flex;flex-wrap:wrap;gap:8px">
+            <button class="sp-save-btn" style="padding:6px 14px;font-size:12px;margin:0" onclick="LobbySound.play('messageSent')">Message Sent</button>
+            <button class="sp-save-btn" style="padding:6px 14px;font-size:12px;margin:0" onclick="LobbySound.play('messageReceived')">Message Received</button>
+            <button class="sp-save-btn" style="padding:6px 14px;font-size:12px;margin:0" onclick="LobbySound.play('notification')">Notification</button>
+            <button class="sp-save-btn" style="padding:6px 14px;font-size:12px;margin:0" onclick="LobbySound.play('vcJoin')">VC Join</button>
+            <button class="sp-save-btn" style="padding:6px 14px;font-size:12px;margin:0" onclick="LobbySound.play('vcLeave')">VC Leave</button>
+            <button class="sp-save-btn" style="padding:6px 14px;font-size:12px;margin:0" onclick="LobbySound.play('callIncoming')">Incoming Ring</button>
+            <button class="sp-save-btn" style="padding:6px 14px;font-size:12px;margin:0" onclick="LobbySound.stop('callIncoming');LobbySound.stop('callOutgoing')">Stop Ringing</button>
+          </div>
+        </div>
       </div>
 
       <!-- ── Updates ── -->
@@ -12531,6 +12615,40 @@ setTimeout(() => { updateMyStatusUI(); }, 100);
     updateSliderFill(inSlider); updateSliderFill(outSlider);
     inSlider.oninput  = () => { document.getElementById("spInputVolLabel").textContent  = `${inSlider.value}%`;  updateSliderFill(inSlider); };
     outSlider.oninput = () => { document.getElementById("spOutputVolLabel").textContent = `${outSlider.value}%`; updateSliderFill(outSlider); };
+
+    // ── Sound settings init ──
+    const soundVol = Math.round(LobbySound.volume * 100);
+    const soundSlider = document.getElementById("spSoundVol");
+    const soundToggle = document.getElementById("spSoundEnabled");
+    const soundKnob = document.getElementById("spSoundToggleKnob");
+    if (soundSlider) {
+      soundSlider.value = soundVol;
+      document.getElementById("spSoundVolLabel").textContent = `${soundVol}%`;
+      updateSliderFill(soundSlider);
+      soundSlider.oninput = () => {
+        const v = parseInt(soundSlider.value);
+        document.getElementById("spSoundVolLabel").textContent = `${v}%`;
+        LobbySound.setVolume(v / 100);
+        updateSliderFill(soundSlider);
+      };
+    }
+    if (soundToggle) {
+      soundToggle.checked = !LobbySound.muted;
+      document.getElementById("spSoundStatus").textContent = LobbySound.muted ? "Off" : "On";
+      if (soundKnob) {
+        soundKnob.style.transform = LobbySound.muted ? "translateX(0)" : "translateX(20px)";
+        soundKnob.parentElement.querySelector("span").style.background = LobbySound.muted ? "var(--bg-3)" : "var(--accent)";
+      }
+      soundToggle.onchange = () => {
+        LobbySound.toggleMute();
+        soundToggle.checked = !LobbySound.muted;
+        document.getElementById("spSoundStatus").textContent = LobbySound.muted ? "Off" : "On";
+        if (soundKnob) {
+          soundKnob.style.transform = LobbySound.muted ? "translateX(0)" : "translateX(20px)";
+          soundKnob.parentElement.querySelector("span").style.background = LobbySound.muted ? "var(--bg-3)" : "var(--accent)";
+        }
+      };
+    }
   }
 
   function populateSel(id, devices, saved) {

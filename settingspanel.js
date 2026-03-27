@@ -46,6 +46,7 @@
       <button class="sp-nav-btn" data-sp="security">🔒 Password</button>
       <div class="sp-nav-label" style="margin-top:10px">App Settings</div>
       <button class="sp-nav-btn" data-sp="audiovideo">🎙 Audio & Video</button>
+      <button class="sp-nav-btn" data-sp="about">ℹ️ About & Updates</button>
     </nav>
 
     <div class="sp-content">
@@ -252,6 +253,48 @@
         <div class="sp-msg" id="spAVMsg"></div>
       </div>
 
+
+      <!-- ── About & Updates ── -->
+      <div class="sp-section" id="sp-about">
+        <h2>About & Updates</h2>
+
+        <div style="display:flex;align-items:center;gap:16px;margin-bottom:24px;padding:16px;background:var(--bg-1);border-radius:12px;border:1px solid rgba(255,255,255,.06)">
+          <div style="width:52px;height:52px;border-radius:12px;background:var(--accent);display:flex;align-items:center;justify-content:center;flex-shrink:0">
+            <svg width="28" height="28" viewBox="0 0 48 48" xmlns="http://www.w3.org/2000/svg"><rect x="14" y="8" width="8" height="32" rx="2" fill="#fff"/><rect x="14" y="32" width="22" height="8" rx="2" fill="#fff"/></svg>
+          </div>
+          <div>
+            <div style="font-size:16px;font-weight:800">LOBBY</div>
+            <div style="font-size:13px;color:var(--text-3)">Your Gaming Social Hub</div>
+            <div style="font-size:12px;color:var(--accent);margin-top:3px;font-weight:600" id="spCurrentVersion">Loading…</div>
+          </div>
+        </div>
+
+        <div class="sp-form-group">
+          <div class="sp-label">Update Status</div>
+          <div style="font-size:14px;color:var(--text-2);margin-bottom:12px" id="spUpdateStatus">Click below to check for updates</div>
+          <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center">
+            <button class="sp-save-btn" id="spCheckUpdateBtn" style="margin-top:0">🔍 Check for Updates</button>
+            <button id="spDownloadBtn" style="display:none;margin-top:0;padding:10px 20px;background:var(--green);color:#fff;border:none;border-radius:8px;font-size:14px;font-weight:700;font-family:inherit;cursor:pointer">⬇️ Download & Install</button>
+          </div>
+          <div id="spUpdateProgressWrap" style="display:none;margin-top:12px">
+            <div style="display:flex;justify-content:space-between;font-size:12px;color:var(--text-3);margin-bottom:4px">
+              <span>Downloading…</span><span id="spUpdateProgressLabel">0%</span>
+            </div>
+            <div style="background:var(--bg-3);border-radius:4px;height:6px;overflow:hidden">
+              <div id="spUpdateProgressBar" style="height:100%;background:var(--accent);border-radius:4px;width:0%;transition:width .3s ease"></div>
+            </div>
+          </div>
+        </div>
+
+        <div style="margin-top:8px;padding:14px;background:var(--bg-1);border-radius:10px;border:1px solid rgba(255,255,255,.06)">
+          <div style="font-size:12px;font-weight:700;text-transform:uppercase;letter-spacing:.6px;color:var(--text-3);margin-bottom:8px">About</div>
+          <div style="font-size:13px;color:var(--text-2);line-height:1.7">
+            LOBBY is a gaming social hub built for gamers.<br>
+            Voice, video, screenshare, groups, lobbies and more.
+          </div>
+        </div>
+      </div>
+
     </div><!-- sp-content -->
   </div><!-- sp-body -->
 </div><!-- settingsDrawer -->`;
@@ -303,6 +346,7 @@
         document.getElementById(`sp-${btn.dataset.sp}`).classList.add("active");
         if (btn.dataset.sp === "audiovideo") loadAVDevices();
         if (btn.dataset.sp === "themes") loadThemeSection();
+        if (btn.dataset.sp === "about") loadAboutSection();
       });
     });
 
@@ -663,6 +707,113 @@
     const el = document.getElementById("composeBanner");
     if (el) { el.style.backgroundImage = "none"; el.style.backgroundColor = "transparent"; el.style.opacity = "0"; }
     spShowMsg("spComposeMsg", "Cleared!", "success");
+  }
+
+  // ── About & Updates section ──────────────────────────────
+  async function loadAboutSection() {
+    const verEl   = document.getElementById("spCurrentVersion");
+    const statusEl = document.getElementById("spUpdateStatus");
+    const checkBtn = document.getElementById("spCheckUpdateBtn");
+    const dlBtn    = document.getElementById("spDownloadBtn");
+    const progressWrap = document.getElementById("spUpdateProgressWrap");
+    const progressBar  = document.getElementById("spUpdateProgressBar");
+    const progressLabel = document.getElementById("spUpdateProgressLabel");
+
+    // Get current version from Electron
+    let currentVersion = "Unknown";
+    try {
+      currentVersion = await window.electronAPI?.getAppVersion() || "Unknown";
+    } catch(e) {}
+    if (verEl) verEl.textContent = currentVersion ? `v${currentVersion}` : "Unknown";
+
+    let latestRelease = null;
+
+    async function checkForUpdates() {
+      statusEl.textContent = "Checking for updates…";
+      statusEl.style.color = "var(--text-3)";
+      checkBtn.disabled = true;
+      checkBtn.textContent = "Checking…";
+      dlBtn.style.display = "none";
+      progressWrap.style.display = "none";
+
+      try {
+        const res = await fetch("https://api.github.com/repos/Overlord-LobbyDev/LOBBY-beta-v0.1/releases/latest", {
+          headers: { "Accept": "application/vnd.github+json", "User-Agent": "LOBBY-App" }
+        });
+        if (!res.ok) throw new Error(`GitHub API error: ${res.status}`);
+        latestRelease = await res.json();
+
+        const latestVersion = latestRelease.tag_name?.replace(/^v/, "") || "0.0.0";
+        const isNewer = compareVersions(latestVersion, currentVersion) > 0;
+
+        if (isNewer) {
+          statusEl.textContent = `✨ Update available: v${latestVersion}`;
+          statusEl.style.color = "var(--green)";
+          // Find the .exe asset
+          const asset = latestRelease.assets?.find(a => a.name.endsWith(".exe") || a.name.endsWith(".dmg") || a.name.endsWith(".AppImage"));
+          if (asset) {
+            dlBtn.style.display = "inline-flex";
+            dlBtn.dataset.url = asset.browser_download_url;
+            dlBtn.dataset.name = asset.name;
+          } else {
+            statusEl.textContent = `✨ v${latestVersion} available — no installer found in release assets`;
+          }
+        } else {
+          statusEl.textContent = "✅ You're up to date!";
+          statusEl.style.color = "var(--green)";
+        }
+      } catch(e) {
+        statusEl.textContent = "⚠️ Could not check for updates. Check your internet connection.";
+        statusEl.style.color = "var(--danger)";
+        console.error("[updater]", e);
+      }
+      checkBtn.disabled = false;
+      checkBtn.textContent = "🔍 Check for Updates";
+    }
+
+    function compareVersions(a, b) {
+      const pa = a.split(".").map(Number);
+      const pb = b.split(".").map(Number);
+      for (let i = 0; i < 3; i++) {
+        if ((pa[i]||0) > (pb[i]||0)) return 1;
+        if ((pa[i]||0) < (pb[i]||0)) return -1;
+      }
+      return 0;
+    }
+
+    if (checkBtn) checkBtn.addEventListener("click", checkForUpdates);
+
+    if (dlBtn) dlBtn.addEventListener("click", async () => {
+      const url  = dlBtn.dataset.url;
+      const name = dlBtn.dataset.name;
+      if (!url || !name) return;
+      dlBtn.disabled = true;
+      dlBtn.textContent = "⬇️ Downloading…";
+      progressWrap.style.display = "block";
+      progressBar.style.width = "0%";
+      progressLabel.textContent = "0%";
+
+      window.electronAPI?.onUpdateProgress(({ percent }) => {
+        const p = Math.round(percent);
+        progressBar.style.width = `${p}%`;
+        progressLabel.textContent = `${p}%`;
+      });
+
+      const result = await window.electronAPI?.downloadUpdate(url, name);
+      if (result?.success) {
+        statusEl.textContent = "✅ Download complete — launching installer…";
+        statusEl.style.color = "var(--green)";
+      } else {
+        statusEl.textContent = `❌ Download failed: ${result?.error || "Unknown error"}`;
+        statusEl.style.color = "var(--danger)";
+        dlBtn.disabled = false;
+        dlBtn.textContent = "⬇️ Download & Install";
+        progressWrap.style.display = "none";
+      }
+    });
+
+    // Auto-check on open
+    checkForUpdates();
   }
 
   const spMsgTimers = {};
