@@ -3623,6 +3623,7 @@
 
 <script>
 const AUTH_URL = "https://lobby-auth-server.onrender.com";
+const PRESETS = ["#5865f2","#57f287","#fee75c","#ed4245","#eb459e","#3ba55d","#faa61a","#2d7d46","#1abc9c","#e67e22","#e74c3c","#9b59b6","#3498db","#2ecc71","#e91e63","#ff5722","#607d8b","#795548"];
 const FEED_AUTH_URL = "https://lobby-auth-server.onrender.com";
 
 // ── Sound Manager ─────────────────────────────────────────────
@@ -4202,7 +4203,7 @@ async function saveHomeSecOrder() {
     const token = localStorage.getItem("vh_token");
     if (!token) return;
 
-    await fetch(`${AUTH_API}/home/section-order`, {
+    await fetch(`${AUTH_URL}/home/section-order`, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
@@ -4220,7 +4221,7 @@ async function loadHomeSecOrder() {
     const token = localStorage.getItem("vh_token");
     if (!token) return;
 
-    const res = await fetch(`${AUTH_API}/home/section-order`, {
+    const res = await fetch(`${AUTH_URL}/home/section-order`, {
       headers: { "Authorization": `Bearer ${token}` }
     });
     if (!res.ok) return;
