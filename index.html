@@ -3642,25 +3642,19 @@ const LobbySound = (() => {
 
   // Pre-load all sounds
   for (const [key, src] of Object.entries(soundFiles)) {
-    try {
-      const audio = new Audio(src);
-      audio.preload = "auto";
-      audio.volume = volume;
-      audio.addEventListener("error", (e) => console.warn(`[Sound] Failed to load ${src}:`, e.message || e));
-      sounds[key] = audio;
-    } catch(e) { console.warn(`[Sound] Could not create audio for ${src}:`, e); }
+    const audio = new Audio(src);
+    audio.preload = "auto";
+    audio.volume = volume;
+    sounds[key] = audio;
   }
 
   function play(name) {
     if (muted) return;
     const s = sounds[name];
-    if (!s) { console.warn(`[Sound] Unknown sound: ${name}`); return; }
-    // Clone the audio so overlapping plays work
-    try {
-      const clone = s.cloneNode();
-      clone.volume = volume;
-      clone.play().catch(e => console.warn(`[Sound] Play failed (${name}):`, e.message));
-    } catch(e) { console.warn(`[Sound] Clone/play error (${name}):`, e); }
+    if (!s) return;
+    s.volume = volume;
+    s.currentTime = 0;
+    s.play().catch(() => {});
   }
 
   function loop(name) {
@@ -3670,7 +3664,7 @@ const LobbySound = (() => {
     s.volume = volume;
     s.loop = true;
     s.currentTime = 0;
-    s.play().catch(e => console.warn(`[Sound] Loop failed (${name}):`, e.message));
+    s.play().catch(() => {});
   }
 
   function stop(name) {
@@ -11874,7 +11868,6 @@ setTimeout(() => { updateMyStatusUI(); }, 100);
       <button class="sp-nav-btn" data-sp="steam">🎮 Steam</button>
       <div class="sp-nav-label" style="margin-top:10px">App Settings</div>
       <button class="sp-nav-btn" data-sp="audiovideo">🎙 Audio & Video</button>
-      <button class="sp-nav-btn" data-sp="sounds">🔔 Sounds</button>
       <button class="sp-nav-btn" data-sp="updates">🔄 Updates</button>
     </nav>
 
@@ -12134,47 +12127,6 @@ setTimeout(() => { updateMyStatusUI(); }, 100);
         </div>
         <button class="sp-save-btn" id="spSaveAV">Save Audio & Video</button>
         <div class="sp-msg" id="spAVMsg"></div>
-      </div>
-
-      <!-- ── Sounds ── -->
-      <div class="sp-section" id="sp-sounds">
-        <h2>Sounds</h2>
-        <p style="color:var(--text-2);font-size:13px;margin-bottom:20px">Control notification and UI sound effects.</p>
-
-        <div class="sp-form-group">
-          <label class="sp-label" style="display:flex;align-items:center;justify-content:space-between;">
-            Enable Sounds
-            <label style="position:relative;display:inline-block;width:44px;height:24px;cursor:pointer;margin:0">
-              <input type="checkbox" id="spSoundEnabled" style="opacity:0;width:0;height:0;position:absolute"
-                onchange="LobbySound.toggleMute();this.checked=!LobbySound.muted;document.getElementById('spSoundStatus').textContent=LobbySound.muted?'Off':'On'">
-              <span style="position:absolute;inset:0;background:var(--bg-3);border-radius:24px;transition:background .2s"></span>
-              <span id="spSoundToggleKnob" style="position:absolute;top:3px;left:3px;width:18px;height:18px;background:#fff;border-radius:50%;transition:transform .2s;pointer-events:none"></span>
-            </label>
-          </label>
-          <span id="spSoundStatus" style="font-size:12px;color:var(--text-3)">On</span>
-        </div>
-
-        <div class="sp-form-group">
-          <label class="sp-label">Sound Volume <span id="spSoundVolLabel" style="color:var(--text-2);font-weight:400;text-transform:none;letter-spacing:0;font-size:12px">50%</span></label>
-          <div class="sp-volume-row">
-            <span class="sp-volume-icon">🔇</span>
-            <div class="sp-volume-wrap"><input type="range" class="sp-slider" id="spSoundVol" min="0" max="100" value="50" /></div>
-            <span class="sp-volume-icon">🔊</span>
-          </div>
-        </div>
-
-        <div style="margin-top:20px;display:flex;flex-direction:column;gap:8px">
-          <label class="sp-label">Test Sounds</label>
-          <div style="display:flex;flex-wrap:wrap;gap:8px">
-            <button class="sp-save-btn" style="padding:6px 14px;font-size:12px;margin:0" onclick="LobbySound.play('messageSent')">Message Sent</button>
-            <button class="sp-save-btn" style="padding:6px 14px;font-size:12px;margin:0" onclick="LobbySound.play('messageReceived')">Message Received</button>
-            <button class="sp-save-btn" style="padding:6px 14px;font-size:12px;margin:0" onclick="LobbySound.play('notification')">Notification</button>
-            <button class="sp-save-btn" style="padding:6px 14px;font-size:12px;margin:0" onclick="LobbySound.play('vcJoin')">VC Join</button>
-            <button class="sp-save-btn" style="padding:6px 14px;font-size:12px;margin:0" onclick="LobbySound.play('vcLeave')">VC Leave</button>
-            <button class="sp-save-btn" style="padding:6px 14px;font-size:12px;margin:0" onclick="LobbySound.play('callIncoming')">Incoming Ring</button>
-            <button class="sp-save-btn" style="padding:6px 14px;font-size:12px;margin:0" onclick="LobbySound.stop('callIncoming');LobbySound.stop('callOutgoing')">Stop Ringing</button>
-          </div>
-        </div>
       </div>
 
       <!-- ── Updates ── -->
@@ -12579,40 +12531,6 @@ setTimeout(() => { updateMyStatusUI(); }, 100);
     updateSliderFill(inSlider); updateSliderFill(outSlider);
     inSlider.oninput  = () => { document.getElementById("spInputVolLabel").textContent  = `${inSlider.value}%`;  updateSliderFill(inSlider); };
     outSlider.oninput = () => { document.getElementById("spOutputVolLabel").textContent = `${outSlider.value}%`; updateSliderFill(outSlider); };
-
-    // ── Sound settings init ──
-    const soundVol = Math.round(LobbySound.volume * 100);
-    const soundSlider = document.getElementById("spSoundVol");
-    const soundToggle = document.getElementById("spSoundEnabled");
-    const soundKnob = document.getElementById("spSoundToggleKnob");
-    if (soundSlider) {
-      soundSlider.value = soundVol;
-      document.getElementById("spSoundVolLabel").textContent = `${soundVol}%`;
-      updateSliderFill(soundSlider);
-      soundSlider.oninput = () => {
-        const v = parseInt(soundSlider.value);
-        document.getElementById("spSoundVolLabel").textContent = `${v}%`;
-        LobbySound.setVolume(v / 100);
-        updateSliderFill(soundSlider);
-      };
-    }
-    if (soundToggle) {
-      soundToggle.checked = !LobbySound.muted;
-      document.getElementById("spSoundStatus").textContent = LobbySound.muted ? "Off" : "On";
-      if (soundKnob) {
-        soundKnob.style.transform = LobbySound.muted ? "translateX(0)" : "translateX(20px)";
-        soundKnob.parentElement.querySelector("span").style.background = LobbySound.muted ? "var(--bg-3)" : "var(--accent)";
-      }
-      soundToggle.onchange = () => {
-        LobbySound.toggleMute();
-        soundToggle.checked = !LobbySound.muted;
-        document.getElementById("spSoundStatus").textContent = LobbySound.muted ? "Off" : "On";
-        if (soundKnob) {
-          soundKnob.style.transform = LobbySound.muted ? "translateX(0)" : "translateX(20px)";
-          soundKnob.parentElement.querySelector("span").style.background = LobbySound.muted ? "var(--bg-3)" : "var(--accent)";
-        }
-      };
-    }
   }
 
   function populateSel(id, devices, saved) {
