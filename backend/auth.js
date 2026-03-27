@@ -345,24 +345,27 @@ app.post("/friends/block", requireAuth, async (req, res) => {
 app.get("/dm/conversations", requireAuth, async (req, res) => {
   try {
     const r = await pool.query(`
-      SELECT DISTINCT ON (other_id)
-        other_id,
-        from_user_id,
-        content,
-        created_at,
+      SELECT
+        sub.other_id,
+        sub.from_user_id,
+        sub.content,
+        sub.created_at,
         u.username,
         u.avatar_url
       FROM (
-        SELECT
+        SELECT DISTINCT ON (other_id)
           CASE WHEN from_user_id = $1 THEN to_user_id ELSE from_user_id END AS other_id,
           from_user_id,
           content,
           created_at
         FROM direct_messages
         WHERE from_user_id = $1 OR to_user_id = $1
+        ORDER BY
+          CASE WHEN from_user_id = $1 THEN to_user_id ELSE from_user_id END,
+          created_at DESC
       ) sub
       JOIN users u ON u.id = sub.other_id
-      ORDER BY other_id, created_at DESC
+      ORDER BY sub.created_at DESC
     `, [req.userId]);
     res.json(r.rows);
   } catch (err) {
