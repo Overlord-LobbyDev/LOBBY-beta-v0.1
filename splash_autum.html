@@ -182,7 +182,8 @@ resize();addEventListener("resize",resize);
 const LEAF_COUNT = 65;
 const LEAF_COLORS = ['#b45309','#d97706','#f97316','#dc2626','#92400e','#a16207'];
 const LEAVES = Array.from({length:LEAF_COUNT}, (_, i) => ({
-  x: Math.random()*innerWidth,
+  fx: Math.random(), // fractional x resolved at draw time
+  x: -1,            // -1 = not yet initialised
   y: -20 - Math.random()*300,
   vy: 45 + Math.random()*90,
   vx: (Math.random()-.5)*55,
@@ -212,6 +213,7 @@ function drawLeaf(x,y,rot,size,col){
 function drawLeaves(t,W,H){
   const dtSec=1/60;
   LEAVES.forEach(l=>{
+    if(l.x===-1) l.x = l.fx * W; // initialise from canvas width
     if(t<l.delay)return;
     const lt=(t-l.delay)/1000;
     const wx=Math.sin(lt*l.wobbleS+l.wobble)*35;
@@ -237,8 +239,8 @@ function easeIn(t){return t*t*t;}
 const STREAM_COUNT = 12;
 const streams = Array.from({length: STREAM_COUNT}, (_, i) => {
   const angle = (i / STREAM_COUNT) * Math.PI * 2;
-  // Vary start distance so they don't all arrive at same time
-  const dist = 500 + Math.random() * 200;
+  const diagBase = Math.sqrt(innerWidth * innerWidth + innerHeight * innerHeight) * 0.55;
+  const dist = diagBase + Math.random() * 150;
   return {
     baseAngle: angle,
     startR: dist,
