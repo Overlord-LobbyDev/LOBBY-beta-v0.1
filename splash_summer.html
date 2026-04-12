@@ -1,0 +1,520 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8"/>
+  <title>LOBBY</title>
+  <link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&display=swap" rel="stylesheet">
+  <style>
+    *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+    html,body{
+      width:100%;height:100%;
+      background:#000;
+      overflow:hidden;user-select:none;
+      -webkit-app-region:drag;
+    }
+    #c{position:fixed;inset:0;display:block;}
+
+    /* ── UI layer ── */
+    #ui{
+      position:fixed;inset:0;
+      display:flex;align-items:center;justify-content:center;
+      pointer-events:none;z-index:10;
+    }
+
+    #outerWrap{
+      display:flex;flex-direction:column;align-items:center;gap:14px;
+    }
+
+    #iconImg{
+      display:block;
+      width:82px;height:82px;
+      border-radius:20px;
+      opacity:0;
+      transform:scale(0.7);
+      transition:opacity .5s ease,
+                 transform .5s cubic-bezier(0.34,1.4,0.64,1);
+    }
+    #iconImg.show{opacity:1;transform:scale(1);}
+
+    /* SVG icon box */
+    #iconBox{
+      width:82px;height:82px;
+      border-radius:20px;
+      display:flex;align-items:center;justify-content:center;
+      opacity:0;transform:scale(0.7);
+      transition:opacity .5s ease, transform .5s cubic-bezier(0.34,1.4,0.64,1);
+      /* background will be set by JS to accent at 20% opacity */
+    }
+    #iconBox.show{opacity:1;transform:scale(1);}
+
+    /* LOBBY + vertical BETA side by side */
+    #wordWrap{
+      display:inline-flex;
+      align-items:stretch; /* children fill full height */
+      opacity:0;
+      transform:translateY(10px);
+      transition:opacity .55s cubic-bezier(0.16,1,0.3,1),
+                 transform .55s cubic-bezier(0.16,1,0.3,1);
+    }
+    #wordWrap.show{opacity:1;transform:translateY(0);}
+
+    #lobby{
+      font-family:'Bebas Neue',sans-serif;
+      font-size:clamp(48px,6.5vw,82px);
+      letter-spacing:0.09em;
+      line-height:1;
+      color:#f9a8d4;
+    }
+
+    /* BETA: vertical stack, flush right of Y, same height as LOBBY text */
+    #betaTag{
+      display:flex;
+      flex-direction:column;
+      justify-content:center;
+      align-items:center;
+      margin-left:4px;
+      padding-bottom:3px;
+    }
+    #betaTag span{
+      font-family:'Bebas Neue',sans-serif;
+      font-size:clamp(8px,1vw,12px);
+      letter-spacing:0.05em;
+      line-height:1.15;
+      display:block;
+      color:#f9a8d4;
+      opacity:0.55;
+    }
+  </style>
+</head>
+<body>
+
+<!-- Seasonal edition badge -->
+<div style="
+  position:fixed;top:18px;left:18px;z-index:20;
+  display:flex;align-items:center;gap:7px;
+  font-family:'Bebas Neue',sans-serif;
+  font-size:13px;letter-spacing:2px;
+  color:#fde047;
+  opacity:0;
+  animation:badgeFadeIn .6s ease 2s forwards;
+  text-shadow:0 0 12px #fde04788;
+  -webkit-app-region:no-drag;
+">
+  <span style="font-size:15px">☀️</span>
+  Summer Edition
+</div>
+<style>
+@keyframes badgeFadeIn {
+  from{opacity:0;transform:translateX(-6px)}
+  to  {opacity:0.75;transform:translateX(0)}
+}
+</style>
+
+<canvas id="c"></canvas>
+
+<div id="ui">
+  <div id="outerWrap">
+    <div id="iconBox">
+      <!-- The L-mark logo, recoloured by JS -->
+      <svg id="iconSvg" width="52" height="52" viewBox="0 0 48 48" xmlns="http://www.w3.org/2000/svg">
+        <rect x="14" y="8"  width="8" height="32" rx="2" fill="white"/>
+        <rect x="14" y="32" width="22" height="8"  rx="2" fill="white"/>
+      </svg>
+    </div>
+    <div id="wordWrap">
+      <div id="lobby">LOBBY</div>
+      <div id="betaTag">
+        <span>B</span>
+        <span>E</span>
+        <span>T</span>
+        <span>A</span>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+// ── Theme ─────────────────────────────────────────────────────
+const THEMES={
+  default:{accent:"#5865f2",t2:"#b5bac1",bg:"#1e1f22"},midnight:{accent:"#7c3aed",t2:"#a0a0c0",bg:"#0a0a0f"},forest:{accent:"#16a34a",t2:"#86efac",bg:"#0d1a0f"},ocean:{accent:"#0ea5e9",t2:"#7dd3fc",bg:"#030d1a"},sunset:{accent:"#f97316",t2:"#fdba74",bg:"#1a0a0a"},rose:{accent:"#e11d48",t2:"#fda4af",bg:"#1a0a10"},nord:{accent:"#88c0d0",t2:"#d8dee9",bg:"#2e3440"},mocha:{accent:"#c2966c",t2:"#d6d3d1",bg:"#1c1917"},light:{accent:"#5865f2",t2:"#4e5058",bg:"#f2f3f5"},charizard:{accent:"#8b1a2a",t2:"#c9909a",bg:"#0d0608"},
+  bulbasaur:{accent:"#16a34a",t2:"#bbf7d0",bg:"#051008"},charmander:{accent:"#f97316",t2:"#fdba74",bg:"#1a0800"},squirtle:{accent:"#38bdf8",t2:"#bae6fd",bg:"#030e18"},pikachu:{accent:"#fbbf24",t2:"#fef3c7",bg:"#1a1500"},raichu:{accent:"#fbbf24",t2:"#fef3c7",bg:"#1a1000"},clefairy:{accent:"#f9a8d4",t2:"#fce7f3",bg:"#180a12"},jigglypuff:{accent:"#f9a8d4",t2:"#fce7f3",bg:"#1a0814"},meowth:{accent:"#fbbf24",t2:"#fef3c7",bg:"#1a1408"},psyduck:{accent:"#fbbf24",t2:"#fef3c7",bg:"#1a1000"},arcanine:{accent:"#f97316",t2:"#fdba74",bg:"#1a0c00"},alakazam:{accent:"#f59e0b",t2:"#fde68a",bg:"#14100a"},slowbro:{accent:"#e879f9",t2:"#fae8ff",bg:"#140a18"},gengar:{accent:"#7c3aed",t2:"#c4b5fd",bg:"#0a0814"},marowak:{accent:"#d97706",t2:"#fde68a",bg:"#100800"},chansey:{accent:"#f9a8d4",t2:"#fce7f3",bg:"#1a0812"},gyarados:{accent:"#1d4ed8",t2:"#bfdbfe",bg:"#020c1a"},lapras:{accent:"#38bdf8",t2:"#e0f2fe",bg:"#020c18"},eevee:{accent:"#d97706",t2:"#fde68a",bg:"#1a1208"},vaporeon:{accent:"#22d3ee",t2:"#a5f3fc",bg:"#030d1a"},jolteon:{accent:"#fde047",t2:"#fef9c3",bg:"#141000"},flareon:{accent:"#f97316",t2:"#fed7aa",bg:"#1a0600"},snorlax:{accent:"#1d4ed8",t2:"#bfdbfe",bg:"#040c10"},articuno:{accent:"#7dd3fc",t2:"#e0f2fe",bg:"#020c18"},zapdos:{accent:"#fde047",t2:"#fef9c3",bg:"#14100a"},moltres:{accent:"#f97316",t2:"#fdba74",bg:"#1a0c00"},dratini:{accent:"#60a5fa",t2:"#dbeafe",bg:"#030a18"},dragonite:{accent:"#f59e0b",t2:"#fde68a",bg:"#0e1400"},mewtwo:{accent:"#a855f7",t2:"#e9d5ff",bg:"#120a1a"},mew:{accent:"#f9a8d4",t2:"#fce7f3",bg:"#1a0812"},
+  chikorita:{accent:"#4ade80",t2:"#bbf7d0",bg:"#061008"},cyndaquil:{accent:"#60a5fa",t2:"#dbeafe",bg:"#0a0c14"},totodile:{accent:"#06b6d4",t2:"#cffafe",bg:"#031018"},togepi:{accent:"#f9a8d4",t2:"#fce7f3",bg:"#141820"},espeon:{accent:"#c084fc",t2:"#f3e8ff",bg:"#10071a"},umbreon:{accent:"#f59e0b",t2:"#fde68a",bg:"#070510"},wobbuffet:{accent:"#38bdf8",t2:"#bae6fd",bg:"#031018"},scizor:{accent:"#ef4444",t2:"#fecaca",bg:"#1a0400"},houndoom:{accent:"#ef4444",t2:"#fecaca",bg:"#140000"},kingdra:{accent:"#1d4ed8",t2:"#bfdbfe",bg:"#020c18"},porygon2:{accent:"#f9a8d4",t2:"#fce7f3",bg:"#14080c"},raikou:{accent:"#fde047",t2:"#fef9c3",bg:"#141000"},entei:{accent:"#f97316",t2:"#fdba74",bg:"#1a0800"},suicune:{accent:"#06b6d4",t2:"#cffafe",bg:"#020c18"},tyranitar:{accent:"#15803d",t2:"#bbf7d0",bg:"#041008"},lugia:{accent:"#818cf8",t2:"#c7d2fe",bg:"#080e18"},ho_oh:{accent:"#ef4444",t2:"#fecaca",bg:"#1a0800"},celebi:{accent:"#4ade80",t2:"#bbf7d0",bg:"#041008"},treecko:{accent:"#16a34a",t2:"#bbf7d0",bg:"#061008"},torchic:{accent:"#f97316",t2:"#fdba74",bg:"#1a0c00"},mudkip:{accent:"#38bdf8",t2:"#bae6fd",bg:"#030e18"},gardevoir:{accent:"#ec4899",t2:"#fbcfe8",bg:"#0f0518"},sableye:{accent:"#7c3aed",t2:"#ddd6fe",bg:"#080414"},manectric:{accent:"#fde047",t2:"#fef9c3",bg:"#030c18"},flygon:{accent:"#34d399",t2:"#a7f3d0",bg:"#041206"},altaria:{accent:"#38bdf8",t2:"#e0f2fe",bg:"#081018"},milotic:{accent:"#f0abfc",t2:"#fae8ff",bg:"#030c18"},absol:{accent:"#e2e8f0",t2:"#94a3b8",bg:"#0a0a14"},salamence:{accent:"#3b82f6",t2:"#dbeafe",bg:"#08041a"},metagross:{accent:"#94a3b8",t2:"#cbd5e1",bg:"#060e12"},latias:{accent:"#f43f5e",t2:"#fecdd3",bg:"#1a0408"},latios:{accent:"#3b82f6",t2:"#dbeafe",bg:"#020c1a"},kyogre:{accent:"#1d4ed8",t2:"#bfdbfe",bg:"#020814"},groudon:{accent:"#dc2626",t2:"#fecaca",bg:"#1a0000"},rayquaza:{accent:"#65a30d",t2:"#d9f99d",bg:"#061008"},jirachi:{accent:"#fde047",t2:"#fef9c3",bg:"#0e1018"},deoxys:{accent:"#a855f7",t2:"#e9d5ff",bg:"#100014"},turtwig:{accent:"#4ade80",t2:"#bbf7d0",bg:"#061008"},chimchar:{accent:"#f97316",t2:"#fdba74",bg:"#1a0a00"},piplup:{accent:"#38bdf8",t2:"#bae6fd",bg:"#030c18"},shinx:{accent:"#fbbf24",t2:"#fef3c7",bg:"#080a14"},luxray:{accent:"#fbbf24",t2:"#fef3c7",bg:"#080a14"},buizel:{accent:"#f97316",t2:"#fdba74",bg:"#1a0c00"},honchkrow:{accent:"#1d4ed8",t2:"#bfdbfe",bg:"#08040e"},glameow:{accent:"#d8b4fe",t2:"#e9d5ff",bg:"#141018"},spiritomb:{accent:"#7c3aed",t2:"#c4b5fd",bg:"#080414"},gible:{accent:"#3b82f6",t2:"#dbeafe",bg:"#080c14"},garchomp:{accent:"#3b82f6",t2:"#dbeafe",bg:"#080c14"},lucario:{accent:"#3b82f6",t2:"#93c5fd",bg:"#080e1a"},weavile:{accent:"#f43f5e",t2:"#fecdd3",bg:"#100410"},leafeon:{accent:"#65a30d",t2:"#d9f99d",bg:"#061008"},glaceon:{accent:"#7dd3fc",t2:"#e0f2fe",bg:"#020d1a"},gliscor:{accent:"#ef4444",t2:"#fecaca",bg:"#1a0408"},gallade:{accent:"#15803d",t2:"#bbf7d0",bg:"#0a1408"},froslass:{accent:"#7dd3fc",t2:"#e0f2fe",bg:"#080c14"},rotom:{accent:"#38bdf8",t2:"#bae6fd",bg:"#020a18"},palkia:{accent:"#e879f9",t2:"#fae8ff",bg:"#14040e"},dialga:{accent:"#0ea5e9",t2:"#e0f2fe",bg:"#040c18"},giratina:{accent:"#7c3aed",t2:"#c4b5fd",bg:"#0a0810"},cresselia:{accent:"#818cf8",t2:"#c7d2fe",bg:"#030c18"},darkrai:{accent:"#1e40af",t2:"#bfdbfe",bg:"#050310"},shaymin:{accent:"#4ade80",t2:"#bbf7d0",bg:"#061008"},arceus:{accent:"#e2e8f0",t2:"#f1f5f9",bg:"#0e0e12"},victini:{accent:"#f97316",t2:"#fdba74",bg:"#1a0c00"},snivy:{accent:"#16a34a",t2:"#bbf7d0",bg:"#061008"},oshawott:{accent:"#38bdf8",t2:"#bae6fd",bg:"#030c18"},herdier:{accent:"#94a3b8",t2:"#e2e8f0",bg:"#100c10"},conkeldurr:{accent:"#f43f5e",t2:"#fecdd3",bg:"#140810"},whimsicott:{accent:"#4ade80",t2:"#bbf7d0",bg:"#0c1008"},zorua:{accent:"#f43f5e",t2:"#fecdd3",bg:"#140408"},zoroark:{accent:"#f43f5e",t2:"#fecdd3",bg:"#100408"},emolga:{accent:"#fde047",t2:"#fef9c3",bg:"#0c1018"},chandelure:{accent:"#7c3aed",t2:"#ddd6fe",bg:"#0a0014"},haxorus:{accent:"#ef4444",t2:"#fecaca",bg:"#100800"},cobalion:{accent:"#22d3ee",t2:"#a5f3fc",bg:"#060e14"},terrakion:{accent:"#ef4444",t2:"#fecaca",bg:"#100c08"},virizion:{accent:"#4ade80",t2:"#bbf7d0",bg:"#061008"},reshiram:{accent:"#60a5fa",t2:"#dbeafe",bg:"#121820"},zekrom:{accent:"#94a3b8",t2:"#e2e8f0",bg:"#080810"},landorus:{accent:"#f97316",t2:"#fdba74",bg:"#0e1008"},kyurem:{accent:"#67e8f9",t2:"#cffafe",bg:"#060c12"},chespin:{accent:"#65a30d",t2:"#d9f99d",bg:"#0a1008"},fennekin:{accent:"#f97316",t2:"#fdba74",bg:"#1a1000"},froakie:{accent:"#60a5fa",t2:"#dbeafe",bg:"#080e14"},greninja:{accent:"#0284c7",t2:"#bae6fd",bg:"#040a14"},sylveon:{accent:"#f472b6",t2:"#fbcfe8",bg:"#1a0814"},hawlucha:{accent:"#65a30d",t2:"#d9f99d",bg:"#0e0c00"},dedenne:{accent:"#f97316",t2:"#fdba74",bg:"#1a0c00"},pumpkaboo:{accent:"#f97316",t2:"#fdba74",bg:"#140800"},xerneas:{accent:"#06b6d4",t2:"#cffafe",bg:"#030c18"},yveltal:{accent:"#f43f5e",t2:"#fecdd3",bg:"#140004"},zygarde:{accent:"#16a34a",t2:"#bbf7d0",bg:"#041008"},diancie:{accent:"#f9a8d4",t2:"#fce7f3",bg:"#1a0414"},hoopa:{accent:"#a855f7",t2:"#e9d5ff",bg:"#12001a"},volcanion:{accent:"#ef4444",t2:"#fecaca",bg:"#1a0400"},rowlet:{accent:"#4ade80",t2:"#bbf7d0",bg:"#061008"},litten:{accent:"#ef4444",t2:"#fecaca",bg:"#100808"},popplio:{accent:"#818cf8",t2:"#c7d2fe",bg:"#080c18"},oricorio:{accent:"#f472b6",t2:"#fbcfe8",bg:"#1a0414"},lycanroc:{accent:"#f97316",t2:"#fdba74",bg:"#1a0c00"},lurantis:{accent:"#f472b6",t2:"#fbcfe8",bg:"#1a0814"},salazzle:{accent:"#a855f7",t2:"#d8b4fe",bg:"#14040c"},mimikyu:{accent:"#facc15",t2:"#fef9c3",bg:"#120e04"},tapu_koko:{accent:"#fbbf24",t2:"#fef3c7",bg:"#0e1008"},solgaleo:{accent:"#fbbf24",t2:"#fef3c7",bg:"#14100a"},lunala:{accent:"#c084fc",t2:"#f3e8ff",bg:"#080410"},necrozma:{accent:"#a78bfa",t2:"#ede9fe",bg:"#080810"},magearna:{accent:"#f472b6",t2:"#fbcfe8",bg:"#100c14"},grookey:{accent:"#4ade80",t2:"#bbf7d0",bg:"#061008"},rillaboom:{accent:"#15803d",t2:"#bbf7d0",bg:"#051008"},scorbunny:{accent:"#f97316",t2:"#fdba74",bg:"#1a0400"},cinderace:{accent:"#ef4444",t2:"#fecaca",bg:"#1a0400"},sobble:{accent:"#38bdf8",t2:"#bae6fd",bg:"#030c18"},inteleon:{accent:"#06b6d4",t2:"#cffafe",bg:"#030c1a"},corviknight:{accent:"#94a3b8",t2:"#cbd5e1",bg:"#08080e"},hatterene:{accent:"#f9a8d4",t2:"#fce7f3",bg:"#100814"},eldegoss:{accent:"#4ade80",t2:"#bbf7d0",bg:"#081008"},appletun:{accent:"#4ade80",t2:"#bbf7d0",bg:"#0e1008"},cramorant:{accent:"#1d4ed8",t2:"#bfdbfe",bg:"#040c18"},toxtricity:{accent:"#a855f7",t2:"#e9d5ff",bg:"#0e0514"},morpeko:{accent:"#fde047",t2:"#fef9c3",bg:"#141000"},zacian:{accent:"#38bdf8",t2:"#e0f2fe",bg:"#030c1a"},zamazenta:{accent:"#818cf8",t2:"#c7d2fe",bg:"#030a18"},eternatus:{accent:"#7c3aed",t2:"#ddd6fe",bg:"#080014"},urshifu:{accent:"#94a3b8",t2:"#e2e8f0",bg:"#080810"},zarude:{accent:"#15803d",t2:"#bbf7d0",bg:"#041008"},regieleki:{accent:"#fde047",t2:"#fef9c3",bg:"#0e1008"},regidrago:{accent:"#dc2626",t2:"#fecaca",bg:"#041008"},glastrier:{accent:"#67e8f9",t2:"#cffafe",bg:"#060c12"},spectrier:{accent:"#7c3aed",t2:"#ddd6fe",bg:"#080014"},calyrex:{accent:"#a78bfa",t2:"#ede9fe",bg:"#0a0814"},sprigatito:{accent:"#4ade80",t2:"#bbf7d0",bg:"#061008"},fuecoco:{accent:"#ef4444",t2:"#fecaca",bg:"#1a0400"},quaxly:{accent:"#38bdf8",t2:"#bae6fd",bg:"#030c18"},pawmi:{accent:"#fbbf24",t2:"#fef3c7",bg:"#1a0c00"},maushold:{accent:"#f9a8d4",t2:"#fce7f3",bg:"#100c10"},frigibax:{accent:"#67e8f9",t2:"#cffafe",bg:"#040c14"},koraidon:{accent:"#ef4444",t2:"#fecaca",bg:"#1a0400"},miraidon:{accent:"#06b6d4",t2:"#cffafe",bg:"#040c18"},great_tusk:{accent:"#f97316",t2:"#fdba74",bg:"#0e100a"},ogerpon:{accent:"#4ade80",t2:"#bbf7d0",bg:"#061008"},terapagos:{accent:"#818cf8",t2:"#c7d2fe",bg:"#080814"},
+  attack_titan:{accent:"#b45309",t2:"#fde68a",bg:"#0a0c08"},naruto:{accent:"#f97316",t2:"#fdba74",bg:"#1a0c00"},dragon_ball:{accent:"#f59e0b",t2:"#fef3c7",bg:"#1a0e00"},one_piece:{accent:"#dc2626",t2:"#fecaca",bg:"#1a0400"},demon_slayer:{accent:"#e11d48",t2:"#fecdd3",bg:"#100014"},my_hero:{accent:"#1d4ed8",t2:"#bfdbfe",bg:"#030c1a"},fullmetal:{accent:"#d97706",t2:"#fde68a",bg:"#100a00"},jujutsu:{accent:"#7c3aed",t2:"#ddd6fe",bg:"#08060e"},evangelion:{accent:"#4ade80",t2:"#bbf7d0",bg:"#020c10"},sword_art:{accent:"#3b82f6",t2:"#dbeafe",bg:"#030a18"},death_note:{accent:"#e2e8f0",t2:"#94a3b8",bg:"#06040c"},bleach:{accent:"#a78bfa",t2:"#ddd6fe",bg:"#080810"},fairy_tail:{accent:"#ec4899",t2:"#f9a8d4",bg:"#100c18"},hunter_x:{accent:"#4ade80",t2:"#bbf7d0",bg:"#041008"},cowboy_bebop:{accent:"#f59e0b",t2:"#fde68a",bg:"#080c14"},spirited_away:{accent:"#06b6d4",t2:"#cffafe",bg:"#030c18"},your_name:{accent:"#818cf8",t2:"#c7d2fe",bg:"#030814"},violet_ever:{accent:"#f9a8d4",t2:"#fce7f3",bg:"#030c18"},re_zero:{accent:"#c084fc",t2:"#e9d5ff",bg:"#100a18"},tokyo_ghoul:{accent:"#dc2626",t2:"#fecaca",bg:"#0e0408"},one_punch:{accent:"#facc15",t2:"#fef9c3",bg:"#030c18"},mob_psycho:{accent:"#a78bfa",t2:"#ede9fe",bg:"#0a0814"},vinland:{accent:"#94a3b8",t2:"#cbd5e1",bg:"#0c0e08"},berserk:{accent:"#dc2626",t2:"#fecaca",bg:"#0a0408"},made_abyss:{accent:"#f59e0b",t2:"#fde68a",bg:"#080c18"},promised_nev:{accent:"#e2e8f0",t2:"#94a3b8",bg:"#061008"},black_clover:{accent:"#15803d",t2:"#bbf7d0",bg:"#041008"},food_wars:{accent:"#f97316",t2:"#fdba74",bg:"#1a0800"},dr_stone:{accent:"#22d3ee",t2:"#a5f3fc",bg:"#031018"},no_game:{accent:"#e879f9",t2:"#f0abfc",bg:"#100418"},code_geass:{accent:"#dc2626",t2:"#fecaca",bg:"#0e0010"},steins_gate:{accent:"#f97316",t2:"#fdba74",bg:"#080c10"},gurren:{accent:"#ef4444",t2:"#fecaca",bg:"#140008"},sailor_moon:{accent:"#f472b6",t2:"#fbcfe8",bg:"#0c0418"},chainsaw:{accent:"#ef4444",t2:"#fecaca",bg:"#0e0408"},spy_family:{accent:"#4ade80",t2:"#bbf7d0",bg:"#08100e"},bocchi:{accent:"#f472b6",t2:"#fbcfe8",bg:"#100814"},blue_lock:{accent:"#3b82f6",t2:"#dbeafe",bg:"#030c18"},oshi_no_ko:{accent:"#facc15",t2:"#fef9c3",bg:"#0a0814"},frieren:{accent:"#a78bfa",t2:"#ede9fe",bg:"#0c1018"},dandadan:{accent:"#4ade80",t2:"#bbf7d0",bg:"#080c14"},solo_leveling:{accent:"#7c3aed",t2:"#c4b5fd",bg:"#06040e"},
+  minecraft:{accent:"#15803d",t2:"#bbf7d0",bg:"#0e1008"},zelda:{accent:"#65a30d",t2:"#d9f99d",bg:"#0e1000"},mario:{accent:"#ef4444",t2:"#fecaca",bg:"#1a0400"},pokemon_game:{accent:"#ef4444",t2:"#fecaca",bg:"#030c1a"},halo:{accent:"#15803d",t2:"#bbf7d0",bg:"#030d18"},cod:{accent:"#94a3b8",t2:"#e2e8f0",bg:"#080c08"},gta:{accent:"#ef4444",t2:"#fecaca",bg:"#030c18"},cyberpunk:{accent:"#facc15",t2:"#fef9c3",bg:"#080414"},witcher:{accent:"#d97706",t2:"#fde68a",bg:"#0c0c08"},dark_souls:{accent:"#f59e0b",t2:"#fde68a",bg:"#080608"},elden_ring:{accent:"#d97706",t2:"#fde68a",bg:"#080608"},fortnite:{accent:"#a855f7",t2:"#e9d5ff",bg:"#030c18"},apex:{accent:"#dc2626",t2:"#fecaca",bg:"#0e0408"},overwatch:{accent:"#f97316",t2:"#fdba74",bg:"#030c18"},league:{accent:"#1d4ed8",t2:"#bfdbfe",bg:"#060e14"},valorant:{accent:"#ef4444",t2:"#fecaca",bg:"#0e0408"},csgo:{accent:"#f97316",t2:"#fdba74",bg:"#030c18"},hollow_knight:{accent:"#a78bfa",t2:"#ddd6fe",bg:"#060810"},celeste:{accent:"#f472b6",t2:"#fbcfe8",bg:"#0a0c18"},stardew:{accent:"#4ade80",t2:"#bbf7d0",bg:"#061008"},undertale:{accent:"#ef4444",t2:"#fecaca",bg:"#040608"},skyrim:{accent:"#94a3b8",t2:"#e2e8f0",bg:"#080c10"},fallout:{accent:"#facc15",t2:"#fef9c3",bg:"#0c1008"},doom:{accent:"#dc2626",t2:"#fecaca",bg:"#0e0408"},
+};
+
+const tid   = localStorage.getItem("lobby_theme")||"default";
+const theme = THEMES[tid]||THEMES.default;
+const ACCENT = theme.accent;
+const T2     = theme.t2;
+const BG     = theme.bg;
+
+// Apply bg to body immediately so no flash
+document.body.style.background = BG;
+
+// Apply colours
+const lobbyEl = document.getElementById("lobby");
+lobbyEl.style.color = ACCENT;
+lobbyEl.style.textShadow = `0 0 50px ${ACCENT}55`;
+document.querySelectorAll("#betaTag span").forEach(s=>{ s.style.color = T2; });
+
+// Icon box — accent background tint + glow
+const iconBox = document.getElementById("iconBox");
+iconBox.style.background = `${ACCENT}22`;
+iconBox.style.boxShadow  = `0 0 32px ${ACCENT}66, 0 0 8px ${ACCENT}33, inset 0 0 0 1.5px ${ACCENT}44`;
+
+function hexRgb(h){
+  h=h.replace("#","");
+  if(h.length===3) h=h.split("").map(c=>c+c).join("");
+  return{r:parseInt(h.slice(0,2),16),g:parseInt(h.slice(2,4),16),b:parseInt(h.slice(4,6),16)};
+}
+const AC=hexRgb(ACCENT), acS=`${AC.r},${AC.g},${AC.b}`;
+const BGC=hexRgb(BG);
+
+// ── Canvas ────────────────────────────────────────────────────
+const canvas=document.getElementById("c");
+const ctx=canvas.getContext("2d");
+function resize(){canvas.width=innerWidth;canvas.height=innerHeight;}
+resize();addEventListener("resize",resize);
+
+
+// ── ☀️ SUMMER — sun + beach scene ────────────────────────────
+const SUN_START = 600;
+const SUN_RAYS = 16;
+
+function drawSun(t,W,H,cx,cy){
+  const st = t - SUN_START; if(st<=0)return;
+  const riseP = Math.min(st/900, 1), eR = 1-Math.pow(1-riseP,3);
+  const sx = W*0.82, sy = H*0.14 - (1-eR)*H*0.4;
+  const sunR = 48*eR;
+  const gr2=ctx.createRadialGradient(sx,sy,0,sx,sy,sunR*5);
+  gr2.addColorStop(0,`rgba(253,224,71,${eR*.18})`);
+  gr2.addColorStop(.4,`rgba(251,191,36,${eR*.06})`);
+  gr2.addColorStop(1,'transparent');
+  ctx.fillStyle=gr2; ctx.fillRect(0,0,W,H);
+  const gr3=ctx.createRadialGradient(sx,sy,0,sx,sy,Math.max(W,H)*1.1);
+  gr3.addColorStop(0,`rgba(253,224,71,${eR*.1})`);
+  gr3.addColorStop(.3,`rgba(251,146,60,${eR*.05})`);
+  gr3.addColorStop(1,'transparent');
+  ctx.fillStyle=gr3; ctx.fillRect(0,0,W,H);
+  ctx.beginPath(); ctx.arc(sx,sy,sunR,0,Math.PI*2);
+  const gSun=ctx.createRadialGradient(sx,sy,0,sx,sy,sunR);
+  gSun.addColorStop(0,'rgba(255,255,220,1)');
+  gSun.addColorStop(.6,'rgba(253,224,71,0.95)');
+  gSun.addColorStop(1,'rgba(251,191,36,0.8)');
+  ctx.fillStyle=gSun; ctx.fill();
+  for(let i=0;i<SUN_RAYS;i++){
+    const a=(i/SUN_RAYS)*Math.PI*2 + t*.0004;
+    const r1=sunR*1.3, r2=sunR*(1.7+Math.sin(i*2.3)*.25);
+    ctx.beginPath(); ctx.moveTo(sx+Math.cos(a)*r1, sy+Math.sin(a)*r1);
+    ctx.lineTo(sx+Math.cos(a)*r2, sy+Math.sin(a)*r2);
+    ctx.strokeStyle=`rgba(253,224,71,${eR*.5})`; ctx.lineWidth=1.8; ctx.stroke();
+  }
+  if(eR>.5){
+    const fp=(eR-.5)/.5;
+    ctx.save(); ctx.globalAlpha=fp*.12;
+    const lg=ctx.createLinearGradient(sx,sy,0,H);
+    lg.addColorStop(0,'rgba(255,255,180,0.8)');
+    lg.addColorStop(.5,'rgba(253,224,71,0.3)');
+    lg.addColorStop(1,'transparent');
+    ctx.fillStyle=lg; ctx.fillRect(0,0,W,H);
+    ctx.restore();
+  }
+}
+
+function easeOut(t){return 1-Math.pow(1-t,3);}
+function easeOut5(t){return 1-Math.pow(1-t,5);}
+function easeInOut(t){return t<.5?4*t*t*t:1-Math.pow(-2*t+2,3)/2;}
+function easeIn(t){return t*t*t;}
+
+// ── STREAM SYSTEM ─────────────────────────────────────────────
+// 8 bright laser streams shoot in from random screen edges,
+// each with a long glowing tail and a bright head.
+// They spiral inward at high speed, tightening each loop,
+// then slam into the centre triggering a shockwave + debris burst.
+
+const STREAM_COUNT = 12;
+const streams = Array.from({length: STREAM_COUNT}, (_, i) => {
+  const angle = (i / STREAM_COUNT) * Math.PI * 2;
+  // Vary start distance so they don't all arrive at same time
+  const dist = 500 + Math.random() * 200;
+  return {
+    baseAngle: angle,
+    startR: dist,
+    // Each stream has slightly different speed
+    speed: 0.85 + Math.random() * 0.3,
+    // Tail length in history points
+    tailLen: 28 + Math.floor(Math.random() * 16),
+    width: 2.0 + Math.random() * 2.0,
+    history: [],
+    done: false,
+  };
+});
+
+// ── DEBRIS (post-impact scatter) ─────────────────────────────
+let debris = [];
+let shockwaveR = 0;
+let shockwaveAlpha = 0;
+let impacted = false;
+
+function spawnDebris(cx, cy) {
+  debris = Array.from({length: 60}, () => {
+    const a = Math.random() * Math.PI * 2;
+    const speed = 80 + Math.random() * 220;
+    return {
+      x: cx, y: cy,
+      vx: Math.cos(a) * speed,
+      vy: Math.sin(a) * speed,
+      life: 1,
+      decay: 0.018 + Math.random() * 0.022,
+      size: 0.8 + Math.random() * 2.2,
+      bright: Math.random() > 0.6, // some are bright white
+    };
+  });
+  shockwaveR = 0;
+  shockwaveAlpha = 1;
+}
+
+// ── TIMELINE ──────────────────────────────────────────────────
+// 0–900ms    streams shoot inward fast, spiralling tighter
+// 900ms      IMPACT — shockwave + debris burst
+// 900–1400ms shockwave expands, debris scatters, glow settles
+// 1400ms     logo + text reveal
+// 1400–2600ms hold
+// 2600–3000ms fade out
+// 3000ms     navigate
+
+const IMPACT_AT  = 900;
+const REVEAL_AT  = 1380;
+const EXIT_START = 5400;
+const EXIT_DUR   = 600;
+const NAV_AT     = 6000;  // minimum display time
+const AUTH_URL   = "https://lobby-auth-server.onrender.com";
+
+let t0=null, done=false, revealed=false;
+let navTarget = null; // set by auth check: "index.html" or "login.html"
+
+// ── Silent auth check runs immediately ────────────────────────
+(async function checkAuth() {
+  try {
+    const token = localStorage.getItem("vh_token") || sessionStorage.getItem("vh_token");
+    if (!token) { navTarget = "login.html"; return; }
+    const res = await fetch(`${AUTH_URL}/me`, {
+      headers: { Authorization: `Bearer ${token}` }
+    });
+    navTarget = res.ok ? "index.html" : "login.html";
+    if (!res.ok) {
+      // Token invalid — clear it
+      localStorage.removeItem("vh_token");
+      sessionStorage.removeItem("vh_token");
+    }
+  } catch {
+    // Server unreachable — go to login to show error
+    navTarget = "login.html";
+  }
+})();
+let lastT = 0;
+
+function frame(ts) {
+  if (!t0) t0 = ts;
+  const t   = ts - t0;
+  const dt  = Math.min(t - lastT, 32); // cap delta
+  lastT = t;
+
+  const W = canvas.width, H = canvas.height;
+  const cx = W/2, cy = H/2;
+
+  // Full clear each frame for crisp rendering
+  ctx.clearRect(0, 0, W, H);
+  ctx.fillStyle = BG;
+  ctx.fillRect(0, 0, W, H);
+  // Motion trail only during stream phase
+  if (t < IMPACT_AT + 100) {
+    ctx.fillStyle = `rgba(${BGC.r},${BGC.g},${BGC.b},0.55)`;
+    ctx.fillRect(0, 0, W, H);
+  }
+
+  const tNorm = Math.min(t / IMPACT_AT, 1); // 0→1 during approach
+
+  // ── Draw streams ──────────────────────────────────────────
+  if (t < IMPACT_AT + 200) {
+    streams.forEach((s, si) => {
+      if (s.done) return;
+
+      // Spiral progress: fast in, tightening
+      const progress = Math.min(t / IMPACT_AT * s.speed, 1);
+      const e = easeOut5(progress);
+
+      // Radius shrinks from startR → 0
+      const r = s.startR * (1 - e);
+      // Rotations increase as spiral tightens: 2.5 full rotations
+      const spin = s.baseAngle + e * Math.PI * 5;
+
+      const x = cx + Math.cos(spin) * r;
+      const y = cy + Math.sin(spin) * r;
+
+      s.history.push({x, y});
+      if (s.history.length > s.tailLen) s.history.shift();
+
+      if (progress >= 1) {
+        s.done = true;
+        return;
+      }
+
+      if (s.history.length < 2) return;
+
+      // Draw tail: gradient from transparent → bright
+      for (let i = 1; i < s.history.length; i++) {
+        const pct = i / s.history.length;
+        const a = Math.pow(pct, 1.8) * 0.9;
+        const w = s.width * pct;
+
+        ctx.beginPath();
+        ctx.moveTo(s.history[i-1].x, s.history[i-1].y);
+        ctx.lineTo(s.history[i].x,   s.history[i].y);
+        ctx.strokeStyle = `rgba(${acS},${a})`;
+        ctx.lineWidth   = w * 2.2;
+        ctx.lineCap     = 'round';
+        ctx.stroke();
+      }
+
+      // Bright head
+      const headA = 0.95;
+      // Core
+      ctx.beginPath();
+      ctx.arc(x, y, s.width * 1.2, 0, Math.PI*2);
+      ctx.fillStyle = `rgba(255,255,255,${headA})`;
+      ctx.fill();
+      // Bright outer flash
+      ctx.beginPath();
+      ctx.arc(x, y, s.width * 2.8, 0, Math.PI*2);
+      ctx.fillStyle = `rgba(${acS},0.7)`;
+      ctx.fill();
+      // Glow ring
+      const gr = ctx.createRadialGradient(x,y,0, x,y, s.width*12);
+      gr.addColorStop(0,   `rgba(${acS},0.85)`);
+      gr.addColorStop(0.4, `rgba(${acS},0.15)`);
+      gr.addColorStop(1,   'transparent');
+      ctx.beginPath();
+      ctx.arc(x, y, s.width*12, 0, Math.PI*2);
+      ctx.fillStyle = gr;
+      ctx.fill();
+    });
+  }
+
+  // ── Ambient build-up glow ─────────────────────────────────
+  if (tNorm > 0.3) {
+    const g = (tNorm - 0.3) / 0.7;
+    const gr = ctx.createRadialGradient(cx,cy,0, cx,cy, 200);
+    gr.addColorStop(0,   `rgba(${acS},${g * 0.25})`);
+    gr.addColorStop(0.5, `rgba(${acS},${g * 0.06})`);
+    gr.addColorStop(1,   'transparent');
+    ctx.fillStyle = gr;
+    ctx.fillRect(0,0,W,H);
+  }
+
+  // ── Force impact at IMPACT_AT regardless of stream state ──
+  if (t >= IMPACT_AT && !impacted) {
+    impacted = true;
+    spawnDebris(cx, cy);
+  }
+
+  // ── Shockwave ring ────────────────────────────────────────
+  if (impacted) {
+    const elapsed = t - IMPACT_AT;
+
+    // Expand ring fast then slow
+    shockwaveR = Math.min(elapsed * 1.4, 360);
+    shockwaveAlpha = Math.max(0, 1 - elapsed / 500);
+
+    if (shockwaveAlpha > 0) {
+      ctx.beginPath();
+      ctx.arc(cx, cy, shockwaveR, 0, Math.PI*2);
+      ctx.strokeStyle = `rgba(255,255,255,${shockwaveAlpha * 0.7})`;
+      ctx.lineWidth = 2.5 * shockwaveAlpha;
+      ctx.stroke();
+
+      // Second wider softer ring
+      ctx.beginPath();
+      ctx.arc(cx, cy, shockwaveR * 0.7, 0, Math.PI*2);
+      ctx.strokeStyle = `rgba(${acS},${shockwaveAlpha * 0.4})`;
+      ctx.lineWidth = 8 * shockwaveAlpha;
+      ctx.stroke();
+    }
+
+    // Impact flash — only in first 120ms
+    if (elapsed < 120) {
+      const flash = 1 - elapsed / 120;
+      const gr = ctx.createRadialGradient(cx,cy,0, cx,cy,200);
+      gr.addColorStop(0,   `rgba(255,255,255,${flash * 0.6})`);
+      gr.addColorStop(0.3, `rgba(${acS},${flash * 0.4})`);
+      gr.addColorStop(1,   'transparent');
+      ctx.fillStyle = gr;
+      ctx.fillRect(0,0,W,H);
+    }
+
+    // Post-impact glow settles
+    const glowP = Math.min(elapsed / 600, 1);
+    const gr = ctx.createRadialGradient(cx,cy,0, cx,cy,180);
+    gr.addColorStop(0,   `rgba(${acS},${0.3 * glowP})`);
+    gr.addColorStop(0.5, `rgba(${acS},${0.08 * glowP})`);
+    gr.addColorStop(1,   'transparent');
+    ctx.fillStyle = gr;
+    ctx.fillRect(0,0,W,H);
+
+    // ── Debris ──────────────────────────────────────────────
+    const dtSec = dt / 1000;
+    debris.forEach(d => {
+      if (d.life <= 0) return;
+      d.life -= d.decay;
+      d.x += d.vx * dtSec;
+      d.y += d.vy * dtSec;
+      d.vx *= 0.92;
+      d.vy *= 0.92;
+
+      const a = Math.max(0, d.life) * 0.85;
+      if (d.bright) {
+        ctx.beginPath();
+        ctx.arc(d.x, d.y, d.size, 0, Math.PI*2);
+        ctx.fillStyle = `rgba(255,255,255,${a})`;
+        ctx.fill();
+      }
+      ctx.beginPath();
+      ctx.arc(d.x, d.y, d.size * (d.bright ? 3 : 2), 0, Math.PI*2);
+      ctx.fillStyle = `rgba(${acS},${a * 0.5})`;
+      ctx.fill();
+    });
+  }
+
+  // ── Reveal logo ───────────────────────────────────────────
+  if (t >= REVEAL_AT && !revealed) {
+    revealed = true;
+    document.getElementById("iconBox").classList.add("show");
+    document.getElementById("wordWrap").classList.add("show");
+  }
+
+
+  // ☀️ SUMMER — sun shines edge rays
+  drawSun(t, W, H, cx, cy);
+
+  // ── Exit fade ─────────────────────────────────────────────
+  const exitP = Math.max(0, Math.min((t - EXIT_START) / EXIT_DUR, 1));
+  if (exitP > 0) {
+    ctx.fillStyle = `rgba(${BGC.r},${BGC.g},${BGC.b},${easeInOut(exitP)})`;
+    ctx.fillRect(0,0,W,H);
+  }
+
+  if (t > NAV_AT && navTarget && !done) {
+    done = true;
+    if (window.electronAPI?.navigate) window.electronAPI.navigate(navTarget, "fade");
+    else window.location.href = navTarget;
+    return;
+  }
+
+  requestAnimationFrame(frame);
+}
+
+requestAnimationFrame(frame);
+</script>
+</body>
+</html>

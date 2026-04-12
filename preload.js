@@ -28,6 +28,11 @@ contextBridge.exposeInMainWorld("electronAPI", {
   onVcPipAction: (cb) => ipcRenderer.on("vc-pip-action", (_e, a) => cb(a)),
   onVcPipClosed: (cb) => ipcRenderer.on("vc-pip-closed", () => cb()),
 
+  // ── Window controls (frameless) ───────────────────────────
+  minimizeWindow: () => ipcRenderer.invoke("win-minimize"),
+  maximizeWindow: () => ipcRenderer.invoke("win-maximize"),
+  closeWindow:    () => ipcRenderer.invoke("win-close"),
+
   // ── Auto-Updater ─────────────────────────────────────────
   getAppVersion: () => ipcRenderer.invoke("get-app-version"),
   downloadUpdate: (url, fileName) => ipcRenderer.invoke("download-update", url, fileName),

@@ -2,14 +2,22 @@
 //  main.js  —  Electron main process
 // ============================================================
 
-const { app, BrowserWindow, ipcMain, desktopCapturer, session, shell, screen } = require("electron");
+const { app, BrowserWindow, ipcMain, desktopCapturer, session, shell, screen, Menu } = require("electron");
 const path = require("path");
+
+// Remove the native menu bar entirely
+Menu.setApplicationMenu(null);
 
 function createWindow() {
   const win = new BrowserWindow({
     width: 1280,
     height: 800,
+    minWidth: 800,
+    minHeight: 600,
     icon: path.join(__dirname, "icon.ico"),
+    autoHideMenuBar: true,
+    frame: false,
+    resizable: true,
     webPreferences: {
       preload: path.join(__dirname, "preload.js"),
       contextIsolation: true,
@@ -53,7 +61,14 @@ function createWindow() {
     steamWin.on("closed", () => {});
   });
 
-  win.loadFile("login.html");
+  // Auto-select seasonal splash (Dec-Feb=winter, Mar-May=spring, Jun-Aug=summer, Sep-Nov=autumn)
+  const month = new Date().getMonth(); // 0=Jan
+  const splashFile = month <= 1 || month === 11 ? "splash_winter.html"
+    : month <= 4 ? "splash_spring.html"
+    : month <= 7 ? "splash_summer.html"
+    : "splash_autumn.html";
+  const splashPath = path.join(__dirname, splashFile);
+  win.loadFile(fs.existsSync(splashPath) ? splashFile : "splash.html");
 }
 
 ipcMain.handle("navigate", (event, page, direction = "fade") => {
@@ -286,6 +301,23 @@ ipcMain.handle("download-update", async (event, downloadUrl, fileName) => {
 
     doDownload(downloadUrl);
   });
+});
+
+// ── Custom window controls ────────────────────────────────────
+ipcMain.handle("win-minimize", (event) => {
+  BrowserWindow.fromWebContents(event.sender)?.minimize();
+});
+ipcMain.handle("win-maximize", (event) => {
+  const win = BrowserWindow.fromWebContents(event.sender);
+  if (!win) return;
+  win.isMaximized() ? win.unmaximize() : win.maximize();
+});
+ipcMain.handle("win-close", (event) => {
+  BrowserWindow.fromWebContents(event.sender)?.close();
+});
+ipcMain.handle("set-titlebar-overlay", (event, { color, symbolColor }) => {
+  const win = BrowserWindow.fromWebContents(event.sender);
+  if (win) win.setTitleBarOverlay({ color, symbolColor, height: 72 });
 });
 
 app.whenReady().then(() => {

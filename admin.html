@@ -30,7 +30,7 @@
     .main { flex:1; display:flex; flex-direction:column; overflow:hidden; }
     .topbar { height:50px; padding:0 24px; display:flex; align-items:center; justify-content:space-between; border-bottom:1px solid rgba(0,0,0,.3); background:var(--bg-2); flex-shrink:0; }
     .topbar-title { font-size:16px; font-weight:700; }
-    .topbar-actions { display:flex; gap:8px; }
+    .topbar-actions { display:flex; gap:8px; margin-right:114px; }
     .content { flex:1; overflow-y:auto; padding:24px; background:var(--bg-2); }
     .stats-row { display:grid; grid-template-columns:repeat(4,1fr); gap:16px; margin-bottom:28px; }
     .stat-card { background:var(--bg-1); border-radius:var(--radius); padding:18px 20px; }
@@ -97,6 +97,76 @@
     ::-webkit-scrollbar { width:6px; }
     ::-webkit-scrollbar-thumb { background:var(--bg-3); border-radius:3px; }
   </style>
+  <script>
+  // ── Apply saved theme on load ────────────────────────────────
+  (function(){
+    const THEMES={
+      default:{bg0:"#1e1f22",bg1:"#2b2d31",bg2:"#313338",bg3:"#383a40",accent:"#5865f2",accentH:"#4752c4",t1:"#f2f3f5",t2:"#b5bac1",t3:"#80848e"},
+      midnight:{bg0:"#0a0a0f",bg1:"#111118",bg2:"#1a1a24",bg3:"#22222f",accent:"#7c3aed",accentH:"#6d28d9",t1:"#f0f0ff",t2:"#a0a0c0",t3:"#606080"},
+      forest:{bg0:"#0d1a0f",bg1:"#142018",bg2:"#1a2d1f",bg3:"#213828",accent:"#16a34a",accentH:"#15803d",t1:"#ecfdf5",t2:"#86efac",t3:"#4ade80"},
+      ocean:{bg0:"#030d1a",bg1:"#071828",bg2:"#0c2236",bg3:"#112c44",accent:"#0ea5e9",accentH:"#0284c7",t1:"#f0f9ff",t2:"#7dd3fc",t3:"#38bdf8"},
+      sunset:{bg0:"#1a0a0a",bg1:"#2a1010",bg2:"#381818",bg3:"#442020",accent:"#f97316",accentH:"#ea580c",t1:"#fff7ed",t2:"#fdba74",t3:"#fb923c"},
+      rose:{bg0:"#1a0a10",bg1:"#2a1020",bg2:"#38182c",bg3:"#442038",accent:"#e11d48",accentH:"#be123c",t1:"#fff1f2",t2:"#fda4af",t3:"#fb7185"},
+      nord:{bg0:"#2e3440",bg1:"#3b4252",bg2:"#434c5e",bg3:"#4c566a",accent:"#88c0d0",accentH:"#81a1c1",t1:"#eceff4",t2:"#d8dee9",t3:"#a0a8b8"},
+      mocha:{bg0:"#1c1917",bg1:"#292524",bg2:"#2d2b29",bg3:"#3d3935",accent:"#c2966c",accentH:"#a87a50",t1:"#fafaf9",t2:"#d6d3d1",t3:"#a8a29e"},
+      light:{bg0:"#f2f3f5",bg1:"#ffffff",bg2:"#e9eaec",bg3:"#d9dade",accent:"#5865f2",accentH:"#4752c4",t1:"#060607",t2:"#4e5058",t3:"#80848e"},
+      charizard:{bg0:"#0d0608",bg1:"#1a0c10",bg2:"#261018",bg3:"#321420",accent:"#8b1a2a",accentH:"#6e1220",t1:"#f5e6e8",t2:"#c9909a",t3:"#8a5560"},
+    };
+    // Full Pokémon + anime + games theme list (bg0/accent/t values)
+    const POKE=[
+      ["bulbasaur","#051008","#0a1e10","#102c18","#163a20","#16a34a","#15803d","#f0fff4","#bbf7d0","#86efac"],
+      ["charmander","#1a0800","#2d1200","#3d1c00","#4d2600","#f97316","#ea580c","#fff7ed","#fdba74","#fb923c"],
+      ["squirtle","#030e18","#061c2e","#092844","#0c345a","#38bdf8","#0ea5e9","#f0f9ff","#bae6fd","#7dd3fc"],
+      ["pikachu","#1a1500","#2d2400","#3d3000","#4d3c00","#fbbf24","#f59e0b","#fffbeb","#fef3c7","#fde68a"],
+      ["raichu","#1a1000","#2e1c00","#3e2800","#4e3400","#fbbf24","#f59e0b","#fffbeb","#fef3c7","#fde68a"],
+      ["clefairy","#180a12","#2c1820","#3e262e","#50343c","#f9a8d4","#f472b6","#fdf2f8","#fce7f3","#fbcfe8"],
+      ["jigglypuff","#1a0814","#2d1422","#3d1c2e","#4d243a","#f9a8d4","#f472b6","#fdf2f8","#fce7f3","#fbcfe8"],
+      ["meowth","#1a1408","#2e2410","#3e3018","#4e3c20","#fbbf24","#f59e0b","#fffbeb","#fef3c7","#fde68a"],
+      ["psyduck","#1a1000","#2e1c00","#3e2800","#4e3400","#fbbf24","#f59e0b","#fffbeb","#fef3c7","#fde68a"],
+      ["arcanine","#1a0c00","#2d1a00","#3d2400","#4d2e00","#f97316","#ea580c","#fff7ed","#fdba74","#fb923c"],
+      ["alakazam","#14100a","#221e12","#302c1a","#3e3a22","#f59e0b","#d97706","#fffbeb","#fde68a","#fbbf24"],
+      ["slowbro","#140a18","#221424","#301e30","#3e283c","#e879f9","#d946ef","#fdf4ff","#fae8ff","#f0abfc"],
+      ["gengar","#0a0814","#12102a","#1a1838","#221f45","#7c3aed","#6d28d9","#f0e8ff","#c4b5fd","#8b73cc"],
+      ["marowak","#100800","#1e1200","#2c1c00","#3a2600","#d97706","#b45309","#fffbeb","#fde68a","#fbbf24"],
+      ["chansey","#1a0812","#2d1420","#3d1c2c","#4d2438","#f9a8d4","#f472b6","#fdf2f8","#fce7f3","#fbcfe8"],
+      ["gyarados","#020c1a","#041828","#062436","#083044","#1d4ed8","#1e40af","#eff6ff","#bfdbfe","#93c5fd"],
+      ["lapras","#020c18","#041828","#062438","#083048","#38bdf8","#0ea5e9","#f0f9ff","#e0f2fe","#bae6fd"],
+      ["eevee","#1a1208","#2e2010","#3d2c16","#4d381c","#d97706","#b45309","#fffbeb","#fde68a","#fbbf24"],
+      ["vaporeon","#030d1a","#061828","#092236","#0c2c44","#22d3ee","#06b6d4","#f0fdff","#a5f3fc","#67e8f9"],
+      ["jolteon","#141000","#221c00","#302800","#3e3400","#fde047","#facc15","#fefce8","#fef9c3","#fef08a"],
+      ["flareon","#1a0600","#2d0e00","#3d1600","#4d1e00","#f97316","#ea580c","#fff7ed","#fed7aa","#fdba74"],
+      ["snorlax","#040c10","#081820","#0c242e","#10303c","#1d4ed8","#1e40af","#eff6ff","#bfdbfe","#93c5fd"],
+      ["mewtwo","#120a1a","#1e1228","#2a1a36","#362244","#a855f7","#9333ea","#fdf4ff","#e9d5ff","#d8b4fe"],
+      ["mew","#1a0812","#2d1420","#3d1c2c","#4d2438","#f9a8d4","#f472b6","#fdf2f8","#fce7f3","#fbcfe8"],
+      ["espeon","#10071a","#1e1228","#2c1d36","#3a2844","#c084fc","#a855f7","#fdf4ff","#f3e8ff","#e9d5ff"],
+      ["umbreon","#070510","#0e0b1e","#16112c","#1e173a","#f59e0b","#d97706","#fffbeb","#fde68a","#fbbf24"],
+      ["sylveon","#1a0814","#2d1422","#3d1c2e","#4d243a","#f472b6","#ec4899","#fdf2f8","#fbcfe8","#f9a8d4"],
+      ["gardevoir","#0f0518","#1c0d28","#281538","#341d48","#ec4899","#db2777","#fdf2f8","#fbcfe8","#f9a8d4"],
+      ["lucario","#080e1a","#0e1826","#162234","#1c2c42","#3b82f6","#2563eb","#eff6ff","#93c5fd","#60a5fa"],
+      ["greninja","#040a14","#081424","#0c1e34","#102844","#0284c7","#0369a1","#f0f9ff","#bae6fd","#7dd3fc"],
+      ["rayquaza","#061008","#0e1c10","#162818","#1e3420","#65a30d","#4d7c0f","#f7fee7","#d9f99d","#bef264"],
+      ["mimikyu","#120e04","#201c0c","#2e2a14","#3c381c","#facc15","#eab308","#fefce8","#fef9c3","#fef08a"],
+      ["lunala","#080410","#10081e","#180c2c","#20103a","#c084fc","#a855f7","#fdf4ff","#f3e8ff","#e9d5ff"],
+      ["marshadow","#080c10","#101820","#182430","#203040","#94a3b8","#64748b","#f8fafc","#e2e8f0","#cbd5e1"],
+    ];
+    POKE.forEach(([id,b0,b1,b2,b3,ac,ah,t1,t2,t3])=>{
+      THEMES[id]={bg0:b0,bg1:b1,bg2:b2,bg3:b3,accent:ac,accentH:ah,t1,t2,t3};
+    });
+
+    const id = localStorage.getItem("lobby_theme") || "default";
+    const t  = THEMES[id] || THEMES.default;
+    const r  = document.documentElement;
+    r.style.setProperty("--bg-0",   t.bg0);
+    r.style.setProperty("--bg-1",   t.bg1);
+    r.style.setProperty("--bg-2",   t.bg2);
+    r.style.setProperty("--bg-3",   t.bg3);
+    r.style.setProperty("--accent", t.accent);
+    r.style.setProperty("--accent-h", t.accentH);
+    r.style.setProperty("--text-1", t.t1);
+    r.style.setProperty("--text-2", t.t2);
+    r.style.setProperty("--text-3", t.t3);
+  })();
+  </script>
   <script src="nav.js"></script>
 </head>
 <body>
@@ -434,5 +504,26 @@ function showToast(msg, type="success") { const el=document.getElementById("toas
 
 boot();
 </script>
+
+<!-- ── Frameless window controls ── -->
+<style>
+  #winControls { position:fixed; top:0; right:0; height:46px; display:flex; align-items:center; z-index:99999; -webkit-app-region:no-drag; }
+  .win-btn { width:46px; height:46px; border:none; background:transparent; color:var(--text-3); cursor:pointer; display:flex; align-items:center; justify-content:center; transition:background .15s, color .15s; }
+  .win-btn:hover { background:rgba(255,255,255,.08); color:var(--text-1); }
+  .win-btn.close:hover { background:#c42b1c; color:#fff; }
+  .sidebar-header { -webkit-app-region: drag; }
+  .sidebar-header * { -webkit-app-region: no-drag; }
+</style>
+<div id="winControls">
+  <button class="win-btn" title="Minimise" onclick="window.electronAPI?.minimizeWindow()">
+    <svg width="10" height="1" viewBox="0 0 10 1"><rect width="10" height="1.5" fill="currentColor"/></svg>
+  </button>
+  <button class="win-btn" title="Maximise/Restore" onclick="window.electronAPI?.maximizeWindow()">
+    <svg width="10" height="10" viewBox="0 0 10 10" fill="none" stroke="currentColor" stroke-width="1.2"><rect x="0.6" y="0.6" width="8.8" height="8.8" rx="1"/></svg>
+  </button>
+  <button class="win-btn close" title="Close" onclick="window.electronAPI?.closeWindow()">
+    <svg width="10" height="10" viewBox="0 0 10 10" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"><line x1="0" y1="0" x2="10" y2="10"/><line x1="10" y1="0" x2="0" y2="10"/></svg>
+  </button>
+</div>
 </body>
 </html>
