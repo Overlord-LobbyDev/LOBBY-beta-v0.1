@@ -2,7 +2,7 @@
 // FIXED VERSION — PostgreSQL syntax
 const express = require('express');
 const router = express.Router();
-const { v4: uuidv4 } = require('uuid');
+
 const { pool } = require('./db');
 
 // Auth middleware - expects req.user to be set by your auth system
@@ -36,17 +36,13 @@ router.post('/create', verifyAuth, async (req, res) => {
       return res.status(400).json({ error: 'Invalid player count' });
     }
     
-    const tournamentId = uuidv4();
-    const now = new Date();
-    
     const result = await pool.query(
       `INSERT INTO tournaments 
-        (id, lobby_id, host_id, name, description, format, player_count, 
-         max_players, status, rules, prize, created_at, start_time)
-       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13)
+        (lobby_id, host_id, name, description, format, player_count, 
+         max_players, status, rules, prize, start_time)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
        RETURNING *`,
       [
-        tournamentId,
         lobbyId,
         req.user.id,
         name,
@@ -57,7 +53,6 @@ router.post('/create', verifyAuth, async (req, res) => {
         'setup',
         rules || null,
         prize || null,
-        now,
         startTime ? new Date(startTime) : null
       ]
     );
