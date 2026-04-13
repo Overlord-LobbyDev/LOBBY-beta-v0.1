@@ -130,7 +130,7 @@ async function handleTournamentSubmit(e) {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
-                'Authorization': `Bearer ${localStorage.getItem('token')}`
+                'Authorization': `Bearer ${localStorage.getItem('vh_token')}`
             },
             body: JSON.stringify(tournamentData)
         });
@@ -168,7 +168,7 @@ async function loadTournaments() {
     try {
         const response = await fetch(`${API_BASE}/api/tournaments/lobby/${currentLobbyId}`, {
             headers: {
-                'Authorization': `Bearer ${localStorage.getItem('token')}`
+                'Authorization': `Bearer ${localStorage.getItem('vh_token')}`
             }
         });
 
@@ -226,7 +226,7 @@ async function openTournamentDetails(tournamentId) {
     try {
         const response = await fetch(`${API_BASE}/api/tournaments/${tournamentId}`, {
             headers: {
-                'Authorization': `Bearer ${localStorage.getItem('token')}`
+                'Authorization': `Bearer ${localStorage.getItem('vh_token')}`
             }
         });
 
@@ -302,7 +302,7 @@ async function generateBracket(tournamentId) {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
-                'Authorization': `Bearer ${localStorage.getItem('token')}`
+                'Authorization': `Bearer ${localStorage.getItem('vh_token')}`
             }
         });
 
@@ -331,7 +331,7 @@ async function registerForTournament(tournamentId) {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
-                'Authorization': `Bearer ${localStorage.getItem('token')}`
+                'Authorization': `Bearer ${localStorage.getItem('vh_token')}`
             }
         });
 
