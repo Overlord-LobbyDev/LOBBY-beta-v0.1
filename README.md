@@ -1,0 +1,1 @@
+![Welcome to LOBBY. Meet Lottie, our mascot!(https://github.com/Overlord-LobbyDev/LOBBY-beta-v0.1/blob/main/image.png?raw=true)
