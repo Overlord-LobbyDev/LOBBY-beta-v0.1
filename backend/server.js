@@ -47,7 +47,7 @@ app.get("/", (req, res) => {
 
 // ── Tournament Routes ──────────────────────────────────
 try {
-  const tournamentRoutes = require('./routes/tournaments.js');
+  const tournamentRoutes = require('./tournaments.js');
   
   // Inject auth middleware into tournament routes
   app.use('/api/tournaments', (req, res, next) => {
