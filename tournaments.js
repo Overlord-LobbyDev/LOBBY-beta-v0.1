@@ -276,73 +276,275 @@ async function openTournamentDetails(tournamentId) {
 function showBracketPanel(tournament) {
     const chatPanel = document.getElementById('chatPanel');
     if (!chatPanel) return;
-    
-    // Mark bracket panel as active
+
     window.bracketPanelActive = true;
     window.activeTournament = tournament;
-    
+
     document.getElementById('homePanel')?.classList.add('hidden');
     document.getElementById('profilePage')?.classList.add('hidden');
     document.getElementById('vcPanel')?.classList.add('hidden');
     chatPanel.classList.remove('hidden');
-    
-    // Get header and content areas
+
     const chatHeader = chatPanel.querySelector('.chat-header') || chatPanel.querySelector('#chatHeader');
-    const chatMain = chatPanel.querySelector('.chat-main') || chatPanel.querySelector('#chatMain');
-    
-    const players = tournament.registeredPlayers || [];
-    const formats = { 'single': 'Single', 'double': 'Double', 'round-robin': 'Round Robin' };
-    const bracket = tournament.bracket || { rounds: [] };
-    const hasMatches = bracket.rounds && bracket.rounds.some(r => r.matches && r.matches.length > 0);
-    
-    const _avStyle = 'width:20px;height:20px;border-radius:50%;background:linear-gradient(135deg,var(--accent),var(--accent-h));display:flex;align-items:center;justify-content:center;font-size:9px;font-weight:700;color:#fff;overflow:hidden;flex-shrink:0;';
-    let bracketHTML = '';
-    if (hasMatches) {
-        bracketHTML = `<div style="display: flex; gap: 40px; overflow-x: auto; overflow-y: auto; padding: 20px 24px; flex: 1;">`;
-        bracket.rounds.forEach(round => {
-            bracketHTML += `<div style="flex-shrink: 0; display: flex; flex-direction: column; gap: 16px;"><div style="text-align: center; font-size: 11px; font-weight: 700; text-transform: uppercase; color: rgba(255, 255, 255, 0.4); letter-spacing: 0.5px;">Round ${round.roundNumber}</div><div style="display: flex; flex-direction: column; gap: 12px;">`;
-            (round.matches || []).forEach(match => {
-                const p1w = match.winner === match.player1?.userId;
-                const p2w = match.winner === match.player2?.userId;
-                const p1av = match.player1?.avatar_url ? `<img src="${match.player1.avatar_url}" style="width:100%;height:100%;object-fit:cover;border-radius:50%;">` : (match.player1?.username||'?')[0].toUpperCase();
-                const p2av = match.player2?.avatar_url ? `<img src="${match.player2.avatar_url}" style="width:100%;height:100%;object-fit:cover;border-radius:50%;">` : (match.player2?.username||'?')[0].toUpperCase();
-                bracketHTML += `<div style="width:220px;background:linear-gradient(135deg,rgba(88,101,242,0.1),rgba(249,168,212,0.05));border:2px solid rgba(88,101,242,0.2);border-radius:8px;padding:12px;display:flex;flex-direction:column;gap:8px;"><div style="display:flex;align-items:center;gap:8px;padding:8px;background:${p1w?'rgba(35,165,90,0.15)':'rgba(0,0,0,0.2)'};border-radius:4px;border-left:${p1w?'2px solid #23a55a':'none'};font-size:12px;font-weight:500;color:#fff;"><div style="${_avStyle}">${p1av}</div><span style="flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${match.player1?.username||'TBD'}</span><span style="background:rgba(255,255,255,0.1);border:1px solid rgba(255,255,255,0.1);padding:3px 8px;border-radius:3px;font-size:11px;font-weight:600;width:40px;text-align:center;">${match.player1Score||0}</span></div><div style="height:1px;background:rgba(255,255,255,0.1);"></div><div style="display:flex;align-items:center;gap:8px;padding:8px;background:${p2w?'rgba(35,165,90,0.15)':'rgba(0,0,0,0.2)'};border-radius:4px;border-left:${p2w?'2px solid #23a55a':'none'};font-size:12px;font-weight:500;color:#fff;"><div style="${_avStyle}">${p2av}</div><span style="flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${match.player2?.username||'TBD'}</span><span style="background:rgba(255,255,255,0.1);border:1px solid rgba(255,255,255,0.1);padding:3px 8px;border-radius:3px;font-size:11px;font-weight:600;width:40px;text-align:center;">${match.player2Score||0}</span></div></div>`;
-            });
-            bracketHTML += `</div></div>`;
+    const chatMain   = chatPanel.querySelector('.chat-main')   || chatPanel.querySelector('#chatMain');
+
+    const players  = tournament.registeredPlayers || [];
+    const bracket  = tournament.bracket || { rounds: [] };
+    const fmtMap   = { single:'Single', double:'Double', 'round-robin':'Round Robin' };
+    const isHost   = tournament.hostId === currentUserId;
+    const isReg    = players.some(p => p.userId === currentUserId);
+    const canStart = players.length >= 2;
+
+    // ── Build full bracket skeleton merged with real data ──
+    function buildSkeleton(playerCount) {
+        const slots = Math.pow(2, Math.ceil(Math.log2(Math.max(playerCount||2, 2))));
+        const nr = Math.log2(slots);
+        const rounds = [];
+        for (let r = 1; r <= nr; r++) {
+            const mc = slots / Math.pow(2, r);
+            rounds.push({ roundNumber: r, matches: Array.from({length:mc}, (_,i) => ({ matchNumber:i+1, player1:null, player2:null, winner:null, player1Score:null, player2Score:null })) });
+        }
+        return rounds;
+    }
+
+    const skeleton = buildSkeleton(tournament.playerCount);
+    const rounds   = skeleton.map(sr => (bracket.rounds||[]).find(r => r.roundNumber === sr.roundNumber) || sr);
+    const numRounds = rounds.length;
+
+    function getRoundName(r, total) {
+        const rem = total - r + 1;
+        if (rem === 1) return 'Final';
+        if (rem === 2) return 'Semi-Final';
+        if (rem === 3) return 'Quarter-Final';
+        return `Round ${r}`;
+    }
+
+    // ── Tree bracket with absolute positioning ──
+    const MATCH_W = 185, MATCH_H = 60, COL_GAP = 48, V_PAD = 30;
+    const firstCount = rounds[0]?.matches?.length || 1;
+    const vSpacing   = MATCH_H + 14;
+    const totalH     = firstCount * vSpacing - 14;
+    const totalW     = numRounds * MATCH_W + (numRounds - 1) * COL_GAP;
+
+    const bgData = JSON.parse(localStorage.getItem('vh_tournament_bracket_bg_data') || '{}');
+    let bgStyle = '';
+    if (bgData.imageUrl) bgStyle = `background-image:url(${bgData.imageUrl});background-size:cover;background-position:center;`;
+    else if (bgData.colour) bgStyle = `background-color:${bgData.colour};`;
+
+    // Build match card HTML
+    const avS = 'width:18px;height:18px;border-radius:50%;background:linear-gradient(135deg,var(--accent),var(--accent-h));display:flex;align-items:center;justify-content:center;font-size:8px;font-weight:800;color:#fff;overflow:hidden;flex-shrink:0;';
+    let matchCards = '';
+    let connPaths  = '';
+
+    rounds.forEach((round, rIdx) => {
+        const mc       = round.matches.length;
+        const slotH    = totalH / mc;
+        const x        = rIdx * (MATCH_W + COL_GAP);
+        const lbl      = getRoundName(round.roundNumber, numRounds);
+
+        // Round label
+        matchCards += `<div style="position:absolute;left:${x}px;top:0;width:${MATCH_W}px;text-align:center;font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:.8px;color:rgba(255,255,255,.35)">${lbl}</div>`;
+
+        round.matches.forEach((match, mIdx) => {
+            const cy  = V_PAD + slotH * mIdx + slotH / 2 - MATCH_H / 2;
+            const p1  = match.player1, p2 = match.player2;
+            const p1w = match.winner && match.winner === p1?.userId;
+            const p2w = match.winner && match.winner === p2?.userId;
+            const p1av = p1?.avatar_url ? `<img src="${p1.avatar_url}" style="width:100%;height:100%;object-fit:cover;border-radius:50%;">` : (p1?.(p1.username||'?')[0].toUpperCase() ?? '?');
+            const p2av = p2?.avatar_url ? `<img src="${p2.avatar_url}" style="width:100%;height:100%;object-fit:cover;border-radius:50%;">` : (p2?(p2.username||'?')[0].toUpperCase() : '?');
+
+            matchCards += `
+            <div style="position:absolute;left:${x}px;top:${cy}px;width:${MATCH_W}px;background:var(--bg-2);border:1.5px solid rgba(255,255,255,.09);border-radius:8px;overflow:hidden;transition:border-color .15s" onmouseover="this.style.borderColor='rgba(249,168,212,.35)'" onmouseout="this.style.borderColor='rgba(255,255,255,.09)'">
+              <div style="display:flex;align-items:center;gap:7px;padding:8px 9px;background:${p1w?'rgba(35,165,90,.14)':'transparent'};${p1w&&!p2w?'':''}${!p1w&&p2w?'opacity:.45':''}">
+                <div style="${avS}">${p1av}</div>
+                <span style="flex:1;font-size:11px;font-weight:${p1w?700:500};color:${p1w?'#57f287':'var(--text-2)'};overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${p1?.username||'TBD'}</span>
+                <span style="font-size:10px;font-weight:700;background:${p1w?'rgba(35,165,90,.22)':'var(--bg-3)'};border:1px solid ${p1w?'rgba(35,165,90,.3)':'rgba(255,255,255,.08)'};border-radius:4px;padding:2px 6px;min-width:22px;text-align:center;color:${p1w?'#57f287':'var(--text-2)'}">${match.player1Score!=null?match.player1Score:'-'}</span>
+              </div>
+              <div style="height:1px;background:rgba(255,255,255,.06)"></div>
+              <div style="display:flex;align-items:center;gap:7px;padding:8px 9px;background:${p2w?'rgba(35,165,90,.14)':'transparent'};${!p2w&&p1w?'opacity:.45':''}">
+                <div style="${avS}">${p2av}</div>
+                <span style="flex:1;font-size:11px;font-weight:${p2w?700:500};color:${p2w?'#57f287':'var(--text-2)'};overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${p2?.username||'TBD'}</span>
+                <span style="font-size:10px;font-weight:700;background:${p2w?'rgba(35,165,90,.22)':'var(--bg-3)'};border:1px solid ${p2w?'rgba(35,165,90,.3)':'rgba(255,255,255,.08)'};border-radius:4px;padding:2px 6px;min-width:22px;text-align:center;color:${p2w?'#57f287':'var(--text-2)'}">${match.player2Score!=null?match.player2Score:'-'}</span>
+              </div>
+            </div>`;
+
+            // Connector to next round
+            if (rIdx < numRounds - 1) {
+                const nextSlotH  = totalH / (mc / 2);
+                const nextMIdx   = Math.floor(mIdx / 2);
+                const y1 = V_PAD + slotH * mIdx + slotH / 2;
+                const y2 = V_PAD + nextSlotH * nextMIdx + nextSlotH / 2;
+                const x1 = x + MATCH_W;
+                const x2 = x + MATCH_W + COL_GAP;
+                const mx = x1 + COL_GAP / 2;
+                connPaths += `<path d="M${x1},${y1} H${mx} V${y2} H${x2}" fill="none" stroke="rgba(249,168,212,.2)" stroke-width="1.5" stroke-linecap="round"/>`;
+            }
         });
-        bracketHTML += `</div>`;
-    } else {
-        bracketHTML = `<div style="display: flex; align-items: center; justify-content: center; flex: 1; color: rgba(255, 255, 255, 0.4); text-align: center;"><div><div style="font-size: 48px; margin-bottom: 16px;">🏆</div><div>${tournament.status === 'setup' ? 'Bracket will be generated' : 'No bracket yet'}</div></div></div>`;
+    });
+
+    // Trophy icon after final
+    const trophyX = numRounds * (MATCH_W + COL_GAP) - COL_GAP + 6;
+    const trophyY = V_PAD + totalH / 2 - 18;
+    matchCards += `<div style="position:absolute;left:${trophyX}px;top:${trophyY}px;font-size:28px;opacity:.3;pointer-events:none">🏆</div>`;
+
+    const canvasW = totalW + 50;
+    const canvasH = totalH + V_PAD + 20;
+
+    const bracketInner = `
+      <div style="position:relative;width:${canvasW}px;height:${canvasH}px;display:inline-block">
+        <svg style="position:absolute;left:0;top:0;width:100%;height:100%;overflow:visible;pointer-events:none" xmlns="http://www.w3.org/2000/svg">${connPaths}</svg>
+        ${matchCards}
+      </div>`;
+
+    // ── Sidebar: players + action buttons ──
+    const playerHTML = players.length === 0
+        ? '<div style="color:var(--text-3);font-size:12px">No players yet</div>'
+        : players.map(p => {
+            const av  = p.avatar_url ? `<img src="${p.avatar_url}" style="width:100%;height:100%;object-fit:cover;border-radius:50%;">` : (p.username||'?')[0].toUpperCase();
+            const tag = p.userId === tournament.hostId ? `<span style="font-size:9px;font-weight:700;color:var(--accent);background:rgba(249,168,212,.12);padding:2px 5px;border-radius:4px;flex-shrink:0">HOST</span>` : '';
+            return `<div style="display:flex;align-items:center;gap:8px;padding:8px 10px;background:rgba(88,101,242,.08);border:1px solid rgba(88,101,242,.15);border-radius:6px"><div style="width:26px;height:26px;border-radius:50%;background:linear-gradient(135deg,var(--accent),var(--accent-h));display:flex;align-items:center;justify-content:center;color:#fff;font-weight:700;font-size:11px;flex-shrink:0;overflow:hidden">${av}</div><div style="font-size:12px;font-weight:500;color:var(--text-2);flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${p.username||'Unknown'}</div>${tag}</div>`;
+          }).join('');
+
+    const btnBase = 'display:flex;align-items:center;justify-content:center;gap:6px;width:100%;padding:9px 14px;border:none;border-radius:8px;font-size:13px;font-weight:700;cursor:pointer;font-family:inherit;transition:opacity .15s;margin-bottom:6px';
+
+    let actionHTML = '';
+    if (tournament.status === 'setup') {
+        if (!isReg) {
+            actionHTML += `<button style="${btnBase};background:var(--accent);color:#1a0a10" onclick="bracketJoin('${tournament.id}')">🎮 Join Tournament</button>`;
+        } else if (!isHost) {
+            actionHTML += `<button style="${btnBase};background:var(--bg-3);color:var(--text-2);border:1px solid rgba(255,255,255,.1)" onclick="bracketLeave('${tournament.id}')">🚪 Leave Tournament</button>`;
+        }
+        if (isHost) {
+            actionHTML += `<button style="${btnBase};background:rgba(35,165,90,.15);color:#57f287;border:1px solid rgba(35,165,90,.3);${!canStart?'opacity:.45;cursor:not-allowed':''}" onclick="${canStart?`bracketStart('${tournament.id}')`:''}" ${!canStart?'disabled':''}> ▶ Start Tournament</button>`;
+            if (!canStart) actionHTML += `<div style="font-size:11px;color:var(--text-3);text-align:center;margin-top:-4px;margin-bottom:6px">Need at least 2 players</div>`;
+        }
     }
-    
-    let playerHTML = '';
-    if (players.length === 0) {
-        playerHTML = '<div style="color: var(--text-3); font-size: 12px;">No players</div>';
-    } else {
-        playerHTML = players.map(p => {
-            const av = p.avatar_url ? `<img src="${p.avatar_url}" style="width:100%;height:100%;object-fit:cover;border-radius:50%;">` : (p.username||'?')[0].toUpperCase();
-            return `<div style="display:flex;align-items:center;gap:10px;padding:10px;background:rgba(88,101,242,0.08);border:1px solid rgba(88,101,242,0.15);border-radius:6px;"><div style="width:28px;height:28px;border-radius:50%;background:linear-gradient(135deg,var(--accent),var(--accent-h));display:flex;align-items:center;justify-content:center;color:white;font-weight:700;font-size:11px;flex-shrink:0;overflow:hidden;">${av}</div><div style="font-size:12px;font-weight:500;color:var(--text-2);flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${p.username||'Unknown'}</div></div>`;
-        }).join('');
+    if (tournament.status === 'in-progress' && isHost) {
+        actionHTML += `<button style="${btnBase};background:rgba(237,66,69,.12);color:var(--danger);border:1px solid rgba(237,66,69,.3)" onclick="bracketEnd('${tournament.id}')">⏹ End Tournament</button>`;
     }
-    
-    // Update header
+    if (tournament.status === 'completed') {
+        actionHTML += `<div style="text-align:center;font-size:12px;color:var(--text-3);padding:6px 0">🏆 Tournament Complete</div>`;
+    }
+
+    const statusColour = tournament.status === 'in-progress' ? '#57f287' : tournament.status === 'completed' ? '#5865f2' : 'var(--yellow)';
+
+    // ── Header ──
     if (chatHeader) {
-        // Get current user's profile picture from players list or use initials
-        const currentPlayer = players.find(p => p.userId === currentUserId);
-        const userInitial = (currentPlayer?.username || '?')[0].toUpperCase();
-        
-        const avatarContent = currentPlayer?.avatar_url ? `<img src="${currentPlayer.avatar_url}" alt="" style="width: 100%; height: 100%; object-fit: cover;">` : userInitial;
-        
-        // Render header with avatar
-        const headerContent = `<div style="display: flex; align-items: center; justify-content: space-between; flex: 1;"><div style="display: flex; align-items: center; gap: 12px;"><div id="bracketHeaderAvatar" style="width: 40px; height: 40px; border-radius: 50%; background: linear-gradient(135deg, var(--accent), var(--accent-h)); display: flex; align-items: center; justify-content: center; color: white; font-weight: 800; font-size: 16px; flex-shrink: 0; overflow: hidden;">${avatarContent}</div><div><h2 style="font-size: 16px; font-weight: 800; margin: 0; color: var(--text-1);">${tournament.name}</h2><div style="display: flex; align-items: center; gap: 8px; margin-top: 6px;"><span style="display: inline-flex; align-items: center; gap: 4px; padding: 4px 8px; background: rgba(88, 101, 242, 0.1); border: 1px solid rgba(88, 101, 242, 0.25); border-radius: 16px; font-size: 11px; font-weight: 600; color: var(--text-2);">📊 ${players.length}/${tournament.playerCount}</span><span style="display: inline-flex; align-items: center; gap: 4px; padding: 4px 8px; background: rgba(88, 101, 242, 0.1); border: 1px solid rgba(88, 101, 242, 0.25); border-radius: 16px; font-size: 11px; font-weight: 600; color: var(--text-2);">📋 ${formats[tournament.format] || tournament.format}</span></div></div></div><button onclick="closeBracketPanel()" style="background: transparent; border: none; color: var(--text-2); cursor: pointer; font-size: 18px; padding: 0 8px; opacity: 0.6;" onmouseover="this.style.opacity='1'" onmouseout="this.style.opacity='0.6'">✕</button></div>`;
-        chatHeader.innerHTML = headerContent;
+        const cp  = players.find(p => p.userId === currentUserId);
+        const cav = cp?.avatar_url ? `<img src="${cp.avatar_url}" style="width:100%;height:100%;object-fit:cover">` : (cp?.username||'?')[0].toUpperCase();
+        chatHeader.innerHTML = `
+          <div style="display:flex;align-items:center;justify-content:space-between;flex:1">
+            <div style="display:flex;align-items:center;gap:12px">
+              <div style="width:38px;height:38px;border-radius:50%;background:linear-gradient(135deg,var(--accent),var(--accent-h));display:flex;align-items:center;justify-content:center;color:#fff;font-weight:800;font-size:15px;flex-shrink:0;overflow:hidden">${cav}</div>
+              <div>
+                <h2 style="font-size:15px;font-weight:800;margin:0;color:var(--text-1)">${tournament.name}</h2>
+                <div style="display:flex;align-items:center;gap:6px;margin-top:4px">
+                  <span style="font-size:10px;font-weight:700;padding:3px 8px;border-radius:12px;background:rgba(88,101,242,.1);border:1px solid rgba(88,101,242,.25);color:var(--text-2)">👥 ${players.length}/${tournament.playerCount}</span>
+                  <span style="font-size:10px;font-weight:700;padding:3px 8px;border-radius:12px;background:rgba(88,101,242,.1);border:1px solid rgba(88,101,242,.25);color:var(--text-2)">📋 ${fmtMap[tournament.format]||tournament.format}</span>
+                  <span style="font-size:10px;font-weight:700;padding:3px 8px;border-radius:12px;color:${statusColour};background:rgba(0,0,0,.2);border:1px solid currentColor">${tournament.status.replace(/-/g,' ').toUpperCase()}</span>
+                </div>
+              </div>
+            </div>
+            <button onclick="closeBracketPanel()" style="background:transparent;border:none;color:var(--text-2);cursor:pointer;font-size:18px;padding:4px 8px;opacity:.6;border-radius:6px" onmouseover="this.style.opacity='1';this.style.background='var(--bg-3)'" onmouseout="this.style.opacity='.6';this.style.background='transparent'">✕</button>
+          </div>`;
     }
-    
-    // Update content with 2-column layout
+
+    // ── Main content ──
     if (chatMain) {
-        chatMain.innerHTML = `<div style="display: flex; flex: 1; min-height: 0; overflow: hidden; background: var(--bg-2);"><div style="width: 260px; background: var(--bg-1); border-right: 1px solid rgba(255, 255, 255, 0.06); padding: 16px; display: flex; flex-direction: column; overflow-y: auto; flex-shrink: 0;"><div style="font-size: 9px; font-weight: 800; text-transform: uppercase; letter-spacing: 1px; color: var(--text-3); margin-bottom: 12px;">Stats</div><div style="display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-bottom: 16px;"><div style="background: rgba(88, 101, 242, 0.08); border: 1px solid rgba(88, 101, 242, 0.15); border-radius: 6px; padding: 10px; text-align: center;"><div style="font-size: 8px; color: var(--text-3); text-transform: uppercase; font-weight: 700; margin-bottom: 4px;">Format</div><div style="font-size: 14px; font-weight: 800; color: var(--accent);">${(formats[tournament.format] || tournament.format).split(' ')[0]}</div></div><div style="background: rgba(88, 101, 242, 0.08); border: 1px solid rgba(88, 101, 242, 0.15); border-radius: 6px; padding: 10px; text-align: center;"><div style="font-size: 8px; color: var(--text-3); text-transform: uppercase; font-weight: 700; margin-bottom: 4px;">Status</div><div style="font-size: 12px; font-weight: 800; color: var(--accent);">${tournament.status}</div></div></div><div style="font-size: 9px; font-weight: 800; text-transform: uppercase; letter-spacing: 1px; color: var(--text-3); margin-bottom: 8px;">Players (${players.length})</div><div style="display: flex; flex-direction: column; gap: 6px; flex: 1; overflow-y: auto;">${playerHTML}</div></div><div style="flex: 1; display: flex; flex-direction: column; overflow: hidden;"><div style="padding: 12px 20px; background: var(--bg-1); border-bottom: 1px solid rgba(255, 255, 255, 0.06); flex-shrink: 0;"><h3 style="font-size: 12px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.5px; color: var(--text-2); margin: 0;">Tournament Bracket</h3></div>${bracketHTML}</div></div>`;
+        chatMain.innerHTML = `
+          <div style="display:flex;flex:1;min-height:0;overflow:hidden">
+            <!-- Sidebar -->
+            <div style="width:240px;min-width:240px;background:var(--bg-1);border-right:1px solid rgba(255,255,255,.06);display:flex;flex-direction:column;overflow-y:auto;flex-shrink:0">
+              <!-- Stats -->
+              <div style="padding:14px 16px;border-bottom:1px solid rgba(255,255,255,.06)">
+                <div style="font-size:9px;font-weight:800;text-transform:uppercase;letter-spacing:1px;color:var(--text-3);margin-bottom:10px">Stats</div>
+                <div style="display:grid;grid-template-columns:1fr 1fr;gap:7px">
+                  <div style="background:rgba(88,101,242,.08);border:1px solid rgba(88,101,242,.15);border-radius:6px;padding:9px;text-align:center"><div style="font-size:8px;color:var(--text-3);text-transform:uppercase;font-weight:700;margin-bottom:2px">Format</div><div style="font-size:13px;font-weight:800;color:var(--accent)">${(fmtMap[tournament.format]||tournament.format).split(' ')[0]}</div></div>
+                  <div style="background:rgba(88,101,242,.08);border:1px solid rgba(88,101,242,.15);border-radius:6px;padding:9px;text-align:center"><div style="font-size:8px;color:var(--text-3);text-transform:uppercase;font-weight:700;margin-bottom:2px">Status</div><div style="font-size:11px;font-weight:800;color:${statusColour}">${tournament.status}</div></div>
+                  <div style="background:rgba(88,101,242,.08);border:1px solid rgba(88,101,242,.15);border-radius:6px;padding:9px;text-align:center"><div style="font-size:8px;color:var(--text-3);text-transform:uppercase;font-weight:700;margin-bottom:2px">Players</div><div style="font-size:13px;font-weight:800;color:var(--accent)">${players.length}</div></div>
+                  <div style="background:rgba(88,101,242,.08);border:1px solid rgba(88,101,242,.15);border-radius:6px;padding:9px;text-align:center"><div style="font-size:8px;color:var(--text-3);text-transform:uppercase;font-weight:700;margin-bottom:2px">Slots</div><div style="font-size:13px;font-weight:800;color:var(--accent)">${tournament.playerCount}</div></div>
+                </div>
+              </div>
+              <!-- Actions -->
+              ${actionHTML ? `<div style="padding:12px 16px;border-bottom:1px solid rgba(255,255,255,.06)">${actionHTML}</div>` : ''}
+              <!-- Players -->
+              <div style="padding:14px 16px;flex:1">
+                <div style="font-size:9px;font-weight:800;text-transform:uppercase;letter-spacing:1px;color:var(--text-3);margin-bottom:10px">Players (${players.length})</div>
+                <div style="display:flex;flex-direction:column;gap:6px">${playerHTML}</div>
+              </div>
+            </div>
+            <!-- Bracket area -->
+            <div style="flex:1;display:flex;flex-direction:column;overflow:hidden;min-width:0">
+              <div style="padding:10px 18px;background:var(--bg-1);border-bottom:1px solid rgba(255,255,255,.06);font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.6px;color:var(--text-3);flex-shrink:0">Tournament Bracket</div>
+              <div style="flex:1;overflow:auto;padding:28px 32px;${bgStyle}" id="bracketInnerScroll">
+                ${bracketInner}
+              </div>
+            </div>
+          </div>`;
     }
 }
+
+// Bracket panel action helpers
+async function bracketJoin(tournamentId) {
+    try {
+        const response = await fetch(`${API_BASE}/api/tournaments/${tournamentId}/register`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${localStorage.getItem('vh_token')}` }
+        });
+        const data = await response.json();
+        if (!response.ok) throw new Error(data.error || 'Failed to join');
+        showNotification('Joined tournament! 🎮', 'success');
+        setTimeout(() => openTournamentDetails(tournamentId), 400);
+    } catch(e) { showNotification(e.message || 'Failed to join', 'error'); }
+}
+
+async function bracketLeave(tournamentId) {
+    if (!confirm('Leave this tournament?')) return;
+    try {
+        const response = await fetch(`${API_BASE}/api/tournaments/${tournamentId}/leave`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${localStorage.getItem('vh_token')}` }
+        });
+        const data = await response.json();
+        if (!response.ok) throw new Error(data.error || 'Failed to leave');
+        showNotification('Left tournament', 'success');
+        setTimeout(() => openTournamentDetails(tournamentId), 400);
+    } catch(e) { showNotification(e.message || 'Failed to leave', 'error'); }
+}
+
+async function bracketStart(tournamentId) {
+    if (!confirm('Start the tournament? Players cannot join after this.')) return;
+    try {
+        const response = await fetch(`${API_BASE}/api/tournaments/${tournamentId}/generate-bracket`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${localStorage.getItem('vh_token')}` }
+        });
+        const data = await response.json();
+        if (!response.ok) throw new Error(data.error || 'Failed to start');
+        showNotification('Tournament started! ▶', 'success');
+        setTimeout(() => openTournamentDetails(tournamentId), 400);
+    } catch(e) { showNotification(e.message || 'Failed to start', 'error'); }
+}
+
+async function bracketEnd(tournamentId) {
+    if (!confirm('End this tournament? This cannot be undone.')) return;
+    try {
+        const response = await fetch(`${API_BASE}/api/tournaments/${tournamentId}/close`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${localStorage.getItem('vh_token')}` }
+        });
+        const data = await response.json();
+        if (!response.ok) throw new Error(data.error || 'Failed to end');
+        showNotification('Tournament ended 🏁', 'success');
+        closeBracketPanel();
+        loadTournaments();
+    } catch(e) { showNotification(e.message || 'Failed to end', 'error'); }
+}
+
+window.bracketJoin  = bracketJoin;
+window.bracketLeave = bracketLeave;
+window.bracketStart = bracketStart;
+window.bracketEnd   = bracketEnd;
 
 function closeBracketPanel() {
     // Clean up state

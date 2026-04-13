@@ -307,6 +307,59 @@ router.post('/:tournamentId/register', verifyAuth, async (req, res) => {
 });
 
 // ============================================================
+// LEAVE TOURNAMENT
+// ============================================================
+router.post('/:tournamentId/leave', verifyAuth, async (req, res) => {
+  try {
+    const { tournamentId } = req.params;
+    const userId = req.user.id;
+
+    // Get tournament
+    const tourResult = await pool.query(
+      'SELECT * FROM tournaments WHERE id = $1',
+      [tournamentId]
+    );
+
+    if (tourResult.rows.length === 0) {
+      return res.status(404).json({ error: 'Tournament not found' });
+    }
+
+    const tournament = tourResult.rows[0];
+
+    // Cannot leave once tournament has started
+    if (tournament.status !== 'setup') {
+      return res.status(400).json({ error: 'Cannot leave a tournament that has already started' });
+    }
+
+    // Host cannot leave their own tournament
+    if (tournament.host_id === userId) {
+      return res.status(400).json({ error: 'Host cannot leave their own tournament. End the tournament instead.' });
+    }
+
+    // Check if registered
+    const existing = await pool.query(
+      'SELECT id FROM tournament_players WHERE tournament_id = $1 AND user_id = $2',
+      [tournamentId, userId]
+    );
+
+    if (existing.rows.length === 0) {
+      return res.status(400).json({ error: 'You are not registered in this tournament' });
+    }
+
+    // Remove player
+    await pool.query(
+      'DELETE FROM tournament_players WHERE tournament_id = $1 AND user_id = $2',
+      [tournamentId, userId]
+    );
+
+    res.json({ success: true, message: 'Left tournament successfully' });
+  } catch (error) {
+    console.error('Leave tournament error:', error);
+    res.status(500).json({ error: 'Failed to leave tournament' });
+  }
+});
+
+// ============================================================
 // GENERATE BRACKET
 // ============================================================
 router.post('/:tournamentId/generate-bracket', verifyAuth, async (req, res) => {
@@ -673,25 +726,23 @@ async function getBracketData(tournamentId) {
   const rounds = await Promise.all(
     roundsResult.rows.map(async (round) => {
       const matchesResult = await pool.query(
-        `SELECT m.id, m.match_number,
-                p1.user_id as player1_user_id, p1.username as player1_username, u1.avatar_url as player1_avatar,
-                p2.user_id as player2_user_id, p2.username as player2_username, u2.avatar_url as player2_avatar,
+        `SELECT m.id, m.match_number, 
+                p1.user_id as player1_user_id, p1.username as player1_username,
+                p2.user_id as player2_user_id, p2.username as player2_username,
                 m.winner_id, m.status
          FROM tournament_matches m
          LEFT JOIN tournament_players p1 ON m.player1_id = p1.id
-         LEFT JOIN users u1 ON p1.user_id = u1.id
          LEFT JOIN tournament_players p2 ON m.player2_id = p2.id
-         LEFT JOIN users u2 ON p2.user_id = u2.id
          WHERE m.round_id = $1
          ORDER BY m.match_number ASC`,
         [round.id]
       );
-
+      
       const matches = matchesResult.rows.map(m => ({
         matchId: m.id,
         matchNumber: m.match_number,
-        player1: m.player1_user_id ? { userId: m.player1_user_id, username: m.player1_username, avatar_url: m.player1_avatar } : null,
-        player2: m.player2_user_id ? { userId: m.player2_user_id, username: m.player2_username, avatar_url: m.player2_avatar } : null,
+        player1: m.player1_user_id ? { userId: m.player1_user_id, username: m.player1_username } : null,
+        player2: m.player2_user_id ? { userId: m.player2_user_id, username: m.player2_username } : null,
         winner: m.winner_id,
         status: m.status
       }));
