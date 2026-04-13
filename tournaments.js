@@ -350,30 +350,35 @@ function showBracketPanel(tournament) {
 
     // Card data comes from server via /me (set on boot as window.currentUserTournamentCard)
     let bgStyle = '';
-    const myCardData = window.currentUserTournamentCard || {};
 
-    // Build a lookup map from registered players for avatar fallback
+    // Build a lookup map from registered players for avatar + card style fallback
     const playerAvatarMap = {};
-    players.forEach(p => { if (p.userId) playerAvatarMap[p.userId] = p.avatar_url || null; });
+    const playerCardMap = {};
+    players.forEach(p => {
+        if (p.userId) {
+            playerAvatarMap[p.userId] = p.avatar_url || null;
+            playerCardMap[p.userId]   = p.tournamentCard || null;
+        }
+    });
 
     function playerCard(p, isWinner, isLoser, score) {
-        const isMe = p?.userId && p.userId === currentUserId;
-        // Avatar: use match data, fall back to registered players list
+        // Use player's own card data from server (works for all players, not just current user)
+        const cardData = p?.tournamentCard || (p?.userId ? playerCardMap[p.userId] : null) || {};
+        const hasCustom = !!(cardData.imageUrl || (cardData.bgColour && cardData.bgColour !== '#2c3440') || (cardData.borderColour && cardData.borderColour !== '#f9a8d4'));
+
         const avatarUrl = p?.avatar_url || (p?.userId ? playerAvatarMap[p.userId] : null);
         const avatarContent = avatarUrl
             ? `<img src="${avatarUrl}" style="width:100%;height:100%;object-fit:cover;">`
             : `<span style="font-size:13px;font-weight:800;color:#fff">${p ? (p.username||'?')[0].toUpperCase() : '?'}</span>`;
 
-        // Apply custom card style if this is the current user's card
         let cardBg, border, nameClr;
-        if (isMe && (myCardData.imageUrl || myCardData.bgColour || myCardData.borderColour)) {
-            const bgPos = myCardData.bgPos || '50% 50%';
-            const bgCss = myCardData.imageUrl
-                ? `background-image:url(${myCardData.imageUrl});background-size:cover;background-position:${bgPos};`
-                : `background-color:${myCardData.bgColour||'var(--bg-2)'};`;
-            cardBg  = bgCss;
-            border  = `1.5px solid ${myCardData.borderColour||'rgba(249,168,212,.5)'}`;
-            nameClr = myCardData.nameColour || 'var(--text-1)';
+        if (hasCustom && !isWinner) {
+            const bgPos = cardData.bgPos || '50% 50%';
+            cardBg  = cardData.imageUrl
+                ? `background-image:url(${cardData.imageUrl});background-size:cover;background-position:${bgPos};`
+                : `background-color:${cardData.bgColour||'var(--bg-2)'};`;
+            border  = `1.5px solid ${cardData.borderColour||'rgba(249,168,212,.5)'}`;
+            nameClr = cardData.nameColour || 'var(--text-1)';
         } else {
             cardBg  = isWinner ? 'background-color:rgba(35,165,90,.14);' : 'background-color:var(--bg-2);';
             border  = isWinner ? '1.5px solid rgba(35,165,90,.45)' : '1.5px solid rgba(255,255,255,.09)';
@@ -385,7 +390,7 @@ function showBracketPanel(tournament) {
         const sBg     = isWinner ? 'rgba(35,165,90,.22)' : 'var(--bg-3)';
         const sBdr    = isWinner ? 'rgba(35,165,90,.3)' : 'rgba(255,255,255,.1)';
         const sClr    = isWinner ? '#57f287' : 'var(--text-3)';
-        return `<div style="display:flex;align-items:center;gap:10px;padding:10px 12px;${cardBg}border:${border};border-radius:10px;${opac}box-shadow:0 3px 10px rgba(0,0,0,.22);height:${CARD_H}px;transition:border-color .15s" onmouseover="this.style.borderColor='rgba(249,168,212,.45)'" onmouseout="this.style.borderColor='${isWinner?'rgba(35,165,90,.45)':isMe&&myCardData.borderColour?myCardData.borderColour:'rgba(255,255,255,.09)'}'">
+        return `<div style="display:flex;align-items:center;gap:10px;padding:10px 12px;${cardBg}border:${border};border-radius:10px;${opac}box-shadow:0 3px 10px rgba(0,0,0,.22);height:${CARD_H}px;transition:border-color .15s" onmouseover="this.style.borderColor='rgba(249,168,212,.45)'" onmouseout="this.style.borderColor='${isWinner?'rgba(35,165,90,.45)':hasCustom&&cardData.borderColour?cardData.borderColour:'rgba(255,255,255,.09)'}'">
             <div style="width:34px;height:34px;border-radius:9px;flex-shrink:0;overflow:hidden;background:linear-gradient(135deg,var(--accent),var(--accent-h));display:flex;align-items:center;justify-content:center;box-shadow:0 2px 6px rgba(0,0,0,.3)">${avatarContent}</div>
             <span style="flex:1;font-size:12px;font-weight:${nameFw};color:${nameClr};overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${p?.username||'TBD'}</span>
             <span style="font-size:11px;font-weight:700;background:${sBg};border:1px solid ${sBdr};border-radius:5px;padding:3px 8px;min-width:26px;text-align:center;color:${sClr}">${score!=null?score:'-'}</span>

@@ -116,7 +116,13 @@ router.get('/lobby/:lobbyId', async (req, res) => {
       result.rows.map(async (tournament) => {
         // Get registered players WITH avatars
         const playersResult = await pool.query(
-          `SELECT tp.user_id, tp.username, tp.joined_at, tp.status, u.avatar_url
+          `SELECT tp.user_id, tp.username, tp.joined_at, tp.status,
+                  u.avatar_url,
+                  u.tournament_card_image_url,
+                  u.tournament_card_bg_colour,
+                  u.tournament_card_border_colour,
+                  u.tournament_card_name_colour,
+                  u.tournament_card_bg_pos
            FROM tournament_players tp
            LEFT JOIN users u ON tp.user_id = u.id
            WHERE tp.tournament_id = $1`,
@@ -128,7 +134,14 @@ router.get('/lobby/:lobbyId', async (req, res) => {
           username: p.username,
           joinedAt: p.joined_at,
           status: p.status,
-          avatar_url: p.avatar_url
+          avatar_url: p.avatar_url,
+          tournamentCard: {
+            imageUrl:      p.tournament_card_image_url     || null,
+            bgColour:      p.tournament_card_bg_colour     || '#2c3440',
+            borderColour:  p.tournament_card_border_colour || '#f9a8d4',
+            nameColour:    p.tournament_card_name_colour   || '#fdf2f8',
+            bgPos:         p.tournament_card_bg_pos        || '50% 50%',
+          }
         }));
         
         return {
@@ -175,7 +188,13 @@ router.get('/:tournamentId', async (req, res) => {
     
     // Get registered players WITH AVATARS
     const playersResult = await pool.query(
-      `SELECT tp.user_id, tp.username, tp.joined_at, tp.status, u.avatar_url 
+      `SELECT tp.user_id, tp.username, tp.joined_at, tp.status,
+              u.avatar_url,
+              u.tournament_card_image_url,
+              u.tournament_card_bg_colour,
+              u.tournament_card_border_colour,
+              u.tournament_card_name_colour,
+              u.tournament_card_bg_pos
        FROM tournament_players tp
        LEFT JOIN users u ON tp.user_id = u.id
        WHERE tp.tournament_id = $1`,
@@ -187,7 +206,14 @@ router.get('/:tournamentId', async (req, res) => {
       username: p.username,
       joinedAt: p.joined_at,
       status: p.status,
-      avatar_url: p.avatar_url
+      avatar_url: p.avatar_url,
+      tournamentCard: {
+        imageUrl:      p.tournament_card_image_url     || null,
+        bgColour:      p.tournament_card_bg_colour     || '#2c3440',
+        borderColour:  p.tournament_card_border_colour || '#f9a8d4',
+        nameColour:    p.tournament_card_name_colour   || '#fdf2f8',
+        bgPos:         p.tournament_card_bg_pos        || '50% 50%',
+      }
     }));
     
     // Get bracket data
@@ -726,23 +752,43 @@ async function getBracketData(tournamentId) {
   const rounds = await Promise.all(
     roundsResult.rows.map(async (round) => {
       const matchesResult = await pool.query(
-        `SELECT m.id, m.match_number, 
+        `SELECT m.id, m.match_number,
                 p1.user_id as player1_user_id, p1.username as player1_username,
+                u1.avatar_url as player1_avatar,
+                u1.tournament_card_image_url as p1_card_image,
+                u1.tournament_card_bg_colour as p1_card_bg,
+                u1.tournament_card_border_colour as p1_card_border,
+                u1.tournament_card_name_colour as p1_card_name,
+                u1.tournament_card_bg_pos as p1_card_pos,
                 p2.user_id as player2_user_id, p2.username as player2_username,
+                u2.avatar_url as player2_avatar,
+                u2.tournament_card_image_url as p2_card_image,
+                u2.tournament_card_bg_colour as p2_card_bg,
+                u2.tournament_card_border_colour as p2_card_border,
+                u2.tournament_card_name_colour as p2_card_name,
+                u2.tournament_card_bg_pos as p2_card_pos,
                 m.winner_id, m.status
          FROM tournament_matches m
          LEFT JOIN tournament_players p1 ON m.player1_id = p1.id
          LEFT JOIN tournament_players p2 ON m.player2_id = p2.id
+         LEFT JOIN users u1 ON p1.user_id = u1.id
+         LEFT JOIN users u2 ON p2.user_id = u2.id
          WHERE m.round_id = $1
          ORDER BY m.match_number ASC`,
         [round.id]
       );
-      
+
       const matches = matchesResult.rows.map(m => ({
         matchId: m.id,
         matchNumber: m.match_number,
-        player1: m.player1_user_id ? { userId: m.player1_user_id, username: m.player1_username } : null,
-        player2: m.player2_user_id ? { userId: m.player2_user_id, username: m.player2_username } : null,
+        player1: m.player1_user_id ? {
+          userId: m.player1_user_id, username: m.player1_username, avatar_url: m.player1_avatar || null,
+          tournamentCard: { imageUrl: m.p1_card_image || null, bgColour: m.p1_card_bg || '#2c3440', borderColour: m.p1_card_border || '#f9a8d4', nameColour: m.p1_card_name || '#fdf2f8', bgPos: m.p1_card_pos || '50% 50%' }
+        } : null,
+        player2: m.player2_user_id ? {
+          userId: m.player2_user_id, username: m.player2_username, avatar_url: m.player2_avatar || null,
+          tournamentCard: { imageUrl: m.p2_card_image || null, bgColour: m.p2_card_bg || '#2c3440', borderColour: m.p2_card_border || '#f9a8d4', nameColour: m.p2_card_name || '#fdf2f8', bgPos: m.p2_card_pos || '50% 50%' }
+        } : null,
         winner: m.winner_id,
         status: m.status
       }));
