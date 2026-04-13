@@ -1,4 +1,5 @@
 // tournaments.js
+const API_BASE = window.location.protocol === 'file:' ? 'http://localhost:3000' : '';
 let selectedPlayerCount = null;
 let currentLobbyId = null;
 let currentUserId = null;
@@ -125,7 +126,7 @@ async function handleTournamentSubmit(e) {
     };
 
     try {
-        const response = await fetch('/api/tournaments/create', {
+        const response = await fetch(`${API_BASE}/api/tournaments/create`, {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
@@ -165,7 +166,7 @@ async function loadTournaments() {
     if (!currentLobbyId) return;
 
     try {
-        const response = await fetch(`/api/tournaments/lobby/${currentLobbyId}`, {
+        const response = await fetch(`${API_BASE}/api/tournaments/lobby/${currentLobbyId}`, {
             headers: {
                 'Authorization': `Bearer ${localStorage.getItem('token')}`
             }
@@ -223,7 +224,7 @@ function displayTournaments(tournaments) {
 // Open tournament details and bracket
 async function openTournamentDetails(tournamentId) {
     try {
-        const response = await fetch(`/api/tournaments/${tournamentId}`, {
+        const response = await fetch(`${API_BASE}/api/tournaments/${tournamentId}`, {
             headers: {
                 'Authorization': `Bearer ${localStorage.getItem('token')}`
             }
@@ -297,7 +298,7 @@ function displayTournamentBracket(tournament) {
 // Generate bracket (host only)
 async function generateBracket(tournamentId) {
     try {
-        const response = await fetch(`/api/tournaments/${tournamentId}/generate-bracket`, {
+        const response = await fetch(`${API_BASE}/api/tournaments/${tournamentId}/generate-bracket`, {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
@@ -326,7 +327,7 @@ async function generateBracket(tournamentId) {
 // Register player for tournament
 async function registerForTournament(tournamentId) {
     try {
-        const response = await fetch(`/api/tournaments/${tournamentId}/register`, {
+        const response = await fetch(`${API_BASE}/api/tournaments/${tournamentId}/register`, {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',

@@ -4886,6 +4886,15 @@ function renderChannelList(channels, members, server) {
   const isOwner = myServerRole === "owner";
   const isAloneOwner = isOwner && members.length <= 1;
 
+  html += `<div class="channel-section" style="margin-top:12px;">
+    <div class="channel-section-label">
+      <span style="display:flex;align-items:center;gap:6px">
+        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"></polyline></svg>
+        Tournaments
+      </span>
+    </div>
+    <div id="tournamentsList" class="tournaments-list"></div>
+  </div>`;
   html += `<div style="margin-top:auto;padding-top:12px">
     <div class="server-actions">
       ${canManage ? `<div class="server-action-item" onclick="openServerSettings(${server.id})">
@@ -14249,8 +14258,6 @@ document.addEventListener("click", () => hideProfileHoverCard());
     </div>
 </div>
 
-<!-- Tournament List -->
-<div id="tournamentsList" class="tournaments-list"></div>
 
 </body>
 </html>
