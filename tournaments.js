@@ -413,6 +413,10 @@ async function displayTournamentBracket(tournament) {
                     <button onclick="closeTournament('${tournament.id}')" class="btn-danger">End Tournament</button>
                 ` : ''}
                 
+                ${isHost && tournament.status === 'completed' ? `
+                    <button onclick="deleteTournament('${tournament.id}')" class="btn-delete">Delete Tournament</button>
+                ` : ''}
+                
                 <button onclick="this.closest('.tournament-container').remove()" class="btn-secondary">Close</button>
             </div>
         </div>
@@ -585,6 +589,42 @@ async function registerForTournament(tournamentId) {
     } catch (error) {
         console.error('Registration error:', error);
         showNotification(error.message || 'Failed to register for tournament', 'error');
+    }
+}
+
+// Delete tournament (host only - completed tournaments only)
+async function deleteTournament(tournamentId) {
+    if (!confirm('Are you sure you want to delete this tournament? This cannot be undone.')) {
+        return;
+    }
+
+    try {
+        const response = await fetch(`${API_BASE}/api/tournaments/${tournamentId}`, {
+            method: 'DELETE',
+            headers: {
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${localStorage.getItem('vh_token')}`
+            }
+        });
+
+        if (!response.ok) {
+            const error = await response.json();
+            throw new Error(error.error || 'Failed to delete tournament');
+        }
+
+        showNotification('Tournament deleted successfully', 'success');
+        
+        // Close modal and refresh
+        document.querySelector('.tournament-container.active')?.remove();
+        loadTournaments();
+
+        // Emit socket event
+        if (window.socket) {
+            window.socket.emit('tournament-deleted', { tournamentId });
+        }
+    } catch (error) {
+        console.error('Delete tournament error:', error);
+        showNotification(error.message || 'Failed to delete tournament', 'error');
     }
 }
 

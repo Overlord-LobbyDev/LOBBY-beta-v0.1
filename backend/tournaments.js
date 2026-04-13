@@ -527,6 +527,69 @@ router.post('/:tournamentId/close', verifyAuth, async (req, res) => {
 });
 
 // ============================================================
+// DELETE TOURNAMENT (HOST ONLY - COMPLETED TOURNAMENTS ONLY)
+// ============================================================
+router.delete('/:tournamentId', verifyAuth, async (req, res) => {
+  try {
+    const { tournamentId } = req.params;
+    
+    // Get tournament
+    const tourResult = await pool.query(
+      'SELECT * FROM tournaments WHERE id = $1',
+      [tournamentId]
+    );
+    
+    if (tourResult.rows.length === 0) {
+      return res.status(404).json({ error: 'Tournament not found' });
+    }
+    
+    const tournament = tourResult.rows[0];
+    
+    // Check if user is host (HOST ONLY)
+    if (tournament.host_id !== req.user.id) {
+      return res.status(403).json({ error: 'Only host can delete tournaments' });
+    }
+    
+    // Check if tournament is completed
+    if (tournament.status !== 'completed') {
+      return res.status(400).json({ error: 'Only completed tournaments can be deleted' });
+    }
+    
+    // Delete matches
+    await pool.query(
+      'DELETE FROM tournament_matches WHERE tournament_id = $1',
+      [tournamentId]
+    );
+    
+    // Delete rounds
+    await pool.query(
+      'DELETE FROM tournament_rounds WHERE tournament_id = $1',
+      [tournamentId]
+    );
+    
+    // Delete players
+    await pool.query(
+      'DELETE FROM tournament_players WHERE tournament_id = $1',
+      [tournamentId]
+    );
+    
+    // Delete tournament
+    await pool.query(
+      'DELETE FROM tournaments WHERE id = $1',
+      [tournamentId]
+    );
+    
+    res.json({ 
+      success: true, 
+      message: 'Tournament deleted successfully' 
+    });
+  } catch (error) {
+    console.error('Delete tournament error:', error);
+    res.status(500).json({ error: 'Failed to delete tournament' });
+  }
+});
+
+// ============================================================
 // RECORD MATCH RESULT (LEGACY - can be deprecated in favor of set-winner)
 // ============================================================
 router.post('/:tournamentId/match-result', verifyAuth, async (req, res) => {
