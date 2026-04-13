@@ -1,613 +1,791 @@
-<!-- tournaments.html - FIXED VERSION WITH HOST REGISTRATION -->
 <!DOCTYPE html>
 <html lang="en">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Tournament Setup</title>
-    <link rel="stylesheet" href="../settingsPanel.css">
-    <style>
-        /* Tournament Modal Styles */
-        .tournament-container {
-            position: fixed;
-            top: 0;
-            left: 0;
-            width: 100%;
-            height: 100%;
-            background: rgba(0, 0, 0, 0.7);
-            display: flex;
-            justify-content: center;
-            align-items: center;
-            z-index: 1000;
-            opacity: 0;
-            pointer-events: none;
-            transition: opacity 0.3s ease;
-        }
-
-        .tournament-container.active {
-            opacity: 1;
-            pointer-events: auto;
-        }
-
-        .tournament-modal {
-            background: linear-gradient(135deg, #1a1f2e 0%, #0f1419 100%);
-            border: 1px solid rgba(100, 200, 255, 0.2);
-            border-radius: 12px;
-            padding: 2rem;
-            max-width: 900px;
-            width: 90%;
-            max-height: 90vh;
-            overflow-y: auto;
-            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.5);
-        }
-
-        .tournament-header {
-            display: flex;
-            align-items: center;
-            justify-content: space-between;
-            gap: 0.75rem;
-            margin-bottom: 1.5rem;
-            padding-bottom: 1rem;
-            border-bottom: 1px solid rgba(100, 200, 255, 0.1);
-        }
-
-        .tournament-header-left {
-            display: flex;
-            align-items: center;
-            gap: 0.75rem;
-        }
-
-        .tournament-header svg {
-            width: 24px;
-            height: 24px;
-            color: #64c8ff;
-        }
-
-        .tournament-header h2 {
-            font-size: 20px;
-            font-weight: 600;
-            color: #ffffff;
-            margin: 0;
-        }
-
-        .tournament-header-right {
-            display: flex;
-            gap: 0.5rem;
-            align-items: center;
-        }
-
-        .tournament-status-badge {
-            display: inline-block;
-            padding: 0.4rem 0.8rem;
-            background: rgba(76, 175, 80, 0.1);
-            border: 1px solid rgba(76, 175, 80, 0.3);
-            border-radius: 4px;
-            font-size: 12px;
-            font-weight: 600;
-            color: #4caf50;
-            text-transform: uppercase;
-        }
-
-        .close-btn {
-            background: none;
-            border: none;
-            color: #64c8ff;
-            cursor: pointer;
-            font-size: 24px;
-            padding: 0;
-            width: 30px;
-            height: 30px;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            transition: color 0.3s ease;
-        }
-
-        .close-btn:hover {
-            color: #ffffff;
-        }
-
-        .form-group {
-            margin-bottom: 1.25rem;
-        }
-
-        .form-group label {
-            display: block;
-            font-size: 14px;
-            font-weight: 500;
-            color: #b0b8c1;
-            margin-bottom: 0.5rem;
-            text-transform: uppercase;
-            letter-spacing: 0.5px;
-        }
-
-        .form-group input,
-        .form-group select,
-        .form-group textarea {
-            width: 100%;
-            padding: 0.75rem;
-            background: rgba(255, 255, 255, 0.05);
-            border: 1px solid rgba(100, 200, 255, 0.2);
-            border-radius: 6px;
-            color: #ffffff;
-            font-size: 14px;
-            font-family: inherit;
-            transition: all 0.3s ease;
-            box-sizing: border-box;
-        }
-
-        .form-group input:focus,
-        .form-group select:focus,
-        .form-group textarea:focus {
-            outline: none;
-            border-color: #64c8ff;
-            background: rgba(100, 200, 255, 0.1);
-            box-shadow: 0 0 12px rgba(100, 200, 255, 0.2);
-        }
-
-        .player-count-selector {
-            display: grid;
-            grid-template-columns: repeat(3, 1fr);
-            gap: 0.75rem;
-        }
-
-        .player-count-btn {
-            padding: 0.75rem;
-            background: rgba(255, 255, 255, 0.05);
-            border: 1px solid rgba(100, 200, 255, 0.2);
-            border-radius: 6px;
-            color: #b0b8c1;
-            font-size: 14px;
-            font-weight: 600;
-            cursor: pointer;
-            transition: all 0.3s ease;
-        }
-
-        .player-count-btn:hover {
-            border-color: #64c8ff;
-            color: #64c8ff;
-        }
-
-        .player-count-btn.active {
-            background: linear-gradient(135deg, #64c8ff 0%, #3d9fd6 100%);
-            border-color: #64c8ff;
-            color: #ffffff;
-            box-shadow: 0 0 12px rgba(100, 200, 255, 0.3);
-        }
-
-        .form-actions {
-            display: flex;
-            gap: 0.75rem;
-            margin-top: 2rem;
-            padding-top: 1rem;
-            border-top: 1px solid rgba(100, 200, 255, 0.1);
-        }
-
-        .btn-primary {
-            flex: 1;
-            padding: 0.75rem;
-            background: linear-gradient(135deg, #64c8ff 0%, #3d9fd6 100%);
-            border: none;
-            border-radius: 6px;
-            color: #ffffff;
-            font-size: 14px;
-            font-weight: 600;
-            cursor: pointer;
-            transition: all 0.3s ease;
-        }
-
-        .btn-primary:hover {
-            transform: translateY(-2px);
-            box-shadow: 0 4px 16px rgba(100, 200, 255, 0.3);
-        }
-
-        .btn-primary:disabled {
-            opacity: 0.5;
-            cursor: not-allowed;
-            transform: none;
-        }
-
-        .btn-secondary {
-            flex: 1;
-            padding: 0.75rem;
-            background: rgba(255, 255, 255, 0.05);
-            border: 1px solid rgba(100, 200, 255, 0.2);
-            border-radius: 6px;
-            color: #b0b8c1;
-            font-size: 14px;
-            font-weight: 600;
-            cursor: pointer;
-            transition: all 0.3s ease;
-        }
-
-        .btn-secondary:hover {
-            border-color: #64c8ff;
-            color: #64c8ff;
-            background: rgba(100, 200, 255, 0.1);
-        }
-
-        .btn-danger {
-            background: linear-gradient(135deg, #f44336 0%, #d32f2f 100%);
-            color: #ffffff;
-            padding: 0.75rem 1.5rem;
-            border: none;
-            border-radius: 6px;
-            font-weight: 600;
-            cursor: pointer;
-            transition: all 0.3s ease;
-        }
-
-        .btn-danger:hover {
-            transform: translateY(-2px);
-            box-shadow: 0 4px 16px rgba(244, 67, 54, 0.3);
-        }
-
-        /* Tournament Bracket Card */
-        .tournament-card {
-            background: linear-gradient(135deg, rgba(26, 31, 46, 0.8) 0%, rgba(15, 20, 25, 0.8) 100%);
-            border: 1px solid rgba(100, 200, 255, 0.2);
-            border-radius: 8px;
-            padding: 1rem;
-            margin-bottom: 1rem;
-            cursor: pointer;
-            transition: all 0.3s ease;
-        }
-
-        .tournament-card:hover {
-            border-color: #64c8ff;
-            background: linear-gradient(135deg, rgba(26, 31, 46, 1) 0%, rgba(15, 20, 25, 1) 100%);
-            box-shadow: 0 4px 16px rgba(100, 200, 255, 0.2);
-        }
-
-        .tournament-card-header {
-            display: flex;
-            justify-content: space-between;
-            align-items: start;
-            margin-bottom: 0.75rem;
-        }
-
-        .tournament-card-title {
-            font-size: 16px;
-            font-weight: 600;
-            color: #64c8ff;
-        }
-
-        .tournament-card-status {
-            display: inline-block;
-            padding: 0.25rem 0.75rem;
-            background: rgba(100, 200, 255, 0.1);
-            border: 1px solid rgba(100, 200, 255, 0.3);
-            border-radius: 4px;
-            font-size: 12px;
-            font-weight: 600;
-            color: #64c8ff;
-            text-transform: uppercase;
-        }
-
-        .tournament-card-status.in-progress {
-            background: rgba(76, 175, 80, 0.1);
-            border-color: rgba(76, 175, 80, 0.3);
-            color: #4caf50;
-        }
-
-        .tournament-card-details {
-            display: grid;
-            grid-template-columns: repeat(2, 1fr);
-            gap: 0.75rem;
-            font-size: 13px;
-            color: #b0b8c1;
-        }
-
-        .tournament-detail {
-            display: flex;
-            flex-direction: column;
-        }
-
-        .tournament-detail-label {
-            font-size: 11px;
-            text-transform: uppercase;
-            color: #7a8591;
-            margin-bottom: 0.25rem;
-        }
-
-        .tournament-detail-value {
-            font-weight: 600;
-            color: #ffffff;
-        }
-
-        /* Bracket Visualization */
-        .bracket-container {
-            display: flex;
-            gap: 2rem;
-            overflow-x: auto;
-            padding: 1rem;
-            background: rgba(15, 20, 25, 0.5);
-            border-radius: 8px;
-            margin-top: 1rem;
-        }
-
-        .bracket-round {
-            min-width: 250px;
-            display: flex;
-            flex-direction: column;
-            gap: 1rem;
-        }
-
-        .bracket-round-title {
-            font-size: 12px;
-            font-weight: 600;
-            color: #7a8591;
-            text-transform: uppercase;
-            padding-bottom: 0.75rem;
-            border-bottom: 1px solid rgba(100, 200, 255, 0.1);
-        }
-
-        /* Match Card with Score Input */
-        .match-card {
-            background: rgba(255, 255, 255, 0.02);
-            border: 1px solid rgba(100, 200, 255, 0.15);
-            border-radius: 6px;
-            padding: 0.75rem;
-            min-height: 100px;
-            display: flex;
-            flex-direction: column;
-            justify-content: space-around;
-        }
-
-        .match-card.has-winner {
-            border-color: rgba(76, 175, 80, 0.3);
-            background: rgba(76, 175, 80, 0.05);
-        }
-
-        .match-player-row {
-            display: flex;
-            gap: 0.5rem;
-            align-items: center;
-            padding: 0.4rem;
-            border-radius: 4px;
-            transition: all 0.2s ease;
-        }
-
-        .match-player-row:hover {
-            background: rgba(100, 200, 255, 0.1);
-        }
-
-        .player-avatar {
-            width: 32px;
-            height: 32px;
-            border-radius: 50%;
-            background: rgba(100, 200, 255, 0.2);
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            font-size: 12px;
-            font-weight: 600;
-            color: #64c8ff;
-            flex-shrink: 0;
-            overflow: hidden;
-        }
-
-        .player-avatar img {
-            width: 100%;
-            height: 100%;
-            object-fit: cover;
-        }
-
-        .player-info {
-            flex: 1;
-            min-width: 0;
-        }
-
-        .player-name {
-            font-size: 13px;
-            color: #b0b8c1;
-            font-weight: 500;
-            white-space: nowrap;
-            overflow: hidden;
-            text-overflow: ellipsis;
-        }
-
-        .player-name.winner {
-            color: #4caf50;
-            font-weight: 600;
-        }
-
-        .score-input {
-            width: 45px;
-            padding: 0.3rem;
-            background: rgba(100, 200, 255, 0.1);
-            border: 1px solid rgba(100, 200, 255, 0.2);
-            border-radius: 4px;
-            color: #ffffff;
-            font-size: 12px;
-            text-align: center;
-            font-weight: 600;
-        }
-
-        .score-input:focus {
-            outline: none;
-            border-color: #64c8ff;
-            background: rgba(100, 200, 255, 0.2);
-        }
-
-        .winner-btn {
-            width: 30px;
-            height: 30px;
-            padding: 0;
-            background: rgba(76, 175, 80, 0.1);
-            border: 1px solid rgba(76, 175, 80, 0.3);
-            border-radius: 4px;
-            color: #4caf50;
-            cursor: pointer;
-            font-weight: 600;
-            font-size: 12px;
-            transition: all 0.2s ease;
-            flex-shrink: 0;
-        }
-
-        .winner-btn:hover:not(:disabled) {
-            background: rgba(76, 175, 80, 0.2);
-            border-color: #4caf50;
-        }
-
-        .winner-btn.active {
-            background: #4caf50;
-            color: #ffffff;
-            border-color: #4caf50;
-        }
-
-        .winner-btn:disabled {
-            opacity: 0.3;
-            cursor: not-allowed;
-        }
-
-        .bracket-divider {
-            height: 1px;
-            background: rgba(100, 200, 255, 0.1);
-            margin: 0.25rem 0;
-        }
-
-        .host-only-notice {
-            background: rgba(255, 193, 7, 0.1);
-            border: 1px solid rgba(255, 193, 7, 0.3);
-            border-radius: 4px;
-            padding: 0.5rem;
-            font-size: 12px;
-            color: #ffc107;
-            text-align: center;
-            margin-top: 0.5rem;
-        }
-
-        .tournament-actions {
-            display: flex;
-            gap: 1rem;
-            margin-top: 2rem;
-            padding-top: 1rem;
-            border-top: 1px solid rgba(100, 200, 255, 0.1);
-            flex-wrap: wrap;
-        }
-
-        .tournament-actions button {
-            flex: 1;
-            min-width: 120px;
-        }
-
-        /* Responsive */
-        @media (max-width: 768px) {
-            .tournament-modal {
-                max-width: 100%;
-                width: 95%;
-                padding: 1.5rem;
-            }
-
-            .player-count-selector {
-                grid-template-columns: repeat(2, 1fr);
-            }
-
-            .tournament-card-details {
-                grid-template-columns: 1fr;
-            }
-
-            .bracket-container {
-                gap: 1rem;
-            }
-
-            .bracket-round {
-                min-width: 180px;
-            }
-
-            .match-player-row {
-                padding: 0.3rem;
-            }
-
-            .player-avatar {
-                width: 28px;
-                height: 28px;
-            }
-
-            .score-input {
-                width: 40px;
-                font-size: 11px;
-            }
-
-            .tournament-actions {
-                flex-direction: column;
-            }
-
-            .tournament-actions button {
-                min-width: auto;
-            }
-        }
-    </style>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Tournaments</title>
+  <style>
+    *, *::before, *::after {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+
+    /* Default theme (inherits from parent document if available) */
+    :root {
+      --bg-0: #141820;
+      --bg-1: #202630;
+      --bg-2: #2c3440;
+      --bg-3: #384250;
+      --accent: #f9a8d4;
+      --accent-h: #f472b6;
+      --danger: #ed4245;
+      --green: #23a55a;
+      --yellow: #f0b232;
+      --text-1: #fdf2f8;
+      --text-2: #fce7f3;
+      --text-3: #fbcfe8;
+      --radius: 8px;
+      --font: "gg sans", "Noto Sans", Whitney, Helvetica Neue, Helvetica, Arial, sans-serif;
+    }
+
+    /* Midnight theme */
+    [data-theme="midnight"] {
+      --bg-0: #0a0a0f;
+      --bg-1: #111118;
+      --bg-2: #1a1a24;
+      --bg-3: #22222f;
+      --accent: #7c3aed;
+      --accent-h: #6d28d9;
+      --text-1: #f0f0ff;
+      --text-2: #a0a0c0;
+      --text-3: #606080;
+    }
+
+    /* Forest theme */
+    [data-theme="forest"] {
+      --bg-0: #0d1a0f;
+      --bg-1: #142018;
+      --bg-2: #1a2d1f;
+      --bg-3: #213828;
+      --accent: #16a34a;
+      --accent-h: #15803d;
+      --text-1: #ecfdf5;
+      --text-2: #86efac;
+      --text-3: #4ade80;
+    }
+
+    /* Ocean theme */
+    [data-theme="ocean"] {
+      --bg-0: #030d1a;
+      --bg-1: #071828;
+      --bg-2: #0c2236;
+      --bg-3: #112c44;
+      --accent: #0ea5e9;
+      --accent-h: #0284c7;
+      --text-1: #f0f9ff;
+      --text-2: #7dd3fc;
+      --text-3: #38bdf8;
+    }
+
+    /* Sunset theme */
+    [data-theme="sunset"] {
+      --bg-0: #1a0a0a;
+      --bg-1: #2a1010;
+      --bg-2: #381818;
+      --bg-3: #442020;
+      --accent: #f97316;
+      --accent-h: #ea580c;
+      --text-1: #fff7ed;
+      --text-2: #fdba74;
+      --text-3: #fb923c;
+    }
+
+    /* Rose theme */
+    [data-theme="rose"] {
+      --bg-0: #1a0a10;
+      --bg-1: #2a1020;
+      --bg-2: #38182c;
+      --bg-3: #442038;
+      --accent: #e11d48;
+      --accent-h: #be123c;
+      --text-1: #fff1f2;
+      --text-2: #fda4af;
+      --text-3: #fb7185;
+    }
+
+    /* Light theme */
+    [data-theme="light"] {
+      --bg-0: #f2f3f5;
+      --bg-1: #ffffff;
+      --bg-2: #e9eaec;
+      --bg-3: #d9dade;
+      --accent: #5865f2;
+      --accent-h: #4752c4;
+      --text-1: #060607;
+      --text-2: #4e5058;
+      --text-3: #80848e;
+    }
+
+    body {
+      background: var(--bg-0);
+      color: var(--text-1);
+      font-family: var(--font);
+      font-size: 14px;
+      line-height: 1.5;
+    }
+
+    /* ──────────── TOURNAMENTS CONTAINER ──────────── */
+    .tournaments-container {
+      padding: 20px;
+      max-width: 1200px;
+      margin: 0 auto;
+    }
+
+    .tournaments-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 24px;
+    }
+
+    .tournaments-title {
+      font-size: 28px;
+      font-weight: 700;
+      color: var(--text-1);
+      letter-spacing: -0.5px;
+    }
+
+    .create-tournament-btn {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      background: var(--accent);
+      color: #fff;
+      border: none;
+      border-radius: var(--radius);
+      padding: 10px 16px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: background 0.15s, transform 0.1s;
+      font-family: var(--font);
+      font-size: 14px;
+    }
+
+    .create-tournament-btn:hover {
+      background: var(--accent-h);
+      transform: translateY(-2px);
+    }
+
+    /* ──────────── TOURNAMENTS LIST ──────────── */
+    .tournaments-list {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+      gap: 16px;
+    }
+
+    .tournament-card {
+      background: var(--bg-2);
+      border: 1px solid rgba(255, 255, 255, 0.08);
+      border-radius: var(--radius);
+      padding: 16px;
+      cursor: pointer;
+      transition: background 0.15s, border-color 0.15s, transform 0.1s;
+    }
+
+    .tournament-card:hover {
+      background: var(--bg-3);
+      border-color: rgba(255, 255, 255, 0.12);
+      transform: translateY(-2px);
+    }
+
+    .tournament-card-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-start;
+      margin-bottom: 12px;
+    }
+
+    .tournament-card-title {
+      font-size: 16px;
+      font-weight: 700;
+      color: var(--text-1);
+    }
+
+    .tournament-card-status {
+      display: inline-block;
+      padding: 4px 10px;
+      border-radius: 6px;
+      font-size: 11px;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+    }
+
+    .tournament-card-status.in-progress {
+      background: rgba(35, 165, 90, 0.15);
+      color: var(--green);
+    }
+
+    .tournament-card-status.pending {
+      background: rgba(240, 178, 50, 0.15);
+      color: var(--yellow);
+    }
+
+    .tournament-card-status.completed {
+      background: rgba(88, 101, 242, 0.15);
+      color: #5865f2;
+    }
+
+    .tournament-card-meta {
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+      margin-bottom: 12px;
+      padding-bottom: 12px;
+      border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+    }
+
+    .tournament-card-meta-item {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      font-size: 13px;
+      color: var(--text-3);
+    }
+
+    .tournament-card-meta-label {
+      color: var(--text-2);
+      font-weight: 600;
+    }
+
+    .tournament-card-description {
+      font-size: 13px;
+      color: var(--text-3);
+      margin-bottom: 12px;
+      line-height: 1.4;
+    }
+
+    /* ──────────── TOURNAMENT MODAL ──────────── */
+    .modal {
+      display: none;
+      position: fixed;
+      inset: 0;
+      background: rgba(0, 0, 0, 0.6);
+      backdrop-filter: blur(4px);
+      z-index: 1000;
+      align-items: center;
+      justify-content: center;
+      padding: 20px;
+    }
+
+    .modal.open {
+      display: flex;
+    }
+
+    .modal-content {
+      background: var(--bg-1);
+      border: 1px solid rgba(255, 255, 255, 0.1);
+      border-radius: var(--radius);
+      max-width: 700px;
+      max-height: 80vh;
+      overflow-y: auto;
+      width: 100%;
+      position: relative;
+      box-shadow: 0 20px 60px rgba(0, 0, 0, 0.4);
+    }
+
+    .modal-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 20px;
+      border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+      flex-shrink: 0;
+    }
+
+    .modal-title {
+      font-size: 20px;
+      font-weight: 700;
+      color: var(--text-1);
+    }
+
+    .modal-close {
+      background: none;
+      border: none;
+      color: var(--text-3);
+      cursor: pointer;
+      font-size: 20px;
+      padding: 4px;
+      border-radius: 6px;
+      transition: color 0.15s, background 0.15s;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+
+    .modal-close:hover {
+      color: var(--text-1);
+      background: rgba(255, 255, 255, 0.08);
+    }
+
+    .modal-body {
+      padding: 20px;
+    }
+
+    .tournament-info {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 12px;
+      margin-bottom: 20px;
+      padding-bottom: 20px;
+      border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+    }
+
+    .tournament-info-item {
+      display: flex;
+      flex-direction: column;
+    }
+
+    .tournament-info-label {
+      font-size: 11px;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      color: var(--text-3);
+      margin-bottom: 4px;
+    }
+
+    .tournament-info-value {
+      font-size: 14px;
+      font-weight: 500;
+      color: var(--text-1);
+    }
+
+    .tournament-description {
+      font-size: 13px;
+      color: var(--text-2);
+      line-height: 1.5;
+      margin-bottom: 20px;
+      padding: 12px;
+      background: rgba(255, 255, 255, 0.04);
+      border-radius: 6px;
+      border-left: 2px solid var(--accent);
+    }
+
+    /* ──────────── REGISTERED PLAYERS ──────────── */
+    .registered-players-section {
+      margin-bottom: 20px;
+    }
+
+    .section-title {
+      font-size: 13px;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 1px;
+      color: var(--text-3);
+      margin-bottom: 12px;
+    }
+
+    .players-list {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+    }
+
+    .player-badge {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      background: var(--bg-2);
+      border: 1px solid rgba(255, 255, 255, 0.1);
+      padding: 8px 12px;
+      border-radius: 6px;
+      font-size: 13px;
+      color: var(--text-2);
+    }
+
+    .player-badge.host {
+      background: rgba(249, 168, 212, 0.12);
+      border-color: var(--accent);
+      color: var(--accent);
+    }
+
+    .player-avatar {
+      width: 24px;
+      height: 24px;
+      border-radius: 50%;
+      background: var(--accent);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-weight: 600;
+      font-size: 11px;
+      color: #fff;
+      overflow: hidden;
+      flex-shrink: 0;
+    }
+
+    .player-avatar img {
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+    }
+
+    .host-badge {
+      font-size: 10px;
+      color: var(--text-3);
+      background: rgba(255, 255, 255, 0.08);
+      padding: 2px 6px;
+      border-radius: 3px;
+    }
+
+    /* ──────────── BRACKET SECTION ──────────── */
+    .bracket-section {
+      margin-bottom: 20px;
+    }
+
+    .bracket-container {
+      background: var(--bg-2);
+      border: 1px solid rgba(255, 255, 255, 0.06);
+      border-radius: var(--radius);
+      padding: 20px;
+      overflow-x: auto;
+      min-height: 300px;
+    }
+
+    .bracket-empty {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      height: 300px;
+      flex-direction: column;
+      gap: 12px;
+      color: var(--text-3);
+    }
+
+    .bracket-empty-icon {
+      font-size: 40px;
+      opacity: 0.5;
+    }
+
+    .bracket-empty-text {
+      font-size: 14px;
+    }
+
+    .bracket {
+      display: flex;
+      gap: 40px;
+      min-width: min-content;
+    }
+
+    .bracket-round {
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+      flex-shrink: 0;
+    }
+
+    .bracket-round-title {
+      font-size: 11px;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 1px;
+      color: var(--text-3);
+      margin-bottom: 12px;
+    }
+
+    .bracket-match {
+      width: 180px;
+      background: var(--bg-3);
+      border: 1px solid rgba(255, 255, 255, 0.08);
+      border-radius: 6px;
+      padding: 12px;
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+
+    .match-team {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 8px;
+      font-size: 13px;
+    }
+
+    .match-team-name {
+      color: var(--text-2);
+      flex: 1;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+
+    .match-team-score {
+      background: var(--bg-2);
+      border: 1px solid rgba(255, 255, 255, 0.08);
+      padding: 4px 8px;
+      border-radius: 4px;
+      width: 50px;
+      text-align: center;
+      color: var(--text-1);
+      font-weight: 600;
+    }
+
+    .match-divider {
+      height: 1px;
+      background: rgba(255, 255, 255, 0.06);
+    }
+
+    /* ──────────── ACTION BUTTONS ──────────── */
+    .action-buttons {
+      display: flex;
+      gap: 10px;
+      padding-top: 20px;
+      border-top: 1px solid rgba(255, 255, 255, 0.06);
+    }
+
+    .btn {
+      padding: 10px 16px;
+      border: none;
+      border-radius: var(--radius);
+      font-weight: 600;
+      cursor: pointer;
+      transition: background 0.15s, transform 0.1s, border-color 0.15s;
+      font-family: var(--font);
+      font-size: 14px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 6px;
+    }
+
+    .btn-primary {
+      background: var(--accent);
+      color: #fff;
+      flex: 1;
+    }
+
+    .btn-primary:hover {
+      background: var(--accent-h);
+      transform: translateY(-2px);
+    }
+
+    .btn-secondary {
+      background: var(--bg-2);
+      color: var(--text-2);
+      border: 1px solid rgba(255, 255, 255, 0.1);
+      flex: 1;
+    }
+
+    .btn-secondary:hover {
+      background: var(--bg-3);
+      color: var(--text-1);
+      border-color: rgba(255, 255, 255, 0.15);
+    }
+
+    .btn-danger {
+      background: rgba(237, 66, 69, 0.15);
+      color: var(--danger);
+      border: 1px solid rgba(237, 66, 69, 0.3);
+    }
+
+    .btn-danger:hover {
+      background: rgba(237, 66, 69, 0.25);
+      border-color: var(--danger);
+    }
+
+    .btn-small {
+      padding: 6px 12px;
+      font-size: 12px;
+    }
+
+    /* ──────────── FORM ELEMENTS ──────────── */
+    .form-group {
+      margin-bottom: 16px;
+    }
+
+    .form-label {
+      display: block;
+      font-size: 12px;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      color: var(--text-3);
+      margin-bottom: 6px;
+    }
+
+    .form-input,
+    .form-select,
+    .form-textarea {
+      width: 100%;
+      background: var(--bg-2);
+      border: 1px solid rgba(255, 255, 255, 0.1);
+      border-radius: 6px;
+      padding: 10px 12px;
+      color: var(--text-1);
+      font-family: var(--font);
+      font-size: 14px;
+      transition: border-color 0.15s;
+    }
+
+    .form-input:focus,
+    .form-select:focus,
+    .form-textarea:focus {
+      outline: none;
+      border-color: var(--accent);
+    }
+
+    .form-textarea {
+      resize: vertical;
+      min-height: 80px;
+    }
+
+    /* ──────────── LOADING & STATES ──────────── */
+    .loading {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+      color: var(--text-3);
+      font-size: 14px;
+    }
+
+    .spinner {
+      width: 16px;
+      height: 16px;
+      border: 2px solid rgba(255, 255, 255, 0.2);
+      border-top-color: var(--accent);
+      border-radius: 50%;
+      animation: spin 0.8s linear infinite;
+    }
+
+    @keyframes spin {
+      to {
+        transform: rotate(360deg);
+      }
+    }
+
+    /* ──────────── RESPONSIVE ──────────── */
+    @media (max-width: 768px) {
+      .tournaments-list {
+        grid-template-columns: 1fr;
+      }
+
+      .tournament-info {
+        grid-template-columns: 1fr;
+      }
+
+      .modal-content {
+        border-radius: var(--radius);
+      }
+
+      .bracket {
+        gap: 20px;
+      }
+
+      .bracket-match {
+        width: 160px;
+      }
+
+      .action-buttons {
+        flex-direction: column-reverse;
+      }
+
+      .btn {
+        width: 100%;
+      }
+    }
+  </style>
 </head>
 <body>
-    <!-- Tournament Setup Modal -->
-    <div class="tournament-container" id="tournamentContainer">
-        <div class="tournament-modal">
-            <div class="tournament-header">
-                <div class="tournament-header-left">
-                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                        <polyline points="22 12 18 12 15 21 9 3 6 12 2 12"></polyline>
-                    </svg>
-                    <h2>Create Tournament</h2>
-                </div>
-                <button class="close-btn" onclick="closeTournamentModal()">×</button>
-            </div>
-
-            <form id="tournamentForm">
-                <div class="form-group">
-                    <label for="tournamentName">Tournament Name</label>
-                    <input type="text" id="tournamentName" placeholder="Enter tournament name" required>
-                </div>
-
-                <div class="form-group">
-                    <label for="tournamentDesc">Description</label>
-                    <textarea id="tournamentDesc" placeholder="Optional tournament description" rows="2"></textarea>
-                </div>
-
-                <div class="form-group">
-                    <label>Number of Players</label>
-                    <div class="player-count-selector">
-                        <button type="button" class="player-count-btn" data-count="4">4</button>
-                        <button type="button" class="player-count-btn" data-count="8">8</button>
-                        <button type="button" class="player-count-btn" data-count="16">16</button>
-                        <button type="button" class="player-count-btn" data-count="32">32</button>
-                        <button type="button" class="player-count-btn" data-count="64">64</button>
-                        <button type="button" class="player-count-btn" data-count="128">128</button>
-                    </div>
-                </div>
-
-                <div class="form-group">
-                    <label for="tournamentFormat">Tournament Format</label>
-                    <select id="tournamentFormat" required>
-                        <option value="">Select format...</option>
-                        <option value="single">Single Elimination</option>
-                        <option value="double">Double Elimination</option>
-                        <option value="round-robin">Round Robin</option>
-                    </select>
-                </div>
-
-                <div class="form-group">
-                    <label for="tournamentRules">Rules</label>
-                    <textarea id="tournamentRules" placeholder="Optional tournament rules" rows="2"></textarea>
-                </div>
-
-                <div class="form-group">
-                    <label for="tournamentPrize">Prize</label>
-                    <input type="text" id="tournamentPrize" placeholder="Optional prize information">
-                </div>
-
-                <div class="form-actions">
-                    <button type="submit" class="btn-primary">Create Tournament</button>
-                    <button type="button" class="btn-secondary" onclick="closeTournamentModal()">Cancel</button>
-                </div>
-            </form>
-        </div>
+  <div class="tournaments-container">
+    <!-- Header -->
+    <div class="tournaments-header">
+      <h1 class="tournaments-title">Tournaments</h1>
+      <button class="create-tournament-btn" onclick="openCreateModal()">
+        <span>+</span> New Tournament
+      </button>
     </div>
 
-    <!-- Tournament List -->
-    <div id="tournamentsList" class="tournaments-list"></div>
+    <!-- Tournaments List -->
+    <div class="tournaments-list" id="tournamentsList"></div>
+  </div>
 
-    <script src="tournaments.js"></script>
+  <!-- Tournament Details Modal -->
+  <div class="modal" id="tournamentModal">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h2 class="modal-title" id="modalTitle">Tournament Name</h2>
+        <button class="modal-close" onclick="closeTournamentModal()">✕</button>
+      </div>
+
+      <div class="modal-body">
+        <!-- Tournament Info Grid -->
+        <div class="tournament-info" id="tournamentInfo"></div>
+
+        <!-- Description -->
+        <div class="tournament-description" id="tournamentDescription"></div>
+
+        <!-- Registered Players -->
+        <div class="registered-players-section">
+          <h3 class="section-title">Registered Players (<span id="playerCount">0</span>)</h3>
+          <div class="players-list" id="playersList"></div>
+        </div>
+
+        <!-- Join Button for Non-Registered Players -->
+        <div id="joinButtonContainer"></div>
+
+        <!-- Bracket Section -->
+        <div class="bracket-section">
+          <h3 class="section-title">Bracket</h3>
+          <div class="bracket-container" id="bracketContainer">
+            <div class="bracket-empty">
+              <div class="bracket-empty-icon">🏆</div>
+              <div class="bracket-empty-text">Bracket will appear here</div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Action Buttons -->
+        <div class="action-buttons">
+          <button class="btn btn-secondary" onclick="closeTournamentModal()">Close</button>
+          <button class="btn btn-primary" id="generateBracketBtn" onclick="generateBracket()" style="display: none;">
+            Generate Bracket
+          </button>
+          <button class="btn btn-danger" id="endTournamentBtn" onclick="endTournament()" style="display: none;">
+            End Tournament
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Create Tournament Modal -->
+  <div class="modal" id="createModal">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h2 class="modal-title">Create New Tournament</h2>
+        <button class="modal-close" onclick="closeCreateModal()">✕</button>
+      </div>
+
+      <div class="modal-body">
+        <form onsubmit="submitCreateTournament(event)">
+          <div class="form-group">
+            <label class="form-label">Tournament Name</label>
+            <input type="text" class="form-input" id="tournamentNameInput" placeholder="e.g., Spring Championship" required />
+          </div>
+
+          <div class="form-group">
+            <label class="form-label">Format</label>
+            <select class="form-select" id="formatSelect" required>
+              <option value="">Select format...</option>
+              <option value="single">Single Elimination</option>
+              <option value="double">Double Elimination</option>
+              <option value="round-robin">Round Robin</option>
+            </select>
+          </div>
+
+          <div class="form-group">
+            <label class="form-label">Max Players</label>
+            <input type="number" class="form-input" id="maxPlayersInput" placeholder="e.g., 8" min="2" max="128" required />
+          </div>
+
+          <div class="form-group">
+            <label class="form-label">Description (Optional)</label>
+            <textarea class="form-textarea" id="descriptionInput" placeholder="Add details about this tournament..."></textarea>
+          </div>
+
+          <div class="action-buttons">
+            <button type="button" class="btn btn-secondary" onclick="closeCreateModal()">Cancel</button>
+            <button type="submit" class="btn btn-primary">Create Tournament</button>
+          </div>
+        </form>
+      </div>
+    </div>
+  </div>
+
+  <script src="tournaments.js"></script>
 </body>
 </html>
