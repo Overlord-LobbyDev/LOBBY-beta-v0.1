@@ -1,4 +1,4 @@
-// routes/tournaments.js - ENHANCED VERSION WITH SCORING AND CLOSURE
+// routes/tournaments.js - ENHANCED VERSION WITH SCORING, CLOSURE, AND AUTO-HOST REGISTRATION
 // FIXED VERSION — PostgreSQL syntax
 const express = require('express');
 const router = express.Router();
@@ -14,7 +14,7 @@ function verifyAuth(req, res, next) {
 }
 
 // ============================================================
-// CREATE TOURNAMENT
+// CREATE TOURNAMENT (FIXED: Auto-register host)
 // ============================================================
 router.post('/create', verifyAuth, async (req, res) => {
   try {
@@ -59,6 +59,13 @@ router.post('/create', verifyAuth, async (req, res) => {
     
     const tournament = result.rows[0];
     
+    // AUTO-REGISTER THE HOST AS A PLAYER
+    await pool.query(
+      `INSERT INTO tournament_players (tournament_id, user_id, username, joined_at, status)
+       VALUES ($1, $2, $3, $4, $5)`,
+      [tournament.id, req.user.id, req.user.username, new Date(), 'registered']
+    );
+    
     // Convert database format to JSON format for frontend
     const responseData = {
       id: tournament.id,
@@ -68,7 +75,12 @@ router.post('/create', verifyAuth, async (req, res) => {
       description: tournament.description,
       format: tournament.format,
       playerCount: tournament.player_count,
-      registeredPlayers: [],
+      registeredPlayers: [{
+        userId: req.user.id,
+        username: req.user.username,
+        joinedAt: new Date(),
+        status: 'registered'
+      }],
       bracket: { rounds: [] },
       status: tournament.status,
       createdAt: tournament.created_at,

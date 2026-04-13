@@ -1,4 +1,4 @@
-// tournaments.js - ENHANCED VERSION WITH SCORING AND TOURNAMENT CLOSURE
+// tournaments.js - ENHANCED VERSION WITH SCORING, TOURNAMENT CLOSURE, AND HOST REGISTRATION
 const API_BASE = 'https://lobby-websocket-server.onrender.com';
 let selectedPlayerCount = null;
 let currentLobbyId = null;
@@ -198,7 +198,7 @@ function displayTournaments(tournaments) {
         <div class="tournament-card" onclick="openTournamentDetails('${tournament.id}')">
             <div class="tournament-card-header">
                 <div class="tournament-card-title">${tournament.name}</div>
-                <span class="tournament-card-status ${tournament.status === 'in-progress' ? 'in-progress' : ''}">${tournament.status}</span>
+                <span class="tournament-card-status ${tournament.status === 'in-progress' ? 'in-progress' : ''}\">${tournament.status}</span>
             </div>
             <div class="tournament-card-details">
                 <div class="tournament-detail">
@@ -301,10 +301,11 @@ async function displayTournamentBracket(tournament) {
     }
 
     const isHost = tournament.hostId === currentUserId;
+    const isRegistered = tournament.registeredPlayers.some(p => p.userId === currentUserId);
     const canEdit = isHost && tournament.status !== 'completed';
 
     let bracketHTML = '';
-    if (tournament.bracket && tournament.bracket.rounds) {
+    if (tournament.bracket && tournament.bracket.rounds && tournament.bracket.rounds.length > 0) {
         bracketHTML = tournament.bracket.rounds.map((round, idx) => `
             <div class="bracket-round">
                 <div class="bracket-round-title">Round ${round.roundNumber}</div>
@@ -364,7 +365,7 @@ async function displayTournamentBracket(tournament) {
             </div>
         `).join('');
     } else {
-        bracketHTML = '<p style="color: #7a8591;">Bracket not yet generated</p>';
+        bracketHTML = '<p style="color: #7a8591;">Bracket not yet generated. Host will generate it once all players register.</p>';
     }
 
     modal.innerHTML = `
@@ -381,7 +382,18 @@ async function displayTournamentBracket(tournament) {
                 <p style="color: #b0b8c1; margin: 0.5rem 0;"><strong>Format:</strong> ${tournament.format}</p>
                 <p style="color: #b0b8c1; margin: 0.5rem 0;"><strong>Players:</strong> ${tournament.registeredPlayers.length}/${tournament.playerCount}</p>
                 <p style="color: #b0b8c1; margin: 0.5rem 0;"><strong>Status:</strong> ${tournament.status}</p>
-                ${tournament.description ? `<p style="color: #b0b8c1; margin: 0.5rem 0;">${tournament.description}</p>` : ''}
+                ${tournament.description ? `<p style="color: #b0b8c1; margin: 0.5rem 0;"><strong>Description:</strong> ${tournament.description}</p>` : ''}
+            </div>
+
+            <div style="margin-bottom: 1.5rem;">
+                <h3 style="color: #ffffff; margin-top: 0; margin-bottom: 0.75rem;">Registered Players (${tournament.registeredPlayers.length}/${tournament.playerCount})</h3>
+                <div style="display: flex; flex-wrap: wrap; gap: 0.5rem;">
+                    ${tournament.registeredPlayers.map(p => `
+                        <div style="background: rgba(100, 200, 255, 0.15); border: 1px solid rgba(100, 200, 255, 0.3); border-radius: 4px; padding: 0.5rem 0.75rem; color: #b0b8c1; font-size: 13px;">
+                            ${p.username}
+                        </div>
+                    `).join('')}
+                </div>
             </div>
 
             <div class="bracket-container">
@@ -389,6 +401,10 @@ async function displayTournamentBracket(tournament) {
             </div>
 
             <div class="tournament-actions">
+                ${!isRegistered && !isHost && tournament.status === 'setup' ? `
+                    <button onclick="registerForTournament('${tournament.id}')" class="btn-primary">Join Tournament</button>
+                ` : ''}
+                
                 ${isHost && tournament.status === 'setup' ? `
                     <button onclick="generateBracket('${tournament.id}')" class="btn-primary">Generate Bracket</button>
                 ` : ''}
@@ -559,7 +575,13 @@ async function registerForTournament(tournamentId) {
         }
 
         showNotification('Successfully registered for tournament!', 'success');
+        
+        // Close current modal and reload
+        document.querySelector('.tournament-container.active')?.remove();
         loadTournaments();
+        
+        // Reopen to show updated bracket
+        setTimeout(() => openTournamentDetails(tournamentId), 500);
     } catch (error) {
         console.error('Registration error:', error);
         showNotification(error.message || 'Failed to register for tournament', 'error');

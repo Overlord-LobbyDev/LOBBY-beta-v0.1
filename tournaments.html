@@ -1,4 +1,4 @@
-<!-- tournaments.html -->
+<!-- tournaments.html - FIXED VERSION WITH HOST REGISTRATION -->
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -484,10 +484,12 @@
             margin-top: 2rem;
             padding-top: 1rem;
             border-top: 1px solid rgba(100, 200, 255, 0.1);
+            flex-wrap: wrap;
         }
 
         .tournament-actions button {
             flex: 1;
+            min-width: 120px;
         }
 
         /* Responsive */
@@ -526,6 +528,14 @@
             .score-input {
                 width: 40px;
                 font-size: 11px;
+            }
+
+            .tournament-actions {
+                flex-direction: column;
+            }
+
+            .tournament-actions button {
+                min-width: auto;
             }
         }
     </style>
