@@ -47,6 +47,8 @@
       <div class="sp-nav-label" style="margin-top:10px">App Settings</div>
       <button class="sp-nav-btn" data-sp="audiovideo">🎙 Audio & Video</button>
       <button class="sp-nav-btn" data-sp="about">ℹ️ About & Updates</button>
+      <div class="sp-nav-label" style="margin-top:10px">Tournament</div>
+      <button class="sp-nav-btn" data-sp="tournaments">🏆 Tournaments</button>
     </nav>
 
     <div class="sp-content">
@@ -295,6 +297,40 @@
         </div>
       </div>
 
+      <!-- ── Tournaments ── -->
+      <div class="sp-section" id="sp-tournaments">
+        <h2>Tournaments</h2>
+        <p style="font-size:13px;color:var(--text-3);margin-top:-12px;margin-bottom:20px">Customise how your bracket looks — like a title card. Changes apply when you view a tournament.</p>
+
+        <div class="sp-form-group">
+          <label class="sp-label">Bracket Background Image</label>
+          <label class="sp-upload-btn" for="spTournamentBgInput">🖼 Upload Background</label>
+          <input type="file" id="spTournamentBgInput" accept="image/*" style="display:none" />
+          <div class="sp-hint">Shown behind your tournament bracket. GIFs supported.</div>
+        </div>
+
+        <div class="sp-form-group">
+          <label class="sp-label">Background Colour <span style="font-size:11px;color:var(--text-3);font-weight:400;text-transform:none;letter-spacing:0">(used when no image is set)</span></label>
+          <div class="sp-colour-row">
+            <input type="color" class="sp-colour-picker" id="spTournamentBgColour" value="#141820" />
+            <div class="sp-colour-presets" id="spTournamentColourPresets"></div>
+          </div>
+        </div>
+
+        <div class="sp-form-group">
+          <label class="sp-label">Preview</label>
+          <div id="spTournamentBgPreview" style="height:90px;border-radius:8px;background:var(--bg-3);border:1px solid rgba(255,255,255,.08);display:flex;align-items:center;justify-content:center;color:var(--text-3);font-size:12px;background-size:cover;background-position:center;transition:background .2s;">
+            No background set
+          </div>
+        </div>
+
+        <div style="display:flex;gap:8px;flex-wrap:wrap">
+          <button class="sp-save-btn" id="spSaveTournament">Save Tournament Style</button>
+          <button class="sp-save-btn" id="spClearTournament" style="background:var(--bg-3);color:var(--text-2)">Clear</button>
+        </div>
+        <div class="sp-msg" id="spTournamentMsg"></div>
+      </div>
+
     </div><!-- sp-content -->
   </div><!-- sp-body -->
 </div><!-- settingsDrawer -->`;
@@ -347,6 +383,7 @@
         if (btn.dataset.sp === "audiovideo") loadAVDevices();
         if (btn.dataset.sp === "themes") loadThemeSection();
         if (btn.dataset.sp === "about") loadAboutSection();
+        if (btn.dataset.sp === "tournaments") initTournamentSection();
       });
     });
 
@@ -823,5 +860,98 @@
     clearTimeout(spMsgTimers[id]);
     spMsgTimers[id] = setTimeout(() => el.className = "sp-msg", 4000);
   }
+
+  // ── Tournament bracket background ──────────────────────────
+  let spTournamentBgUrl = null;
+  let _tournamentSectionInit = false;
+
+  function initTournamentSection() {
+    if (_tournamentSectionInit) return;
+    _tournamentSectionInit = true;
+
+    const saved = JSON.parse(localStorage.getItem('vh_tournament_bracket_bg_data') || '{}');
+    spTournamentBgUrl = saved.imageUrl || null;
+
+    const preview = document.getElementById('spTournamentBgPreview');
+    const colourPicker = document.getElementById('spTournamentBgColour');
+
+    if (saved.imageUrl) {
+      preview.style.backgroundImage = `url(${saved.imageUrl})`;
+      preview.style.backgroundColor = 'transparent';
+      preview.textContent = '';
+    }
+    if (saved.colour) {
+      colourPicker.value = saved.colour;
+      if (!saved.imageUrl) {
+        preview.style.backgroundImage = 'none';
+        preview.style.backgroundColor = saved.colour;
+        preview.textContent = '';
+      }
+    }
+    buildTournamentPresets(saved.colour || '#141820');
+
+    document.getElementById('spTournamentBgInput').addEventListener('change', e => {
+      const file = e.target.files[0]; if (!file) return;
+      const reader = new FileReader();
+      reader.onload = ev => {
+        spTournamentBgUrl = ev.target.result;
+        preview.style.backgroundImage = `url(${ev.target.result})`;
+        preview.style.backgroundColor = 'transparent';
+        preview.textContent = '';
+      };
+      reader.readAsDataURL(file);
+      e.target.value = '';
+    });
+
+    colourPicker.addEventListener('input', e => {
+      buildTournamentPresets(e.target.value);
+      if (!spTournamentBgUrl) {
+        preview.style.backgroundImage = 'none';
+        preview.style.backgroundColor = e.target.value;
+        preview.textContent = '';
+      }
+    });
+
+    document.getElementById('spSaveTournament').addEventListener('click', () => {
+      const colour = colourPicker.value;
+      const data = { colour, imageUrl: spTournamentBgUrl || null };
+      localStorage.setItem('vh_tournament_bracket_bg_data', JSON.stringify(data));
+      localStorage.setItem('vh_tournament_bracket_bg', spTournamentBgUrl || '');
+      localStorage.setItem('vh_tournament_bracket_bg_colour', colour);
+      buildTournamentPresets(colour);
+      spShowMsg('spTournamentMsg', 'Tournament style saved!', 'success');
+    });
+
+    document.getElementById('spClearTournament').addEventListener('click', () => {
+      spTournamentBgUrl = null;
+      localStorage.removeItem('vh_tournament_bracket_bg_data');
+      localStorage.removeItem('vh_tournament_bracket_bg');
+      localStorage.removeItem('vh_tournament_bracket_bg_colour');
+      preview.style.backgroundImage = 'none';
+      preview.style.backgroundColor = '';
+      preview.textContent = 'No background set';
+      colourPicker.value = '#141820';
+      buildTournamentPresets('#141820');
+      spShowMsg('spTournamentMsg', 'Cleared!', 'success');
+    });
+  }
+
+  function buildTournamentPresets(active) {
+    const container = document.getElementById('spTournamentColourPresets');
+    if (!container) return;
+    container.innerHTML = PRESETS.map(c => `
+      <div class="sp-colour-preset ${c === active ? 'selected' : ''}" style="background:${c}" title="${c}"
+        onclick="(function(){ window._spSelectTournamentColour('${c}'); })()"></div>`).join('');
+  }
+
+  window._spSelectTournamentColour = function(colour) {
+    const picker = document.getElementById('spTournamentBgColour');
+    if (picker) picker.value = colour;
+    buildTournamentPresets(colour);
+    if (!spTournamentBgUrl) {
+      const preview = document.getElementById('spTournamentBgPreview');
+      if (preview) { preview.style.backgroundImage = 'none'; preview.style.backgroundColor = colour; preview.textContent = ''; }
+    }
+  };
 
 })();

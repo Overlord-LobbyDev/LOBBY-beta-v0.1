@@ -1,5 +1,6 @@
 // tournaments.js - ENHANCED VERSION WITH SCORING, TOURNAMENT CLOSURE, AND HOST REGISTRATION
 const API_BASE = 'https://lobby-websocket-server.onrender.com';
+const AUTH_BASE = 'https://lobby-auth-server.onrender.com';
 let selectedPlayerCount = null;
 let currentLobbyId = null;
 let currentUserId = null;
@@ -224,29 +225,21 @@ function displayTournaments(tournaments) {
 
 // Fetch user profile data
 async function fetchUserProfile(userId) {
-    // Check cache first
-    if (userCache[userId]) {
-        return userCache[userId];
-    }
-
+    if (userCache[userId]) return userCache[userId];
     try {
-        const response = await fetch(`${API_BASE}/api/users/${userId}/profile`, {
-            headers: {
-                'Authorization': `Bearer ${localStorage.getItem('vh_token')}`
-            }
+        const response = await fetch(`${AUTH_BASE}/profile/${userId}`, {
+            headers: { 'Authorization': `Bearer ${localStorage.getItem('vh_token')}` }
         });
-
         if (response.ok) {
             const profile = await response.json();
+            profile._avatarUrl = profile.avatar_url || profile.profilePicture || null;
             userCache[userId] = profile;
             return profile;
         }
     } catch (error) {
         console.error(`Failed to fetch profile for user ${userId}:`, error);
     }
-
-    // Return default profile if fetch fails
-    return { userId, username: 'Unknown', profilePicture: null };
+    return { userId, username: 'Unknown', _avatarUrl: null };
 }
 
 // Get initials for avatar fallback
@@ -302,6 +295,7 @@ function showBracketPanel(tournament) {
     const bracket = tournament.bracket || { rounds: [] };
     const hasMatches = bracket.rounds && bracket.rounds.some(r => r.matches && r.matches.length > 0);
     
+    const _avStyle = 'width:20px;height:20px;border-radius:50%;background:linear-gradient(135deg,var(--accent),var(--accent-h));display:flex;align-items:center;justify-content:center;font-size:9px;font-weight:700;color:#fff;overflow:hidden;flex-shrink:0;';
     let bracketHTML = '';
     if (hasMatches) {
         bracketHTML = `<div style="display: flex; gap: 40px; overflow-x: auto; overflow-y: auto; padding: 20px 24px; flex: 1;">`;
@@ -310,7 +304,9 @@ function showBracketPanel(tournament) {
             (round.matches || []).forEach(match => {
                 const p1w = match.winner === match.player1?.userId;
                 const p2w = match.winner === match.player2?.userId;
-                bracketHTML += `<div style="width: 200px; background: linear-gradient(135deg, rgba(88, 101, 242, 0.1), rgba(249, 168, 212, 0.05)); border: 2px solid rgba(88, 101, 242, 0.2); border-radius: 8px; padding: 12px; display: flex; flex-direction: column; gap: 8px;"><div style="display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 8px; background: ${p1w ? 'rgba(35, 165, 90, 0.15)' : 'rgba(0, 0, 0, 0.2)'}; border-radius: 4px; border-left: ${p1w ? '2px solid #23a55a' : 'none'}; font-size: 12px; font-weight: 500; color: #fff;"><span style="flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">${match.player1?.username || 'TBD'}</span><span style="background: rgba(255, 255, 255, 0.1); border: 1px solid rgba(255, 255, 255, 0.1); padding: 3px 8px; border-radius: 3px; font-size: 11px; font-weight: 600; width: 40px; text-align: center;">${match.player1Score || 0}</span></div><div style="height: 1px; background: rgba(255, 255, 255, 0.1);"></div><div style="display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 8px; background: ${p2w ? 'rgba(35, 165, 90, 0.15)' : 'rgba(0, 0, 0, 0.2)'}; border-radius: 4px; border-left: ${p2w ? '2px solid #23a55a' : 'none'}; font-size: 12px; font-weight: 500; color: #fff;"><span style="flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">${match.player2?.username || 'TBD'}</span><span style="background: rgba(255, 255, 255, 0.1); border: 1px solid rgba(255, 255, 255, 0.1); padding: 3px 8px; border-radius: 3px; font-size: 11px; font-weight: 600; width: 40px; text-align: center;">${match.player2Score || 0}</span></div></div>`;
+                const p1av = match.player1?.avatar_url ? `<img src="${match.player1.avatar_url}" style="width:100%;height:100%;object-fit:cover;border-radius:50%;">` : (match.player1?.username||'?')[0].toUpperCase();
+                const p2av = match.player2?.avatar_url ? `<img src="${match.player2.avatar_url}" style="width:100%;height:100%;object-fit:cover;border-radius:50%;">` : (match.player2?.username||'?')[0].toUpperCase();
+                bracketHTML += `<div style="width:220px;background:linear-gradient(135deg,rgba(88,101,242,0.1),rgba(249,168,212,0.05));border:2px solid rgba(88,101,242,0.2);border-radius:8px;padding:12px;display:flex;flex-direction:column;gap:8px;"><div style="display:flex;align-items:center;gap:8px;padding:8px;background:${p1w?'rgba(35,165,90,0.15)':'rgba(0,0,0,0.2)'};border-radius:4px;border-left:${p1w?'2px solid #23a55a':'none'};font-size:12px;font-weight:500;color:#fff;"><div style="${_avStyle}">${p1av}</div><span style="flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${match.player1?.username||'TBD'}</span><span style="background:rgba(255,255,255,0.1);border:1px solid rgba(255,255,255,0.1);padding:3px 8px;border-radius:3px;font-size:11px;font-weight:600;width:40px;text-align:center;">${match.player1Score||0}</span></div><div style="height:1px;background:rgba(255,255,255,0.1);"></div><div style="display:flex;align-items:center;gap:8px;padding:8px;background:${p2w?'rgba(35,165,90,0.15)':'rgba(0,0,0,0.2)'};border-radius:4px;border-left:${p2w?'2px solid #23a55a':'none'};font-size:12px;font-weight:500;color:#fff;"><div style="${_avStyle}">${p2av}</div><span style="flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${match.player2?.username||'TBD'}</span><span style="background:rgba(255,255,255,0.1);border:1px solid rgba(255,255,255,0.1);padding:3px 8px;border-radius:3px;font-size:11px;font-weight:600;width:40px;text-align:center;">${match.player2Score||0}</span></div></div>`;
             });
             bracketHTML += `</div></div>`;
         });
@@ -323,7 +319,10 @@ function showBracketPanel(tournament) {
     if (players.length === 0) {
         playerHTML = '<div style="color: var(--text-3); font-size: 12px;">No players</div>';
     } else {
-        playerHTML = players.map(p => `<div class="player-item" data-user-id="${p.userId}" style="display: flex; align-items: center; gap: 10px; padding: 10px; background: rgba(88, 101, 242, 0.08); border: 1px solid rgba(88, 101, 242, 0.15); border-radius: 6px;"><div class="player-avatar" style="width: 28px; height: 28px; border-radius: 50%; background: linear-gradient(135deg, var(--accent), var(--accent-h)); display: flex; align-items: center; justify-content: center; color: white; font-weight: 700; font-size: 11px; flex-shrink: 0; overflow: hidden;">${(p.username || '?')[0].toUpperCase()}</div><div style="font-size: 12px; font-weight: 500; color: var(--text-2); flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">${p.username || 'Unknown'}</div></div>`).join('');
+        playerHTML = players.map(p => {
+            const av = p.avatar_url ? `<img src="${p.avatar_url}" style="width:100%;height:100%;object-fit:cover;border-radius:50%;">` : (p.username||'?')[0].toUpperCase();
+            return `<div style="display:flex;align-items:center;gap:10px;padding:10px;background:rgba(88,101,242,0.08);border:1px solid rgba(88,101,242,0.15);border-radius:6px;"><div style="width:28px;height:28px;border-radius:50%;background:linear-gradient(135deg,var(--accent),var(--accent-h));display:flex;align-items:center;justify-content:center;color:white;font-weight:700;font-size:11px;flex-shrink:0;overflow:hidden;">${av}</div><div style="font-size:12px;font-weight:500;color:var(--text-2);flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${p.username||'Unknown'}</div></div>`;
+        }).join('');
     }
     
     // Update header
@@ -342,37 +341,6 @@ function showBracketPanel(tournament) {
     // Update content with 2-column layout
     if (chatMain) {
         chatMain.innerHTML = `<div style="display: flex; flex: 1; min-height: 0; overflow: hidden; background: var(--bg-2);"><div style="width: 260px; background: var(--bg-1); border-right: 1px solid rgba(255, 255, 255, 0.06); padding: 16px; display: flex; flex-direction: column; overflow-y: auto; flex-shrink: 0;"><div style="font-size: 9px; font-weight: 800; text-transform: uppercase; letter-spacing: 1px; color: var(--text-3); margin-bottom: 12px;">Stats</div><div style="display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-bottom: 16px;"><div style="background: rgba(88, 101, 242, 0.08); border: 1px solid rgba(88, 101, 242, 0.15); border-radius: 6px; padding: 10px; text-align: center;"><div style="font-size: 8px; color: var(--text-3); text-transform: uppercase; font-weight: 700; margin-bottom: 4px;">Format</div><div style="font-size: 14px; font-weight: 800; color: var(--accent);">${(formats[tournament.format] || tournament.format).split(' ')[0]}</div></div><div style="background: rgba(88, 101, 242, 0.08); border: 1px solid rgba(88, 101, 242, 0.15); border-radius: 6px; padding: 10px; text-align: center;"><div style="font-size: 8px; color: var(--text-3); text-transform: uppercase; font-weight: 700; margin-bottom: 4px;">Status</div><div style="font-size: 12px; font-weight: 800; color: var(--accent);">${tournament.status}</div></div></div><div style="font-size: 9px; font-weight: 800; text-transform: uppercase; letter-spacing: 1px; color: var(--text-3); margin-bottom: 8px;">Players (${players.length})</div><div style="display: flex; flex-direction: column; gap: 6px; flex: 1; overflow-y: auto;">${playerHTML}</div></div><div style="flex: 1; display: flex; flex-direction: column; overflow: hidden;"><div style="padding: 12px 20px; background: var(--bg-1); border-bottom: 1px solid rgba(255, 255, 255, 0.06); flex-shrink: 0;"><h3 style="font-size: 12px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.5px; color: var(--text-2); margin: 0;">Tournament Bracket</h3></div>${bracketHTML}</div></div>`;
-        
-        // Fetch avatars for all players
-        players.forEach(p => {
-            if (p.userId) {
-                fetch(`${API_BASE}/api/users/${p.userId}/profile`, {
-                    headers: { 'Authorization': `Bearer ${localStorage.getItem('vh_token')}` }
-                }).then(r => r.json()).then(profile => {
-                    if (profile.avatar_url) {
-                        const playerItems = chatMain.querySelectorAll(`[data-user-id="${p.userId}"] .player-avatar`);
-                        playerItems.forEach(el => {
-                            el.innerHTML = `<img src="${profile.avatar_url}" alt="" style="width: 100%; height: 100%; object-fit: cover;">`;
-                        });
-                    }
-                }).catch(e => console.error(`Failed to fetch profile for ${p.userId}:`, e));
-            }
-        });
-    }
-    
-    // Fetch header avatar
-    const currentPlayer = players.find(p => p.userId === currentUserId);
-    if (chatHeader && currentPlayer && currentUserId) {
-        fetch(`${API_BASE}/api/users/${currentUserId}/profile`, {
-            headers: { 'Authorization': `Bearer ${localStorage.getItem('vh_token')}` }
-        }).then(r => r.json()).then(profile => {
-            if (profile.avatar_url) {
-                const avatarEl = chatHeader.querySelector('#bracketHeaderAvatar');
-                if (avatarEl) {
-                    avatarEl.innerHTML = `<img src="${profile.avatar_url}" alt="" style="width: 100%; height: 100%; object-fit: cover;">`;
-                }
-            }
-        }).catch(e => console.error('Failed to fetch user profile:', e));
     }
 }
 
@@ -434,10 +402,10 @@ document.addEventListener('DOMContentLoaded', function() {
 });
 
 // Also observe on script load in case DOM is already ready
-const chatPanel = document.getElementById('chatPanel');
-if (chatPanel) {
-    observer.observe(chatPanel, { attributes: true, attributeFilter: ['class'] });
-}
+(function() {
+    const _cp = document.getElementById('chatPanel');
+    if (_cp) observer.observe(_cp, { attributes: true, attributeFilter: ['class'] });
+})();
 
 // Display tournament bracket with scoring
 async function displayTournamentBracket(tournament) {
@@ -471,8 +439,8 @@ async function displayTournamentBracket(tournament) {
                 ${round.matches.map((match, matchIdx) => {
                     const p1Profile = playerProfiles[match.player1?.userId] || match.player1;
                     const p2Profile = playerProfiles[match.player2?.userId] || match.player2;
-                    const p1Avatar = p1Profile?.profilePicture || null;
-                    const p2Avatar = p2Profile?.profilePicture || null;
+                    const p1Avatar = p1Profile?._avatarUrl || p1Profile?.avatar_url || p1Profile?.profilePicture || null;
+                    const p2Avatar = p2Profile?._avatarUrl || p2Profile?.avatar_url || p2Profile?.profilePicture || null;
                     const hasWinner = !!match.winner;
 
                     return `

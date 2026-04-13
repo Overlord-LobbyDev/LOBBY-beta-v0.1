@@ -673,23 +673,25 @@ async function getBracketData(tournamentId) {
   const rounds = await Promise.all(
     roundsResult.rows.map(async (round) => {
       const matchesResult = await pool.query(
-        `SELECT m.id, m.match_number, 
-                p1.user_id as player1_user_id, p1.username as player1_username,
-                p2.user_id as player2_user_id, p2.username as player2_username,
+        `SELECT m.id, m.match_number,
+                p1.user_id as player1_user_id, p1.username as player1_username, u1.avatar_url as player1_avatar,
+                p2.user_id as player2_user_id, p2.username as player2_username, u2.avatar_url as player2_avatar,
                 m.winner_id, m.status
          FROM tournament_matches m
          LEFT JOIN tournament_players p1 ON m.player1_id = p1.id
+         LEFT JOIN users u1 ON p1.user_id = u1.id
          LEFT JOIN tournament_players p2 ON m.player2_id = p2.id
+         LEFT JOIN users u2 ON p2.user_id = u2.id
          WHERE m.round_id = $1
          ORDER BY m.match_number ASC`,
         [round.id]
       );
-      
+
       const matches = matchesResult.rows.map(m => ({
         matchId: m.id,
         matchNumber: m.match_number,
-        player1: m.player1_user_id ? { userId: m.player1_user_id, username: m.player1_username } : null,
-        player2: m.player2_user_id ? { userId: m.player2_user_id, username: m.player2_username } : null,
+        player1: m.player1_user_id ? { userId: m.player1_user_id, username: m.player1_username, avatar_url: m.player1_avatar } : null,
+        player2: m.player2_user_id ? { userId: m.player2_user_id, username: m.player2_username, avatar_url: m.player2_avatar } : null,
         winner: m.winner_id,
         status: m.status
       }));
