@@ -273,11 +273,170 @@ async function openTournamentDetails(tournamentId) {
         }
 
         const tournament = await response.json();
-        displayTournamentBracket(tournament);
+        showBracketPanel(tournament);
     } catch (error) {
         console.error('Load tournament details error:', error);
         showNotification('Failed to load tournament details', 'error');
     }
+}
+
+function showBracketPanel(tournament) {
+    const chatPanel = document.getElementById('chatPanel');
+    if (!chatPanel) return;
+    
+    // Mark bracket panel as active
+    window.bracketPanelActive = true;
+    window.activeTournament = tournament;
+    
+    document.getElementById('homePanel')?.classList.add('hidden');
+    document.getElementById('profilePage')?.classList.add('hidden');
+    document.getElementById('vcPanel')?.classList.add('hidden');
+    chatPanel.classList.remove('hidden');
+    
+    // Get header and content areas
+    const chatHeader = chatPanel.querySelector('.chat-header') || chatPanel.querySelector('#chatHeader');
+    const chatMain = chatPanel.querySelector('.chat-main') || chatPanel.querySelector('#chatMain');
+    
+    const players = tournament.registeredPlayers || [];
+    const formats = { 'single': 'Single', 'double': 'Double', 'round-robin': 'Round Robin' };
+    const bracket = tournament.bracket || { rounds: [] };
+    const hasMatches = bracket.rounds && bracket.rounds.some(r => r.matches && r.matches.length > 0);
+    
+    let bracketHTML = '';
+    if (hasMatches) {
+        bracketHTML = `<div style="display: flex; gap: 40px; overflow-x: auto; overflow-y: auto; padding: 20px 24px; flex: 1;">`;
+        bracket.rounds.forEach(round => {
+            bracketHTML += `<div style="flex-shrink: 0; display: flex; flex-direction: column; gap: 16px;"><div style="text-align: center; font-size: 11px; font-weight: 700; text-transform: uppercase; color: rgba(255, 255, 255, 0.4); letter-spacing: 0.5px;">Round ${round.roundNumber}</div><div style="display: flex; flex-direction: column; gap: 12px;">`;
+            (round.matches || []).forEach(match => {
+                const p1w = match.winner === match.player1?.userId;
+                const p2w = match.winner === match.player2?.userId;
+                bracketHTML += `<div style="width: 200px; background: linear-gradient(135deg, rgba(88, 101, 242, 0.1), rgba(249, 168, 212, 0.05)); border: 2px solid rgba(88, 101, 242, 0.2); border-radius: 8px; padding: 12px; display: flex; flex-direction: column; gap: 8px;"><div style="display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 8px; background: ${p1w ? 'rgba(35, 165, 90, 0.15)' : 'rgba(0, 0, 0, 0.2)'}; border-radius: 4px; border-left: ${p1w ? '2px solid #23a55a' : 'none'}; font-size: 12px; font-weight: 500; color: #fff;"><span style="flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">${match.player1?.username || 'TBD'}</span><span style="background: rgba(255, 255, 255, 0.1); border: 1px solid rgba(255, 255, 255, 0.1); padding: 3px 8px; border-radius: 3px; font-size: 11px; font-weight: 600; width: 40px; text-align: center;">${match.player1Score || 0}</span></div><div style="height: 1px; background: rgba(255, 255, 255, 0.1);"></div><div style="display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 8px; background: ${p2w ? 'rgba(35, 165, 90, 0.15)' : 'rgba(0, 0, 0, 0.2)'}; border-radius: 4px; border-left: ${p2w ? '2px solid #23a55a' : 'none'}; font-size: 12px; font-weight: 500; color: #fff;"><span style="flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">${match.player2?.username || 'TBD'}</span><span style="background: rgba(255, 255, 255, 0.1); border: 1px solid rgba(255, 255, 255, 0.1); padding: 3px 8px; border-radius: 3px; font-size: 11px; font-weight: 600; width: 40px; text-align: center;">${match.player2Score || 0}</span></div></div>`;
+            });
+            bracketHTML += `</div></div>`;
+        });
+        bracketHTML += `</div>`;
+    } else {
+        bracketHTML = `<div style="display: flex; align-items: center; justify-content: center; flex: 1; color: rgba(255, 255, 255, 0.4); text-align: center;"><div><div style="font-size: 48px; margin-bottom: 16px;">🏆</div><div>${tournament.status === 'setup' ? 'Bracket will be generated' : 'No bracket yet'}</div></div></div>`;
+    }
+    
+    let playerHTML = '';
+    if (players.length === 0) {
+        playerHTML = '<div style="color: var(--text-3); font-size: 12px;">No players</div>';
+    } else {
+        playerHTML = players.map(p => `<div class="player-item" data-user-id="${p.userId}" style="display: flex; align-items: center; gap: 10px; padding: 10px; background: rgba(88, 101, 242, 0.08); border: 1px solid rgba(88, 101, 242, 0.15); border-radius: 6px;"><div class="player-avatar" style="width: 28px; height: 28px; border-radius: 50%; background: linear-gradient(135deg, var(--accent), var(--accent-h)); display: flex; align-items: center; justify-content: center; color: white; font-weight: 700; font-size: 11px; flex-shrink: 0; overflow: hidden;">${(p.username || '?')[0].toUpperCase()}</div><div style="font-size: 12px; font-weight: 500; color: var(--text-2); flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">${p.username || 'Unknown'}</div></div>`).join('');
+    }
+    
+    // Update header
+    if (chatHeader) {
+        // Get current user's profile picture from players list or use initials
+        const currentPlayer = players.find(p => p.userId === currentUserId);
+        const userInitial = (currentPlayer?.username || '?')[0].toUpperCase();
+        
+        const avatarContent = currentPlayer?.avatar_url ? `<img src="${currentPlayer.avatar_url}" alt="" style="width: 100%; height: 100%; object-fit: cover;">` : userInitial;
+        
+        // Render header with avatar
+        const headerContent = `<div style="display: flex; align-items: center; justify-content: space-between; flex: 1;"><div style="display: flex; align-items: center; gap: 12px;"><div id="bracketHeaderAvatar" style="width: 40px; height: 40px; border-radius: 50%; background: linear-gradient(135deg, var(--accent), var(--accent-h)); display: flex; align-items: center; justify-content: center; color: white; font-weight: 800; font-size: 16px; flex-shrink: 0; overflow: hidden;">${avatarContent}</div><div><h2 style="font-size: 16px; font-weight: 800; margin: 0; color: var(--text-1);">${tournament.name}</h2><div style="display: flex; align-items: center; gap: 8px; margin-top: 6px;"><span style="display: inline-flex; align-items: center; gap: 4px; padding: 4px 8px; background: rgba(88, 101, 242, 0.1); border: 1px solid rgba(88, 101, 242, 0.25); border-radius: 16px; font-size: 11px; font-weight: 600; color: var(--text-2);">📊 ${players.length}/${tournament.playerCount}</span><span style="display: inline-flex; align-items: center; gap: 4px; padding: 4px 8px; background: rgba(88, 101, 242, 0.1); border: 1px solid rgba(88, 101, 242, 0.25); border-radius: 16px; font-size: 11px; font-weight: 600; color: var(--text-2);">📋 ${formats[tournament.format] || tournament.format}</span></div></div></div><button onclick="closeBracketPanel()" style="background: transparent; border: none; color: var(--text-2); cursor: pointer; font-size: 18px; padding: 0 8px; opacity: 0.6;" onmouseover="this.style.opacity='1'" onmouseout="this.style.opacity='0.6'">✕</button></div>`;
+        chatHeader.innerHTML = headerContent;
+    }
+    
+    // Update content with 2-column layout
+    if (chatMain) {
+        chatMain.innerHTML = `<div style="display: flex; flex: 1; min-height: 0; overflow: hidden; background: var(--bg-2);"><div style="width: 260px; background: var(--bg-1); border-right: 1px solid rgba(255, 255, 255, 0.06); padding: 16px; display: flex; flex-direction: column; overflow-y: auto; flex-shrink: 0;"><div style="font-size: 9px; font-weight: 800; text-transform: uppercase; letter-spacing: 1px; color: var(--text-3); margin-bottom: 12px;">Stats</div><div style="display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-bottom: 16px;"><div style="background: rgba(88, 101, 242, 0.08); border: 1px solid rgba(88, 101, 242, 0.15); border-radius: 6px; padding: 10px; text-align: center;"><div style="font-size: 8px; color: var(--text-3); text-transform: uppercase; font-weight: 700; margin-bottom: 4px;">Format</div><div style="font-size: 14px; font-weight: 800; color: var(--accent);">${(formats[tournament.format] || tournament.format).split(' ')[0]}</div></div><div style="background: rgba(88, 101, 242, 0.08); border: 1px solid rgba(88, 101, 242, 0.15); border-radius: 6px; padding: 10px; text-align: center;"><div style="font-size: 8px; color: var(--text-3); text-transform: uppercase; font-weight: 700; margin-bottom: 4px;">Status</div><div style="font-size: 12px; font-weight: 800; color: var(--accent);">${tournament.status}</div></div></div><div style="font-size: 9px; font-weight: 800; text-transform: uppercase; letter-spacing: 1px; color: var(--text-3); margin-bottom: 8px;">Players (${players.length})</div><div style="display: flex; flex-direction: column; gap: 6px; flex: 1; overflow-y: auto;">${playerHTML}</div></div><div style="flex: 1; display: flex; flex-direction: column; overflow: hidden;"><div style="padding: 12px 20px; background: var(--bg-1); border-bottom: 1px solid rgba(255, 255, 255, 0.06); flex-shrink: 0;"><h3 style="font-size: 12px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.5px; color: var(--text-2); margin: 0;">Tournament Bracket</h3></div>${bracketHTML}</div></div>`;
+        
+        // Fetch avatars for all players
+        players.forEach(p => {
+            if (p.userId) {
+                fetch(`${API_BASE}/api/users/${p.userId}/profile`, {
+                    headers: { 'Authorization': `Bearer ${localStorage.getItem('vh_token')}` }
+                }).then(r => r.json()).then(profile => {
+                    if (profile.avatar_url) {
+                        const playerItems = chatMain.querySelectorAll(`[data-user-id="${p.userId}"] .player-avatar`);
+                        playerItems.forEach(el => {
+                            el.innerHTML = `<img src="${profile.avatar_url}" alt="" style="width: 100%; height: 100%; object-fit: cover;">`;
+                        });
+                    }
+                }).catch(e => console.error(`Failed to fetch profile for ${p.userId}:`, e));
+            }
+        });
+    }
+    
+    // Fetch header avatar
+    const currentPlayer = players.find(p => p.userId === currentUserId);
+    if (chatHeader && currentPlayer && currentUserId) {
+        fetch(`${API_BASE}/api/users/${currentUserId}/profile`, {
+            headers: { 'Authorization': `Bearer ${localStorage.getItem('vh_token')}` }
+        }).then(r => r.json()).then(profile => {
+            if (profile.avatar_url) {
+                const avatarEl = chatHeader.querySelector('#bracketHeaderAvatar');
+                if (avatarEl) {
+                    avatarEl.innerHTML = `<img src="${profile.avatar_url}" alt="" style="width: 100%; height: 100%; object-fit: cover;">`;
+                }
+            }
+        }).catch(e => console.error('Failed to fetch user profile:', e));
+    }
+}
+
+function closeBracketPanel() {
+    // Clean up state
+    window.bracketPanelActive = false;
+    window.activeTournament = null;
+    
+    const chatPanel = document.getElementById('chatPanel');
+    if (!chatPanel) return;
+    
+    // Get or find the message container
+    const messageContainer = chatPanel.querySelector('.messages-container') || 
+                             chatPanel.querySelector('#messagesContainer') ||
+                             chatPanel.querySelector('.chat-main');
+    
+    if (messageContainer) {
+        // Just clear it - let the app reinitialize when switching channels
+        messageContainer.innerHTML = '';
+    }
+    
+    // Also clear header if it exists
+    const chatHeader = chatPanel.querySelector('.chat-header') || chatPanel.querySelector('#chatHeader');
+    if (chatHeader) {
+        chatHeader.innerHTML = '';
+    }
+}
+
+// Intercept ALL panel switches to clean up bracket state
+const originalSelectServer = window.selectServer;
+if (originalSelectServer && typeof originalSelectServer === 'function') {
+    window.selectServer = async function(server) {
+        if (window.bracketPanelActive) {
+            closeBracketPanel();
+        }
+        return originalSelectServer.call(this, server);
+    };
+}
+
+// Monitor for panel visibility changes to clean up when leaving chat panel
+const observer = new MutationObserver(function(mutations) {
+    mutations.forEach(function(mutation) {
+        if (mutation.attributeName === 'class') {
+            const chatPanel = document.getElementById('chatPanel');
+            // If chatPanel is being hidden while bracket is active, clean up
+            if (window.bracketPanelActive && chatPanel && chatPanel.classList.contains('hidden')) {
+                closeBracketPanel();
+            }
+        }
+    });
+});
+
+// Start observing chatPanel for class changes
+document.addEventListener('DOMContentLoaded', function() {
+    const chatPanel = document.getElementById('chatPanel');
+    if (chatPanel) {
+        observer.observe(chatPanel, { attributes: true, attributeFilter: ['class'] });
+    }
+});
+
+// Also observe on script load in case DOM is already ready
+const chatPanel = document.getElementById('chatPanel');
+if (chatPanel) {
+    observer.observe(chatPanel, { attributes: true, attributeFilter: ['class'] });
 }
 
 // Display tournament bracket with scoring

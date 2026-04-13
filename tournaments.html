@@ -362,9 +362,12 @@
       font-size: 13px;
       font-weight: 700;
       text-transform: uppercase;
-      letter-spacing: 1px;
-      color: var(--text-3);
-      margin-bottom: 12px;
+      letter-spacing: 1.2px;
+      color: var(--text-2);
+      margin-bottom: 16px;
+      padding-bottom: 8px;
+      border-bottom: 2px solid rgba(88, 101, 242, 0.2);
+      display: inline-block;
     }
 
     .players-list {
@@ -422,16 +425,23 @@
 
     /* ──────────── BRACKET SECTION ──────────── */
     .bracket-section {
-      margin-bottom: 20px;
+      margin-bottom: 24px;
+      padding-bottom: 24px;
+      border-bottom: 1px solid rgba(255, 255, 255, 0.06);
     }
 
     .bracket-container {
-      background: var(--bg-2);
-      border: 1px solid rgba(255, 255, 255, 0.06);
-      border-radius: var(--radius);
-      padding: 20px;
+      background: linear-gradient(135deg, var(--bg-2) 0%, rgba(88, 101, 242, 0.05) 100%);
+      border: 2px solid rgba(88, 101, 242, 0.2);
+      border-radius: 12px;
+      padding: 24px;
       overflow-x: auto;
-      min-height: 300px;
+      min-height: 320px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      width: 100%;
+      box-shadow: inset 0 2px 8px rgba(0, 0, 0, 0.2);
     }
 
     .bracket-empty {
@@ -440,8 +450,9 @@
       justify-content: center;
       height: 300px;
       flex-direction: column;
-      gap: 12px;
+      gap: 16px;
       color: var(--text-3);
+      width: 100%;
     }
 
     .bracket-empty-icon {
@@ -477,13 +488,21 @@
 
     .bracket-match {
       width: 180px;
-      background: var(--bg-3);
-      border: 1px solid rgba(255, 255, 255, 0.08);
-      border-radius: 6px;
-      padding: 12px;
+      background: linear-gradient(135deg, var(--bg-3) 0%, rgba(88, 101, 242, 0.08) 100%);
+      border: 2px solid rgba(88, 101, 242, 0.15);
+      border-radius: 8px;
+      padding: 14px;
       display: flex;
       flex-direction: column;
-      gap: 8px;
+      gap: 10px;
+      transition: all 0.2s ease;
+      cursor: pointer;
+    }
+
+    .bracket-match:hover {
+      border-color: rgba(88, 101, 242, 0.4);
+      box-shadow: 0 4px 16px rgba(88, 101, 242, 0.15);
+      transform: translateY(-2px);
     }
 
     .match-team {
@@ -503,14 +522,22 @@
     }
 
     .match-team-score {
-      background: var(--bg-2);
-      border: 1px solid rgba(255, 255, 255, 0.08);
-      padding: 4px 8px;
-      border-radius: 4px;
+      background: linear-gradient(135deg, var(--bg-2) 0%, rgba(88, 101, 242, 0.1) 100%);
+      border: 1.5px solid rgba(88, 101, 242, 0.2);
+      padding: 5px 10px;
+      border-radius: 6px;
       width: 50px;
       text-align: center;
       color: var(--text-1);
-      font-weight: 600;
+      font-weight: 700;
+      transition: all 0.2s ease;
+      cursor: pointer;
+    }
+
+    .match-team-score:focus {
+      border-color: rgba(88, 101, 242, 0.5);
+      background: linear-gradient(135deg, var(--bg-3) 0%, rgba(88, 101, 242, 0.15) 100%);
+      box-shadow: 0 0 8px rgba(88, 101, 242, 0.2);
     }
 
     .match-divider {

@@ -114,12 +114,22 @@ router.get('/lobby/:lobbyId', async (req, res) => {
     
     const tournaments = await Promise.all(
       result.rows.map(async (tournament) => {
+        // Get registered players WITH avatars
         const playersResult = await pool.query(
-          'SELECT COUNT(*) as count FROM tournament_players WHERE tournament_id = $1',
+          `SELECT tp.user_id, tp.username, tp.joined_at, tp.status, u.avatar_url
+           FROM tournament_players tp
+           LEFT JOIN users u ON tp.user_id = u.id
+           WHERE tp.tournament_id = $1`,
           [tournament.id]
         );
         
-        const playerCount = parseInt(playersResult.rows[0].count);
+        const registeredPlayers = playersResult.rows.map(p => ({
+          userId: p.user_id,
+          username: p.username,
+          joinedAt: p.joined_at,
+          status: p.status,
+          avatar_url: p.avatar_url
+        }));
         
         return {
           id: tournament.id,
@@ -129,7 +139,7 @@ router.get('/lobby/:lobbyId', async (req, res) => {
           description: tournament.description,
           format: tournament.format,
           playerCount: tournament.player_count,
-          registeredPlayers: Array(playerCount).fill(null).map((_, i) => ({ userId: i })), // Placeholder for count
+          registeredPlayers,
           status: tournament.status,
           createdAt: tournament.created_at,
           startTime: tournament.start_time
@@ -163,9 +173,12 @@ router.get('/:tournamentId', async (req, res) => {
     
     const tournament = tourResult.rows[0];
     
-    // Get registered players
+    // Get registered players WITH AVATARS
     const playersResult = await pool.query(
-      'SELECT user_id, username, joined_at, status FROM tournament_players WHERE tournament_id = $1',
+      `SELECT tp.user_id, tp.username, tp.joined_at, tp.status, u.avatar_url 
+       FROM tournament_players tp
+       LEFT JOIN users u ON tp.user_id = u.id
+       WHERE tp.tournament_id = $1`,
       [tournamentId]
     );
     
@@ -173,7 +186,8 @@ router.get('/:tournamentId', async (req, res) => {
       userId: p.user_id,
       username: p.username,
       joinedAt: p.joined_at,
-      status: p.status
+      status: p.status,
+      avatar_url: p.avatar_url
     }));
     
     // Get bracket data
