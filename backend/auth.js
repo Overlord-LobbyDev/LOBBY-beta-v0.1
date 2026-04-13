@@ -1519,7 +1519,375 @@ app.get("/steam/recent/:userId", requireAuth, async (req, res) => {
     res.status(500).json({ error: "Could not reach Steam API" });
   }
 });
+// ==================== TOURNAMENT ROUTES ====================
+// Add these routes to your auth.js file (before the global error handlers section)
 
+// Create a new tournament
+app.post("/tournaments/create", requireAuth, async (req, res) => {
+  const { lobbyId, name, description, format, playerCount, rules, prize, startTime } = req.body;
+  
+  // Validate input
+  if (!lobbyId || !name || !format || !playerCount) {
+    return res.status(400).json({ error: "Missing required fields" });
+  }
+  
+  const validFormats = ['single', 'double', 'round-robin'];
+  const validPlayerCounts = [4, 8, 16, 32, 64, 128];
+  
+  if (!validFormats.includes(format)) {
+    return res.status(400).json({ error: "Invalid tournament format" });
+  }
+  
+  if (!validPlayerCounts.includes(playerCount)) {
+    return res.status(400).json({ error: "Invalid player count" });
+  }
+
+  try {
+    const result = await pool.query(
+      `INSERT INTO tournaments 
+        (lobby_id, host_id, name, description, format, player_count, max_players, status, rules, prize, start_time)
+      VALUES ($1, $2, $3, $4, $5, $6, $7, 'setup', $8, $9, $10)
+      RETURNING *;`,
+      [
+        lobbyId,
+        req.userId,
+        name,
+        description || null,
+        format,
+        playerCount,
+        playerCount,
+        rules || null,
+        prize || null,
+        startTime ? new Date(startTime) : null
+      ]
+    );
+
+    res.status(201).json({
+      success: true,
+      tournament: result.rows[0]
+    });
+  } catch (error) {
+    console.error("[tournament/create error]", error);
+    res.status(500).json({ error: "Failed to create tournament" });
+  }
+});
+
+// Get tournament details
+app.get("/tournaments/:tournamentId", async (req, res) => {
+  try {
+    const { tournamentId } = req.params;
+
+    // Get tournament
+    const tournamentResult = await pool.query(
+      "SELECT * FROM tournaments WHERE id = $1;",
+      [tournamentId]
+    );
+
+    if (tournamentResult.rows.length === 0) {
+      return res.status(404).json({ error: "Tournament not found" });
+    }
+
+    const tournament = tournamentResult.rows[0];
+
+    // Get registered players
+    const playersResult = await pool.query(
+      `SELECT id, user_id, username, joined_at, status 
+       FROM tournament_players 
+       WHERE tournament_id = $1 
+       ORDER BY joined_at ASC;`,
+      [tournamentId]
+    );
+
+    // Get bracket rounds and matches
+    const bracketResult = await pool.query(
+      `SELECT 
+        r.id as round_id,
+        r.round_number,
+        m.id as match_id,
+        m.match_number,
+        p1.id as player1_id,
+        p1.username as player1_username,
+        p2.id as player2_id,
+        p2.username as player2_username,
+        pw.id as winner_id,
+        pw.username as winner_username,
+        m.status as match_status,
+        m.created_at,
+        m.completed_at
+      FROM tournament_rounds r
+      LEFT JOIN tournament_matches m ON r.id = m.round_id
+      LEFT JOIN tournament_players p1 ON m.player1_id = p1.id
+      LEFT JOIN tournament_players p2 ON m.player2_id = p2.id
+      LEFT JOIN tournament_players pw ON m.winner_id = pw.id
+      WHERE r.tournament_id = $1
+      ORDER BY r.round_number ASC, m.match_number ASC;`,
+      [tournamentId]
+    );
+
+    // Build bracket structure
+    const rounds = [];
+    bracketResult.rows.forEach(row => {
+      let round = rounds.find(r => r.roundNumber === row.round_number);
+      if (!round) {
+        round = {
+          roundNumber: row.round_number,
+          matches: []
+        };
+        rounds.push(round);
+      }
+
+      if (row.match_id) {
+        round.matches.push({
+          matchId: row.match_id,
+          matchNumber: row.match_number,
+          player1: row.player1_id ? { userId: row.player1_id, username: row.player1_username } : null,
+          player2: row.player2_id ? { userId: row.player2_id, username: row.player2_username } : null,
+          winner: row.winner_id,
+          status: row.match_status,
+          createdAt: row.created_at,
+          completedAt: row.completed_at
+        });
+      }
+    });
+
+    res.json({
+      ...tournament,
+      registeredPlayers: playersResult.rows,
+      bracket: { rounds }
+    });
+  } catch (error) {
+    console.error("[tournament/get error]", error);
+    res.status(500).json({ error: "Failed to fetch tournament" });
+  }
+});
+
+// Get tournaments for a lobby
+app.get("/tournaments/lobby/:lobbyId", async (req, res) => {
+  try {
+    const { lobbyId } = req.params;
+
+    const result = await pool.query(
+      `SELECT 
+        t.*,
+        COUNT(tp.id) as registered_count
+      FROM tournaments t
+      LEFT JOIN tournament_players tp ON t.id = tp.tournament_id
+      WHERE t.lobby_id = $1
+      GROUP BY t.id
+      ORDER BY t.created_at DESC;`,
+      [lobbyId]
+    );
+
+    res.json(result.rows);
+  } catch (error) {
+    console.error("[tournament/lobby error]", error);
+    res.status(500).json({ error: "Failed to fetch tournaments" });
+  }
+});
+
+// Register player for tournament
+app.post("/tournaments/:tournamentId/register", requireAuth, async (req, res) => {
+  const client = await pool.connect();
+  try {
+    const { tournamentId } = req.params;
+    const userId = req.userId;
+    const username = req.username;
+
+    await client.query('BEGIN');
+
+    // Check tournament exists and get player count
+    const tournamentResult = await client.query(
+      `SELECT t.*, COUNT(tp.id) as current_players
+       FROM tournaments t
+       LEFT JOIN tournament_players tp ON t.id = tp.tournament_id
+       WHERE t.id = $1
+       GROUP BY t.id;`,
+      [tournamentId]
+    );
+
+    if (tournamentResult.rows.length === 0) {
+      await client.query('ROLLBACK');
+      return res.status(404).json({ error: "Tournament not found" });
+    }
+
+    const tournament = tournamentResult.rows[0];
+
+    // Check if already registered
+    const checkResult = await client.query(
+      "SELECT id FROM tournament_players WHERE tournament_id = $1 AND user_id = $2;",
+      [tournamentId, userId]
+    );
+
+    if (checkResult.rows.length > 0) {
+      await client.query('ROLLBACK');
+      return res.status(400).json({ error: "Already registered for this tournament" });
+    }
+
+    // Check if tournament is full
+    if (tournament.current_players >= tournament.max_players) {
+      await client.query('ROLLBACK');
+      return res.status(400).json({ error: "Tournament is full" });
+    }
+
+    // Register player
+    await client.query(
+      `INSERT INTO tournament_players (tournament_id, user_id, username, status)
+       VALUES ($1, $2, $3, 'registered')
+       RETURNING *;`,
+      [tournamentId, userId, username]
+    );
+
+    await client.query('COMMIT');
+
+    res.json({ success: true, message: "Successfully registered for tournament" });
+  } catch (error) {
+    await client.query('ROLLBACK');
+    console.error("[tournament/register error]", error);
+    res.status(500).json({ error: "Failed to register for tournament" });
+  } finally {
+    client.release();
+  }
+});
+
+// Generate bracket (called when tournament starts)
+app.post("/tournaments/:tournamentId/generate-bracket", requireAuth, async (req, res) => {
+  const client = await pool.connect();
+  try {
+    const { tournamentId } = req.params;
+
+    await client.query('BEGIN');
+
+    // Check tournament and verify host
+    const tournamentResult = await client.query(
+      "SELECT * FROM tournaments WHERE id = $1;",
+      [tournamentId]
+    );
+
+    if (tournamentResult.rows.length === 0) {
+      await client.query('ROLLBACK');
+      return res.status(404).json({ error: "Tournament not found" });
+    }
+
+    const tournament = tournamentResult.rows[0];
+
+    if (tournament.host_id !== req.userId) {
+      await client.query('ROLLBACK');
+      return res.status(403).json({ error: "Only tournament host can generate bracket" });
+    }
+
+    // Get registered players (randomized)
+    const playersResult = await client.query(
+      `SELECT id, user_id, username FROM tournament_players 
+       WHERE tournament_id = $1 
+       ORDER BY RANDOM();`,
+      [tournamentId]
+    );
+    const players = playersResult.rows;
+
+    if (players.length < tournament.player_count) {
+      await client.query('ROLLBACK');
+      return res.status(400).json({ error: "Not enough players registered" });
+    }
+
+    // Generate bracket rounds
+    const numRounds = Math.log2(tournament.player_count);
+
+    for (let roundNum = 1; roundNum <= numRounds; roundNum++) {
+      const roundResult = await client.query(
+        `INSERT INTO tournament_rounds (tournament_id, round_number)
+         VALUES ($1, $2)
+         RETURNING id;`,
+        [tournamentId, roundNum]
+      );
+      const roundId = roundResult.rows[0].id;
+
+      let matchCount = tournament.player_count / Math.pow(2, roundNum - 1);
+
+      if (roundNum === 1) {
+        // First round - pair up players
+        for (let i = 0; i < players.length; i += 2) {
+          await client.query(
+            `INSERT INTO tournament_matches 
+             (round_id, tournament_id, match_number, player1_id, player2_id, status)
+             VALUES ($1, $2, $3, $4, $5, 'pending');`,
+            [
+              roundId,
+              tournamentId,
+              i / 2 + 1,
+              players[i].id,
+              players[i + 1]?.id || null
+            ]
+          );
+        }
+      } else {
+        // Subsequent rounds - TBD players
+        for (let i = 0; i < matchCount; i++) {
+          await client.query(
+            `INSERT INTO tournament_matches 
+             (round_id, tournament_id, match_number, status)
+             VALUES ($1, $2, $3, 'pending');`,
+            [roundId, tournamentId, i + 1]
+          );
+        }
+      }
+    }
+
+    // Update tournament status
+    const updateResult = await client.query(
+      `UPDATE tournaments 
+       SET status = 'in-progress', start_time = CURRENT_TIMESTAMP
+       WHERE id = $1
+       RETURNING *;`,
+      [tournamentId]
+    );
+
+    await client.query('COMMIT');
+
+    res.json({ success: true, tournament: updateResult.rows[0] });
+  } catch (error) {
+    await client.query('ROLLBACK');
+    console.error("[tournament/bracket error]", error);
+    res.status(500).json({ error: "Failed to generate bracket" });
+  } finally {
+    client.release();
+  }
+});
+
+// Record match result
+app.post("/tournaments/:tournamentId/match-result", requireAuth, async (req, res) => {
+  const client = await pool.connect();
+  try {
+    const { tournamentId } = req.params;
+    const { matchId, winnerId } = req.body;
+
+    await client.query('BEGIN');
+
+    // Update match with result
+    const result = await client.query(
+      `UPDATE tournament_matches 
+       SET winner_id = $1, status = 'completed', completed_at = CURRENT_TIMESTAMP
+       WHERE id = $2 AND tournament_id = $3
+       RETURNING *;`,
+      [winnerId, matchId, tournamentId]
+    );
+
+    if (result.rows.length === 0) {
+      await client.query('ROLLBACK');
+      return res.status(404).json({ error: "Match not found" });
+    }
+
+    await client.query('COMMIT');
+    res.json({ success: true, match: result.rows[0] });
+  } catch (error) {
+    await client.query('ROLLBACK');
+    console.error("[tournament/match-result error]", error);
+    res.status(500).json({ error: "Failed to record match result" });
+  } finally {
+    client.release();
+  }
+});
+
+// ==================== END TOURNAMENT ROUTES ====================
 // ── Global error handlers ────────────────────────────────────
 process.on("unhandledRejection", (reason, promise) => {
   console.error("[UNHANDLED REJECTION]", reason);

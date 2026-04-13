@@ -16,7 +16,7 @@ async function initDb() {
     CREATE TABLE IF NOT EXISTS users (
       id           SERIAL PRIMARY KEY,
       username     TEXT UNIQUE NOT NULL,
-      password     TEXT NOT NULL,
+      password_hash TEXT NOT NULL,
       avatar_url   TEXT DEFAULT NULL,
       is_admin       BOOLEAN DEFAULT FALSE,
       is_banned      BOOLEAN DEFAULT FALSE,
@@ -247,7 +247,7 @@ async function initDb() {
 
   // Add visibility column to users for profile privacy
   const alters = [
-    "ALTER TABLE users ADD COLUMN IF NOT EXISTS password       TEXT DEFAULT ''",
+    "ALTER TABLE users ADD COLUMN IF NOT EXISTS password_hash TEXT DEFAULT ''",
     "ALTER TABLE users ADD COLUMN IF NOT EXISTS is_admin       BOOLEAN DEFAULT FALSE",
     "ALTER TABLE users ADD COLUMN IF NOT EXISTS is_banned      BOOLEAN DEFAULT FALSE",
     "ALTER TABLE users ADD COLUMN IF NOT EXISTS banned_until   TIMESTAMPTZ DEFAULT NULL",
@@ -281,6 +281,76 @@ async function initDb() {
     UPDATE servers SET unique_id = UPPER(SUBSTRING(MD5(id::text || name), 1, 6))
     WHERE unique_id IS NULL
   `).catch(() => {});
+
+  // ==================== TOURNAMENTS ====================
+  // Tournaments
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS tournaments (
+      id          SERIAL PRIMARY KEY,
+      lobby_id    TEXT NOT NULL,
+      host_id     INTEGER REFERENCES users(id) ON DELETE CASCADE,
+      name        TEXT NOT NULL,
+      description TEXT DEFAULT NULL,
+      format      TEXT NOT NULL CHECK (format IN ('single', 'double', 'round-robin')),
+      player_count INTEGER NOT NULL CHECK (player_count IN (4, 8, 16, 32, 64, 128)),
+      max_players INTEGER NOT NULL,
+      status      TEXT NOT NULL DEFAULT 'setup' CHECK (status IN ('setup', 'registration', 'in-progress', 'completed', 'cancelled')),
+      rules       TEXT DEFAULT NULL,
+      prize       TEXT DEFAULT NULL,
+      created_at  TIMESTAMPTZ DEFAULT NOW(),
+      start_time  TIMESTAMPTZ DEFAULT NULL,
+      end_time    TIMESTAMPTZ DEFAULT NULL
+    );
+  `);
+
+  // Tournament Players (registered players)
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS tournament_players (
+      id            SERIAL PRIMARY KEY,
+      tournament_id INTEGER REFERENCES tournaments(id) ON DELETE CASCADE,
+      user_id       INTEGER REFERENCES users(id) ON DELETE CASCADE,
+      username      TEXT NOT NULL,
+      joined_at     TIMESTAMPTZ DEFAULT NOW(),
+      status        TEXT NOT NULL DEFAULT 'registered' CHECK (status IN ('registered', 'checked-in', 'eliminated', 'winner')),
+      UNIQUE(tournament_id, user_id)
+    );
+  `);
+
+  // Tournament Rounds
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS tournament_rounds (
+      id            SERIAL PRIMARY KEY,
+      tournament_id INTEGER REFERENCES tournaments(id) ON DELETE CASCADE,
+      round_number  INTEGER NOT NULL,
+      UNIQUE(tournament_id, round_number)
+    );
+  `);
+
+  // Tournament Matches
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS tournament_matches (
+      id            SERIAL PRIMARY KEY,
+      round_id      INTEGER REFERENCES tournament_rounds(id) ON DELETE CASCADE,
+      tournament_id INTEGER REFERENCES tournaments(id) ON DELETE CASCADE,
+      match_number  INTEGER NOT NULL,
+      player1_id    INTEGER REFERENCES tournament_players(id) ON DELETE SET NULL,
+      player2_id    INTEGER REFERENCES tournament_players(id) ON DELETE SET NULL,
+      winner_id     INTEGER REFERENCES tournament_players(id) ON DELETE SET NULL,
+      status        TEXT NOT NULL DEFAULT 'pending' CHECK (status IN ('pending', 'in-progress', 'completed', 'bye')),
+      created_at    TIMESTAMPTZ DEFAULT NOW(),
+      completed_at  TIMESTAMPTZ DEFAULT NULL
+    );
+  `);
+
+  // Create indexes for tournament performance
+  await pool.query(`CREATE INDEX IF NOT EXISTS idx_tournaments_lobby_id ON tournaments(lobby_id);`).catch(() => {});
+  await pool.query(`CREATE INDEX IF NOT EXISTS idx_tournaments_host_id ON tournaments(host_id);`).catch(() => {});
+  await pool.query(`CREATE INDEX IF NOT EXISTS idx_tournaments_status ON tournaments(status);`).catch(() => {});
+  await pool.query(`CREATE INDEX IF NOT EXISTS idx_tournament_players_tournament_id ON tournament_players(tournament_id);`).catch(() => {});
+  await pool.query(`CREATE INDEX IF NOT EXISTS idx_tournament_players_user_id ON tournament_players(user_id);`).catch(() => {});
+  await pool.query(`CREATE INDEX IF NOT EXISTS idx_tournament_rounds_tournament_id ON tournament_rounds(tournament_id);`).catch(() => {});
+  await pool.query(`CREATE INDEX IF NOT EXISTS idx_tournament_matches_round_id ON tournament_matches(round_id);`).catch(() => {});
+  await pool.query(`CREATE INDEX IF NOT EXISTS idx_tournament_matches_tournament_id ON tournament_matches(tournament_id);`).catch(() => {});
 
   console.log("[db] Schema ready");
 }

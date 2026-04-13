@@ -4423,7 +4423,7 @@ async function saveHomeSecOrder() {
     const token = localStorage.getItem("vh_token");
     if (!token) return;
 
-    await fetch(`${AUTH_API}/home/section-order`, {
+    await fetch(`${AUTH_URL}/home/section-order`, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
@@ -4441,7 +4441,7 @@ async function loadHomeSecOrder() {
     const token = localStorage.getItem("vh_token");
     if (!token) return;
 
-    const res = await fetch(`${AUTH_API}/home/section-order`, {
+    const res = await fetch(`${AUTH_URL}/home/section-order`, {
       headers: { "Authorization": `Bearer ${token}` }
     });
     if (!res.ok) return;
@@ -12321,7 +12321,12 @@ setTimeout(() => { updateMyStatusUI(); }, 100);
 
 
   
-  function init() { injectHTML(); wireToggle(); wireNav(); wireUpdater(); }
+  function init() {
+    injectHTML();
+    try { wireToggle(); } catch(e) { console.error("wireToggle failed:", e); }
+    try { wireNav(); } catch(e) { console.error("wireNav failed:", e); }
+    try { wireUpdater(); } catch(e) { console.error("wireUpdater failed:", e); }
+  }
 
   function injectHTML() {
     const el = document.createElement("div");
@@ -12941,8 +12946,16 @@ setTimeout(() => { updateMyStatusUI(); }, 100);
     }
   }
 
+  // Colour presets for banner and compose pickers
+  const PRESETS = [
+    "#f9a8d4","#f472b6","#e11d48","#f97316","#fbbf24","#facc15",
+    "#4ade80","#16a34a","#22d3ee","#0ea5e9","#3b82f6","#6366f1",
+    "#8b5cf6","#a855f7","#c084fc","#94a3b8","#ffffff","#000000"
+  ];
+
   function buildColourPresets(selected) {
     const container = document.getElementById("spColourPresets");
+    if (!container) return;
     container.innerHTML = PRESETS.map(c => `
       <div class="sp-colour-preset ${c === selected ? "selected" : ""}" style="background:${c}" title="${c}"
         onclick="(function(){ window._spSelectColour('${c}'); })()"></div>`).join("");
@@ -13341,22 +13354,19 @@ setTimeout(() => { updateMyStatusUI(); }, 100);
   function wireUpdater() {
     const checkBtn = document.getElementById("spCheckUpdateBtn");
     const dlBtn    = document.getElementById("spDownloadUpdateBtn");
-    if (!checkBtn) return;
+    const verEl    = document.getElementById("spCurrentVersion");
+    if (!checkBtn || !verEl) return;
 
-    const verEl = document.getElementById("spCurrentVersion");
-
-    // ✅ FIX 1: Load current version immediately on page load
+    // Load version immediately
     if (window.electronAPI?.getAppVersion) {
       window.electronAPI.getAppVersion().then(v => {
         verEl.textContent = "v" + v;
-      }).catch(() => {
-        verEl.textContent = "Unknown";
-      });
+      }).catch(() => { verEl.textContent = "unknown"; });
     } else {
-      verEl.textContent = "N/A";
+      verEl.textContent = "v1.0.0";
     }
 
-    async function runUpdateCheck(silent = false) {
+    checkBtn.addEventListener("click", async () => {
       checkBtn.disabled = true;
       checkBtn.textContent = "⏳ Checking…";
 
@@ -13366,30 +13376,24 @@ setTimeout(() => { updateMyStatusUI(); }, 100);
       const actionsEl   = document.getElementById("spUpdateActions");
 
       try {
-        // Use main-process IPC — avoids CORS/CSP, works regardless of repo visibility
-        if (!window.electronAPI?.checkForUpdates) throw new Error("Update check not available");
+        if (!window.electronAPI?.checkForUpdates) throw new Error("Update API not available — restart the app");
+
         const release = await window.electronAPI.checkForUpdates();
+        if (!release) throw new Error("No response from update server");
         if (release.error) throw new Error(release.error);
 
-        // Get current version
-        const currentVersion = await window.electronAPI.getAppVersion();
-        const hasUpdate = isNewer(release.tag, currentVersion);
+        // Get current version fresh from the DOM (already set above)
+        const localVerText = verEl.textContent.replace("v", "").trim();
+        const hasUpdate = isNewer(release.tag, localVerText);
         latestReleaseData = release;
 
-        // ✅ FIX 2: Always show result when manually checking, only show if update found when silent
-        if (!silent || hasUpdate) {
-          resultEl.style.display = "block";
-        }
+        resultEl.style.display = "block";
 
         if (hasUpdate) {
-          statusEl.innerHTML = `<span style="color:var(--accent);font-weight:700">🎉 Update available: ${release.name}</span>`;
+          statusEl.innerHTML = `<span style="color:var(--accent);font-weight:700">🎉 New version available: <strong>${release.name}</strong></span>`;
+          changelogEl.style.whiteSpace = "pre-wrap";
           changelogEl.textContent = release.body || "No changelog provided.";
           actionsEl.style.display = "flex";
-          
-          // ✅ FIX 3: Only show toast notification on silent checks (background)
-          if (silent) {
-            showToast(`⬆️ Update available: ${release.name} — open Settings to install`, "success");
-          }
         } else {
           statusEl.innerHTML = `<span style="color:#4ade80;font-weight:600">✅ You're on the latest version (${release.name})</span>`;
           changelogEl.textContent = "";
@@ -13397,73 +13401,59 @@ setTimeout(() => { updateMyStatusUI(); }, 100);
         }
 
       } catch (err) {
-        if (!silent) {
-          resultEl.style.display = "block";
-          statusEl.innerHTML = `<span style="color:var(--danger)">❌ ${err.message}</span>`;
-          changelogEl.textContent = "";
-          actionsEl.style.display = "none";
-        }
+        resultEl.style.display = "block";
+        statusEl.innerHTML = `<span style="color:var(--danger)">❌ ${err.message}</span>`;
+        changelogEl.textContent = "";
+        if (actionsEl) actionsEl.style.display = "none";
       }
 
       checkBtn.disabled = false;
       checkBtn.textContent = "🔄 Check for Updates";
-    }
-
-    checkBtn.addEventListener("click", () => runUpdateCheck(false));
-
-    dlBtn.addEventListener("click", async () => {
-      if (!latestReleaseData) return;
-
-      const exeAsset = (latestReleaseData.assets || []).find(a =>
-        a.name.endsWith(".exe") && !a.name.includes("blockmap")
-      );
-
-      if (!exeAsset) {
-        // No .exe asset found — open release page in browser as fallback
-        window.open(latestReleaseData.url || `https://github.com/Overlord-LobbyDev/LOBBY-beta-v0.1/releases/latest`, "_blank");
-        return;
-      }
-
-      // ✅ FIX 4: Add confirmation dialog before downloading update
-      const confirmed = confirm(
-        `Download and install ${latestReleaseData.name}?\n\n` +
-        `The app will close and restart after the update is complete.\n\n` +
-        `Click OK to proceed or Cancel to update later.`
-      );
-
-      if (!confirmed) {
-        return; // User declined
-      }
-
-      if (typeof window.electronAPI?.downloadUpdate === "function") {
-        dlBtn.disabled = true;
-        dlBtn.textContent = "⏳ Downloading…";
-        const progressEl = document.getElementById("spDownloadProgress");
-        const pctEl      = document.getElementById("spDownloadPct");
-        const barEl      = document.getElementById("spDownloadBar");
-        if (progressEl) progressEl.style.display = "block";
-
-        try {
-          const result = await window.electronAPI.downloadUpdate(exeAsset.browser_download_url, exeAsset.name);
-          if (result.success) {
-            dlBtn.textContent = "✅ Installing…";
-            if (pctEl) pctEl.textContent = "100%";
-            if (barEl) barEl.style.width = "100%";
-          } else {
-            throw new Error(result.error || "Download failed");
-          }
-        } catch(err) {
-          spShowMsg("spUpdateMsg", "Download failed: " + err.message, "error");
-          dlBtn.disabled = false;
-          dlBtn.textContent = "⬇️ Download & Install";
-          if (progressEl) progressEl.style.display = "none";
-        }
-      } else {
-        window.open(exeAsset.browser_download_url, "_blank");
-      }
     });
 
-    if (typeof window.electronAPI?.onUpdateProgress === "function") {
+    if (dlBtn) {
+      dlBtn.addEventListener("click", async () => {
+        if (!latestReleaseData) return;
+
+        const exeAsset = (latestReleaseData.assets || []).find(a =>
+          a.name.endsWith(".exe") && !a.name.includes("blockmap")
+        );
+
+        if (!exeAsset) {
+          window.open(latestReleaseData.url || "https://github.com/Overlord-LobbyDev/LOBBY-beta-v0.1/releases/latest", "_blank");
+          return;
+        }
+
+        if (window.electronAPI?.downloadUpdate) {
+          dlBtn.disabled = true;
+          dlBtn.textContent = "⏳ Downloading…";
+          const progressEl = document.getElementById("spDownloadProgress");
+          const pctEl      = document.getElementById("spDownloadPct");
+          const barEl      = document.getElementById("spDownloadBar");
+          if (progressEl) progressEl.style.display = "block";
+
+          try {
+            const result = await window.electronAPI.downloadUpdate(exeAsset.browser_download_url, exeAsset.name);
+            if (result.success) {
+              dlBtn.textContent = "✅ Installing…";
+              if (pctEl) pctEl.textContent = "100%";
+              if (barEl) barEl.style.width = "100%";
+            } else {
+              throw new Error(result.error || "Download failed");
+            }
+          } catch(err) {
+            spShowMsg("spUpdateMsg", "Download failed: " + err.message, "error");
+            dlBtn.disabled = false;
+            dlBtn.textContent = "⬇️ Download & Install";
+            if (progressEl) progressEl.style.display = "none";
+          }
+        } else {
+          window.open(exeAsset.browser_download_url, "_blank");
+        }
+      });
+    }
+
+    if (window.electronAPI?.onUpdateProgress) {
       window.electronAPI.onUpdateProgress(({ percent }) => {
         const pctEl = document.getElementById("spDownloadPct");
         const barEl = document.getElementById("spDownloadBar");
@@ -13472,15 +13462,19 @@ setTimeout(() => { updateMyStatusUI(); }, 100);
       });
     }
 
-    // ✅ FIX 5: Silent auto-check 8s after launch — only notifies if update found
-    setTimeout(() => runUpdateCheck(true), 8000);
-  }
-
-  // Boot
-  if (document.readyState === "loading") {
-    document.addEventListener("DOMContentLoaded", init);
-  } else {
-    init();
+    // Auto-check silently 8s after launch
+    setTimeout(async () => {
+      try {
+        if (!window.electronAPI?.checkForUpdates) return;
+        const release = await window.electronAPI.checkForUpdates();
+        if (!release || release.error) return;
+        const localVer = (verEl.textContent || "").replace("v", "").trim();
+        if (isNewer(release.tag, localVer)) {
+          latestReleaseData = release;
+          showToast(`⬆️ Update available: ${release.name} — open Settings to install`, "success");
+        }
+      } catch(e) { /* silent fail */ }
+    }, 8000);
   }
 
   // Boot

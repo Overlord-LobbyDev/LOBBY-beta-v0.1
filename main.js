@@ -2,7 +2,7 @@
 //  main.js  —  Electron main process
 // ============================================================
 
-const { app, BrowserWindow, ipcMain, desktopCapturer, session, shell, screen, Menu, dialog } = require("electron");
+const { app, BrowserWindow, ipcMain, desktopCapturer, session, shell, screen, Menu, globalShortcut } = require("electron");
 const path = require("path");
 
 // Remove the native menu bar entirely
@@ -67,7 +67,6 @@ function createWindow() {
     : month <= 4 ? "splash_spring.html"
     : month <= 7 ? "splash_summer.html"
     : "splash_autumn.html";
-  const fs = require("fs");
   const splashPath = path.join(__dirname, splashFile);
   win.loadFile(fs.existsSync(splashPath) ? splashFile : "splash.html");
 }
@@ -381,6 +380,16 @@ ipcMain.handle("set-titlebar-overlay", (event, { color, symbolColor }) => {
 app.whenReady().then(() => {
   if (process.platform === "win32") app.setAppUserModelId("com.lobby.app");
   createWindow();
+
+  // F12 or Ctrl+Shift+I opens DevTools on the focused window
+  globalShortcut.register("F12", () => {
+    const win = BrowserWindow.getFocusedWindow();
+    if (win) win.webContents.toggleDevTools();
+  });
+  globalShortcut.register("CommandOrControl+Shift+I", () => {
+    const win = BrowserWindow.getFocusedWindow();
+    if (win) win.webContents.toggleDevTools();
+  });
 });
 
 app.on("window-all-closed", () => {
