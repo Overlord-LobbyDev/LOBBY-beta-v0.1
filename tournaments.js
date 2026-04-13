@@ -11,6 +11,11 @@ let _tournamentListenersAttached = false;
 function initTournaments(lobbyId, userId) {
     currentLobbyId = lobbyId;
     currentUserId = userId;
+
+    // Sync card data from the global me object (populated by /me on boot)
+    if (typeof me !== 'undefined' && me?.tournamentCard) {
+        window.currentUserTournamentCard = me.tournamentCard;
+    }
     
     // Add tournament button to lobby menu
     addTournamentButton();
@@ -343,14 +348,9 @@ function showBracketPanel(tournament) {
     const totalH  = firstCount * slotH0 - MATCH_GAP;
     const totalW  = numRounds * MATCH_W + (numRounds - 1) * COL_GAP;
 
-    const bgData = JSON.parse(localStorage.getItem('vh_tournament_bracket_bg_data') || '{}');
+    // Card data comes from server via /me (set on boot as window.currentUserTournamentCard)
     let bgStyle = '';
-    if (bgData.imageUrl) bgStyle = `background-image:url(${bgData.imageUrl});background-size:cover;background-position:center;`;
-    else if (bgData.colour) bgStyle = `background-color:${bgData.colour};`;
-
-    // Each player gets their own standalone card
-    // Load this user's saved card style
-    const myCardData = JSON.parse(localStorage.getItem('vh_tournament_card') || '{}');
+    const myCardData = window.currentUserTournamentCard || {};
 
     // Build a lookup map from registered players for avatar fallback
     const playerAvatarMap = {};
@@ -367,8 +367,9 @@ function showBracketPanel(tournament) {
         // Apply custom card style if this is the current user's card
         let cardBg, border, nameClr;
         if (isMe && (myCardData.imageUrl || myCardData.bgColour || myCardData.borderColour)) {
+            const bgPos = myCardData.bgPos || '50% 50%';
             const bgCss = myCardData.imageUrl
-                ? `background-image:url(${myCardData.imageUrl});background-size:cover;background-position:center;`
+                ? `background-image:url(${myCardData.imageUrl});background-size:cover;background-position:${bgPos};`
                 : `background-color:${myCardData.bgColour||'var(--bg-2)'};`;
             cardBg  = bgCss;
             border  = `1.5px solid ${myCardData.borderColour||'rgba(249,168,212,.5)'}`;
@@ -445,9 +446,14 @@ function showBracketPanel(tournament) {
     const playerHTML = players.length === 0
         ? '<div style="color:var(--text-3);font-size:12px">No players yet</div>'
         : players.map(p => {
-            const av  = p.avatar_url ? `<img src="${p.avatar_url}" style="width:100%;height:100%;object-fit:cover;border-radius:50%;">` : (p.username||'?')[0].toUpperCase();
-            const tag = p.userId === tournament.hostId ? `<span style="font-size:9px;font-weight:700;color:var(--accent);background:rgba(249,168,212,.12);padding:2px 5px;border-radius:4px;flex-shrink:0">HOST</span>` : '';
-            return `<div style="display:flex;align-items:center;gap:8px;padding:8px 10px;background:rgba(88,101,242,.08);border:1px solid rgba(88,101,242,.15);border-radius:6px"><div style="width:26px;height:26px;border-radius:50%;background:linear-gradient(135deg,var(--accent),var(--accent-h));display:flex;align-items:center;justify-content:center;color:#fff;font-weight:700;font-size:11px;flex-shrink:0;overflow:hidden">${av}</div><div style="font-size:12px;font-weight:500;color:var(--text-2);flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${p.username||'Unknown'}</div>${tag}</div>`;
+            const tag = p.userId === tournament.hostId ? `<span style="font-size:9px;font-weight:700;color:var(--accent);background:rgba(249,168,212,.12);padding:2px 5px;border-radius:4px;flex-shrink:0;margin-left:4px">HOST</span>` : '';
+            // Reuse playerCard but inject host tag — wrap in relative div
+            const card = playerCard(p, false, false, null);
+            // Replace the closing </div> to inject host tag before it
+            return card.replace(
+                `${p?.username||'TBD'}</span>`,
+                `${p?.username||'Unknown'}</span>${tag}`
+            );
           }).join('');
 
     const btnBase = 'display:flex;align-items:center;justify-content:center;gap:6px;width:100%;padding:9px 14px;border:none;border-radius:8px;font-size:13px;font-weight:700;cursor:pointer;font-family:inherit;transition:opacity .15s;margin-bottom:6px';

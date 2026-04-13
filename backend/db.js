@@ -299,6 +299,11 @@ async function initDb() {
       "ALTER TABLE servers ADD COLUMN IF NOT EXISTS unique_id    TEXT DEFAULT NULL",
       "ALTER TABLE server_members ADD COLUMN IF NOT EXISTS role  TEXT DEFAULT 'member'",
       "ALTER TABLE users ADD COLUMN IF NOT EXISTS presence_status VARCHAR(20) DEFAULT 'online'",
+      "ALTER TABLE users ADD COLUMN IF NOT EXISTS tournament_card_image_url    TEXT DEFAULT NULL",
+      "ALTER TABLE users ADD COLUMN IF NOT EXISTS tournament_card_bg_colour    TEXT DEFAULT NULL",
+      "ALTER TABLE users ADD COLUMN IF NOT EXISTS tournament_card_border_colour TEXT DEFAULT NULL",
+      "ALTER TABLE users ADD COLUMN IF NOT EXISTS tournament_card_name_colour  TEXT DEFAULT NULL",
+      "ALTER TABLE users ADD COLUMN IF NOT EXISTS tournament_card_bg_pos       TEXT DEFAULT NULL",
     ];
     for (const sql of alters) await pool.query(sql).catch(() => {});
 

@@ -12701,6 +12701,8 @@ setTimeout(() => { updateMyStatusUI(); }, 100);
       <button class="sp-nav-btn" data-sp="audiovideo">🎙 Audio & Video</button>
       <button class="sp-nav-btn" data-sp="sounds">🔔 Sounds</button>
       <button class="sp-nav-btn" data-sp="updates">🔄 Updates</button>
+      <div class="sp-nav-label" style="margin-top:10px">Tournament</div>
+      <button class="sp-nav-btn" data-sp="tournaments">🏆 Tournaments</button>
     </nav>
 
     <div class="sp-content">
@@ -13030,6 +13032,68 @@ setTimeout(() => { updateMyStatusUI(); }, 100);
         <div class="sp-msg" id="spUpdateMsg"></div>
       </div>
 
+      <!-- ── Tournaments ── -->
+      <div class="sp-section" id="sp-tournaments">
+        <h2>Tournaments</h2>
+        <p style="font-size:13px;color:var(--text-3);margin-top:-12px;margin-bottom:20px">Personalise your match card — flex on everyone in the bracket. GIFs supported.</p>
+
+        <div class="sp-form-group">
+          <label class="sp-label">Live Preview</label>
+          <div id="spCardPreview" style="max-width:280px;border-radius:10px;overflow:hidden;border:1.5px solid rgba(255,255,255,.1);box-shadow:0 4px 20px rgba(0,0,0,.4)"></div>
+          <div class="sp-hint">This is exactly how your card looks to other players.</div>
+        </div>
+
+        <div class="sp-form-group">
+          <label class="sp-label">Card Background Image / GIF</label>
+          <div style="display:flex;gap:8px;align-items:center">
+            <label class="sp-upload-btn" for="spCardBgInput" style="flex:1;justify-content:center">🖼 Upload Image or GIF</label>
+            <button id="spCardBgClear" style="background:var(--bg-3);border:1px solid rgba(255,255,255,.1);border-radius:8px;color:var(--text-3);padding:8px 12px;cursor:pointer;font-size:12px;font-family:inherit">✕ Clear</button>
+          </div>
+          <input type="file" id="spCardBgInput" accept="image/*,image/gif" style="display:none" />
+          <div class="sp-hint">GIFs animate live in the bracket for everyone to see.</div>
+        </div>
+
+        <div class="sp-form-group" id="spCardBgPosGroup" style="display:none">
+          <label class="sp-label">Drag to Reposition</label>
+          <div id="spCardDragWrap" style="position:relative;width:280px;height:80px;border-radius:10px;overflow:hidden;border:1.5px solid rgba(255,255,255,.15);cursor:grab;user-select:none;background:var(--bg-3)">
+            <div id="spCardDragImg" style="position:absolute;inset:0;background-size:cover;background-repeat:no-repeat;pointer-events:none"></div>
+            <div style="position:absolute;inset:0;display:flex;align-items:center;justify-content:center;pointer-events:none">
+              <div style="background:rgba(0,0,0,.45);backdrop-filter:blur(4px);border-radius:6px;padding:4px 10px;font-size:11px;font-weight:600;color:rgba(255,255,255,.8)">✥ drag to reposition</div>
+            </div>
+          </div>
+          <div class="sp-hint">Drag the image to choose which part shows in your card.</div>
+        </div>
+
+        <div class="sp-form-group">
+          <label class="sp-label">Card Background Colour <span style="font-size:11px;color:var(--text-3);font-weight:400;text-transform:none;letter-spacing:0">(used when no image is set)</span></label>
+          <div class="sp-colour-row">
+            <input type="color" class="sp-colour-picker" id="spCardBgColour" value="#2c3440" />
+            <div class="sp-colour-presets" id="spCardColourPresets"></div>
+          </div>
+        </div>
+
+        <div class="sp-form-group">
+          <label class="sp-label">Card Border Colour</label>
+          <div class="sp-colour-row">
+            <input type="color" class="sp-colour-picker" id="spCardBorderColour" value="#f9a8d4" />
+            <div class="sp-colour-presets" id="spCardBorderPresets"></div>
+          </div>
+        </div>
+
+        <div class="sp-form-group">
+          <label class="sp-label">Name Text Colour</label>
+          <div class="sp-colour-row">
+            <input type="color" class="sp-colour-picker" id="spCardNameColour" value="#fdf2f8" />
+          </div>
+        </div>
+
+        <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:8px">
+          <button class="sp-save-btn" id="spSaveTournament">💾 Save Card Style</button>
+          <button class="sp-save-btn" id="spClearTournament" style="background:var(--bg-3);color:var(--text-2)">Clear All</button>
+        </div>
+        <div class="sp-msg" id="spTournamentMsg"></div>
+      </div>
+
     </div><!-- sp-content -->
   </div><!-- sp-body -->
 </div><!-- settingsDrawer -->`;
@@ -13054,6 +13118,8 @@ setTimeout(() => { updateMyStatusUI(); }, 100);
     document.getElementById("settingsPanelBackdrop").classList.add("open");
     const t = document.getElementById("spTriggerBtn");
     if (t) { t.style.color = "var(--accent)"; t.style.background = "var(--bg-3)"; }
+    // Reset tournament section so it reloads with the correct user's data
+    window._tCardInit = false;
     loadProfile();
   }
 
@@ -13075,9 +13141,10 @@ setTimeout(() => { updateMyStatusUI(); }, 100);
         document.querySelectorAll(".sp-section").forEach(s => s.classList.remove("active"));
         btn.classList.add("active");
         document.getElementById(`sp-${btn.dataset.sp}`).classList.add("active");
-        if (btn.dataset.sp === "audiovideo") loadAVDevices();
-        if (btn.dataset.sp === "themes") loadThemeSection();
-        if (btn.dataset.sp === "steam")  loadSteamSection();
+        if (btn.dataset.sp === "audiovideo")  loadAVDevices();
+        if (btn.dataset.sp === "themes")      loadThemeSection();
+        if (btn.dataset.sp === "steam")       loadSteamSection();
+        if (btn.dataset.sp === "tournaments") window.initTournamentSection();
       });
     });
 
@@ -13829,6 +13896,192 @@ setTimeout(() => { updateMyStatusUI(); }, 100);
   }
 
   // Boot
+
+  // ── Tournament match card settings ───────────────────────────
+  const _SP_PRESETS = ['#141820','#1e2430','#2c3440','#1a1a2e','#16213e','#0f3460','#533483','#e94560','#f9a8d4','#f472b6','#f59e0b','#10b981','#3b82f6','#8b5cf6','#ec4899','#06b6d4'];
+
+  window.initTournamentSection = function() {
+    if (window._tCardInit) return;
+    window._tCardInit = true;
+    window._tCardBgUrl = null;
+    window._tCardBgPos = 'center';
+
+    const uid = spMe?.id || 'guest';
+    // Load from server — me.tournamentCard is populated by /me endpoint
+    const saved = (typeof me !== 'undefined' && me?.tournamentCard) ? me.tournamentCard : {};
+    window._tCardBgUrl = saved.imageUrl || null;
+    window._tCardBgPos = saved.bgPos || '50% 50%';
+    if (saved.bgColour)     document.getElementById('spCardBgColour').value     = saved.bgColour;
+    if (saved.borderColour) document.getElementById('spCardBorderColour').value = saved.borderColour;
+    if (saved.nameColour)   document.getElementById('spCardNameColour').value   = saved.nameColour;
+    _spBuildCardPresets('spCardColourPresets',  saved.bgColour     || '#2c3440', 'Bg');
+    _spBuildCardPresets('spCardBorderPresets',  saved.borderColour || '#f9a8d4', 'Border');
+    if (window._tCardBgUrl) {
+      const pg = document.getElementById('spCardBgPosGroup');
+      if (pg) pg.style.display = 'block';
+      setTimeout(_spInitDragReposition, 0);
+    }
+    _spUpdateCardPreview();
+
+    document.getElementById('spCardBgInput').addEventListener('change', async e => {
+      const file = e.target.files[0]; if (!file) return;
+      const btn = document.querySelector('label[for="spCardBgInput"]');
+      if (btn) btn.textContent = '⏳ Uploading…';
+      try {
+        const fd = new FormData();
+        fd.append('image', file);
+        const r = await fetch(`${AUTH_URL}/tournament-card-image`, {
+          method: 'POST',
+          headers: { Authorization: `Bearer ${localStorage.getItem('vh_token')}` },
+          body: fd
+        });
+        const data = await r.json();
+        if (data.error) throw new Error(data.error);
+        window._tCardBgUrl = data.imageUrl;
+        window._tCardBgPos = '50% 50%';
+        if (me) me.tournamentCard = { ...(me.tournamentCard||{}), imageUrl: data.imageUrl };
+        const pg = document.getElementById('spCardBgPosGroup');
+        if (pg) pg.style.display = 'block';
+        setTimeout(_spInitDragReposition, 0);
+        _spUpdateCardPreview();
+        spShowMsg('spTournamentMsg', '✓ Image uploaded!', 'success');
+      } catch(err) {
+        spShowMsg('spTournamentMsg', 'Upload failed: ' + err.message, 'error');
+      } finally {
+        if (btn) btn.textContent = '🖼 Upload Image or GIF';
+        e.target.value = '';
+      }
+    });
+
+    document.getElementById('spCardBgClear').addEventListener('click', () => {
+      window._tCardBgUrl = null;
+      const pg = document.getElementById('spCardBgPosGroup');
+      if (pg) pg.style.display = 'none';
+      _spUpdateCardPreview();
+    });
+
+    document.getElementById('spCardBgColour').addEventListener('input', () => { _spBuildCardPresets('spCardColourPresets', document.getElementById('spCardBgColour').value, 'Bg'); _spUpdateCardPreview(); });
+    document.getElementById('spCardBorderColour').addEventListener('input', () => { _spBuildCardPresets('spCardBorderPresets', document.getElementById('spCardBorderColour').value, 'Border'); _spUpdateCardPreview(); });
+    document.getElementById('spCardNameColour').addEventListener('input', _spUpdateCardPreview);
+
+    document.getElementById('spSaveTournament').addEventListener('click', async () => {
+      const data = {
+        bgColour:     document.getElementById('spCardBgColour').value,
+        borderColour: document.getElementById('spCardBorderColour').value,
+        nameColour:   document.getElementById('spCardNameColour').value,
+        bgPos:        window._tCardBgPos || '50% 50%',
+      };
+      try {
+        const r = await fetch(`${AUTH_URL}/tournament-card`, {
+          method: 'PATCH',
+          headers: { Authorization: `Bearer ${localStorage.getItem('vh_token')}`, 'Content-Type': 'application/json' },
+          body: JSON.stringify(data)
+        });
+        const res = await r.json();
+        if (res.error) throw new Error(res.error);
+        if (me) me.tournamentCard = { ...(me.tournamentCard||{}), ...data, imageUrl: window._tCardBgUrl };
+        spShowMsg('spTournamentMsg', '✓ Card style saved!', 'success');
+      } catch(err) {
+        spShowMsg('spTournamentMsg', 'Save failed: ' + err.message, 'error');
+      }
+    });
+
+    document.getElementById('spClearTournament').addEventListener('click', async () => {
+      window._tCardBgUrl = null; window._tCardBgPos = '50% 50%';
+      document.getElementById('spCardBgColour').value     = '#2c3440';
+      document.getElementById('spCardBorderColour').value = '#f9a8d4';
+      document.getElementById('spCardNameColour').value   = '#fdf2f8';
+      const pg = document.getElementById('spCardBgPosGroup');
+      if (pg) pg.style.display = 'none';
+      _spBuildCardPresets('spCardColourPresets', '#2c3440', 'Bg');
+      _spBuildCardPresets('spCardBorderPresets', '#f9a8d4', 'Border');
+      _spUpdateCardPreview();
+      try {
+        await fetch(`${AUTH_URL}/tournament-card`, {
+          method: 'PATCH',
+          headers: { Authorization: `Bearer ${localStorage.getItem('vh_token')}`, 'Content-Type': 'application/json' },
+          body: JSON.stringify({ clearImage: true, bgColour: '#2c3440', borderColour: '#f9a8d4', nameColour: '#fdf2f8', bgPos: '50% 50%' })
+        });
+        if (me) me.tournamentCard = { imageUrl: null, bgColour: '#2c3440', borderColour: '#f9a8d4', nameColour: '#fdf2f8', bgPos: '50% 50%' };
+        spShowMsg('spTournamentMsg', 'Cleared!', 'success');
+      } catch(err) {
+        spShowMsg('spTournamentMsg', 'Clear failed: ' + err.message, 'error');
+      }
+    });
+  };
+
+  function _spInitDragReposition() {
+    const wrap = document.getElementById('spCardDragWrap');
+    const img  = document.getElementById('spCardDragImg');
+    if (!wrap || !img) return;
+
+    // Set the image on the drag thumbnail
+    img.style.backgroundImage = `url(${window._tCardBgUrl})`;
+
+    // Convert stored % position back to pixel offset for drag
+    const pos = window._tCardBgPos || '50% 50%';
+    const parts = pos.split(' ');
+    let pctX = parseFloat(parts[0]) || 50;
+    let pctY = parseFloat(parts[1]) || 50;
+
+    function applyPos() {
+      img.style.backgroundPosition = `${pctX}% ${pctY}%`;
+      window._tCardBgPos = `${pctX}% ${pctY}%`;
+      _spUpdateCardPreview();
+    }
+    applyPos();
+
+    let dragging = false, startX, startY, startPctX, startPctY;
+
+    wrap.addEventListener('mousedown', e => {
+      dragging = true;
+      startX = e.clientX; startY = e.clientY;
+      startPctX = pctX; startPctY = pctY;
+      wrap.style.cursor = 'grabbing';
+      e.preventDefault();
+    });
+
+    window.addEventListener('mousemove', e => {
+      if (!dragging) return;
+      // How far moved as % of wrap size (inverted — drag right moves image left)
+      const dx = ((e.clientX - startX) / wrap.offsetWidth)  * -100;
+      const dy = ((e.clientY - startY) / wrap.offsetHeight) * -100;
+      pctX = Math.max(0, Math.min(100, startPctX + dx));
+      pctY = Math.max(0, Math.min(100, startPctY + dy));
+      applyPos();
+    });
+
+    window.addEventListener('mouseup', () => {
+      if (!dragging) return;
+      dragging = false;
+      wrap.style.cursor = 'grab';
+    });
+  }
+
+  function _spUpdateCardPreview() {
+    const el = document.getElementById('spCardPreview'); if (!el) return;
+    const bgC  = document.getElementById('spCardBgColour')?.value     || '#2c3440';
+    const borC = document.getElementById('spCardBorderColour')?.value || '#f9a8d4';
+    const namC = document.getElementById('spCardNameColour')?.value   || '#fdf2f8';
+    const pos  = window._tCardBgPos || 'center';
+    const bgCss = window._tCardBgUrl
+      ? `background-image:url(${window._tCardBgUrl});background-size:cover;background-position:${pos};`
+      : `background-color:${bgC};`;
+    const uname = document.querySelector('.sp-preview-username')?.textContent || (typeof currentUsername !== 'undefined' ? currentUsername : 'You');
+    const avImg = document.querySelector('.sp-preview-avatar img');
+    const avHTML = avImg ? `<img src="${avImg.src}" style="width:100%;height:100%;object-fit:cover;">` : `<span style="font-size:13px;font-weight:800;color:#fff">${(uname||'Y')[0].toUpperCase()}</span>`;
+    el.innerHTML = `<div style="display:flex;align-items:center;gap:10px;padding:10px 12px;${bgCss}border:1.5px solid ${borC};border-radius:10px;box-shadow:0 3px 10px rgba(0,0,0,.4)">
+      <div style="width:34px;height:34px;border-radius:9px;flex-shrink:0;overflow:hidden;background:linear-gradient(135deg,var(--accent),var(--accent-h));display:flex;align-items:center;justify-content:center">${avHTML}</div>
+      <span style="flex:1;font-size:12px;font-weight:600;color:${namC};overflow:hidden;text-overflow:ellipsis;white-space:nowrap;text-shadow:0 1px 3px rgba(0,0,0,.5)">${uname}</span>
+      <span style="font-size:11px;font-weight:700;background:rgba(0,0,0,.3);border:1px solid rgba(255,255,255,.15);border-radius:5px;padding:3px 8px;min-width:26px;text-align:center;color:rgba(255,255,255,.7)">-</span>
+    </div>`;
+  }
+
+  function _spBuildCardPresets(containerId, active, key) {
+    const el = document.getElementById(containerId); if (!el) return;
+    el.innerHTML = _SP_PRESETS.map(c => `<div class="sp-colour-preset ${c===active?'selected':''}" style="background:${c}" title="${c}" onclick="(function(){var ids={Bg:'spCardBgColour',Border:'spCardBorderColour'};var pids={Bg:'spCardColourPresets',Border:'spCardBorderPresets'};if(ids['${key}'])document.getElementById(ids['${key}']).value='${c}';if(pids['${key}'])_spBuildCardPresets(pids['${key}'],'${c}','${key}');_spUpdateCardPreview();})()"></div>`).join('');
+  }
+
   if (document.readyState === "loading") {
     document.addEventListener("DOMContentLoaded", init);
   } else {

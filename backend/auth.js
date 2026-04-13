@@ -136,11 +136,24 @@ app.post("/login", async (req, res) => {
 });
 
 app.get("/me", requireAuth, async (req, res) => {
-  const r = await pool.query("SELECT id, username, avatar_url, is_admin, is_banned, banned_until FROM users WHERE id = $1", [req.userId]);
+  const r = await pool.query("SELECT id, username, avatar_url, is_admin, is_banned, banned_until, tournament_card_image_url, tournament_card_bg_colour, tournament_card_border_colour, tournament_card_name_colour, tournament_card_bg_pos FROM users WHERE id = $1", [req.userId]);
   const user = r.rows[0];
   if (!user) return res.status(404).json({ error: "User not found" });
   if (isCurrentlyBanned(user)) return res.status(403).json({ error: "Account banned" });
-  res.json({ id: user.id, username: user.username, avatarUrl: user.avatar_url, isAdmin: user.is_admin, is_admin: user.is_admin });
+  res.json({
+    id: user.id,
+    username: user.username,
+    avatarUrl: user.avatar_url,
+    isAdmin: user.is_admin,
+    is_admin: user.is_admin,
+    tournamentCard: {
+      imageUrl:      user.tournament_card_image_url   || null,
+      bgColour:      user.tournament_card_bg_colour   || '#2c3440',
+      borderColour:  user.tournament_card_border_colour || '#f9a8d4',
+      nameColour:    user.tournament_card_name_colour || '#fdf2f8',
+      bgPos:         user.tournament_card_bg_pos      || '50% 50%',
+    }
+  });
 });
 
 // GET /me/invites — fetch all pending server invites for the logged-in user
@@ -190,8 +203,46 @@ app.post("/banner", requireAuth, (req, res) => {
   });
 });
 
+// ── Tournament card image upload ─────────────────────────────
+const tournamentCardUpload = multer({
+  storage: multer.memoryStorage(),
+  limits: { fileSize: 20 * 1024 * 1024 },
+  fileFilter: (req, file, cb) => cb(null, /image\//.test(file.mimetype))
+});
+
+app.post("/tournament-card-image", requireAuth, (req, res) => {
+  tournamentCardUpload.single("image")(req, res, async (err) => {
+    if (err) return res.status(400).json({ error: err.message });
+    if (!req.file) return res.status(400).json({ error: "No file uploaded" });
+    try {
+      const imageUrl = await uploadToCloudinary(req.file.buffer, "tournament_cards", `tcard_${req.userId}`);
+      await pool.query("UPDATE users SET tournament_card_image_url = $1 WHERE id = $2", [imageUrl, req.userId]);
+      res.json({ imageUrl });
+    } catch(err) { res.status(500).json({ error: err.message }); }
+  });
+});
+
+// ── Tournament card settings (colours, position) ─────────────
+app.patch("/tournament-card", requireAuth, async (req, res) => {
+  try {
+    const { bgColour, borderColour, nameColour, bgPos, clearImage } = req.body;
+    if (clearImage) {
+      await pool.query("UPDATE users SET tournament_card_image_url = NULL WHERE id = $1", [req.userId]);
+    }
+    await pool.query(
+      `UPDATE users SET
+        tournament_card_bg_colour      = COALESCE($1, tournament_card_bg_colour),
+        tournament_card_border_colour  = COALESCE($2, tournament_card_border_colour),
+        tournament_card_name_colour    = COALESCE($3, tournament_card_name_colour),
+        tournament_card_bg_pos         = COALESCE($4, tournament_card_bg_pos)
+       WHERE id = $5`,
+      [bgColour || null, borderColour || null, nameColour || null, bgPos || null, req.userId]
+    );
+    res.json({ success: true });
+  } catch(err) { res.status(500).json({ error: err.message }); }
+});
+
 app.patch("/profile", requireAuth, async (req, res) => {
-  const { bio, status, bannerColour } = req.body;
   await pool.query(
     `UPDATE users SET
       bio = COALESCE($1, bio),
