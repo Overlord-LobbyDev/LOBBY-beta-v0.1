@@ -1,4 +1,4 @@
-// routes/tournaments.js
+// routes/tournaments.js - ENHANCED VERSION WITH SCORING AND CLOSURE
 // FIXED VERSION — PostgreSQL syntax
 const express = require('express');
 const router = express.Router();
@@ -193,6 +193,38 @@ router.get('/:tournamentId', async (req, res) => {
 });
 
 // ============================================================
+// GET USER PROFILE (for profile pictures)
+// ============================================================
+router.get('/users/:userId/profile', verifyAuth, async (req, res) => {
+  try {
+    const { userId } = req.params;
+    
+    const result = await pool.query(
+      'SELECT id, username, profile_picture FROM users WHERE id = $1',
+      [userId]
+    );
+    
+    if (result.rows.length === 0) {
+      return res.json({
+        userId,
+        username: 'Unknown',
+        profilePicture: null
+      });
+    }
+    
+    const user = result.rows[0];
+    res.json({
+      userId: user.id,
+      username: user.username,
+      profilePicture: user.profile_picture
+    });
+  } catch (error) {
+    console.error('Get user profile error:', error);
+    res.status(500).json({ error: 'Failed to fetch user profile' });
+  }
+});
+
+// ============================================================
 // REGISTER PLAYER FOR TOURNAMENT
 // ============================================================
 router.post('/:tournamentId/register', verifyAuth, async (req, res) => {
@@ -357,7 +389,133 @@ router.post('/:tournamentId/generate-bracket', verifyAuth, async (req, res) => {
 });
 
 // ============================================================
-// RECORD MATCH RESULT
+// SET MATCH WINNER (ENHANCED - SCORES + WINNER)
+// ============================================================
+router.post('/:tournamentId/set-winner', verifyAuth, async (req, res) => {
+  try {
+    const { tournamentId } = req.params;
+    const { roundNumber, matchNumber, winnerId } = req.body;
+    
+    // Get tournament
+    const tourResult = await pool.query(
+      'SELECT * FROM tournaments WHERE id = $1',
+      [tournamentId]
+    );
+    
+    if (tourResult.rows.length === 0) {
+      return res.status(404).json({ error: 'Tournament not found' });
+    }
+    
+    const tournament = tourResult.rows[0];
+    
+    // Check if user is host (HOST ONLY)
+    if (tournament.host_id !== req.user.id) {
+      return res.status(403).json({ error: 'Only host can set winners' });
+    }
+    
+    // Get the match
+    const matchResult = await pool.query(
+      `SELECT m.id FROM tournament_matches m
+       JOIN tournament_rounds r ON m.round_id = r.id
+       WHERE m.tournament_id = $1 AND r.round_number = $2 AND m.match_number = $3`,
+      [tournamentId, roundNumber, matchNumber]
+    );
+    
+    if (matchResult.rows.length === 0) {
+      return res.status(404).json({ error: 'Match not found' });
+    }
+    
+    const matchId = matchResult.rows[0].id;
+    
+    // Get the winner user ID for database (if needed)
+    let winnerDbId = winnerId;
+    if (winnerId) {
+      // Verify winner is a valid player in tournament
+      const playerCheck = await pool.query(
+        `SELECT id FROM tournament_players WHERE tournament_id = $1 AND user_id = $2`,
+        [tournamentId, winnerId]
+      );
+      
+      if (playerCheck.rows.length === 0) {
+        return res.status(400).json({ error: 'Invalid winner user ID' });
+      }
+      
+      winnerDbId = playerCheck.rows[0].id;
+    }
+    
+    // Update match with winner
+    await pool.query(
+      `UPDATE tournament_matches 
+       SET winner_id = $1, status = $2, completed_at = $3
+       WHERE id = $4`,
+      [winnerDbId, 'completed', new Date(), matchId]
+    );
+    
+    res.json({ success: true, message: 'Winner set successfully' });
+  } catch (error) {
+    console.error('Set winner error:', error);
+    res.status(500).json({ error: 'Failed to set winner' });
+  }
+});
+
+// ============================================================
+// CLOSE/END TOURNAMENT (HOST ONLY)
+// ============================================================
+router.post('/:tournamentId/close', verifyAuth, async (req, res) => {
+  try {
+    const { tournamentId } = req.params;
+    
+    // Get tournament
+    const tourResult = await pool.query(
+      'SELECT * FROM tournaments WHERE id = $1',
+      [tournamentId]
+    );
+    
+    if (tourResult.rows.length === 0) {
+      return res.status(404).json({ error: 'Tournament not found' });
+    }
+    
+    const tournament = tourResult.rows[0];
+    
+    // Check if user is host (HOST ONLY)
+    if (tournament.host_id !== req.user.id) {
+      return res.status(403).json({ error: 'Only host can close tournaments' });
+    }
+    
+    // Check if already completed
+    if (tournament.status === 'completed') {
+      return res.status(400).json({ error: 'Tournament is already completed' });
+    }
+    
+    // Update tournament status to completed
+    const result = await pool.query(
+      `UPDATE tournaments 
+       SET status = $1, end_time = $2
+       WHERE id = $3
+       RETURNING *`,
+      ['completed', new Date(), tournamentId]
+    );
+    
+    const completedTournament = result.rows[0];
+    
+    res.json({
+      success: true,
+      message: 'Tournament closed successfully',
+      tournament: {
+        id: completedTournament.id,
+        name: completedTournament.name,
+        status: completedTournament.status,
+        endTime: completedTournament.end_time
+      }
+    });
+  } catch (error) {
+    console.error('Close tournament error:', error);
+    res.status(500).json({ error: 'Failed to close tournament' });
+  }
+});
+
+// ============================================================
+// RECORD MATCH RESULT (LEGACY - can be deprecated in favor of set-winner)
 // ============================================================
 router.post('/:tournamentId/match-result', verifyAuth, async (req, res) => {
   try {
