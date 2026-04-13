@@ -2,7 +2,7 @@
 //  main.js  —  Electron main process
 // ============================================================
 
-const { app, BrowserWindow, ipcMain, desktopCapturer, session, shell, screen, Menu } = require("electron");
+const { app, BrowserWindow, ipcMain, desktopCapturer, session, shell, screen, Menu, dialog } = require("electron");
 const path = require("path");
 
 // Remove the native menu bar entirely
@@ -67,6 +67,7 @@ function createWindow() {
     : month <= 4 ? "splash_spring.html"
     : month <= 7 ? "splash_summer.html"
     : "splash_autumn.html";
+  const fs = require("fs");
   const splashPath = path.join(__dirname, splashFile);
   win.loadFile(fs.existsSync(splashPath) ? splashFile : "splash.html");
 }
@@ -223,6 +224,63 @@ const { execFile } = require("child_process");
 ipcMain.handle("get-app-version", () => {
   return app.getVersion();
 });
+
+// ── Check for updates via GitHub Releases API ─────────────────
+ipcMain.handle("check-for-updates", async () => {
+  const REPO = "Overlord-LobbyDev/LOBBY-beta-v0.1";
+  const url  = `https://api.github.com/repos/${REPO}/releases/latest`;
+
+  return new Promise((resolve) => {
+    const doFetch = (fetchUrl) => {
+      https.get(fetchUrl, {
+        headers: {
+          "User-Agent": "LOBBY-Updater/" + app.getVersion(),
+          "Accept": "application/vnd.github.v3+json",
+        }
+      }, (res) => {
+        // Follow redirects
+        if (res.statusCode >= 300 && res.statusCode < 400 && res.headers.location) {
+          doFetch(res.headers.location);
+          return;
+        }
+        if (res.statusCode === 404) {
+          resolve({ error: "Release not found — check repo name or make sure a release exists." });
+          return;
+        }
+        if (res.statusCode !== 200) {
+          resolve({ error: `GitHub API error: HTTP ${res.statusCode}` });
+          return;
+        }
+        let body = "";
+        res.on("data", chunk => body += chunk);
+        res.on("end", () => {
+          try {
+            const data = JSON.parse(body);
+            resolve({
+              tag:       data.tag_name,
+              name:      data.name || data.tag_name,
+              body:      data.body || "",
+              url:       data.html_url,
+              assets:    (data.assets || []).map(a => ({
+                name:                 a.name,
+                browser_download_url: a.browser_download_url,
+                size:                 a.size,
+              })),
+              published: data.published_at,
+            });
+          } catch(e) {
+            resolve({ error: "Failed to parse GitHub response: " + e.message });
+          }
+        });
+      }).on("error", (e) => {
+        resolve({ error: "Network error: " + e.message });
+      });
+    };
+    doFetch(url);
+  });
+});
+
+
 
 ipcMain.handle("download-update", async (event, downloadUrl, fileName) => {
   const tmpDir = os.tmpdir();

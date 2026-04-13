@@ -8,10 +8,10 @@
   <style>
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
     :root {
-      --bg-0:#1e1f22; --bg-1:#2b2d31; --bg-2:#313338; --bg-3:#383a40;
-      --accent:#5865f2; --accent-h:#4752c4; --danger:#ed4245;
+      --bg-0:#141820; --bg-1:#202630; --bg-2:#2c3440; --bg-3:#384250;
+      --accent:#f9a8d4; --accent-h:#f472b6; --danger:#ed4245;
       --green:#23a55a; --yellow:#f0b232;
-      --text-1:#f2f3f5; --text-2:#b5bac1; --text-3:#80848e;
+      --text-1:#fdf2f8; --text-2:#fce7f3; --text-3:#fbcfe8;
       --radius:8px; --font:"gg sans","Noto Sans",Whitney,Helvetica Neue,Helvetica,Arial,sans-serif;
     }
 
@@ -388,70 +388,126 @@
 
     .chat-main { flex:1; display:flex; flex-direction:column; overflow:hidden; background:var(--bg-2); }
     .chat-header {
-      height:48px; padding:0 16px; display:flex; align-items:center; gap:10px;
-      border-bottom:1px solid rgba(0,0,0,.3); flex-shrink:0; font-weight:600;
+      height:52px; padding:0 20px; display:flex; align-items:center; gap:12px;
+      border-bottom:1px solid rgba(255,255,255,.05); flex-shrink:0;
+      background:var(--bg-2);
     }
-    .chat-header-icon { font-size:20px; color:var(--text-3); }
-    .chat-header-name { font-size:16px; }
-    .chat-header-topic { font-size:13px; color:var(--text-3); margin-left:8px; }
-    .chat-header-actions { margin-left:auto; display:flex; gap:6px; }
+    .chat-header-icon {
+      width:34px; height:34px; border-radius:50%; flex-shrink:0;
+      background:var(--accent); display:flex; align-items:center; justify-content:center;
+      font-weight:700; font-size:14px; overflow:hidden; color:#fff;
+    }
+    .chat-header-icon img { width:100%; height:100%; object-fit:cover; border-radius:50%; }
+    .chat-header-name { font-size:15px; font-weight:700; color:var(--text-1); }
+    .chat-header-topic { font-size:12px; color:var(--text-3); margin-left:4px; }
+    .chat-header-actions { margin-left:auto; display:flex; gap:4px; }
+    .chat-header-btn {
+      background:none; border:none; cursor:pointer; color:var(--text-3);
+      padding:6px; border-radius:6px; transition:color .15s, background .15s;
+      display:flex; align-items:center; justify-content:center;
+    }
+    .chat-header-btn:hover { color:var(--text-1); background:rgba(255,255,255,.06); }
 
-    .messages { flex:1; overflow-y:auto; padding:16px; display:flex; flex-direction:column; gap:2px; }
-    .message-group { display:flex; gap:12px; padding:6px 16px; margin-top:0; position:relative; }
+    .messages {
+      flex:1; overflow-y:auto; padding:8px 0 4px;
+      display:flex; flex-direction:column;
+    }
+    .message-group { display:flex; gap:14px; padding:2px 20px; position:relative; }
     .message-group:hover { background:rgba(255,255,255,.02); }
-    .message-group.msg-new-author { margin-top:16px; padding-top:16px; border-top:1px solid rgba(255,255,255,.06); }
-    .message-group.msg-new-author:first-child { border-top:none; margin-top:0; }
+    .message-group.msg-new-author { margin-top:18px; }
+    .message-group.msg-new-author:first-child { margin-top:8px; }
     .message-group.msg-continuation { padding-top:1px; padding-bottom:1px; }
-    .message-group.msg-continuation .msg-avatar { visibility:hidden; width:40px; height:0; margin:0; overflow:hidden; }
+    .message-group.msg-continuation .msg-avatar { visibility:hidden; pointer-events:none; }
     .message-group.msg-continuation .msg-header { display:none; }
-    .message-group.msg-continuation:hover .msg-compact-time { display:inline; }
-    .msg-compact-time { display:none; font-size:10px; color:var(--text-3); position:absolute; left:4px; top:50%; transform:translateY(-50%); font-variant-numeric:tabular-nums; }
+    .message-group.msg-continuation:hover .msg-compact-time { display:flex; }
+    .msg-compact-time {
+      display:none; font-size:10px; color:var(--text-3);
+      position:absolute; left:20px; top:50%; transform:translateY(-50%);
+      font-variant-numeric:tabular-nums; width:40px; justify-content:center;
+    }
     .msg-avatar {
       width:40px; height:40px; border-radius:50%;
       background:var(--accent); display:flex; align-items:center; justify-content:center;
-      font-weight:700; font-size:16px; flex-shrink:0; overflow:hidden; margin-top:2px;
+      font-weight:700; font-size:15px; flex-shrink:0; overflow:hidden;
+      cursor:pointer; user-select:none;
     }
     .msg-avatar img { width:100%; height:100%; object-fit:cover; }
     .msg-body { flex:1; min-width:0; }
-    .msg-header { display:flex; align-items:baseline; gap:8px; margin-bottom:2px; }
-    .msg-username { font-weight:600; font-size:15px; color:var(--text-1); }
-    .msg-time { font-size:11px; color:var(--text-3); }
-    .msg-content { font-size:15px; color:var(--text-2); line-height:1.5; word-break:break-word; }
-    .msg-delete { background:none; border:none; color:var(--danger); font-size:12px; cursor:pointer; display:none; margin-left:8px; }
+    .msg-header { display:flex; align-items:baseline; gap:8px; margin-bottom:3px; }
+    .msg-username { font-weight:600; font-size:14px; color:var(--text-1); cursor:pointer; }
+    .msg-username:hover { text-decoration:underline; }
+    .msg-time { font-size:11px; color:var(--text-3); font-variant-numeric:tabular-nums; }
+    .msg-content { font-size:14px; color:var(--text-2); line-height:1.55; word-break:break-word; }
+    .msg-delete { background:none; border:none; color:var(--danger); font-size:11px; cursor:pointer; display:none; margin-left:6px; opacity:0.7; padding:1px 4px; border-radius:3px; }
+    .msg-delete:hover { opacity:1; background:rgba(237,66,69,.12); }
     .message-group:hover .msg-delete { display:inline; }
 
     .msg-attachments { display:flex; flex-wrap:wrap; gap:8px; margin-top:6px; }
-    .msg-image { max-width:300px; max-height:200px; border-radius:6px; cursor:pointer; object-fit:cover; }
+    .msg-image { max-width:320px; max-height:220px; border-radius:8px; cursor:pointer; object-fit:cover; }
     .msg-file {
       display:flex; align-items:center; gap:8px; background:var(--bg-1);
-      border-radius:6px; padding:10px 14px; font-size:13px; color:var(--text-2);
+      border-radius:8px; padding:10px 14px; font-size:13px; color:var(--text-2);
       text-decoration:none; border:1px solid rgba(255,255,255,.06);
     }
     .msg-file:hover { background:var(--bg-3); color:var(--text-1); }
 
-    .typing-indicator { padding:4px 16px; font-size:12px; color:var(--text-3); min-height:24px; }
-
-    .chat-input-wrap { padding:0 16px 16px; flex-shrink:0; }
-    .chat-input-box {
-      background:var(--bg-3); border-radius:var(--radius);
-      display:flex; align-items:flex-end; gap:8px; padding:8px 12px;
-      border:1px solid rgba(255,255,255,.06);
+    .msg-date-divider {
+      display:flex; align-items:center; gap:12px;
+      padding:12px 20px; color:var(--text-3); font-size:11px; font-weight:600;
+      text-transform:uppercase; letter-spacing:.6px;
     }
+    .msg-date-divider::before, .msg-date-divider::after {
+      content:""; flex:1; height:1px; background:rgba(255,255,255,.06);
+    }
+
+    /* DM conversation start */
+    .dm-convo-start {
+      padding:24px 20px 8px; display:flex; flex-direction:column; gap:8px;
+    }
+    .dm-convo-start-avatar {
+      width:64px; height:64px; border-radius:50%;
+      background:var(--accent); display:flex; align-items:center; justify-content:center;
+      font-weight:700; font-size:26px; overflow:hidden;
+    }
+    .dm-convo-start-avatar img { width:100%; height:100%; object-fit:cover; }
+    .dm-convo-start h3 { font-size:22px; font-weight:800; color:var(--text-1); margin:4px 0 0; }
+    .dm-convo-start p { font-size:14px; color:var(--text-3); margin:0; }
+
+    .chat-input-wrap { padding:0 16px 14px; flex-shrink:0; }
+    .chat-input-box {
+      background:var(--bg-3); border-radius:12px;
+      display:flex; align-items:flex-end; gap:4px; padding:6px 6px 6px 12px;
+      border:1px solid rgba(255,255,255,.07);
+      transition:border-color .15s;
+    }
+    .chat-input-box:focus-within { border-color:rgba(255,255,255,.14); }
     .chat-input {
       flex:1; background:none; border:none; outline:none;
-      color:var(--text-1); font-size:15px; font-family:var(--font);
-      resize:none; max-height:150px; line-height:1.5;
+      color:var(--text-1); font-size:14px; font-family:var(--font);
+      resize:none; max-height:150px; line-height:1.5; padding:4px 0;
     }
     .chat-input::placeholder { color:var(--text-3); }
-    .attach-btn, .send-btn { background:none; border:none; cursor:pointer; font-size:20px; padding:4px; color:var(--text-3); transition:color .15s; }
-    .attach-btn:hover { color:var(--text-1); }
-    .send-btn { color:var(--accent); }
-    .send-btn:hover { color:var(--accent-h); }
+    .attach-btn {
+      background:none; border:none; cursor:pointer; padding:6px;
+      color:var(--text-3); border-radius:8px; transition:color .15s, background .15s;
+      display:flex; align-items:center; font-size:18px;
+    }
+    .attach-btn:hover { color:var(--text-1); background:rgba(255,255,255,.06); }
+    .send-btn {
+      background:var(--accent); border:none; cursor:pointer;
+      width:34px; height:34px; border-radius:8px; flex-shrink:0;
+      display:flex; align-items:center; justify-content:center;
+      color:#fff; transition:background .15s, transform .1s;
+    }
+    .send-btn:hover { background:var(--accent-h); }
+    .send-btn:active { transform:scale(0.93); }
+    .send-btn svg { width:16px; height:16px; }
     #fileInput { display:none; }
 
-    .attach-preview { display:flex; flex-wrap:wrap; gap:8px; padding:8px 0 4px; }
-    .attach-chip { display:flex; align-items:center; gap:6px; background:var(--bg-1); border-radius:6px; padding:6px 10px; font-size:12px; color:var(--text-2); }
-    .attach-chip button { background:none; border:none; color:var(--danger); cursor:pointer; font-size:14px; }
+    .attach-preview { display:flex; flex-wrap:wrap; gap:8px; padding:8px 0 4px; align-items:flex-start; }
+    .attach-chip { display:flex; align-items:center; gap:6px; background:var(--bg-1); border-radius:8px; padding:6px 10px; font-size:12px; color:var(--text-2); border:1px solid rgba(255,255,255,.07); max-width:220px; }
+    .attach-chip button { background:none; border:none; color:var(--text-3); cursor:pointer; font-size:13px; padding:0 2px; transition:color .15s; }
+    .attach-chip button:hover { color:var(--danger); }
 
     .members-sidebar {
       position:fixed; bottom:0; left:72px; right:0;
@@ -680,6 +736,9 @@
     .empty-state .empty-icon { font-size:64px; }
     .empty-state h3 { font-size:20px; font-weight:700; color:var(--text-2); }
     .empty-state p { font-size:14px; text-align:center; max-width:300px; }
+    /* DM panel background when no convo open */
+    #chatPanel { background: var(--bg-2); }
+    #chatMain:has(.empty-state) { background: var(--bg-2); }
 
     #toast { position:fixed; bottom:24px; right:24px; background:var(--bg-3); color:var(--text-1); padding:12px 20px; border-radius:var(--radius); font-size:14px; font-weight:500; transform:translateY(80px); opacity:0; transition:transform .25s,opacity .25s; z-index:99999; }
     #toast.show { transform:translateY(0); opacity:1; }
@@ -1541,20 +1600,24 @@
     #socialFeed {
       position:fixed; top:72px; right:0; bottom:0;
       width:min(620px, 40vw);
-      display:flex; flex-direction:column;
+      display:flex !important; flex-direction:column;
       background:var(--bg-0);
       box-shadow:-8px 0 32px rgba(0,0,0,.35);
       z-index:100;
-      transition:width .3s cubic-bezier(0.16,1,0.3,1),
-                 opacity .25s ease,
-                 box-shadow .3s ease;
+      transform:translateX(0);
+      transition:transform .28s cubic-bezier(0.16,1,0.3,1),
+                 box-shadow .28s ease;
       overflow:hidden;
     }
     #socialFeed.collapsed {
-      width:0 !important;
-      opacity:0;
+      transform:translateX(100%) !important;
       box-shadow:none;
       pointer-events:none;
+    }
+    /* Panels slide smoothly when feed opens/closes */
+    #homePanel, #chatPanel, #profilePage {
+      transition: right .28s cubic-bezier(0.16,1,0.3,1),
+                  left  .28s cubic-bezier(0.16,1,0.3,1);
     }
     /* Shrink panels away from the fixed feed sidebar */
     body.feed-open  #homePanel,
@@ -2792,10 +2855,12 @@
 <!-- ── Chat Panel ── -->
 <div id="chatPanel">
   <div class="chat-main" id="chatMain">
-    <div class="empty-state" id="emptyState">
-      <div class="empty-icon">💬</div>
-      <h3>WELCOME TO THE LOBBY</h3>
-      <p>Select a friend or channel to start chatting</p>
+    <div class="empty-state" id="emptyState" style="gap:16px">
+      <div style="width:72px;height:72px;border-radius:20px;background:rgba(88,101,242,0.12);border:1px solid rgba(88,101,242,0.2);display:flex;align-items:center;justify-content:center;font-size:32px">💬</div>
+      <div style="display:flex;flex-direction:column;align-items:center;gap:6px">
+        <h3 style="font-size:17px;font-weight:700;color:var(--text-1);margin:0">Direct Messages</h3>
+        <p style="font-size:13px;color:var(--text-3);margin:0;text-align:center;max-width:260px;line-height:1.5">Select a conversation from the left, or start a new one by searching for a friend.</p>
+      </div>
     </div>
   </div>
 </div>
@@ -5067,7 +5132,7 @@ async function showDMPanel() {
   document.getElementById("membersSidebar").classList.remove("open");
   document.body.classList.remove("members-visible");
   document.body.classList.remove("members-bar-open");
-  document.getElementById("chatMain").innerHTML = `<div class="empty-state"><div class="empty-icon">💬</div><h3>Your Messages</h3><p>Select a friend to start chatting</p></div>`;
+  document.getElementById("chatMain").innerHTML = `<div class="empty-state" style="gap:16px"><div style="width:72px;height:72px;border-radius:20px;background:rgba(88,101,242,0.12);border:1px solid rgba(88,101,242,0.2);display:flex;align-items:center;justify-content:center;font-size:32px">💬</div><div style="display:flex;flex-direction:column;align-items:center;gap:6px"><h3 style="font-size:17px;font-weight:700;color:var(--text-1);margin:0">Direct Messages</h3><p style="font-size:13px;color:var(--text-3);margin:0;text-align:center;max-width:260px;line-height:1.5">Select a conversation from the left, or start a new one by searching for a friend.</p></div></div>`;
   const friends = await api("/friends");
   const accepted = (friends || []).filter(f => f.status === "accepted");
   const pending  = (friends || []).filter(f => f.status === "pending" && !f.is_sender);
@@ -5210,10 +5275,20 @@ async function openDM(userId, username, avatarUrl) {
   delete unreadDMs[userId]; updateDMBadge();
   document.querySelectorAll(".dm-item").forEach(el => el.classList.remove("active"));
   document.querySelector(`.dm-item[data-user-id="${userId}"]`)?.classList.add("active");
-  renderChatArea({ icon: avatarUrl ? `<img src="${avatarUrl}" style="width:20px;height:20px;border-radius:50%;object-fit:cover"/>` : "💬", name: username, placeholder: `Message ${username}` });
+  const initial = username.slice(0,1).toUpperCase();
+  const avatarEl = avatarUrl
+    ? `<img src="${avatarUrl}" style="width:34px;height:34px;border-radius:50%;object-fit:cover"/>`
+    : initial;
+  renderChatArea({ icon: avatarEl, name: username, placeholder: `Message ${username}` });
   const messages = await api(`/dm/${userId}`);
   const container = document.getElementById("msgContainer");
-  container.innerHTML = ""; (messages || []).forEach(m => appendMessage(m, "dm"));
+  // Conversation start banner
+  const avatarBigHtml = avatarUrl ? `<img src="${avatarUrl}"/>` : initial;
+  const startBanner = document.createElement("div");
+  startBanner.className = "dm-convo-start";
+  startBanner.innerHTML = `<div class="dm-convo-start-avatar">${avatarBigHtml}</div><h3>${username}</h3><p>This is the beginning of your direct message history with <strong>${username}</strong>.</p>`;
+  container.appendChild(startBanner);
+  (messages || []).forEach(m => appendMessage(m, "dm"));
   container.scrollTop = container.scrollHeight;
 }
 
@@ -5234,18 +5309,38 @@ async function openChannel(id, name, type) {
 }
 
 function renderChatArea({ icon, name, placeholder, readonly = false }) {
+  // icon is either an img tag string (DM) or a text emoji (#, 📢)
+  const isImgIcon = icon && icon.startsWith('<img');
+  const headerIcon = isImgIcon
+    ? `<div class="chat-header-icon">${icon}</div>`
+    : `<div class="chat-header-icon" style="background:var(--bg-3);color:var(--text-2);font-size:16px;border-radius:8px">${icon}</div>`;
+
   document.getElementById("chatMain").innerHTML = `
-    <div class="chat-header"><span class="chat-header-icon">${icon}</span><span class="chat-header-name">${name}</span></div>
+    <div class="chat-header">
+      ${headerIcon}
+      <div>
+        <div class="chat-header-name">${name}</div>
+      </div>
+      <div class="chat-header-actions">
+        <button class="chat-header-btn" title="Search messages" onclick="">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/></svg>
+        </button>
+      </div>
+    </div>
     <div class="messages" id="msgContainer"></div>
     <div class="typing-indicator" id="typingIndicator"></div>
     ${readonly ? "" : `<div class="chat-input-wrap">
       <div id="attachPreview" class="attach-preview"></div>
       <div class="chat-input-box">
-        <button class="attach-btn" onclick="document.getElementById('fileInput').click()">📎</button>
+        <button class="attach-btn" onclick="document.getElementById('fileInput').click()" title="Attach file">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m21.44 11.05-9.19 9.19a6 6 0 0 1-8.49-8.49l8.57-8.57A4 4 0 1 1 18 8.84l-8.59 8.57a2 2 0 0 1-2.83-2.83l8.49-8.48"/></svg>
+        </button>
         <textarea class="chat-input" id="chatInput" placeholder="${placeholder}" rows="1"
           oninput="autoResize(this);sendTyping();handleMentionTyping(this,selectedServer?'lobby':'feed')"
           onkeydown="if(event.key==='Enter'&&!event.shiftKey){event.preventDefault();sendMessage()}"></textarea>
-        <button class="send-btn" onclick="sendMessage()">➤</button>
+        <button class="send-btn" onclick="sendMessage()" title="Send">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="m22 2-7 20-4-9-9-4z"/><path d="M22 2 11 13"/></svg>
+        </button>
       </div></div>`}`;
 }
 
@@ -5258,19 +5353,25 @@ async function sendMessage() {
   const content = input?.value.trim() || "";
   if (!content && !pendingFiles.length) return;
   input.value = ""; input.style.height = "auto";
-  // Close mention dropdown
   const mDrop = document.getElementById("mentionDropGlobal");
   if (mDrop) mDrop.style.display = "none";
+
+  // Send with a space if content is empty but files are attached (avoids empty-content rejections)
+  const sendContent = content || " ";
   let savedMessage;
-  if (currentView.type === "dm") savedMessage = await api(`/dm/${currentView.id}`, { method:"POST", body:JSON.stringify({ content }) });
-  else if (currentView.type === "group") savedMessage = await api(`/groups/${currentView.id}/messages`, { method:"POST", body:JSON.stringify({ content }) });
-  else savedMessage = await api(`/channels/${currentView.id}/messages`, { method:"POST", body:JSON.stringify({ content }) });
-  if (pendingFiles.length && savedMessage?.id) {
+  if (currentView.type === "dm") savedMessage = await api(`/dm/${currentView.id}`, { method:"POST", body:JSON.stringify({ content: sendContent }) });
+  else if (currentView.type === "group") savedMessage = await api(`/groups/${currentView.id}/messages`, { method:"POST", body:JSON.stringify({ content: sendContent }) });
+  else savedMessage = await api(`/channels/${currentView.id}/messages`, { method:"POST", body:JSON.stringify({ content: sendContent }) });
+
+  if (!savedMessage?.id) { showToast("Failed to send message", "error"); return; }
+
+  if (pendingFiles.length) {
     for (const file of pendingFiles) {
       const formData = new FormData(); formData.append("file", file);
+      const token = localStorage.getItem("vh_token") || sessionStorage.getItem("vh_token");
       const upload = await fetch(`${AUTH_URL}/upload`, {
-        method:"POST", headers:{ Authorization:`Bearer ${localStorage.getItem("vh_token")||sessionStorage.getItem("vh_token")}` }, body:formData
-      }).then(r => r.json());
+        method:"POST", headers:{ Authorization:`Bearer ${token}` }, body:formData
+      }).then(r => r.json()).catch(() => ({}));
       if (upload.url) {
         const attachKey = currentView.type==="dm" ? "dmId" : currentView.type==="group" ? "groupMsgId" : "messageId";
         await api("/attachments", { method:"POST", body:JSON.stringify({ [attachKey]:savedMessage.id, url:upload.url, filename:upload.filename, mimeType:upload.mimeType, sizeBytes:upload.sizeBytes }) });
@@ -5278,10 +5379,15 @@ async function sendMessage() {
         savedMessage.attachments.push({ url:upload.url, filename:upload.filename, mime_type:upload.mimeType });
       }
     }
-    pendingFiles = []; document.getElementById("attachPreview").innerHTML = "";
+    pendingFiles = [];
+    const preview = document.getElementById("attachPreview");
+    if (preview) preview.innerHTML = "";
   }
+
   savedMessage.username = me.username; savedMessage.avatar_url = me.avatarUrl;
   savedMessage.from_user_id = me.id; savedMessage.user_id = me.id;
+  // Trim the placeholder space from display
+  if (savedMessage.content === " ") savedMessage.content = "";
   if (currentView.type === "channel") wsSend({ type:"channel-message", channelId:currentView.id, message:savedMessage });
   else if (currentView.type === "group") wsSend({ type:"group-message", groupId:currentView.id, message:savedMessage });
   else wsSend({ type:"direct-message", toUserId:currentView.id, message:savedMessage });
@@ -5299,35 +5405,51 @@ function appendMessage(msg, type) {
   const isMe = msg.user_id === me.id || msg.from_user_id === me.id;
   const authorId = msg.user_id || msg.from_user_id;
   const avatarHtml = msg.avatar_url ? `<img src="${msg.avatar_url}" />` : (msg.username||"?").slice(0,1).toUpperCase();
-  const time = new Date(msg.created_at).toLocaleTimeString([], { hour:"2-digit", minute:"2-digit" });
+  const msgDate = new Date(msg.created_at);
+  const time = msgDate.toLocaleTimeString([], { hour:"2-digit", minute:"2-digit" });
   const attachHtml = (msg.attachments||[]).map(a => {
     if (/^image\//.test(a.mime_type)) return `<img class="msg-image" src="${a.url}" onclick="openLightbox('${a.url}')" />`;
     const size = a.size_bytes > 1024*1024 ? `${(a.size_bytes/1024/1024).toFixed(1)} MB` : `${Math.round(a.size_bytes/1024)} KB`;
-    return `<a class="msg-file" href="${a.url}" target="_blank" download>📎 ${a.filename} <span style="color:var(--text-3);font-size:11px">${size}</span></a>`;
+    return `<a class="msg-file" href="${a.url}" target="_blank" download><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="m21.44 11.05-9.19 9.19a6 6 0 0 1-8.49-8.49l8.57-8.57A4 4 0 1 1 18 8.84l-8.59 8.57a2 2 0 0 1-2.83-2.83l8.49-8.48"/></svg> ${a.filename} <span style="color:var(--text-3);font-size:11px">${size}</span></a>`;
   }).join("");
   const canDelete = isMe || me.is_admin === true || (currentView.type === "channel" && (myServerRole === "owner" || myServerRole === "moderator"));
 
-  // Determine if this is a continuation of the previous message
+  // Date divider
   const lastMsg = container.lastElementChild;
+  const lastMsgDate = lastMsg?.dataset?.dateStr;
+  const todayStr = msgDate.toDateString();
+  if (lastMsgDate !== todayStr) {
+    const now = new Date();
+    const yesterday = new Date(now); yesterday.setDate(yesterday.getDate()-1);
+    const label = todayStr === now.toDateString() ? "Today"
+      : todayStr === yesterday.toDateString() ? "Yesterday"
+      : msgDate.toLocaleDateString([], { weekday:"long", month:"long", day:"numeric" });
+    const divider = document.createElement("div");
+    divider.className = "msg-date-divider";
+    divider.innerHTML = `<span>${label}</span>`;
+    container.appendChild(divider);
+  }
+
   const lastAuthorId = lastMsg?.dataset?.authorId;
   const lastTime = lastMsg?.dataset?.time;
   const isContinuation = lastAuthorId && parseInt(lastAuthorId) === authorId
-    && lastTime && (new Date(msg.created_at).getTime() - parseInt(lastTime)) < 5 * 60 * 1000; // 5 min window
+    && lastTime && (msgDate.getTime() - parseInt(lastTime)) < 5 * 60 * 1000;
 
   const div = document.createElement("div");
   div.className = "message-group " + (isContinuation ? "msg-continuation" : "msg-new-author");
   div.dataset.authorId = authorId;
-  div.dataset.time = new Date(msg.created_at).getTime();
+  div.dataset.time = msgDate.getTime();
+  div.dataset.dateStr = todayStr;
   div.innerHTML = `
     ${isContinuation ? `<span class="msg-compact-time">${time}</span>` : ""}
-    <div class="msg-avatar" style="cursor:pointer" onclick="openProfile(${authorId})">${avatarHtml}</div>
+    <div class="msg-avatar" onclick="openProfilePanel(${authorId})">${avatarHtml}</div>
     <div class="msg-body">
       <div class="msg-header">
-        <span class="msg-username" style="cursor:pointer" onclick="openProfilePanel(${authorId})" data-user-id="${authorId}">${msg.username||"Unknown"}</span>
+        <span class="msg-username" onclick="openProfilePanel(${authorId})" data-user-id="${authorId}">${msg.username||"Unknown"}</span>
         <span class="msg-time">${time}</span>
-        ${canDelete?`<button class="msg-delete" onclick="deleteMessage(${msg.id})">🗑 Delete</button>`:""}
+        ${canDelete?`<button class="msg-delete" onclick="deleteMessage(${msg.id})">Delete</button>`:""}
       </div>
-      ${msg.content?`<div class="msg-content">${highlightMentions(escapeHtml(msg.content))}</div>`:""}
+      ${(msg.content&&msg.content.trim())?`<div class="msg-content">${highlightMentions(escapeHtml(msg.content))}</div>`:""}
       ${attachHtml?`<div class="msg-attachments">${attachHtml}</div>`:""}
     </div>`;
   container.appendChild(div);
@@ -5354,7 +5476,22 @@ function handleFileSelect() {
 function renderAttachPreview() {
   const preview = document.getElementById("attachPreview");
   if (!preview) return;
-  preview.innerHTML = pendingFiles.map((f,i) => `<div class="attach-chip">📎 ${f.name} <button onclick="removeAttach(${i})">✕</button></div>`).join("");
+  preview.innerHTML = pendingFiles.map((f, i) => {
+    const isImg = f.type.startsWith("image/");
+    if (isImg) {
+      const url = URL.createObjectURL(f);
+      return `<div class="attach-chip attach-chip-img" style="padding:0;overflow:hidden;position:relative;width:80px;height:80px;border-radius:8px;flex-shrink:0">
+        <img src="${url}" style="width:100%;height:100%;object-fit:cover;display:block"/>
+        <button onclick="removeAttach(${i})" style="position:absolute;top:3px;right:3px;background:rgba(0,0,0,.7);border:none;color:#fff;border-radius:50%;width:18px;height:18px;font-size:11px;cursor:pointer;display:flex;align-items:center;justify-content:center;line-height:1">✕</button>
+        <div style="position:absolute;bottom:0;left:0;right:0;background:rgba(0,0,0,.5);font-size:9px;color:#fff;padding:2px 4px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${f.name}</div>
+      </div>`;
+    }
+    return `<div class="attach-chip">
+      <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="m21.44 11.05-9.19 9.19a6 6 0 0 1-8.49-8.49l8.57-8.57A4 4 0 1 1 18 8.84l-8.59 8.57a2 2 0 0 1-2.83-2.83l8.49-8.48"/></svg>
+      <span style="max-width:140px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${f.name}</span>
+      <button onclick="removeAttach(${i})">✕</button>
+    </div>`;
+  }).join("");
 }
 function removeAttach(i) { pendingFiles.splice(i,1); renderAttachPreview(); }
 
@@ -7838,7 +7975,7 @@ document.getElementById("postContent").addEventListener("input", function() {
 
 // ── Theme System ───────────────────────────────────────────────
 const LOBBY_THEMES = {
-  default:  { name:"Default",  emoji:"🌑", bg0:"#1e1f22", bg1:"#2b2d31", bg2:"#313338", bg3:"#383a40", accent:"#5865f2", accentH:"#4752c4", t1:"#f2f3f5", t2:"#b5bac1", t3:"#80848e" },
+  default:  { name:"Default",  emoji:"🌑", bg0:"#141820", bg1:"#202630", bg2:"#2c3440", bg3:"#384250", accent:"#f9a8d4", accentH:"#f472b6", t1:"#fdf2f8", t2:"#fce7f3", t3:"#fbcfe8" },
   midnight: { name:"Midnight", emoji:"🟣", bg0:"#0a0a0f", bg1:"#111118", bg2:"#1a1a24", bg3:"#22222f", accent:"#7c3aed", accentH:"#6d28d9", t1:"#f0f0ff", t2:"#a0a0c0", t3:"#606080" },
   forest:   { name:"Forest",   emoji:"🌲", bg0:"#0d1a0f", bg1:"#142018", bg2:"#1a2d1f", bg3:"#213828", accent:"#16a34a", accentH:"#15803d", t1:"#ecfdf5", t2:"#86efac", t3:"#4ade80" },
   ocean:    { name:"Ocean",    emoji:"🌊", bg0:"#030d1a", bg1:"#071828", bg2:"#0c2236", bg3:"#112c44", accent:"#0ea5e9", accentH:"#0284c7", t1:"#f0f9ff", t2:"#7dd3fc", t3:"#38bdf8" },
@@ -9250,10 +9387,20 @@ function showHomePanel() {
   // Show social feed sidebar (home only) and hide members sidebar
   const socialFeed = document.getElementById("socialFeed");
   const membersSidebar = document.getElementById("membersSidebar");
+  const reopenBtn  = document.getElementById("feedReopenBtn");
   if (socialFeed) {
-    socialFeed.style.display = "flex";
-    socialFeed.classList.remove("collapsed");
-    if(typeof applySocialResizeStyles==="function")applySocialResizeStyles();
+    if (feedVisible) {
+      socialFeed.classList.remove("collapsed");
+      document.body.classList.add("feed-open");
+      document.body.classList.remove("feed-closed");
+      if (reopenBtn) reopenBtn.style.display = "none";
+      if(typeof applySocialResizeStyles==="function")applySocialResizeStyles();
+    } else {
+      socialFeed.classList.add("collapsed");
+      document.body.classList.remove("feed-open");
+      document.body.classList.add("feed-closed");
+      if (reopenBtn) reopenBtn.style.display = "block";
+    }
   }
   if (membersSidebar) {
     membersSidebar.style.display = "none";
@@ -9380,16 +9527,23 @@ function showChatPanel() {
   if (sl) sl.classList.remove("collapsed");
   if (btn) btn.textContent = "◀";
   
-  // Hide social feed when in chat/DMs view
+  // Hide social feed panel when in chat/DMs — but keep reopen btn visible so feed is accessible anywhere
   const socialFeed = document.getElementById("socialFeed");
-  if (socialFeed) { socialFeed.style.display = "none"; socialFeed.classList.add("collapsed"); }
+  const reopenBtn  = document.getElementById("feedReopenBtn");
+  if (socialFeed) {
+    socialFeed.classList.add("collapsed");
+  }
+  document.body.classList.remove("feed-open");
+  document.body.classList.add("feed-closed");
+  // Always show reopen btn so user can access feed from any page
+  if (reopenBtn && feedVisible) reopenBtn.style.display = "block";
   
-  // Show members sidebar (chat view)
+  // Don't show members sidebar for DMs — only for server channels
   const membersSidebar = document.getElementById("membersSidebar");
   if (membersSidebar) {
-    membersSidebar.style.display = "block";
-    membersSidebar.classList.add("open");
-    document.body.classList.add("members-bar-open", "members-visible");
+    membersSidebar.style.display = "none";
+    membersSidebar.classList.remove("open");
+    document.body.classList.remove("members-bar-open", "members-visible");
   }
   
   if (typeof showDMPanel === "function") showDMPanel();
@@ -9503,11 +9657,20 @@ function toggleFeed() {
   const feed      = document.getElementById("socialFeed");
   const reopenBtn = document.getElementById("feedReopenBtn");
   feedVisible     = !feedVisible;
+
   feed.classList.toggle("collapsed", !feedVisible);
   document.body.classList.toggle("feed-open",   feedVisible);
   document.body.classList.toggle("feed-closed", !feedVisible);
   if (reopenBtn) reopenBtn.style.display = feedVisible ? "none" : "block";
-  if (feedVisible) { feedThawGifs(); if(typeof applyFeedResizeStyles==="function")applyFeedResizeStyles(); } else { feedFreezeGifs(); if(typeof clearFeedResizeStyles==="function")clearFeedResizeStyles(); }
+
+  if (feedVisible) {
+    feed.style.pointerEvents = "";
+    feedThawGifs();
+    if(typeof applyFeedResizeStyles==="function") applyFeedResizeStyles();
+  } else {
+    feedFreezeGifs();
+    if(typeof clearFeedResizeStyles==="function") clearFeedResizeStyles();
+  }
 }
 
 document.getElementById("feedToggleBtn").addEventListener("click", e => { e.stopPropagation(); toggleFeed(); });
@@ -13180,87 +13343,112 @@ setTimeout(() => { updateMyStatusUI(); }, 100);
     const dlBtn    = document.getElementById("spDownloadUpdateBtn");
     if (!checkBtn) return;
 
-    // Show current version from Electron (falls back to package.json version)
-    const curVer = typeof window.electronAPI?.getAppVersion === "function"
-      ? "loading…" // will be set async below
-      : "1.0.0";
     const verEl = document.getElementById("spCurrentVersion");
 
-    if (typeof window.electronAPI?.getAppVersion === "function") {
-      window.electronAPI.getAppVersion().then(v => { verEl.textContent = "v" + v; });
+    // ✅ FIX 1: Load current version immediately on page load
+    if (window.electronAPI?.getAppVersion) {
+      window.electronAPI.getAppVersion().then(v => {
+        verEl.textContent = "v" + v;
+      }).catch(() => {
+        verEl.textContent = "Unknown";
+      });
     } else {
-      verEl.textContent = "v" + curVer;
+      verEl.textContent = "N/A";
     }
 
-    checkBtn.addEventListener("click", async () => {
+    async function runUpdateCheck(silent = false) {
       checkBtn.disabled = true;
       checkBtn.textContent = "⏳ Checking…";
+
       const resultEl    = document.getElementById("spUpdateResult");
       const statusEl    = document.getElementById("spUpdateStatus");
       const changelogEl = document.getElementById("spUpdateChangelog");
       const actionsEl   = document.getElementById("spUpdateActions");
 
       try {
-        const res = await fetch(LOBBY_GITHUB_API, { headers: { "Accept": "application/vnd.github.v3+json" } });
-        if (!res.ok) throw new Error("GitHub API returned " + res.status);
-        latestReleaseData = await res.json();
+        // Use main-process IPC — avoids CORS/CSP, works regardless of repo visibility
+        if (!window.electronAPI?.checkForUpdates) throw new Error("Update check not available");
+        const release = await window.electronAPI.checkForUpdates();
+        if (release.error) throw new Error(release.error);
 
-        const localVer = verEl.textContent.replace("v", "");
-        const remoteTag = latestReleaseData.tag_name;
-        const remoteName = latestReleaseData.name || remoteTag;
+        // Get current version
+        const currentVersion = await window.electronAPI.getAppVersion();
+        const hasUpdate = isNewer(release.tag, currentVersion);
+        latestReleaseData = release;
 
-        resultEl.style.display = "block";
+        // ✅ FIX 2: Always show result when manually checking, only show if update found when silent
+        if (!silent || hasUpdate) {
+          resultEl.style.display = "block";
+        }
 
-        if (isNewer(remoteTag, localVer)) {
-          statusEl.innerHTML = `<span style="color:var(--accent);font-weight:600">🎉 New version available: ${remoteName}</span>`;
-          changelogEl.textContent = latestReleaseData.body || "No changelog provided.";
+        if (hasUpdate) {
+          statusEl.innerHTML = `<span style="color:var(--accent);font-weight:700">🎉 Update available: ${release.name}</span>`;
+          changelogEl.textContent = release.body || "No changelog provided.";
           actionsEl.style.display = "flex";
+          
+          // ✅ FIX 3: Only show toast notification on silent checks (background)
+          if (silent) {
+            showToast(`⬆️ Update available: ${release.name} — open Settings to install`, "success");
+          }
         } else {
-          statusEl.innerHTML = `<span style="color:var(--success,#4ade80);font-weight:600">✅ You're up to date!</span>`;
-          changelogEl.textContent = `Latest release: ${remoteName}`;
+          statusEl.innerHTML = `<span style="color:#4ade80;font-weight:600">✅ You're on the latest version (${release.name})</span>`;
+          changelogEl.textContent = "";
           actionsEl.style.display = "none";
         }
+
       } catch (err) {
-        resultEl.style.display = "block";
-        statusEl.innerHTML = `<span style="color:var(--danger,#f87171)">❌ Failed to check: ${err.message}</span>`;
-        changelogEl.textContent = "";
-        actionsEl.style.display = "none";
+        if (!silent) {
+          resultEl.style.display = "block";
+          statusEl.innerHTML = `<span style="color:var(--danger)">❌ ${err.message}</span>`;
+          changelogEl.textContent = "";
+          actionsEl.style.display = "none";
+        }
       }
 
       checkBtn.disabled = false;
       checkBtn.textContent = "🔄 Check for Updates";
-    });
+    }
+
+    checkBtn.addEventListener("click", () => runUpdateCheck(false));
 
     dlBtn.addEventListener("click", async () => {
       if (!latestReleaseData) return;
 
-      // Find the .exe asset (NSIS installer)
-      const exeAsset = latestReleaseData.assets.find(a =>
+      const exeAsset = (latestReleaseData.assets || []).find(a =>
         a.name.endsWith(".exe") && !a.name.includes("blockmap")
       );
 
       if (!exeAsset) {
-        // Fallback: open the release page in browser
-        window.open(latestReleaseData.html_url, "_blank");
+        // No .exe asset found — open release page in browser as fallback
+        window.open(latestReleaseData.url || `https://github.com/Overlord-LobbyDev/LOBBY-beta-v0.1/releases/latest`, "_blank");
         return;
       }
 
-      // If we have Electron IPC for downloading, use it
+      // ✅ FIX 4: Add confirmation dialog before downloading update
+      const confirmed = confirm(
+        `Download and install ${latestReleaseData.name}?\n\n` +
+        `The app will close and restart after the update is complete.\n\n` +
+        `Click OK to proceed or Cancel to update later.`
+      );
+
+      if (!confirmed) {
+        return; // User declined
+      }
+
       if (typeof window.electronAPI?.downloadUpdate === "function") {
         dlBtn.disabled = true;
         dlBtn.textContent = "⏳ Downloading…";
         const progressEl = document.getElementById("spDownloadProgress");
         const pctEl      = document.getElementById("spDownloadPct");
         const barEl      = document.getElementById("spDownloadBar");
-        progressEl.style.display = "block";
+        if (progressEl) progressEl.style.display = "block";
 
         try {
           const result = await window.electronAPI.downloadUpdate(exeAsset.browser_download_url, exeAsset.name);
           if (result.success) {
             dlBtn.textContent = "✅ Installing…";
-            pctEl.textContent = "100%";
-            barEl.style.width = "100%";
-            // Electron main process will open the installer and quit
+            if (pctEl) pctEl.textContent = "100%";
+            if (barEl) barEl.style.width = "100%";
           } else {
             throw new Error(result.error || "Download failed");
           }
@@ -13268,15 +13456,13 @@ setTimeout(() => { updateMyStatusUI(); }, 100);
           spShowMsg("spUpdateMsg", "Download failed: " + err.message, "error");
           dlBtn.disabled = false;
           dlBtn.textContent = "⬇️ Download & Install";
-          progressEl.style.display = "none";
+          if (progressEl) progressEl.style.display = "none";
         }
       } else {
-        // No Electron — open in browser
         window.open(exeAsset.browser_download_url, "_blank");
       }
     });
 
-    // Listen for download progress from main process
     if (typeof window.electronAPI?.onUpdateProgress === "function") {
       window.electronAPI.onUpdateProgress(({ percent }) => {
         const pctEl = document.getElementById("spDownloadPct");
@@ -13285,6 +13471,16 @@ setTimeout(() => { updateMyStatusUI(); }, 100);
         if (barEl) barEl.style.width = percent + "%";
       });
     }
+
+    // ✅ FIX 5: Silent auto-check 8s after launch — only notifies if update found
+    setTimeout(() => runUpdateCheck(true), 8000);
+  }
+
+  // Boot
+  if (document.readyState === "loading") {
+    document.addEventListener("DOMContentLoaded", init);
+  } else {
+    init();
   }
 
   // Boot

@@ -32,9 +32,11 @@ contextBridge.exposeInMainWorld("electronAPI", {
   minimizeWindow: () => ipcRenderer.invoke("win-minimize"),
   maximizeWindow: () => ipcRenderer.invoke("win-maximize"),
   closeWindow:    () => ipcRenderer.invoke("win-close"),
+  setTitlebarOverlay: (opts) => ipcRenderer.invoke("set-titlebar-overlay", opts),
 
   // ── Auto-Updater ─────────────────────────────────────────
-  getAppVersion: () => ipcRenderer.invoke("get-app-version"),
-  downloadUpdate: (url, fileName) => ipcRenderer.invoke("download-update", url, fileName),
+  getAppVersion:   () => ipcRenderer.invoke("get-app-version"),
+  checkForUpdates: () => ipcRenderer.invoke("check-for-updates"),
+  downloadUpdate:  (url, fileName) => ipcRenderer.invoke("download-update", url, fileName),
   onUpdateProgress: (cb) => ipcRenderer.on("update-download-progress", (_e, d) => cb(d)),
 });
