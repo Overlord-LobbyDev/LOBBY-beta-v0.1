@@ -4908,6 +4908,7 @@ function renderChannelList(channels, members, server) {
   </div>`;
 
   content.innerHTML = html;
+  if (typeof initTournaments === 'function') initTournaments(server.id, me?.id);
   renderMembers(members);
   document.getElementById("membersSidebar").style.display = "flex";
   document.getElementById("membersSidebar").classList.add("open");
@@ -14184,13 +14185,7 @@ document.addEventListener("click", () => hideProfileHoverCard());
   </button>
 </div>
 <script src="tournaments.js"></script>
-<script>
-document.addEventListener("DOMContentLoaded", () => {
-  if (typeof initTournaments === "function") {
-    initTournaments("default-lobby", 1);
-  }
-});
-</script>
+<!-- initTournaments is called from selectServer() with the real lobby id and user id -->
 
 <!-- ════════════════════ TOURNAMENT FEATURE ════════════════════ -->
 <!-- Tournament Setup Modal -->

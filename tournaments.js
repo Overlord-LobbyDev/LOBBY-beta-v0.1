@@ -4,6 +4,7 @@ let currentLobbyId = null;
 let currentUserId = null;
 
 // Initialize tournament system
+let _tournamentListenersAttached = false;
 function initTournaments(lobbyId, userId) {
     currentLobbyId = lobbyId;
     currentUserId = userId;
@@ -14,22 +15,29 @@ function initTournaments(lobbyId, userId) {
     // Load existing tournaments for this lobby
     loadTournaments();
     
-    // Set up event listeners
-    setupEventListeners();
+    // Set up event listeners only once
+    if (!_tournamentListenersAttached) {
+        setupEventListeners();
+        _tournamentListenersAttached = true;
+    }
 }
 
 // Add tournament setup button to lobby menu
 function addTournamentButton() {
-    const lobbyMenu = document.querySelector('.lobby-menu');
+    const lobbyMenu = document.querySelector('.server-actions');
     if (!lobbyMenu) return;
 
-    const tournamentItem = document.createElement('button');
-    tournamentItem.className = 'lobby-menu-item tournament-setup-btn';
+    // Remove any existing tournament button to avoid duplicates
+    const existing = lobbyMenu.querySelector('.tournament-setup-btn');
+    if (existing) existing.remove();
+
+    const tournamentItem = document.createElement('div');
+    tournamentItem.className = 'server-action-item tournament-setup-btn';
     tournamentItem.innerHTML = `
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+        <span class="sa-icon"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
             <polyline points="22 12 18 12 15 21 9 3 6 12 2 12"></polyline>
-        </svg>
-        <span>Tournament Setup</span>
+        </svg></span>
+        Tournament Setup
     `;
     tournamentItem.onclick = openTournamentModal;
     
