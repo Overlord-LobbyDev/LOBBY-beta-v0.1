@@ -11,6 +11,7 @@ const { WebSocketServer } = require("ws");
 const { randomUUID } = require("crypto");
 const jwt = require("jsonwebtoken");
 const url = require("url");
+const cors = require("cors");
 
 const app = express();
 const server = http.createServer(app);
@@ -18,15 +19,57 @@ const server = http.createServer(app);
 // ── Port (Render assigns PORT env var dynamically) ──
 const PORT = process.env.PORT || 3000;
 
+// ── Middleware ────────────────────────────────────────
+app.use(express.json());
+app.use(express.urlencoded({ extended: true }));
+app.use(cors());
+
+// ── Auth Middleware ───────────────────────────────────
+const SECRET = process.env.JWT_SECRET || "change-this-secret-in-production";
+
+function authMiddleware(req, res, next) {
+  try {
+    const token = req.headers.authorization?.split(' ')[1];
+    if (!token) return res.status(401).json({ error: 'No token provided' });
+    
+    const decoded = jwt.verify(token, SECRET);
+    req.user = decoded;
+    next();
+  } catch (err) {
+    return res.status(401).json({ error: 'Invalid token' });
+  }
+}
+
 // ── Health check endpoint ──────────────────────────────
 app.get("/", (req, res) => {
   res.status(200).json({ message: "WebSocket server is running" });
 });
 
+// ── Tournament Routes ──────────────────────────────────
+try {
+  const tournamentRoutes = require('./routes/tournaments.js');
+  
+  // Inject auth middleware into tournament routes
+  app.use('/api/tournaments', (req, res, next) => {
+    // Skip auth for GET /api/tournaments/lobby/:lobbyId (you can add auth if needed)
+    if (req.method === 'GET' && req.path.match(/^\/lobby\//)) {
+      return next();
+    }
+    // Require auth for POST, PUT, DELETE
+    if (['POST', 'PUT', 'DELETE'].includes(req.method)) {
+      return authMiddleware(req, res, next);
+    }
+    next();
+  });
+  
+  app.use('/api/tournaments', tournamentRoutes);
+  console.log('[✓] Tournament routes loaded');
+} catch (err) {
+  console.warn('[!] Tournament routes not found:', err.message);
+}
+
 // ── WebSocket server ──────────────────────────────────
 const wss = new WebSocketServer({ server });
-
-const SECRET = process.env.JWT_SECRET || "change-this-secret-in-production";
 
 // id → { ws, username, avatarUrl, channels: Set, userId, vcChannelId, vcServerId }
 const clients = new Map();
@@ -97,8 +140,6 @@ wss.on("connection", (ws, req) => {
     try { msg = JSON.parse(raw); } catch { return; }
 
     // ── WebRTC signalling (1-1, group, and voice channel) ─
-    // vc-offer / vc-answer / vc-candidate all have a `to` field —
-    // they're handled here automatically, same as 1-1 call signalling.
     if (msg.to) {
       const target = clients.get(msg.to);
       if (target?.ws.readyState === 1) {
@@ -230,6 +271,45 @@ wss.on("connection", (ws, req) => {
       return;
     }
 
+    // ── Tournament events ────────────────────────────────
+    if (msg.type === "tournament-created") {
+      // Broadcast to all users in the lobby
+      broadcast(user.peerId, {
+        type: "tournament-created",
+        tournamentId: msg.tournamentId,
+        lobbyId: msg.lobbyId,
+        hostId: user.userId,
+        hostName: user.username
+      });
+      return;
+    }
+
+    if (msg.type === "tournament-update") {
+      broadcast(user.peerId, {
+        type: "tournament-update",
+        tournamentId: msg.tournamentId,
+        data: msg.data
+      });
+      return;
+    }
+
+    if (msg.type === "bracket-generated") {
+      broadcast(user.peerId, {
+        type: "bracket-generated",
+        tournamentId: msg.tournamentId
+      });
+      return;
+    }
+
+    if (msg.type === "match-result") {
+      broadcast(user.peerId, {
+        type: "match-result",
+        tournamentId: msg.tournamentId,
+        winnerName: msg.winnerName
+      });
+      return;
+    }
+
     // ── 1-1 call signalling ──────────────────────────────
     if (["call-invite","call-accept","call-decline","call-offer","call-answer","call-candidate","call-end"].includes(msg.type)) {
       const target = clients.get(msg.to);
@@ -251,13 +331,11 @@ wss.on("connection", (ws, req) => {
       const joinerClient = clients.get(user.peerId);
       if (joinerClient) joinerClient.groupCallId = msg.groupId;
 
-      // Tell the joiner who is already in the call
       const existingPeers = [...clients.values()]
         .filter(c => c.groupCallId === msg.groupId && c.peerId !== user.peerId)
         .map(c => ({ peerId: c.peerId, userId: c.userId, username: c.username, avatarUrl: c.avatarUrl || null }));
       ws.send(JSON.stringify({ type: "group-call-peers", groupId: msg.groupId, peers: existingPeers }));
 
-      // Notify only members of this group (subscribed to its channel)
       for (const [id, c] of clients) {
         if (id !== user.peerId && c.subscribedChannels.has(groupChannelId) && c.ws.readyState === 1) {
           c.ws.send(JSON.stringify({
@@ -349,13 +427,11 @@ wss.on("connection", (ws, req) => {
         client.vcAvatarUrl = msg.avatarUrl || null;
       }
 
-      // Send the joiner the current member list for this channel
       const currentMembers = [...clients.values()]
         .filter(c => c.vcChannelId === msg.channelId && c.peerId !== user.peerId)
         .map(c => ({ userId: c.userId, username: c.vcUsername || c.username, avatarUrl: c.vcAvatarUrl || null, muted: false }));
       ws.send(JSON.stringify({ type: "vc-members", channelId: msg.channelId, members: currentMembers }));
 
-      // Notify everyone else in the same channel that we joined
       for (const [id, c] of clients) {
         if (id !== user.peerId && c.vcChannelId === msg.channelId && c.ws.readyState === 1) {
           c.ws.send(JSON.stringify({
@@ -407,7 +483,6 @@ wss.on("connection", (ws, req) => {
   ws.on("close", () => {
     const client = clients.get(user.peerId);
 
-    // Notify VC members if user was in a voice channel
     if (client?.vcChannelId) {
       const channelId = client.vcChannelId;
       for (const [id, c] of clients) {
@@ -417,7 +492,6 @@ wss.on("connection", (ws, req) => {
       }
     }
 
-    // Notify group call members if user was in a group call
     if (client?.groupCallId) {
       const groupId = client.groupCallId;
       const groupChannelId = `group-${groupId}`;

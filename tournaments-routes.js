@@ -1,11 +1,22 @@
 // routes/tournaments.js
+// FIXED VERSION — PostgreSQL syntax
 const express = require('express');
 const router = express.Router();
 const { v4: uuidv4 } = require('uuid');
-const auth = require('../middleware/auth'); // assuming you have auth middleware
+const { pool } = require('../db');
 
-// Create a new tournament
-router.post('/create', auth, async (req, res) => {
+// Auth middleware - expects req.user to be set by your auth system
+function verifyAuth(req, res, next) {
+  if (!req.user || !req.user.id) {
+    return res.status(401).json({ error: 'Unauthorized' });
+  }
+  next();
+}
+
+// ============================================================
+// CREATE TOURNAMENT
+// ============================================================
+router.post('/create', verifyAuth, async (req, res) => {
   try {
     const { lobbyId, name, description, format, playerCount, rules, prize, startTime } = req.body;
     
@@ -25,34 +36,56 @@ router.post('/create', auth, async (req, res) => {
       return res.status(400).json({ error: 'Invalid player count' });
     }
     
-    const tournament = {
-      id: uuidv4(),
-      lobbyId,
-      hostId: req.user.id,
-      name,
-      description: description || '',
-      format,
-      playerCount,
-      maxPlayers: playerCount,
-      registeredPlayers: [],
-      bracket: {
-        rounds: []
-      },
-      status: 'setup',
-      createdAt: new Date(),
-      startTime: startTime ? new Date(startTime) : null,
-      endTime: null,
-      rules: rules || '',
-      prize: prize || ''
-    };
+    const tournamentId = uuidv4();
+    const now = new Date();
     
-    // Save to database (adjust based on your db setup)
-    const db = require('../db'); // assuming you have a db module
-    await db.tournaments.insertOne(tournament);
+    const result = await pool.query(
+      `INSERT INTO tournaments 
+        (id, lobby_id, host_id, name, description, format, player_count, 
+         max_players, status, rules, prize, created_at, start_time)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13)
+       RETURNING *`,
+      [
+        tournamentId,
+        lobbyId,
+        req.user.id,
+        name,
+        description || null,
+        format,
+        playerCount,
+        playerCount,
+        'setup',
+        rules || null,
+        prize || null,
+        now,
+        startTime ? new Date(startTime) : null
+      ]
+    );
+    
+    const tournament = result.rows[0];
+    
+    // Convert database format to JSON format for frontend
+    const responseData = {
+      id: tournament.id,
+      lobbyId: tournament.lobby_id,
+      hostId: tournament.host_id,
+      name: tournament.name,
+      description: tournament.description,
+      format: tournament.format,
+      playerCount: tournament.player_count,
+      registeredPlayers: [],
+      bracket: { rounds: [] },
+      status: tournament.status,
+      createdAt: tournament.created_at,
+      startTime: tournament.start_time,
+      endTime: tournament.end_time,
+      rules: tournament.rules,
+      prize: tournament.prize
+    };
     
     res.status(201).json({
       success: true,
-      tournament
+      tournament: responseData
     });
   } catch (error) {
     console.error('Tournament creation error:', error);
@@ -60,80 +93,158 @@ router.post('/create', auth, async (req, res) => {
   }
 });
 
-// Get tournament details
+// ============================================================
+// GET TOURNAMENT DETAILS
+// ============================================================
 router.get('/:tournamentId', async (req, res) => {
   try {
     const { tournamentId } = req.params;
-    const db = require('../db');
     
-    const tournament = await db.tournaments.findOne({ id: tournamentId });
-    if (!tournament) {
+    // Get tournament
+    const tourResult = await pool.query(
+      'SELECT * FROM tournaments WHERE id = $1',
+      [tournamentId]
+    );
+    
+    if (tourResult.rows.length === 0) {
       return res.status(404).json({ error: 'Tournament not found' });
     }
     
-    res.json(tournament);
+    const tournament = tourResult.rows[0];
+    
+    // Get registered players
+    const playersResult = await pool.query(
+      'SELECT user_id, username, joined_at, status FROM tournament_players WHERE tournament_id = $1',
+      [tournamentId]
+    );
+    
+    const registeredPlayers = playersResult.rows.map(p => ({
+      userId: p.user_id,
+      username: p.username,
+      joinedAt: p.joined_at,
+      status: p.status
+    }));
+    
+    // Get bracket data
+    const bracket = await getBracketData(tournamentId);
+    
+    const responseData = {
+      id: tournament.id,
+      lobbyId: tournament.lobby_id,
+      hostId: tournament.host_id,
+      name: tournament.name,
+      description: tournament.description,
+      format: tournament.format,
+      playerCount: tournament.player_count,
+      registeredPlayers,
+      bracket,
+      status: tournament.status,
+      createdAt: tournament.created_at,
+      startTime: tournament.start_time,
+      endTime: tournament.end_time,
+      rules: tournament.rules,
+      prize: tournament.prize
+    };
+    
+    res.json(responseData);
   } catch (error) {
+    console.error('Get tournament error:', error);
     res.status(500).json({ error: 'Failed to fetch tournament' });
   }
 });
 
-// Get tournaments for a lobby
+// ============================================================
+// GET TOURNAMENTS FOR A LOBBY
+// ============================================================
 router.get('/lobby/:lobbyId', async (req, res) => {
   try {
     const { lobbyId } = req.params;
-    const db = require('../db');
     
-    const tournaments = await db.tournaments.find({ lobbyId }).toArray();
+    const result = await pool.query(
+      'SELECT * FROM tournaments WHERE lobby_id = $1 ORDER BY created_at DESC',
+      [lobbyId]
+    );
+    
+    const tournaments = await Promise.all(
+      result.rows.map(async (tournament) => {
+        const playersResult = await pool.query(
+          'SELECT COUNT(*) as count FROM tournament_players WHERE tournament_id = $1',
+          [tournament.id]
+        );
+        
+        const playerCount = parseInt(playersResult.rows[0].count);
+        
+        return {
+          id: tournament.id,
+          lobbyId: tournament.lobby_id,
+          hostId: tournament.host_id,
+          name: tournament.name,
+          description: tournament.description,
+          format: tournament.format,
+          playerCount: tournament.player_count,
+          registeredPlayers: Array(playerCount).fill(null).map((_, i) => ({ userId: i })), // Placeholder for count
+          status: tournament.status,
+          createdAt: tournament.created_at,
+          startTime: tournament.start_time
+        };
+      })
+    );
+    
     res.json(tournaments);
   } catch (error) {
+    console.error('Load tournaments error:', error);
     res.status(500).json({ error: 'Failed to fetch tournaments' });
   }
 });
 
-// Register player for tournament
-router.post('/:tournamentId/register', auth, async (req, res) => {
+// ============================================================
+// REGISTER PLAYER FOR TOURNAMENT
+// ============================================================
+router.post('/:tournamentId/register', verifyAuth, async (req, res) => {
   try {
     const { tournamentId } = req.params;
     const userId = req.user.id;
     const username = req.user.username;
     
-    const db = require('../db');
-    const tournament = await db.tournaments.findOne({ id: tournamentId });
+    // Get tournament
+    const tourResult = await pool.query(
+      'SELECT * FROM tournaments WHERE id = $1',
+      [tournamentId]
+    );
     
-    if (!tournament) {
+    if (tourResult.rows.length === 0) {
       return res.status(404).json({ error: 'Tournament not found' });
     }
     
+    const tournament = tourResult.rows[0];
+    
     // Check if already registered
-    if (tournament.registeredPlayers.some(p => p.userId === userId)) {
+    const existingResult = await pool.query(
+      'SELECT id FROM tournament_players WHERE tournament_id = $1 AND user_id = $2',
+      [tournamentId, userId]
+    );
+    
+    if (existingResult.rows.length > 0) {
       return res.status(400).json({ error: 'Already registered' });
     }
     
     // Check if tournament is full
-    if (tournament.registeredPlayers.length >= tournament.maxPlayers) {
+    const countResult = await pool.query(
+      'SELECT COUNT(*) as count FROM tournament_players WHERE tournament_id = $1',
+      [tournamentId]
+    );
+    
+    const currentCount = parseInt(countResult.rows[0].count);
+    if (currentCount >= tournament.max_players) {
       return res.status(400).json({ error: 'Tournament is full' });
     }
     
-    // Add player
-    const player = {
-      userId,
-      username,
-      joinedAt: new Date(),
-      status: 'registered'
-    };
-    
-    await db.tournaments.updateOne(
-      { id: tournamentId },
-      { $push: { registeredPlayers: player } }
+    // Register player
+    await pool.query(
+      `INSERT INTO tournament_players (tournament_id, user_id, username, joined_at, status)
+       VALUES ($1, $2, $3, $4, $5)`,
+      [tournamentId, userId, username, new Date(), 'registered']
     );
-    
-    // Emit event to all players in lobby
-    const io = require('../socket'); // assuming you have socket.io setup
-    io.to(`lobby-${tournament.lobbyId}`).emit('tournament-update', {
-      tournamentId,
-      registeredCount: tournament.registeredPlayers.length + 1,
-      maxPlayers: tournament.maxPlayers
-    });
     
     res.json({ success: true, message: 'Registered for tournament' });
   } catch (error) {
@@ -142,36 +253,106 @@ router.post('/:tournamentId/register', auth, async (req, res) => {
   }
 });
 
-// Generate bracket (called when tournament starts)
-router.post('/:tournamentId/generate-bracket', auth, async (req, res) => {
+// ============================================================
+// GENERATE BRACKET
+// ============================================================
+router.post('/:tournamentId/generate-bracket', verifyAuth, async (req, res) => {
   try {
     const { tournamentId } = req.params;
-    const db = require('../db');
     
-    const tournament = await db.tournaments.findOne({ id: tournamentId });
+    // Get tournament
+    const tourResult = await pool.query(
+      'SELECT * FROM tournaments WHERE id = $1',
+      [tournamentId]
+    );
     
-    if (!tournament) {
+    if (tourResult.rows.length === 0) {
       return res.status(404).json({ error: 'Tournament not found' });
     }
     
-    if (tournament.hostId !== req.user.id) {
+    const tournament = tourResult.rows[0];
+    
+    // Check if user is host
+    if (tournament.host_id !== req.user.id) {
       return res.status(403).json({ error: 'Only host can generate bracket' });
     }
     
-    // Generate bracket based on format
-    const bracket = generateBracket(tournament);
-    
-    // Update tournament
-    await db.tournaments.updateOne(
-      { id: tournamentId },
-      {
-        $set: {
-          bracket,
-          status: 'in-progress',
-          startTime: new Date()
-        }
-      }
+    // Get registered players
+    const playersResult = await pool.query(
+      'SELECT id as tournament_player_id, user_id, username FROM tournament_players WHERE tournament_id = $1',
+      [tournamentId]
     );
+    
+    const players = playersResult.rows;
+    
+    // Shuffle players
+    const shuffled = [...players].sort(() => Math.random() - 0.5);
+    
+    // Delete existing rounds/matches if any
+    await pool.query('DELETE FROM tournament_rounds WHERE tournament_id = $1', [tournamentId]);
+    
+    // Create first round
+    const firstRoundResult = await pool.query(
+      `INSERT INTO tournament_rounds (tournament_id, round_number)
+       VALUES ($1, $2)
+       RETURNING id`,
+      [tournamentId, 1]
+    );
+    
+    const firstRoundId = firstRoundResult.rows[0].id;
+    
+    // Create first round matches
+    for (let i = 0; i < shuffled.length; i += 2) {
+      const player1Id = shuffled[i]?.tournament_player_id || null;
+      const player2Id = shuffled[i + 1]?.tournament_player_id || null;
+      
+      await pool.query(
+        `INSERT INTO tournament_matches 
+          (round_id, tournament_id, match_number, player1_id, player2_id, status)
+         VALUES ($1, $2, $3, $4, $5, $6)`,
+        [firstRoundId, tournamentId, Math.floor(i / 2), player1Id, player2Id, 'pending']
+      );
+    }
+    
+    // Create subsequent rounds for single elimination
+    if (tournament.format === 'single') {
+      let currentRoundNum = 2;
+      let matchesInRound = Math.floor(shuffled.length / 4);
+      
+      while (matchesInRound > 0) {
+        const nextRoundResult = await pool.query(
+          `INSERT INTO tournament_rounds (tournament_id, round_number)
+           VALUES ($1, $2)
+           RETURNING id`,
+          [tournamentId, currentRoundNum]
+        );
+        
+        const nextRoundId = nextRoundResult.rows[0].id;
+        
+        for (let i = 0; i < matchesInRound; i++) {
+          await pool.query(
+            `INSERT INTO tournament_matches 
+              (round_id, tournament_id, match_number, status)
+             VALUES ($1, $2, $3, $4)`,
+            [nextRoundId, tournamentId, i, 'pending']
+          );
+        }
+        
+        currentRoundNum++;
+        matchesInRound = Math.floor(matchesInRound / 2);
+      }
+    }
+    
+    // Update tournament status
+    await pool.query(
+      `UPDATE tournaments 
+       SET status = $1, start_time = $2
+       WHERE id = $3`,
+      ['in-progress', new Date(), tournamentId]
+    );
+    
+    // Get the generated bracket
+    const bracket = await getBracketData(tournamentId);
     
     res.json({ success: true, bracket });
   } catch (error) {
@@ -180,37 +361,51 @@ router.post('/:tournamentId/generate-bracket', auth, async (req, res) => {
   }
 });
 
-// Record match result
-router.post('/:tournamentId/match-result', auth, async (req, res) => {
+// ============================================================
+// RECORD MATCH RESULT
+// ============================================================
+router.post('/:tournamentId/match-result', verifyAuth, async (req, res) => {
   try {
     const { tournamentId } = req.params;
-    const { roundNumber, matchId, winnerId } = req.body;
+    const { roundNumber, matchNumber, winnerId } = req.body;
     
-    const db = require('../db');
-    const tournament = await db.tournaments.findOne({ id: tournamentId });
+    // Get tournament
+    const tourResult = await pool.query(
+      'SELECT * FROM tournaments WHERE id = $1',
+      [tournamentId]
+    );
     
-    if (!tournament) {
+    if (tourResult.rows.length === 0) {
       return res.status(404).json({ error: 'Tournament not found' });
     }
     
-    // Update match result
-    await db.tournaments.updateOne(
-      {
-        id: tournamentId,
-        'bracket.rounds.roundNumber': roundNumber,
-        'bracket.rounds.matches.matchId': matchId
-      },
-      {
-        $set: {
-          'bracket.rounds.$[].matches.$[m].winner': winnerId,
-          'bracket.rounds.$[].matches.$[m].status': 'completed'
-        }
-      },
-      {
-        arrayFilters: [
-          { 'm.matchId': matchId }
-        ]
-      }
+    const tournament = tourResult.rows[0];
+    
+    // Check if user is host
+    if (tournament.host_id !== req.user.id) {
+      return res.status(403).json({ error: 'Only host can record results' });
+    }
+    
+    // Get the match
+    const matchResult = await pool.query(
+      `SELECT m.id FROM tournament_matches m
+       JOIN tournament_rounds r ON m.round_id = r.id
+       WHERE m.tournament_id = $1 AND r.round_number = $2 AND m.match_number = $3`,
+      [tournamentId, roundNumber, matchNumber]
+    );
+    
+    if (matchResult.rows.length === 0) {
+      return res.status(404).json({ error: 'Match not found' });
+    }
+    
+    const matchId = matchResult.rows[0].id;
+    
+    // Update match with winner
+    await pool.query(
+      `UPDATE tournament_matches 
+       SET winner_id = $1, status = $2, completed_at = $3
+       WHERE id = $4`,
+      [winnerId, 'completed', new Date(), matchId]
     );
     
     res.json({ success: true });
@@ -220,60 +415,49 @@ router.post('/:tournamentId/match-result', auth, async (req, res) => {
   }
 });
 
-// Helper function to generate bracket
-function generateBracket(tournament) {
-  const players = [...tournament.registeredPlayers].sort(() => Math.random() - 0.5);
-  const rounds = [];
-  const playerCount = tournament.playerCount;
+// ============================================================
+// HELPER FUNCTIONS
+// ============================================================
+
+async function getBracketData(tournamentId) {
+  const roundsResult = await pool.query(
+    `SELECT r.id, r.round_number 
+     FROM tournament_rounds r 
+     WHERE r.tournament_id = $1 
+     ORDER BY r.round_number ASC`,
+    [tournamentId]
+  );
   
-  // First round matches
-  const firstRoundMatches = [];
-  for (let i = 0; i < playerCount; i += 2) {
-    firstRoundMatches.push({
-      matchId: uuidv4(),
-      player1: {
-        userId: players[i]?.userId || null,
-        username: players[i]?.username || 'TBD'
-      },
-      player2: {
-        userId: players[i + 1]?.userId || null,
-        username: players[i + 1]?.username || 'TBD'
-      },
-      winner: null,
-      status: 'pending'
-    });
-  }
-  
-  rounds.push({
-    roundNumber: 1,
-    matches: firstRoundMatches
-  });
-  
-  // Generate subsequent rounds (single elimination)
-  if (tournament.format === 'single') {
-    let currentMatches = playerCount / 2;
-    let roundNum = 2;
-    
-    while (currentMatches > 0) {
-      const roundMatches = [];
-      for (let i = 0; i < currentMatches; i++) {
-        roundMatches.push({
-          matchId: uuidv4(),
-          player1: { userId: null, username: 'TBD' },
-          player2: { userId: null, username: 'TBD' },
-          winner: null,
-          status: 'pending'
-        });
-      }
-      rounds.push({
-        roundNumber: roundNum,
-        matches: roundMatches
-      });
+  const rounds = await Promise.all(
+    roundsResult.rows.map(async (round) => {
+      const matchesResult = await pool.query(
+        `SELECT m.id, m.match_number, 
+                p1.user_id as player1_user_id, p1.username as player1_username,
+                p2.user_id as player2_user_id, p2.username as player2_username,
+                m.winner_id, m.status
+         FROM tournament_matches m
+         LEFT JOIN tournament_players p1 ON m.player1_id = p1.id
+         LEFT JOIN tournament_players p2 ON m.player2_id = p2.id
+         WHERE m.round_id = $1
+         ORDER BY m.match_number ASC`,
+        [round.id]
+      );
       
-      currentMatches = currentMatches / 2;
-      roundNum++;
-    }
-  }
+      const matches = matchesResult.rows.map(m => ({
+        matchId: m.id,
+        matchNumber: m.match_number,
+        player1: m.player1_user_id ? { userId: m.player1_user_id, username: m.player1_username } : null,
+        player2: m.player2_user_id ? { userId: m.player2_user_id, username: m.player2_username } : null,
+        winner: m.winner_id,
+        status: m.status
+      }));
+      
+      return {
+        roundNumber: round.round_number,
+        matches
+      };
+    })
+  );
   
   return { rounds };
 }
