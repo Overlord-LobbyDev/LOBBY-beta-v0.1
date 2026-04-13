@@ -3,7 +3,7 @@
 const express = require('express');
 const router = express.Router();
 const { v4: uuidv4 } = require('uuid');
-const { pool } = require('../db');
+const { pool } = require('./db');
 
 // Auth middleware - expects req.user to be set by your auth system
 function verifyAuth(req, res, next) {
@@ -94,6 +94,50 @@ router.post('/create', verifyAuth, async (req, res) => {
 });
 
 // ============================================================
+// GET TOURNAMENTS FOR A LOBBY
+// ============================================================
+router.get('/lobby/:lobbyId', async (req, res) => {
+  try {
+    const { lobbyId } = req.params;
+    
+    const result = await pool.query(
+      'SELECT * FROM tournaments WHERE lobby_id = $1 ORDER BY created_at DESC',
+      [lobbyId]
+    );
+    
+    const tournaments = await Promise.all(
+      result.rows.map(async (tournament) => {
+        const playersResult = await pool.query(
+          'SELECT COUNT(*) as count FROM tournament_players WHERE tournament_id = $1',
+          [tournament.id]
+        );
+        
+        const playerCount = parseInt(playersResult.rows[0].count);
+        
+        return {
+          id: tournament.id,
+          lobbyId: tournament.lobby_id,
+          hostId: tournament.host_id,
+          name: tournament.name,
+          description: tournament.description,
+          format: tournament.format,
+          playerCount: tournament.player_count,
+          registeredPlayers: Array(playerCount).fill(null).map((_, i) => ({ userId: i })), // Placeholder for count
+          status: tournament.status,
+          createdAt: tournament.created_at,
+          startTime: tournament.start_time
+        };
+      })
+    );
+    
+    res.json(tournaments);
+  } catch (error) {
+    console.error('Load tournaments error:', error);
+    res.status(500).json({ error: 'Failed to fetch tournaments' });
+  }
+});
+
+// ============================================================
 // GET TOURNAMENT DETAILS
 // ============================================================
 router.get('/:tournamentId', async (req, res) => {
@@ -150,50 +194,6 @@ router.get('/:tournamentId', async (req, res) => {
   } catch (error) {
     console.error('Get tournament error:', error);
     res.status(500).json({ error: 'Failed to fetch tournament' });
-  }
-});
-
-// ============================================================
-// GET TOURNAMENTS FOR A LOBBY
-// ============================================================
-router.get('/lobby/:lobbyId', async (req, res) => {
-  try {
-    const { lobbyId } = req.params;
-    
-    const result = await pool.query(
-      'SELECT * FROM tournaments WHERE lobby_id = $1 ORDER BY created_at DESC',
-      [lobbyId]
-    );
-    
-    const tournaments = await Promise.all(
-      result.rows.map(async (tournament) => {
-        const playersResult = await pool.query(
-          'SELECT COUNT(*) as count FROM tournament_players WHERE tournament_id = $1',
-          [tournament.id]
-        );
-        
-        const playerCount = parseInt(playersResult.rows[0].count);
-        
-        return {
-          id: tournament.id,
-          lobbyId: tournament.lobby_id,
-          hostId: tournament.host_id,
-          name: tournament.name,
-          description: tournament.description,
-          format: tournament.format,
-          playerCount: tournament.player_count,
-          registeredPlayers: Array(playerCount).fill(null).map((_, i) => ({ userId: i })), // Placeholder for count
-          status: tournament.status,
-          createdAt: tournament.created_at,
-          startTime: tournament.start_time
-        };
-      })
-    );
-    
-    res.json(tournaments);
-  } catch (error) {
-    console.error('Load tournaments error:', error);
-    res.status(500).json({ error: 'Failed to fetch tournaments' });
   }
 });
 
