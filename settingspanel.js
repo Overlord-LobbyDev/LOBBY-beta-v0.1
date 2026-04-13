@@ -300,33 +300,76 @@
       <!-- ── Tournaments ── -->
       <div class="sp-section" id="sp-tournaments">
         <h2>Tournaments</h2>
-        <p style="font-size:13px;color:var(--text-3);margin-top:-12px;margin-bottom:20px">Customise how your bracket looks — like a title card. Changes apply when you view a tournament.</p>
+        <p style="font-size:13px;color:var(--text-3);margin-top:-12px;margin-bottom:20px">Personalise how your match card looks to all players in tournaments. GIFs supported.</p>
 
+        <!-- Live preview -->
         <div class="sp-form-group">
-          <label class="sp-label">Bracket Background Image</label>
-          <label class="sp-upload-btn" for="spTournamentBgInput">🖼 Upload Background</label>
-          <input type="file" id="spTournamentBgInput" accept="image/*" style="display:none" />
-          <div class="sp-hint">Shown behind your tournament bracket. GIFs supported.</div>
-        </div>
-
-        <div class="sp-form-group">
-          <label class="sp-label">Background Colour <span style="font-size:11px;color:var(--text-3);font-weight:400;text-transform:none;letter-spacing:0">(used when no image is set)</span></label>
-          <div class="sp-colour-row">
-            <input type="color" class="sp-colour-picker" id="spTournamentBgColour" value="#141820" />
-            <div class="sp-colour-presets" id="spTournamentColourPresets"></div>
+          <label class="sp-label">Match Card Preview</label>
+          <div id="spCardPreview" style="border-radius:10px;overflow:hidden;border:1px solid rgba(255,255,255,.1);max-width:260px">
+            <!-- rendered by JS -->
           </div>
         </div>
 
+        <!-- Card background image -->
         <div class="sp-form-group">
-          <label class="sp-label">Preview</label>
-          <div id="spTournamentBgPreview" style="height:90px;border-radius:8px;background:var(--bg-3);border:1px solid rgba(255,255,255,.08);display:flex;align-items:center;justify-content:center;color:var(--text-3);font-size:12px;background-size:cover;background-position:center;transition:background .2s;">
-            No background set
+          <label class="sp-label">Card Background Image / GIF</label>
+          <label class="sp-upload-btn" for="spCardBgInput">🖼 Upload Image or GIF</label>
+          <input type="file" id="spCardBgInput" accept="image/*" style="display:none" />
+          <div class="sp-hint">Shown as the background of your match card. GIFs animate live.</div>
+        </div>
+
+        <!-- Card background colour -->
+        <div class="sp-form-group">
+          <label class="sp-label">Card Background Colour <span style="font-size:11px;color:var(--text-3);font-weight:400;text-transform:none;letter-spacing:0">(used when no image is set)</span></label>
+          <div class="sp-colour-row">
+            <input type="color" class="sp-colour-picker" id="spCardBgColour" value="#2c3440" />
+            <div class="sp-colour-presets" id="spCardColourPresets"></div>
+          </div>
+        </div>
+
+        <!-- Card border colour -->
+        <div class="sp-form-group">
+          <label class="sp-label">Card Border Colour</label>
+          <div class="sp-colour-row">
+            <input type="color" class="sp-colour-picker" id="spCardBorderColour" value="#f9a8d4" />
+            <div class="sp-colour-presets" id="spCardBorderPresets"></div>
+          </div>
+        </div>
+
+        <!-- Name colour -->
+        <div class="sp-form-group">
+          <label class="sp-label">Name Text Colour</label>
+          <div class="sp-colour-row">
+            <input type="color" class="sp-colour-picker" id="spCardNameColour" value="#fdf2f8" />
+          </div>
+        </div>
+
+        <div style="border-top:1px solid rgba(255,255,255,.06);padding-top:20px;margin-top:8px">
+          <h2 style="font-size:15px;margin-bottom:16px">Bracket Background</h2>
+          <div class="sp-form-group">
+            <label class="sp-label">Bracket Background Image / GIF</label>
+            <label class="sp-upload-btn" for="spTournamentBgInput">🖼 Upload Background</label>
+            <input type="file" id="spTournamentBgInput" accept="image/*" style="display:none" />
+            <div class="sp-hint">Shown behind the entire bracket area.</div>
+          </div>
+          <div class="sp-form-group">
+            <label class="sp-label">Background Colour</label>
+            <div class="sp-colour-row">
+              <input type="color" class="sp-colour-picker" id="spTournamentBgColour" value="#141820" />
+              <div class="sp-colour-presets" id="spTournamentColourPresets"></div>
+            </div>
+          </div>
+          <div class="sp-form-group">
+            <label class="sp-label">Preview</label>
+            <div id="spTournamentBgPreview" style="height:70px;border-radius:8px;background:var(--bg-3);border:1px solid rgba(255,255,255,.08);display:flex;align-items:center;justify-content:center;color:var(--text-3);font-size:12px;background-size:cover;background-position:center;">
+              No background set
+            </div>
           </div>
         </div>
 
         <div style="display:flex;gap:8px;flex-wrap:wrap">
           <button class="sp-save-btn" id="spSaveTournament">Save Tournament Style</button>
-          <button class="sp-save-btn" id="spClearTournament" style="background:var(--bg-3);color:var(--text-2)">Clear</button>
+          <button class="sp-save-btn" id="spClearTournament" style="background:var(--bg-3);color:var(--text-2)">Clear All</button>
         </div>
         <div class="sp-msg" id="spTournamentMsg"></div>
       </div>
@@ -861,80 +904,149 @@
     spMsgTimers[id] = setTimeout(() => el.className = "sp-msg", 4000);
   }
 
-  // ── Tournament bracket background ──────────────────────────
+  // ── Tournament card + bracket background ──────────────────────────
   let spTournamentBgUrl = null;
+  let spCardBgUrl = null;
   let _tournamentSectionInit = false;
 
   function initTournamentSection() {
     if (_tournamentSectionInit) return;
     _tournamentSectionInit = true;
 
-    const saved = JSON.parse(localStorage.getItem('vh_tournament_bracket_bg_data') || '{}');
-    spTournamentBgUrl = saved.imageUrl || null;
+    const savedCard = JSON.parse(localStorage.getItem('vh_tournament_card') || '{}');
+    const savedBg   = JSON.parse(localStorage.getItem('vh_tournament_bracket_bg_data') || '{}');
 
-    const preview = document.getElementById('spTournamentBgPreview');
-    const colourPicker = document.getElementById('spTournamentBgColour');
+    // Restore card settings
+    spCardBgUrl = savedCard.imageUrl || null;
+    if (savedCard.bgColour)     document.getElementById('spCardBgColour').value     = savedCard.bgColour;
+    if (savedCard.borderColour) document.getElementById('spCardBorderColour').value = savedCard.borderColour;
+    if (savedCard.nameColour)   document.getElementById('spCardNameColour').value   = savedCard.nameColour;
+    buildCardColourPresets('spCardColourPresets',  savedCard.bgColour     || '#2c3440', 'CardBg');
+    buildCardColourPresets('spCardBorderPresets',  savedCard.borderColour || '#f9a8d4', 'CardBorder');
 
-    if (saved.imageUrl) {
-      preview.style.backgroundImage = `url(${saved.imageUrl})`;
-      preview.style.backgroundColor = 'transparent';
-      preview.textContent = '';
+    // Restore bracket bg settings
+    spTournamentBgUrl = savedBg.imageUrl || null;
+    if (savedBg.colour) document.getElementById('spTournamentBgColour').value = savedBg.colour;
+    buildTournamentPresets(savedBg.colour || '#141820');
+    if (savedBg.imageUrl) {
+      const prev = document.getElementById('spTournamentBgPreview');
+      prev.style.backgroundImage = `url(${savedBg.imageUrl})`;
+      prev.style.backgroundColor = 'transparent';
+      prev.textContent = '';
     }
-    if (saved.colour) {
-      colourPicker.value = saved.colour;
-      if (!saved.imageUrl) {
-        preview.style.backgroundImage = 'none';
-        preview.style.backgroundColor = saved.colour;
-        preview.textContent = '';
-      }
-    }
-    buildTournamentPresets(saved.colour || '#141820');
 
+    updateCardPreview();
+
+    // Card image upload
+    document.getElementById('spCardBgInput').addEventListener('change', e => {
+      const file = e.target.files[0]; if (!file) return;
+      const reader = new FileReader();
+      reader.onload = ev => { spCardBgUrl = ev.target.result; updateCardPreview(); };
+      reader.readAsDataURL(file); e.target.value = '';
+    });
+
+    // Card colour pickers
+    document.getElementById('spCardBgColour').addEventListener('input', () => { buildCardColourPresets('spCardColourPresets', document.getElementById('spCardBgColour').value, 'CardBg'); updateCardPreview(); });
+    document.getElementById('spCardBorderColour').addEventListener('input', () => { buildCardColourPresets('spCardBorderPresets', document.getElementById('spCardBorderColour').value, 'CardBorder'); updateCardPreview(); });
+    document.getElementById('spCardNameColour').addEventListener('input', updateCardPreview);
+
+    // Bracket bg image upload
     document.getElementById('spTournamentBgInput').addEventListener('change', e => {
       const file = e.target.files[0]; if (!file) return;
       const reader = new FileReader();
       reader.onload = ev => {
         spTournamentBgUrl = ev.target.result;
-        preview.style.backgroundImage = `url(${ev.target.result})`;
-        preview.style.backgroundColor = 'transparent';
-        preview.textContent = '';
+        const prev = document.getElementById('spTournamentBgPreview');
+        prev.style.backgroundImage = `url(${ev.target.result})`;
+        prev.style.backgroundColor = 'transparent';
+        prev.textContent = '';
       };
-      reader.readAsDataURL(file);
-      e.target.value = '';
+      reader.readAsDataURL(file); e.target.value = '';
     });
-
-    colourPicker.addEventListener('input', e => {
+    document.getElementById('spTournamentBgColour').addEventListener('input', e => {
       buildTournamentPresets(e.target.value);
       if (!spTournamentBgUrl) {
-        preview.style.backgroundImage = 'none';
-        preview.style.backgroundColor = e.target.value;
-        preview.textContent = '';
+        const prev = document.getElementById('spTournamentBgPreview');
+        prev.style.backgroundImage = 'none';
+        prev.style.backgroundColor = e.target.value;
+        prev.textContent = '';
       }
     });
 
+    // Save
     document.getElementById('spSaveTournament').addEventListener('click', () => {
-      const colour = colourPicker.value;
-      const data = { colour, imageUrl: spTournamentBgUrl || null };
-      localStorage.setItem('vh_tournament_bracket_bg_data', JSON.stringify(data));
+      const cardData = {
+        imageUrl:      spCardBgUrl || null,
+        bgColour:      document.getElementById('spCardBgColour').value,
+        borderColour:  document.getElementById('spCardBorderColour').value,
+        nameColour:    document.getElementById('spCardNameColour').value,
+      };
+      const bgData = {
+        imageUrl: spTournamentBgUrl || null,
+        colour:   document.getElementById('spTournamentBgColour').value,
+      };
+      localStorage.setItem('vh_tournament_card', JSON.stringify(cardData));
+      localStorage.setItem('vh_tournament_bracket_bg_data', JSON.stringify(bgData));
       localStorage.setItem('vh_tournament_bracket_bg', spTournamentBgUrl || '');
-      localStorage.setItem('vh_tournament_bracket_bg_colour', colour);
-      buildTournamentPresets(colour);
-      spShowMsg('spTournamentMsg', 'Tournament style saved!', 'success');
+      localStorage.setItem('vh_tournament_bracket_bg_colour', bgData.colour);
+      buildTournamentPresets(bgData.colour);
+      spShowMsg('spTournamentMsg', 'Tournament style saved! ✓', 'success');
     });
 
+    // Clear
     document.getElementById('spClearTournament').addEventListener('click', () => {
-      spTournamentBgUrl = null;
+      spCardBgUrl = null; spTournamentBgUrl = null;
+      localStorage.removeItem('vh_tournament_card');
       localStorage.removeItem('vh_tournament_bracket_bg_data');
       localStorage.removeItem('vh_tournament_bracket_bg');
       localStorage.removeItem('vh_tournament_bracket_bg_colour');
-      preview.style.backgroundImage = 'none';
-      preview.style.backgroundColor = '';
-      preview.textContent = 'No background set';
-      colourPicker.value = '#141820';
+      document.getElementById('spCardBgColour').value     = '#2c3440';
+      document.getElementById('spCardBorderColour').value = '#f9a8d4';
+      document.getElementById('spCardNameColour').value   = '#fdf2f8';
+      document.getElementById('spTournamentBgColour').value = '#141820';
+      const prev = document.getElementById('spTournamentBgPreview');
+      prev.style.backgroundImage = 'none'; prev.style.backgroundColor = ''; prev.textContent = 'No background set';
+      buildCardColourPresets('spCardColourPresets',  '#2c3440', 'CardBg');
+      buildCardColourPresets('spCardBorderPresets',  '#f9a8d4', 'CardBorder');
       buildTournamentPresets('#141820');
+      updateCardPreview();
       spShowMsg('spTournamentMsg', 'Cleared!', 'success');
     });
   }
+
+  function updateCardPreview() {
+    const el = document.getElementById('spCardPreview');
+    if (!el) return;
+    const bgColour     = document.getElementById('spCardBgColour')?.value     || '#2c3440';
+    const borderColour = document.getElementById('spCardBorderColour')?.value || '#f9a8d4';
+    const nameColour   = document.getElementById('spCardNameColour')?.value   || '#fdf2f8';
+    const bgCss = spCardBgUrl
+      ? `background-image:url(${spCardBgUrl});background-size:cover;background-position:center;`
+      : `background-color:${bgColour};`;
+    const meUsername = document.getElementById('spPreviewUsername')?.textContent || 'You';
+    const meAvatar   = document.getElementById('spPreviewAvatar')?.innerHTML    || meUsername[0].toUpperCase();
+    el.innerHTML = `
+      <div style="display:flex;align-items:center;gap:10px;padding:10px 12px;${bgCss}border:1.5px solid ${borderColour};border-radius:10px;box-shadow:0 3px 10px rgba(0,0,0,.22)">
+        <div style="width:34px;height:34px;border-radius:9px;flex-shrink:0;overflow:hidden;background:linear-gradient(135deg,var(--accent),var(--accent-h));display:flex;align-items:center;justify-content:center;box-shadow:0 2px 6px rgba(0,0,0,.3);font-size:13px;font-weight:800;color:#fff">${meAvatar}</div>
+        <span style="flex:1;font-size:12px;font-weight:600;color:${nameColour};overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${meUsername}</span>
+        <span style="font-size:11px;font-weight:700;background:var(--bg-3);border:1px solid rgba(255,255,255,.1);border-radius:5px;padding:3px 8px;min-width:26px;text-align:center;color:var(--text-3)">-</span>
+      </div>`;
+  }
+
+  function buildCardColourPresets(containerId, active, key) {
+    const container = document.getElementById(containerId); if (!container) return;
+    container.innerHTML = PRESETS.map(c => `
+      <div class="sp-colour-preset ${c===active?'selected':''}" style="background:${c}" title="${c}"
+        onclick="(function(){ window._spSelectCardColour('${key}','${c}'); })()"></div>`).join('');
+  }
+
+  window._spSelectCardColour = function(key, colour) {
+    const ids = { CardBg:'spCardBgColour', CardBorder:'spCardBorderColour' };
+    if (ids[key]) { document.getElementById(ids[key]).value = colour; }
+    const presetIds = { CardBg:'spCardColourPresets', CardBorder:'spCardBorderPresets' };
+    if (presetIds[key]) buildCardColourPresets(presetIds[key], colour, key);
+    updateCardPreview();
+  };
 
   function buildTournamentPresets(active) {
     const container = document.getElementById('spTournamentColourPresets');

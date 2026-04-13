@@ -309,10 +309,12 @@
   }
 
   /* ───── BRACKET RENDERER ───── */
-  const MATCH_W = 190;
-  const MATCH_H = 62;   // approx height of match card
-  const COL_GAP = 52;   // horizontal gap between rounds (connector space)
-  const V_PAD   = 36;   // top padding for round label
+  const CARD_H  = 58;
+  const CARD_GAP = 8;
+  const MATCH_H = CARD_H * 2 + CARD_GAP;
+  const MATCH_W = 210;
+  const COL_GAP = 56;
+  const V_PAD   = 36;
 
   function buildSkeleton(playerCount) {
     const slots = Math.pow(2, Math.ceil(Math.log2(Math.max(playerCount||2, 2))));
@@ -332,9 +334,20 @@
     if (bgData.imageUrl) { scroll.style.backgroundImage=`url(${bgData.imageUrl})`; scroll.style.backgroundSize='cover'; scroll.style.backgroundPosition='center'; }
     else if (bgData.colour) { scroll.style.backgroundImage='none'; scroll.style.backgroundColor=bgData.colour; }
 
-    const skeleton = buildSkeleton(t.playerCount||2);
+    const realRounds = t.bracket?.rounds || [];
+    let effectiveCount;
+    if (realRounds.length > 0) {
+      // Derive from actual bracket first-round match count
+      effectiveCount = (realRounds[0]?.matches?.length || 1) * 2;
+    } else {
+      // Pre-start: use actual registered players rounded up to power of 2
+      const actualPlayers = Math.max((t.registeredPlayers||[]).length, 2);
+      effectiveCount = Math.pow(2, Math.ceil(Math.log2(actualPlayers)));
+    }
+
+    const skeleton = buildSkeleton(effectiveCount);
     const rounds = skeleton.map(sr => {
-      const real = (t.bracket?.rounds||[]).find(r => r.roundNumber === sr.roundNumber);
+      const real = realRounds.find(r => r.roundNumber === sr.roundNumber);
       return real || sr;
     });
 
@@ -342,59 +355,56 @@
     if (!numRounds) return;
 
     const firstCount = rounds[0].matches.length;
-    // Vertical spacing for first round
-    const vSpacing = MATCH_H + 16;
-    const totalH = firstCount * vSpacing - 16;
-    const totalW = numRounds * MATCH_W + (numRounds - 1) * COL_GAP;
+    const MATCH_GAP  = 32;
+    const slotH0     = MATCH_H + MATCH_GAP;
+    const totalH     = firstCount * slotH0 - MATCH_GAP;
+    const totalW     = numRounds * MATCH_W + (numRounds - 1) * COL_GAP;
 
     const canvas = document.getElementById('bracketCanvas');
     canvas.style.width  = (totalW + 40) + 'px';
     canvas.style.height = (totalH + V_PAD + 20) + 'px';
 
     let html = '';
-
-    // SVG layer for connectors
     html += `<svg style="position:absolute;left:0;top:0;width:100%;height:100%;pointer-events:none;overflow:visible" xmlns="http://www.w3.org/2000/svg" id="connSvg"></svg>`;
 
-    const matchPositions = {}; // key: "r-m" => {cx, cy}
+    const matchPositions = {};
+
+    function playerCardHTML(p, isWinner, isLoser, score) {
+      const av = p?.avatar_url
+        ? `<img src="${p.avatar_url}" style="width:100%;height:100%;object-fit:cover;">`
+        : `<span style="font-size:13px;font-weight:800;color:#fff">${p ? (p.username||'?')[0].toUpperCase() : '?'}</span>`;
+      const cardBg  = isWinner ? 'rgba(35,165,90,.14)' : 'var(--bg-2)';
+      const border  = isWinner ? '1.5px solid rgba(35,165,90,.45)' : '1.5px solid rgba(255,255,255,.09)';
+      const nameClr = isWinner ? '#57f287' : 'var(--text-1)';
+      const nameFw  = isWinner ? 700 : 500;
+      const opac    = isLoser ? 'opacity:.35;' : '';
+      const sBg     = isWinner ? 'rgba(35,165,90,.22)' : 'var(--bg-3)';
+      const sBdr    = isWinner ? 'rgba(35,165,90,.3)' : 'rgba(255,255,255,.1)';
+      const sClr    = isWinner ? '#57f287' : 'var(--text-3)';
+      return `<div style="display:flex;align-items:center;gap:10px;padding:10px 12px;background:${cardBg};border:${border};border-radius:10px;${opac}box-shadow:0 3px 10px rgba(0,0,0,.22);height:${CARD_H}px;transition:border-color .15s" onmouseover="this.style.borderColor='rgba(249,168,212,.45)'" onmouseout="this.style.borderColor='${isWinner?'rgba(35,165,90,.45)':'rgba(255,255,255,.09)'}'">
+        <div style="width:34px;height:34px;border-radius:9px;flex-shrink:0;overflow:hidden;background:linear-gradient(135deg,var(--accent),var(--accent-h));display:flex;align-items:center;justify-content:center;box-shadow:0 2px 6px rgba(0,0,0,.3)">${av}</div>
+        <span style="flex:1;font-size:12px;font-weight:${nameFw};color:${nameClr};overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${p?.username||'TBD'}</span>
+        <span style="font-size:11px;font-weight:700;background:${sBg};border:1px solid ${sBdr};border-radius:5px;padding:3px 8px;min-width:26px;text-align:center;color:${sClr}">${score!=null?score:'-'}</span>
+      </div>`;
+    }
 
     rounds.forEach((round, rIdx) => {
       const matchCount = round.matches.length;
-      const x = rIdx * (MATCH_W + COL_GAP);
-
-      // For this round, each match occupies a vertical "slot"
-      // The slot height scales up by 2x each round
-      const slotH = (totalH) / matchCount;
-
-      // Round label
-      const lbl = getRoundName(round.roundNumber, numRounds);
+      const x     = rIdx * (MATCH_W + COL_GAP);
+      const slotH = totalH / matchCount;
+      const lbl   = getRoundName(round.roundNumber, numRounds);
       html += `<div class="round-lbl" style="left:${x}px;top:0;width:${MATCH_W}px">${lbl}</div>`;
 
       round.matches.forEach((match, mIdx) => {
-        const cy = V_PAD + slotH * mIdx + slotH / 2 - MATCH_H / 2;
-        const key = `${rIdx}-${mIdx}`;
-        matchPositions[key] = { x, cy, cx: x + MATCH_W, midY: cy + MATCH_H / 2 };
+        const matchCY = V_PAD + slotH * mIdx + slotH / 2 - MATCH_H / 2;
+        matchPositions[`${rIdx}-${mIdx}`] = { x, cy: matchCY, cx: x + MATCH_W, midY: matchCY + MATCH_H / 2 };
 
         const p1 = match.player1, p2 = match.player2;
-        const p1w = match.winner && match.winner === p1?.userId;
-        const p2w = match.winner && match.winner === p2?.userId;
-        const p1av = p1?.avatar_url ? `<img src="${p1.avatar_url}">` : (p1 ? (p1.username||'?')[0].toUpperCase() : '?');
-        const p2av = p2?.avatar_url ? `<img src="${p2.avatar_url}">` : (p2 ? (p2.username||'?')[0].toUpperCase() : '?');
+        const p1w = !!(match.winner && match.winner === p1?.userId);
+        const p2w = !!(match.winner && match.winner === p2?.userId);
 
-        html += `
-          <div class="bm" style="left:${x}px;top:${cy}px">
-            <div class="bm-row ${p1w?'winner':p2w?'loser':''}">
-              <div class="bm-av">${p1av}</div>
-              <span class="bm-name">${p1?.username||'TBD'}</span>
-              <span class="bm-score">${match.player1Score!=null?match.player1Score:'-'}</span>
-            </div>
-            <div class="bm-div"></div>
-            <div class="bm-row ${p2w?'winner':p1w?'loser':''}">
-              <div class="bm-av">${p2av}</div>
-              <span class="bm-name">${p2?.username||'TBD'}</span>
-              <span class="bm-score">${match.player2Score!=null?match.player2Score:'-'}</span>
-            </div>
-          </div>`;
+        html += `<div style="position:absolute;left:${x}px;top:${matchCY}px;width:${MATCH_W}px">${playerCardHTML(p1, p1w, p2w && !p1w, match.player1Score)}</div>`;
+        html += `<div style="position:absolute;left:${x}px;top:${matchCY + CARD_H + CARD_GAP}px;width:${MATCH_W}px">${playerCardHTML(p2, p2w, p1w && !p2w, match.player2Score)}</div>`;
       });
     });
 
@@ -408,31 +418,26 @@
 
     canvas.innerHTML = html;
 
-    // Draw connectors via SVG after DOM is set
+    // Draw connectors
     requestAnimationFrame(() => {
       const svgEl = canvas.querySelector('#connSvg');
       if (!svgEl) return;
       let paths = '';
-
       rounds.forEach((round, rIdx) => {
         if (rIdx >= numRounds - 1) return;
         const matchCount = round.matches.length;
-        const slotH = totalH / matchCount;
+        const slotH     = totalH / matchCount;
         const nextSlotH = totalH / (matchCount / 2);
-        const nextX = (rIdx + 1) * (MATCH_W + COL_GAP);
-
+        const nextX     = (rIdx + 1) * (MATCH_W + COL_GAP);
         round.matches.forEach((_, mIdx) => {
-          const y1 = V_PAD + slotH * mIdx + slotH / 2;
+          const y1    = V_PAD + slotH * mIdx + slotH / 2;
           const nextMIdx = Math.floor(mIdx / 2);
-          const y2 = V_PAD + nextSlotH * nextMIdx + nextSlotH / 2;
-          const x1 = rIdx * (MATCH_W + COL_GAP) + MATCH_W;
-          const x2 = nextX;
-          const mx = x1 + COL_GAP / 2;
-
-          paths += `<path d="M${x1},${y1} H${mx} V${y2} H${x2}" fill="none" stroke="rgba(249,168,212,0.22)" stroke-width="1.5" stroke-linecap="round"/>`;
+          const y2    = V_PAD + nextSlotH * nextMIdx + nextSlotH / 2;
+          const x1    = rIdx * (MATCH_W + COL_GAP) + MATCH_W;
+          const mx    = x1 + COL_GAP / 2;
+          paths += `<path d="M${x1},${y1} H${mx} V${y2} H${nextX}" fill="none" stroke="rgba(249,168,212,0.22)" stroke-width="1.5" stroke-linecap="round"/>`;
         });
       });
-
       svgEl.innerHTML = paths;
     });
   }

@@ -307,8 +307,21 @@ function showBracketPanel(tournament) {
         return rounds;
     }
 
-    const skeleton = buildSkeleton(tournament.playerCount);
-    const rounds   = skeleton.map(sr => (bracket.rounds||[]).find(r => r.roundNumber === sr.roundNumber) || sr);
+    // Use actual registered players to size the bracket (rounded to nearest power of 2),
+    // but never fewer than 2. If a real bracket already exists, use that size.
+    const realRounds = bracket.rounds || [];
+    let effectiveCount;
+    if (realRounds.length > 0) {
+        // Derive from actual bracket: first round match count * 2 = slots
+        effectiveCount = (realRounds[0]?.matches?.length || 1) * 2;
+    } else {
+        // Pre-start: use actual registered players (min 2), rounded up to power of 2
+        const actualPlayers = Math.max(players.length, 2);
+        effectiveCount = Math.pow(2, Math.ceil(Math.log2(actualPlayers)));
+    }
+
+    const skeleton = buildSkeleton(effectiveCount);
+    const rounds   = skeleton.map(sr => realRounds.find(r => r.roundNumber === sr.roundNumber) || sr);
     const numRounds = rounds.length;
 
     function getRoundName(r, total) {
@@ -320,64 +333,96 @@ function showBracketPanel(tournament) {
     }
 
     // ── Tree bracket with absolute positioning ──
-    const MATCH_W = 185, MATCH_H = 60, COL_GAP = 48, V_PAD = 30;
+    const CARD_H  = 58;   // height of one player card
+    const CARD_GAP = 8;   // gap between the two player cards in a match
+    const MATCH_H = CARD_H * 2 + CARD_GAP;
+    const MATCH_W = 210, COL_GAP = 56, V_PAD = 36;
+    const MATCH_GAP = 32; // gap between different matches in same round
     const firstCount = rounds[0]?.matches?.length || 1;
-    const vSpacing   = MATCH_H + 14;
-    const totalH     = firstCount * vSpacing - 14;
-    const totalW     = numRounds * MATCH_W + (numRounds - 1) * COL_GAP;
+    const slotH0  = MATCH_H + MATCH_GAP;
+    const totalH  = firstCount * slotH0 - MATCH_GAP;
+    const totalW  = numRounds * MATCH_W + (numRounds - 1) * COL_GAP;
 
     const bgData = JSON.parse(localStorage.getItem('vh_tournament_bracket_bg_data') || '{}');
     let bgStyle = '';
     if (bgData.imageUrl) bgStyle = `background-image:url(${bgData.imageUrl});background-size:cover;background-position:center;`;
     else if (bgData.colour) bgStyle = `background-color:${bgData.colour};`;
 
-    // Build match card HTML
-    const avS = 'width:18px;height:18px;border-radius:50%;background:linear-gradient(135deg,var(--accent),var(--accent-h));display:flex;align-items:center;justify-content:center;font-size:8px;font-weight:800;color:#fff;overflow:hidden;flex-shrink:0;';
+    // Each player gets their own standalone card
+    // Load this user's saved card style
+    const myCardData = JSON.parse(localStorage.getItem('vh_tournament_card') || '{}');
+
+    // Build a lookup map from registered players for avatar fallback
+    const playerAvatarMap = {};
+    players.forEach(p => { if (p.userId) playerAvatarMap[p.userId] = p.avatar_url || null; });
+
+    function playerCard(p, isWinner, isLoser, score) {
+        const isMe = p?.userId && p.userId === currentUserId;
+        // Avatar: use match data, fall back to registered players list
+        const avatarUrl = p?.avatar_url || (p?.userId ? playerAvatarMap[p.userId] : null);
+        const avatarContent = avatarUrl
+            ? `<img src="${avatarUrl}" style="width:100%;height:100%;object-fit:cover;">`
+            : `<span style="font-size:13px;font-weight:800;color:#fff">${p ? (p.username||'?')[0].toUpperCase() : '?'}</span>`;
+
+        // Apply custom card style if this is the current user's card
+        let cardBg, border, nameClr;
+        if (isMe && (myCardData.imageUrl || myCardData.bgColour || myCardData.borderColour)) {
+            const bgCss = myCardData.imageUrl
+                ? `background-image:url(${myCardData.imageUrl});background-size:cover;background-position:center;`
+                : `background-color:${myCardData.bgColour||'var(--bg-2)'};`;
+            cardBg  = bgCss;
+            border  = `1.5px solid ${myCardData.borderColour||'rgba(249,168,212,.5)'}`;
+            nameClr = myCardData.nameColour || 'var(--text-1)';
+        } else {
+            cardBg  = isWinner ? 'background-color:rgba(35,165,90,.14);' : 'background-color:var(--bg-2);';
+            border  = isWinner ? '1.5px solid rgba(35,165,90,.45)' : '1.5px solid rgba(255,255,255,.09)';
+            nameClr = isWinner ? '#57f287' : 'var(--text-1)';
+        }
+
+        const nameFw  = isWinner ? 700 : 500;
+        const opac    = isLoser ? 'opacity:.35;' : '';
+        const sBg     = isWinner ? 'rgba(35,165,90,.22)' : 'var(--bg-3)';
+        const sBdr    = isWinner ? 'rgba(35,165,90,.3)' : 'rgba(255,255,255,.1)';
+        const sClr    = isWinner ? '#57f287' : 'var(--text-3)';
+        return `<div style="display:flex;align-items:center;gap:10px;padding:10px 12px;${cardBg}border:${border};border-radius:10px;${opac}box-shadow:0 3px 10px rgba(0,0,0,.22);height:${CARD_H}px;transition:border-color .15s" onmouseover="this.style.borderColor='rgba(249,168,212,.45)'" onmouseout="this.style.borderColor='${isWinner?'rgba(35,165,90,.45)':isMe&&myCardData.borderColour?myCardData.borderColour:'rgba(255,255,255,.09)'}'">
+            <div style="width:34px;height:34px;border-radius:9px;flex-shrink:0;overflow:hidden;background:linear-gradient(135deg,var(--accent),var(--accent-h));display:flex;align-items:center;justify-content:center;box-shadow:0 2px 6px rgba(0,0,0,.3)">${avatarContent}</div>
+            <span style="flex:1;font-size:12px;font-weight:${nameFw};color:${nameClr};overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${p?.username||'TBD'}</span>
+            <span style="font-size:11px;font-weight:700;background:${sBg};border:1px solid ${sBdr};border-radius:5px;padding:3px 8px;min-width:26px;text-align:center;color:${sClr}">${score!=null?score:'-'}</span>
+        </div>`;
+    }
+
     let matchCards = '';
     let connPaths  = '';
 
     rounds.forEach((round, rIdx) => {
-        const mc       = round.matches.length;
-        const slotH    = totalH / mc;
-        const x        = rIdx * (MATCH_W + COL_GAP);
-        const lbl      = getRoundName(round.roundNumber, numRounds);
+        const mc    = round.matches.length;
+        const slotH = totalH / mc;
+        const x     = rIdx * (MATCH_W + COL_GAP);
+        const lbl   = getRoundName(round.roundNumber, numRounds);
 
-        // Round label
-        matchCards += `<div style="position:absolute;left:${x}px;top:0;width:${MATCH_W}px;text-align:center;font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:.8px;color:rgba(255,255,255,.35)">${lbl}</div>`;
+        matchCards += `<div style="position:absolute;left:${x}px;top:0;width:${MATCH_W}px;text-align:center;font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:1px;color:rgba(255,255,255,.3)">${lbl}</div>`;
 
         round.matches.forEach((match, mIdx) => {
-            const cy  = V_PAD + slotH * mIdx + slotH / 2 - MATCH_H / 2;
+            const matchCY = V_PAD + slotH * mIdx + slotH / 2 - MATCH_H / 2;
             const p1  = match.player1, p2 = match.player2;
-            const p1w = match.winner && match.winner === p1?.userId;
-            const p2w = match.winner && match.winner === p2?.userId;
-            const p1av = p1?.avatar_url ? `<img src="${p1.avatar_url}" style="width:100%;height:100%;object-fit:cover;border-radius:50%;">` : (p1?.(p1.username||'?')[0].toUpperCase() ?? '?');
-            const p2av = p2?.avatar_url ? `<img src="${p2.avatar_url}" style="width:100%;height:100%;object-fit:cover;border-radius:50%;">` : (p2?(p2.username||'?')[0].toUpperCase() : '?');
+            const p1w = !!(match.winner && match.winner === p1?.userId);
+            const p2w = !!(match.winner && match.winner === p2?.userId);
 
-            matchCards += `
-            <div style="position:absolute;left:${x}px;top:${cy}px;width:${MATCH_W}px;background:var(--bg-2);border:1.5px solid rgba(255,255,255,.09);border-radius:8px;overflow:hidden;transition:border-color .15s" onmouseover="this.style.borderColor='rgba(249,168,212,.35)'" onmouseout="this.style.borderColor='rgba(255,255,255,.09)'">
-              <div style="display:flex;align-items:center;gap:7px;padding:8px 9px;background:${p1w?'rgba(35,165,90,.14)':'transparent'};${p1w&&!p2w?'':''}${!p1w&&p2w?'opacity:.45':''}">
-                <div style="${avS}">${p1av}</div>
-                <span style="flex:1;font-size:11px;font-weight:${p1w?700:500};color:${p1w?'#57f287':'var(--text-2)'};overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${p1?.username||'TBD'}</span>
-                <span style="font-size:10px;font-weight:700;background:${p1w?'rgba(35,165,90,.22)':'var(--bg-3)'};border:1px solid ${p1w?'rgba(35,165,90,.3)':'rgba(255,255,255,.08)'};border-radius:4px;padding:2px 6px;min-width:22px;text-align:center;color:${p1w?'#57f287':'var(--text-2)'}">${match.player1Score!=null?match.player1Score:'-'}</span>
-              </div>
-              <div style="height:1px;background:rgba(255,255,255,.06)"></div>
-              <div style="display:flex;align-items:center;gap:7px;padding:8px 9px;background:${p2w?'rgba(35,165,90,.14)':'transparent'};${!p2w&&p1w?'opacity:.45':''}">
-                <div style="${avS}">${p2av}</div>
-                <span style="flex:1;font-size:11px;font-weight:${p2w?700:500};color:${p2w?'#57f287':'var(--text-2)'};overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${p2?.username||'TBD'}</span>
-                <span style="font-size:10px;font-weight:700;background:${p2w?'rgba(35,165,90,.22)':'var(--bg-3)'};border:1px solid ${p2w?'rgba(35,165,90,.3)':'rgba(255,255,255,.08)'};border-radius:4px;padding:2px 6px;min-width:22px;text-align:center;color:${p2w?'#57f287':'var(--text-2)'}">${match.player2Score!=null?match.player2Score:'-'}</span>
-              </div>
-            </div>`;
+            // P1 card
+            matchCards += `<div style="position:absolute;left:${x}px;top:${matchCY}px;width:${MATCH_W}px">${playerCard(p1, p1w, p2w && !p1w, match.player1Score)}</div>`;
+            // P2 card — separate, below with gap
+            matchCards += `<div style="position:absolute;left:${x}px;top:${matchCY + CARD_H + CARD_GAP}px;width:${MATCH_W}px">${playerCard(p2, p2w, p1w && !p2w, match.player2Score)}</div>`;
 
-            // Connector to next round
+            // Connector to next round — connect from mid-point between the two cards
             if (rIdx < numRounds - 1) {
-                const nextSlotH  = totalH / (mc / 2);
-                const nextMIdx   = Math.floor(mIdx / 2);
-                const y1 = V_PAD + slotH * mIdx + slotH / 2;
+                const nextSlotH = totalH / (mc / 2);
+                const nextMIdx  = Math.floor(mIdx / 2);
+                const y1 = V_PAD + slotH * mIdx + slotH / 2;  // mid of this match slot
                 const y2 = V_PAD + nextSlotH * nextMIdx + nextSlotH / 2;
                 const x1 = x + MATCH_W;
                 const x2 = x + MATCH_W + COL_GAP;
                 const mx = x1 + COL_GAP / 2;
-                connPaths += `<path d="M${x1},${y1} H${mx} V${y2} H${x2}" fill="none" stroke="rgba(249,168,212,.2)" stroke-width="1.5" stroke-linecap="round"/>`;
+                connPaths += `<path d="M${x1},${y1} H${mx} V${y2} H${x2}" fill="none" stroke="rgba(249,168,212,.22)" stroke-width="1.5" stroke-linecap="round"/>`;
             }
         });
     });
