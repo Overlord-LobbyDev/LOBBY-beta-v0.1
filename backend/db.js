@@ -379,11 +379,11 @@ async function initDb() {
     await pool.query(`CREATE INDEX IF NOT EXISTS idx_tournament_matches_tournament_id ON tournament_matches(tournament_id);`).catch(() => {});
 
     console.log("✅ Database initialized successfully!");
-    process.exit(0);
+    // process.exit(0) removed — let caller handle startup
   } catch (error) {
     console.error("❌ Database initialization failed:", error.message);
     console.error("Error details:", error);
-    process.exit(1);
+    throw error;
   }
 }
 
