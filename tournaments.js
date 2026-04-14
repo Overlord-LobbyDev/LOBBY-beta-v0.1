@@ -129,7 +129,8 @@ async function handleTournamentSubmit(e) {
         format: document.getElementById('tournamentFormat').value,
         playerCount: selectedPlayerCount,
         rules: document.getElementById('tournamentRules').value,
-        prize: document.getElementById('tournamentPrize').value
+        prize: document.getElementById('tournamentPrize').value,
+        hasLosersBracket: document.getElementById('tournamentLosers')?.checked || false
     };
 
     try {
@@ -338,8 +339,8 @@ function showBracketPanel(tournament) {
     }
 
     // ── Tree bracket with absolute positioning ──
-    const CARD_H  = 58;   // height of one player card
-    const CARD_GAP = 8;   // gap between the two player cards in a match
+    const CARD_H  = 52;   // height of one player card
+    const CARD_GAP = 6;   // gap between the two player cards in a match
     const MATCH_H = CARD_H * 2 + CARD_GAP;
     const MATCH_W = 210, COL_GAP = 56, V_PAD = 36;
     const MATCH_GAP = 32; // gap between different matches in same round
@@ -392,7 +393,7 @@ function showBracketPanel(tournament) {
         const sClr    = isWinner ? '#57f287' : 'var(--text-3)';
         return `<div style="display:flex;align-items:center;gap:10px;padding:10px 12px;${cardBg}border:${border};border-radius:10px;${opac}box-shadow:0 3px 10px rgba(0,0,0,.22);height:${CARD_H}px;transition:border-color .15s" onmouseover="this.style.borderColor='rgba(249,168,212,.45)'" onmouseout="this.style.borderColor='${isWinner?'rgba(35,165,90,.45)':hasCustom&&cardData.borderColour?cardData.borderColour:'rgba(255,255,255,.09)'}'">
             <div style="width:34px;height:34px;border-radius:9px;flex-shrink:0;overflow:hidden;background:linear-gradient(135deg,var(--accent),var(--accent-h));display:flex;align-items:center;justify-content:center;box-shadow:0 2px 6px rgba(0,0,0,.3)">${avatarContent}</div>
-            <span style="flex:1;font-size:12px;font-weight:${nameFw};color:${nameClr};overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${p?.username||'TBD'}</span>
+            <span style="flex:1;font-size:12px;font-weight:700;color:${nameClr};overflow:hidden;text-overflow:ellipsis;white-space:nowrap;text-shadow:${hasCustom?'0 1px 4px rgba(0,0,0,.7)':''}">${p?.username||'TBD'}</span>
             <span style="font-size:11px;font-weight:700;background:${sBg};border:1px solid ${sBdr};border-radius:5px;padding:3px 8px;min-width:26px;text-align:center;color:${sClr}">${score!=null?score:'-'}</span>
         </div>`;
     }
@@ -413,11 +414,36 @@ function showBracketPanel(tournament) {
             const p1  = match.player1, p2 = match.player2;
             const p1w = !!(match.winner && match.winner === p1?.userId);
             const p2w = !!(match.winner && match.winner === p2?.userId);
+            const scoringMode = window._bracketScoringMode && isHost && tournament.status === 'in-progress';
+            const mid = match.matchId || `${rIdx}-${mIdx}`;
 
-            // P1 card
-            matchCards += `<div style="position:absolute;left:${x}px;top:${matchCY}px;width:${MATCH_W}px">${playerCard(p1, p1w, p2w && !p1w, match.player1Score)}</div>`;
-            // P2 card — separate, below with gap
-            matchCards += `<div style="position:absolute;left:${x}px;top:${matchCY + CARD_H + CARD_GAP}px;width:${MATCH_W}px">${playerCard(p2, p2w, p1w && !p2w, match.player2Score)}</div>`;
+            if (scoringMode) {
+                // Scoring mode: show editable score inputs + advance button
+                const p1name = p1?.username || 'TBD';
+                const p2name = p2?.username || 'TBD';
+                const p1score = match.player1Score ?? 0;
+                const p2score = match.player2Score ?? 0;
+                const cardStyle = `position:absolute;left:${x}px;top:${matchCY}px;width:${MATCH_W + 60}px;background:var(--bg-2);border:1.5px solid rgba(88,101,242,.4);border-radius:10px;padding:10px 12px;box-shadow:0 4px 20px rgba(88,101,242,.2)`;
+                matchCards += `
+                <div style="${cardStyle}">
+                  <div style="font-size:9px;font-weight:700;text-transform:uppercase;color:#7289da;margin-bottom:8px;letter-spacing:.5px">⚙ Edit Match</div>
+                  <div style="display:flex;align-items:center;gap:6px;margin-bottom:6px">
+                    <span style="flex:1;font-size:11px;font-weight:700;color:var(--text-1);overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${p1name}</span>
+                    <input type="number" min="0" max="999" value="${p1score}" style="width:52px;background:var(--bg-3);border:1px solid rgba(255,255,255,.15);border-radius:5px;color:var(--text-1);font-size:12px;font-weight:700;padding:4px 6px;text-align:center;outline:none" onchange="bracketSetScore('${tournament.id}','${mid}',1,this.value)" />
+                    <button style="font-size:10px;padding:4px 7px;background:rgba(35,165,90,.2);color:#57f287;border:1px solid rgba(35,165,90,.4);border-radius:5px;cursor:pointer;font-weight:700;white-space:nowrap" onclick="bracketAdvance('${tournament.id}','${mid}','${p1?.userId||null}')">▶ Win</button>
+                  </div>
+                  <div style="height:1px;background:rgba(255,255,255,.07);margin:4px 0"></div>
+                  <div style="display:flex;align-items:center;gap:6px;margin-top:6px">
+                    <span style="flex:1;font-size:11px;font-weight:700;color:var(--text-1);overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${p2name}</span>
+                    <input type="number" min="0" max="999" value="${p2score}" style="width:52px;background:var(--bg-3);border:1px solid rgba(255,255,255,.15);border-radius:5px;color:var(--text-1);font-size:12px;font-weight:700;padding:4px 6px;text-align:center;outline:none" onchange="bracketSetScore('${tournament.id}','${mid}',2,this.value)" />
+                    <button style="font-size:10px;padding:4px 7px;background:rgba(35,165,90,.2);color:#57f287;border:1px solid rgba(35,165,90,.4);border-radius:5px;cursor:pointer;font-weight:700;white-space:nowrap" onclick="bracketAdvance('${tournament.id}','${mid}','${p2?.userId||null}')">▶ Win</button>
+                  </div>
+                </div>`;
+            } else {
+                // Normal view
+                matchCards += `<div style="position:absolute;left:${x}px;top:${matchCY}px;width:${MATCH_W}px">${playerCard(p1, p1w, p2w && !p1w, match.player1Score)}</div>`;
+                matchCards += `<div style="position:absolute;left:${x}px;top:${matchCY + CARD_H + CARD_GAP}px;width:${MATCH_W}px">${playerCard(p2, p2w, p1w && !p2w, match.player2Score)}</div>`;
+            }
 
             // Connector to next round — connect from mid-point between the two cards
             if (rIdx < numRounds - 1) {
@@ -473,13 +499,21 @@ function showBracketPanel(tournament) {
         if (isHost) {
             actionHTML += `<button style="${btnBase};background:rgba(35,165,90,.15);color:#57f287;border:1px solid rgba(35,165,90,.3);${!canStart?'opacity:.45;cursor:not-allowed':''}" onclick="${canStart?`bracketStart('${tournament.id}')`:''}" ${!canStart?'disabled':''}> ▶ Start Tournament</button>`;
             if (!canStart) actionHTML += `<div style="font-size:11px;color:var(--text-3);text-align:center;margin-top:-4px;margin-bottom:6px">Need at least 2 players</div>`;
+            actionHTML += `<button style="${btnBase};background:rgba(237,66,69,.1);color:var(--danger);border:1px solid rgba(237,66,69,.25);margin-top:4px" onclick="bracketDelete('${tournament.id}')">🗑 Delete Tournament</button>`;
         }
     }
-    if (tournament.status === 'in-progress' && isHost) {
-        actionHTML += `<button style="${btnBase};background:rgba(237,66,69,.12);color:var(--danger);border:1px solid rgba(237,66,69,.3)" onclick="bracketEnd('${tournament.id}')">⏹ End Tournament</button>`;
+    if (tournament.status === 'in-progress') {
+        if (isHost) {
+            actionHTML += `<button style="${btnBase};background:rgba(237,66,69,.12);color:var(--danger);border:1px solid rgba(237,66,69,.3)" onclick="bracketEnd('${tournament.id}')">⏹ End Tournament</button>`;
+            actionHTML += `<button style="${btnBase};background:rgba(88,101,242,.12);color:#7289da;border:1px solid rgba(88,101,242,.3)" onclick="bracketOpenScoring('${tournament.id}')">⚙ Edit Scores / Advance</button>`;
+            actionHTML += `<button style="${btnBase};background:rgba(237,66,69,.1);color:var(--danger);border:1px solid rgba(237,66,69,.25)" onclick="bracketDelete('${tournament.id}')">🗑 Delete Tournament</button>`;
+        }
     }
     if (tournament.status === 'completed') {
         actionHTML += `<div style="text-align:center;font-size:12px;color:var(--text-3);padding:6px 0">🏆 Tournament Complete</div>`;
+        if (isHost) {
+            actionHTML += `<button style="${btnBase};background:rgba(237,66,69,.1);color:var(--danger);border:1px solid rgba(237,66,69,.25);margin-top:4px" onclick="bracketDelete('${tournament.id}')">🗑 Delete Tournament</button>`;
+        }
     }
 
     const statusColour = tournament.status === 'in-progress' ? '#57f287' : tournament.status === 'completed' ? '#5865f2' : 'var(--yellow)';
@@ -601,6 +635,65 @@ window.bracketJoin  = bracketJoin;
 window.bracketLeave = bracketLeave;
 window.bracketStart = bracketStart;
 window.bracketEnd   = bracketEnd;
+
+async function bracketDelete(tournamentId) {
+    if (!confirm('Delete this tournament permanently? This cannot be undone.')) return;
+    try {
+        const response = await fetch(`${API_BASE}/api/tournaments/${tournamentId}`, {
+            method: 'DELETE',
+            headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${localStorage.getItem('vh_token')}` }
+        });
+        const data = await response.json();
+        if (!response.ok) throw new Error(data.error || 'Failed to delete');
+        showNotification('Tournament deleted', 'success');
+        closeBracketPanel();
+        loadTournaments();
+    } catch(e) { showNotification(e.message || 'Failed to delete', 'error'); }
+}
+
+function bracketOpenScoring(tournamentId) {
+    // Refresh bracket with scoring mode enabled
+    const tournament = window.activeTournament;
+    if (!tournament) return;
+    window._bracketScoringMode = true;
+    openTournamentDetails(tournamentId);
+}
+
+window.bracketDelete      = bracketDelete;
+window.bracketOpenScoring = bracketOpenScoring;
+
+// Set score for a match player inline
+async function bracketSetScore(tournamentId, matchId, player, score) {
+    try {
+        const response = await fetch(`${API_BASE}/api/tournaments/${tournamentId}/match-score`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${localStorage.getItem('vh_token')}` },
+            body: JSON.stringify({ matchId, player, score: parseInt(score) || 0 })
+        });
+        const data = await response.json();
+        if (!response.ok) throw new Error(data.error || 'Failed to set score');
+    } catch(e) { showNotification(e.message || 'Failed to set score', 'error'); }
+}
+
+async function bracketAdvance(tournamentId, matchId, winnerUserId) {
+    if (!winnerUserId || winnerUserId === 'null') { showNotification('Cannot advance TBD player', 'error'); return; }
+    if (!confirm('Advance this player to the next round?')) return;
+    try {
+        const response = await fetch(`${API_BASE}/api/tournaments/${tournamentId}/set-winner`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${localStorage.getItem('vh_token')}` },
+            body: JSON.stringify({ matchId, winnerId: winnerUserId })
+        });
+        const data = await response.json();
+        if (!response.ok) throw new Error(data.error || 'Failed to advance player');
+        showNotification('Player advanced ✓', 'success');
+        setTimeout(() => openTournamentDetails(tournamentId), 400);
+    } catch(e) { showNotification(e.message || 'Failed to advance', 'error'); }
+}
+
+window.bracketSetScore = bracketSetScore;
+window.bracketAdvance  = bracketAdvance;
+
 
 function closeBracketPanel() {
     // Clean up state

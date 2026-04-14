@@ -12089,6 +12089,21 @@ async function renderProfileGames(body) {
 function openProfile(userId) { openProfilePanel(userId); }
 function openUserProfile(userId) { openProfilePanel(userId); }
 boot();
+// Don't auto-open sidebars on startup — let user open manually
+(function() {
+  const cs  = document.querySelector(".channel-sidebar");
+  const btn = document.getElementById("chatSidebarToggle");
+  const sl  = document.getElementById("serverList");
+  if (cs)  cs.classList.remove("open");
+  if (sl)  sl.classList.add("collapsed");
+  if (btn) btn.textContent = "▶";
+  document.body.classList.remove("sidebar-open");
+  // Also hide social feed initially
+  const sf = document.getElementById("socialFeed");
+  if (sf) { sf.style.display="none"; document.body.classList.remove("feed-open"); }
+  const membersSidebar = document.getElementById("membersSidebar");
+  if (membersSidebar) { membersSidebar.style.display="none"; membersSidebar.classList.remove("open"); }
+})();
 showHomePanel();
 
 // ── Invite link handler ───────────────────────────────────────
@@ -13897,6 +13912,16 @@ setTimeout(() => { updateMyStatusUI(); }, 100);
 
   // Boot
 
+  // Wire losers bracket toggle animation
+  document.addEventListener('change', e => {
+    if (e.target.id === 'tournamentLosers') {
+      const track = document.getElementById('loserToggleTrack');
+      const knob  = document.getElementById('loserToggleKnob');
+      if (track) track.style.background = e.target.checked ? 'var(--accent)' : 'var(--bg-3)';
+      if (knob)  knob.style.transform   = e.target.checked ? 'translateX(18px)' : 'translateX(0)';
+    }
+  });
+
   // ── Tournament match card settings ───────────────────────────
   const _SP_PRESETS = ['#141820','#1e2430','#2c3440','#1a1a2e','#16213e','#0f3460','#533483','#e94560','#f9a8d4','#f472b6','#f59e0b','#10b981','#3b82f6','#8b5cf6','#ec4899','#06b6d4'];
 
@@ -14491,6 +14516,18 @@ document.addEventListener("click", () => hideProfileHoverCard());
                     <option value="double">Double Elimination</option>
                     <option value="round-robin">Round Robin</option>
                 </select>
+            </div>
+
+            <div class="form-group">
+                <label style="display:flex;align-items:center;justify-content:space-between;cursor:pointer">
+                    <span>Losers Bracket</span>
+                    <label style="position:relative;display:inline-block;width:40px;height:22px;cursor:pointer;margin:0">
+                        <input type="checkbox" id="tournamentLosers" style="opacity:0;width:0;height:0;position:absolute">
+                        <span id="loserToggleTrack" style="position:absolute;inset:0;background:var(--bg-3);border-radius:22px;transition:background .2s;border:1.5px solid rgba(255,255,255,.1)"></span>
+                        <span id="loserToggleKnob" style="position:absolute;top:3px;left:3px;width:14px;height:14px;background:#fff;border-radius:50%;transition:transform .2s;pointer-events:none"></span>
+                    </label>
+                </label>
+                <div style="font-size:11px;color:var(--text-3);margin-top:4px">Eliminated players compete in a second bracket for a chance to return</div>
             </div>
 
             <div class="form-group">
