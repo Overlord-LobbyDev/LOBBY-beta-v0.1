@@ -9723,15 +9723,17 @@ function showHomePanel() {
   document.getElementById("profilePage").classList.add("hidden");
   clearAllNavIcons();
   document.getElementById("homeNavIcon").classList.add("active");
-  // Open the sidebar on home showing friends, not DMs
-  const cs  = document.querySelector(".channel-sidebar");
-  const btn = document.getElementById("chatSidebarToggle");
-  const sl  = document.getElementById("serverList");
-  cs?.classList.add("open");
-  document.body.classList.add("sidebar-open");
-  if(typeof applyChannelResizeStyles==="function")applyChannelResizeStyles();
-  if (sl) sl.classList.remove("collapsed");
-  if (btn) btn.textContent = "◀";
+  // Only open the sidebar if NOT the very first startup load
+  if (window._startupComplete) {
+    const cs  = document.querySelector(".channel-sidebar");
+    const btn = document.getElementById("chatSidebarToggle");
+    const sl  = document.getElementById("serverList");
+    cs?.classList.add("open");
+    document.body.classList.add("sidebar-open");
+    if(typeof applyChannelResizeStyles==="function")applyChannelResizeStyles();
+    if (sl) sl.classList.remove("collapsed");
+    if (btn) btn.textContent = "◀";
+  }
   currentPanel = "home";
   setPageTitle("HOME 🏠");
   
@@ -9740,13 +9742,22 @@ function showHomePanel() {
   const membersSidebar = document.getElementById("membersSidebar");
   const reopenBtn  = document.getElementById("feedReopenBtn");
   if (socialFeed) {
-    if (feedVisible) {
+    if (!window._startupComplete) {
+      // Startup: keep feed hidden, user opens manually
+      socialFeed.style.display = "none";
+      socialFeed.classList.add("collapsed");
+      document.body.classList.remove("feed-open");
+      document.body.classList.add("feed-closed");
+      if (reopenBtn) reopenBtn.style.display = "none";
+    } else if (feedVisible) {
+      socialFeed.style.display = "";
       socialFeed.classList.remove("collapsed");
       document.body.classList.add("feed-open");
       document.body.classList.remove("feed-closed");
       if (reopenBtn) reopenBtn.style.display = "none";
       if(typeof applySocialResizeStyles==="function")applySocialResizeStyles();
     } else {
+      socialFeed.style.display = "";
       socialFeed.classList.add("collapsed");
       document.body.classList.remove("feed-open");
       document.body.classList.add("feed-closed");
@@ -12103,8 +12114,12 @@ boot();
   if (sf) { sf.style.display="none"; document.body.classList.remove("feed-open"); }
   const membersSidebar = document.getElementById("membersSidebar");
   if (membersSidebar) { membersSidebar.style.display="none"; membersSidebar.classList.remove("open"); }
+  // Flag: startup call to showHomePanel should NOT open sidebars
+  window._startupComplete = false;
 })();
 showHomePanel();
+// After the startup showHomePanel, mark startup done so future calls open sidebars normally
+window._startupComplete = true;
 
 // ── Invite link handler ───────────────────────────────────────
 // If URL contains ?invite=userId, open that user's profile after boot
