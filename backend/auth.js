@@ -311,10 +311,11 @@ app.post("/link-chess/start", requireAuth, async (req, res) => {
 
   } catch (err) {
     console.error("Chess linking error:", err);
-    const is404 = err.message?.includes("not found");
+    // axios throws on non-2xx — its message is "Request failed with status code 404"
+    const is404 = err.response?.status === 404 || err.message?.includes("not found") || err.message?.includes("404");
     res.status(is404 ? 404 : 500).json({
-      error: is404 
-        ? `${platform} account '${username}' not found` 
+      error: is404
+        ? `${platform} account '${username}' not found`
         : "Failed to start verification"
     });
   }

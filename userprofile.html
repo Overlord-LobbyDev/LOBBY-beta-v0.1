@@ -227,6 +227,8 @@ function openDMAndReturn(userId, username) {
   smoothNavigate("chat.html", "down");
 }
 
+let verificationState = { platform: null, username: null };
+
 async function linkChess(platform) {
   const statusEl = document.getElementById('chessLinkStatus');
   const username = platform === 'lichess'
@@ -240,25 +242,59 @@ async function linkChess(platform) {
   }
 
   statusEl.style.color = 'var(--text-3)';
-  statusEl.textContent = 'Verifying…';
+  statusEl.textContent = 'Sending verification code…';
 
   try {
-    const res = await fetch(`${AUTH_URL}/link-chess`, {
+    const res = await fetch(`${AUTH_URL}/link-chess/start`, {
       method: 'POST',
       headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
       body: JSON.stringify({ platform, username })
     });
     const data = await res.json();
-    if (!res.ok) throw new Error(data.error || 'Failed');
+    if (!res.ok) throw new Error(data.error || 'Failed to start verification');
+    
+    verificationState = { platform, username };
     statusEl.style.color = '#57f287';
-    statusEl.textContent = `✅ ${platform === 'lichess' ? 'Lichess' : 'Chess.com'} linked as ${data.username}`;
-    // Reload page to reflect update buttons
+    statusEl.innerHTML = `✅ Code sent to your ${platform === 'lichess' ? 'Lichess' : 'Chess.com'} email! Enter it below:<br>
+      <input id="verificationCode" placeholder="6-digit code" maxlength="6" style="margin-top:8px;width:120px;padding:6px 10px;background:var(--bg-2);border:1px solid rgba(255,255,255,.1);border-radius:6px;color:var(--text-1);font-size:13px;font-family:var(--font)" />
+      <button onclick="confirmChessVerification()" style="margin-top:8px;margin-left:6px;padding:6px 12px;background:var(--accent);color:#fff;border:none;border-radius:6px;font-size:12px;font-weight:700;cursor:pointer;font-family:var(--font)">Confirm</button>`;
+  } catch(e) {
+    statusEl.style.color = 'var(--danger)';
+    statusEl.textContent = `❌ ${e.message}`;
+  }
+}
+
+async function confirmChessVerification() {
+  const statusEl = document.getElementById('chessLinkStatus');
+  const code = document.getElementById('verificationCode')?.value?.trim();
+  
+  if (!code || code.length !== 6) {
+    statusEl.style.color = 'var(--danger)';
+    statusEl.textContent = 'Enter a valid 6-digit code.';
+    return;
+  }
+
+  statusEl.style.color = 'var(--text-3)';
+  statusEl.textContent = 'Verifying code…';
+
+  try {
+    const res = await fetch(`${AUTH_URL}/link-chess/confirm`, {
+      method: 'POST',
+      headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ platform: verificationState.platform, code })
+    });
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.error || 'Invalid code');
+    
+    statusEl.style.color = '#57f287';
+    statusEl.textContent = `✅ ${verificationState.platform === 'lichess' ? 'Lichess' : 'Chess.com'} linked as ${verificationState.username}`;
     setTimeout(() => window.location.reload(), 1200);
   } catch(e) {
     statusEl.style.color = 'var(--danger)';
     statusEl.textContent = `❌ ${e.message}`;
   }
 }
+
 
 async function unlinkChess(platform) {
   const statusEl = document.getElementById('chessLinkStatus');

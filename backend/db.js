@@ -330,6 +330,22 @@ async function initDb() {
     ];
     for (const sql of alters) await pool.query(sql).catch(() => {});
 
+    // ==================== CHESS VERIFICATION ====================
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS chess_verifications (
+        id                SERIAL PRIMARY KEY,
+        user_id           INTEGER REFERENCES users(id) ON DELETE CASCADE,
+        platform          TEXT NOT NULL CHECK (platform IN ('chess.com', 'lichess')),
+        username          TEXT NOT NULL,
+        verification_code TEXT NOT NULL,
+        code_expires_at   TIMESTAMPTZ NOT NULL,
+        attempts          INTEGER NOT NULL DEFAULT 0,
+        created_at        TIMESTAMPTZ DEFAULT NOW(),
+        UNIQUE(user_id, platform)
+      );
+    `);
+    await pool.query(`CREATE INDEX IF NOT EXISTS idx_chess_verifications_user_id ON chess_verifications(user_id);`).catch(() => {});
+
     // Back-fill unique_id for any servers that don't have one yet
     await pool.query(`
       UPDATE servers SET unique_id = UPPER(SUBSTRING(MD5(id::text || name), 1, 6))
