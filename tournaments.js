@@ -686,13 +686,75 @@ async function bracketAdvance(tournamentId, matchId, winnerUserId) {
         });
         const data = await response.json();
         if (!response.ok) throw new Error(data.error || 'Failed to advance player');
-        showNotification('Player advanced ✓', 'success');
-        setTimeout(() => openTournamentDetails(tournamentId), 400);
+
+        // Check if tournament just completed — show winner popup
+        if (data.tournamentStatus === 'completed' && data.winner) {
+            showWinnerPopup(data.winner, tournamentId);
+        } else {
+            showNotification('Player advanced ✓', 'success');
+            window._bracketScoringMode = true;
+            setTimeout(() => openTournamentDetails(tournamentId), 400);
+        }
     } catch(e) { showNotification(e.message || 'Failed to advance', 'error'); }
 }
 
-window.bracketSetScore = bracketSetScore;
-window.bracketAdvance  = bracketAdvance;
+function showWinnerPopup(winner, tournamentId) {
+    // Remove any existing popup
+    document.getElementById('tournamentWinnerPopup')?.remove();
+
+    const card = winner.tournamentCard || {};
+    const bgPos = card.bgPos || '50% 50%';
+    const cardBg = card.imageUrl
+        ? `background-image:url(${card.imageUrl});background-size:cover;background-position:${bgPos};`
+        : `background-color:${card.bgColour||'#2c3440'};`;
+    const avatarContent = winner.avatarUrl
+        ? `<img src="${winner.avatarUrl}" style="width:100%;height:100%;object-fit:cover;border-radius:10px;">`
+        : `<span style="font-size:22px;font-weight:800;color:#fff">${(winner.username||'?')[0].toUpperCase()}</span>`;
+
+    const popup = document.createElement('div');
+    popup.id = 'tournamentWinnerPopup';
+    popup.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.85);z-index:99999;display:flex;align-items:center;justify-content:center;backdrop-filter:blur(8px);animation:fadeIn .4s ease';
+    popup.innerHTML = `
+      <div style="text-align:center;max-width:420px;padding:40px 32px;animation:popIn .5s cubic-bezier(.34,1.56,.64,1)">
+        <div style="font-size:64px;margin-bottom:16px;animation:spin 1s ease">🏆</div>
+        <div style="font-size:13px;font-weight:700;text-transform:uppercase;letter-spacing:2px;color:rgba(249,168,212,.7);margin-bottom:8px">Tournament Winner</div>
+        <div style="font-size:32px;font-weight:900;color:#fff;margin-bottom:24px;text-shadow:0 0 40px rgba(249,168,212,.6)">${winner.username}</div>
+
+        <!-- Winner's match card (big) -->
+        <div style="display:flex;align-items:center;gap:14px;padding:16px 20px;${cardBg}border:2px solid ${card.borderColour||'rgba(249,168,212,.6)'};border-radius:14px;box-shadow:0 8px 40px rgba(249,168,212,.25);margin-bottom:32px;max-width:300px;margin-left:auto;margin-right:auto">
+          <div style="width:52px;height:52px;border-radius:12px;flex-shrink:0;overflow:hidden;background:linear-gradient(135deg,var(--accent),var(--accent-h));display:flex;align-items:center;justify-content:center;box-shadow:0 4px 12px rgba(0,0,0,.4)">${avatarContent}</div>
+          <div>
+            <div style="font-size:16px;font-weight:800;color:${card.nameColour||'#fff'};text-shadow:0 1px 4px rgba(0,0,0,.6)">${winner.username}</div>
+            <div style="font-size:12px;color:rgba(255,255,255,.6);margin-top:2px">🥇 Champion</div>
+          </div>
+        </div>
+
+        <div style="display:flex;gap:12px;justify-content:center">
+          <button onclick="document.getElementById('tournamentWinnerPopup').remove();loadTournaments();" style="padding:12px 28px;background:var(--accent);color:#1a0a10;border:none;border-radius:10px;font-size:14px;font-weight:800;cursor:pointer;font-family:inherit">🎉 Celebrate!</button>
+          <button onclick="document.getElementById('tournamentWinnerPopup').remove();window._bracketScoringMode=false;openTournamentDetails('${tournamentId}');" style="padding:12px 28px;background:var(--bg-3);color:var(--text-2);border:1px solid rgba(255,255,255,.1);border-radius:10px;font-size:14px;font-weight:700;cursor:pointer;font-family:inherit">View Bracket</button>
+        </div>
+      </div>`;
+
+    // Add animations
+    if (!document.getElementById('winnerPopupStyles')) {
+        const style = document.createElement('style');
+        style.id = 'winnerPopupStyles';
+        style.textContent = `
+          @keyframes fadeIn { from { opacity:0 } to { opacity:1 } }
+          @keyframes popIn  { from { transform:scale(.5);opacity:0 } to { transform:scale(1);opacity:1 } }
+          @keyframes spin   { 0%{transform:rotate(-20deg) scale(.8)} 50%{transform:rotate(10deg) scale(1.2)} 100%{transform:rotate(0deg) scale(1)} }
+        `;
+        document.head.appendChild(style);
+    }
+
+    document.body.appendChild(popup);
+    // Close on backdrop click
+    popup.addEventListener('click', e => { if (e.target === popup) popup.remove(); });
+}
+
+window.bracketSetScore  = bracketSetScore;
+window.bracketAdvance   = bracketAdvance;
+window.showWinnerPopup  = showWinnerPopup;
 
 
 function closeBracketPanel() {

@@ -2685,7 +2685,7 @@
     .form-group textarea {
         width: 100%;
         padding: 0.75rem;
-        background: rgba(255, 255, 255, 0.05);
+        background: var(--bg-2, #2c3440);
         border: 1px solid rgba(100, 200, 255, 0.2);
         border-radius: 6px;
         color: #ffffff;
@@ -2693,6 +2693,19 @@
         font-family: inherit;
         transition: all 0.3s ease;
         box-sizing: border-box;
+        color-scheme: dark;
+    }
+
+    .form-group select option {
+        background: #1e2630;
+        color: #ffffff;
+        padding: 8px;
+    }
+
+    .form-group select option:hover,
+    .form-group select option:checked {
+        background: #2c3440;
+        color: #ffffff;
     }
 
     .form-group input:focus,

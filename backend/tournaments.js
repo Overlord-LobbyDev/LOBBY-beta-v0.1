@@ -569,8 +569,101 @@ router.post('/:tournamentId/set-winner', verifyAuth, async (req, res) => {
        WHERE id = $4`,
       [winnerDbId, 'completed', new Date(), matchId]
     );
-    
-    res.json({ success: true, message: 'Winner set successfully' });
+
+    // ── Advance winner to next round ──────────────────────────
+    try {
+      // Get current match info: round, match_number, player slots
+      const curMatch = await pool.query(
+        `SELECT m.match_number, m.player1_id, m.player2_id, r.round_number
+         FROM tournament_matches m
+         JOIN tournament_rounds r ON m.round_id = r.id
+         WHERE m.id = $1`,
+        [matchId]
+      );
+
+      if (curMatch.rows.length > 0) {
+        const { match_number, round_number } = curMatch.rows[0];
+
+        // Find next round
+        const nextRound = await pool.query(
+          `SELECT r.id FROM tournament_rounds r
+           WHERE r.tournament_id = $1 AND r.round_number = $2`,
+          [tournamentId, round_number + 1]
+        );
+
+        if (nextRound.rows.length > 0) {
+          const nextRoundId = nextRound.rows[0].id;
+          // Winner goes into match ceil(match_number/2) of next round
+          // Odd match_number → player1 slot, even → player2 slot
+          const nextMatchNumber = Math.ceil(match_number / 2);
+          const slot = match_number % 2 !== 0 ? 'player1_id' : 'player2_id';
+
+          const nextMatch = await pool.query(
+            `SELECT id FROM tournament_matches WHERE round_id = $1 AND match_number = $2`,
+            [nextRoundId, nextMatchNumber]
+          );
+
+          if (nextMatch.rows.length > 0) {
+            await pool.query(
+              `UPDATE tournament_matches SET ${slot} = $1 WHERE id = $2`,
+              [winnerDbId, nextMatch.rows[0].id]
+            );
+          }
+        } else {
+          // No next round — this is the final. Check if tournament is complete.
+          const allMatches = await pool.query(
+            `SELECT COUNT(*) as total, COUNT(winner_id) as completed
+             FROM tournament_matches WHERE tournament_id = $1`,
+            [tournamentId]
+          );
+          const { total, completed } = allMatches.rows[0];
+          if (parseInt(total) === parseInt(completed)) {
+            await pool.query(
+              `UPDATE tournaments SET status = 'completed', winner_id = $1 WHERE id = $2`,
+              [winnerDbId, tournamentId]
+            );
+          }
+        }
+      }
+    } catch (advanceErr) {
+      console.error('Advance winner error (non-fatal):', advanceErr.message);
+    }
+
+    // Return updated tournament data so frontend can check for winner
+    const updatedTour = await pool.query('SELECT status, winner_id FROM tournaments WHERE id = $1', [tournamentId]);
+    const tourStatus = updatedTour.rows[0];
+
+    // Get winner username if tournament just completed
+    let winnerData = null;
+    if (tourStatus.status === 'completed' && tourStatus.winner_id) {
+      const winnerPlayer = await pool.query(
+        `SELECT tp.username, tp.user_id, u.avatar_url,
+                u.tournament_card_image_url, u.tournament_card_bg_colour,
+                u.tournament_card_border_colour, u.tournament_card_name_colour,
+                u.tournament_card_bg_pos
+         FROM tournament_players tp
+         LEFT JOIN users u ON tp.user_id = u.id
+         WHERE tp.id = $1`,
+        [tourStatus.winner_id]
+      );
+      if (winnerPlayer.rows.length > 0) {
+        const w = winnerPlayer.rows[0];
+        winnerData = {
+          username: w.username,
+          userId: w.user_id,
+          avatarUrl: w.avatar_url,
+          tournamentCard: {
+            imageUrl: w.tournament_card_image_url || null,
+            bgColour: w.tournament_card_bg_colour || '#2c3440',
+            borderColour: w.tournament_card_border_colour || '#f9a8d4',
+            nameColour: w.tournament_card_name_colour || '#fdf2f8',
+            bgPos: w.tournament_card_bg_pos || '50% 50%',
+          }
+        };
+      }
+    }
+
+    res.json({ success: true, message: 'Winner set successfully', tournamentStatus: tourStatus.status, winner: winnerData });
   } catch (error) {
     console.error('Set winner error:', error);
     res.status(500).json({ error: 'Failed to set winner' });
