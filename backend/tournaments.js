@@ -25,6 +25,11 @@ if (process.env.DATABASE_URL) {
     "ALTER TABLE tournaments ADD COLUMN IF NOT EXISTS alert_before_minutes INTEGER DEFAULT 15",
     "ALTER TABLE tournament_matches ADD COLUMN IF NOT EXISTS locked_players JSONB DEFAULT '[]'",
     "ALTER TABLE tournament_matches ADD COLUMN IF NOT EXISTS round_locked BOOLEAN DEFAULT FALSE",
+    "ALTER TABLE tournaments ADD COLUMN IF NOT EXISTS result_mode TEXT DEFAULT 'manual'",
+    "ALTER TABLE tournament_matches ADD COLUMN IF NOT EXISTS p1_report JSONB DEFAULT NULL",
+    "ALTER TABLE tournament_matches ADD COLUMN IF NOT EXISTS p2_report JSONB DEFAULT NULL",
+    "ALTER TABLE tournament_matches ADD COLUMN IF NOT EXISTS dispute_status TEXT DEFAULT NULL",
+    "ALTER TABLE tournament_matches ADD COLUMN IF NOT EXISTS dispute_resolved_by INTEGER DEFAULT NULL",
     "ALTER TABLE tournament_matches ADD COLUMN IF NOT EXISTS player1_score INTEGER DEFAULT 0",
     "ALTER TABLE tournament_matches ADD COLUMN IF NOT EXISTS player2_score INTEGER DEFAULT 0",
     "ALTER TABLE users ADD COLUMN IF NOT EXISTS tournament_card_image_url TEXT DEFAULT NULL",
@@ -52,7 +57,7 @@ function verifyAuth(req, res, next) {
 // ============================================================
 router.post('/create', verifyAuth, async (req, res) => {
   try {
-    const { lobbyId, name, description, format, playerCount, rules, prize, startTime, hasLosersBracket, hasPointsTally, scheduledStart, alertBeforeMinutes, hostJoinsAsPlayer } = req.body;
+    const { lobbyId, name, description, format, playerCount, rules, prize, startTime, hasLosersBracket, hasPointsTally, scheduledStart, alertBeforeMinutes, hostJoinsAsPlayer, resultMode } = req.body;
     
     // Validate input
     if (!lobbyId || !name || !format || !playerCount) {
@@ -74,8 +79,8 @@ router.post('/create', verifyAuth, async (req, res) => {
       `INSERT INTO tournaments 
         (lobby_id, host_id, name, description, format, player_count, 
          max_players, status, rules, prize, start_time, has_losers_bracket, has_points_tally,
-         scheduled_start, alert_before_minutes)
-       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15)
+         scheduled_start, alert_before_minutes, result_mode)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16)
        RETURNING *`,
       [
         lobbyId,
@@ -92,7 +97,8 @@ router.post('/create', verifyAuth, async (req, res) => {
         hasLosersBracket ? true : false,
         hasPointsTally !== false,
         scheduledStart ? new Date(scheduledStart) : null,
-        alertBeforeMinutes ? parseInt(alertBeforeMinutes) : 15
+        alertBeforeMinutes ? parseInt(alertBeforeMinutes) : 15,
+        ['manual','self-report'].includes(resultMode) ? resultMode : 'manual'
       ]
     );
     
@@ -197,7 +203,8 @@ router.get('/lobby/:lobbyId', async (req, res) => {
           scheduledStart: tournament.scheduled_start || null,
           alertBeforeMinutes: tournament.alert_before_minutes || 15,
           hasLosersBracket: tournament.has_losers_bracket || false,
-          hasPointsTally: tournament.has_points_tally !== false
+          hasPointsTally: tournament.has_points_tally !== false,
+          resultMode: tournament.result_mode || 'manual'
         };
       })
     );
@@ -303,7 +310,8 @@ router.get('/:tournamentId', async (req, res) => {
       prize: tournament.prize,
       winnerId: null,
       scheduledStart: tournament.scheduled_start || null,
-      alertBeforeMinutes: tournament.alert_before_minutes || 15
+      alertBeforeMinutes: tournament.alert_before_minutes || 15,
+      resultMode: tournament.result_mode || 'manual'
     };
 
     // Resolve winner_id (tournament_players.id) → user_id
@@ -956,7 +964,8 @@ async function getBracketData(tournamentId) {
                 u2.avatar_url as player2_avatar,
                 m.winner_id, m.status,
                 m.player1_score, m.player2_score,
-                m.locked_players, m.round_locked
+                m.locked_players, m.round_locked,
+                m.p1_report, m.p2_report, m.dispute_status
          FROM tournament_matches m
          LEFT JOIN tournament_players p1 ON m.player1_id = p1.id
          LEFT JOIN tournament_players p2 ON m.player2_id = p2.id
@@ -994,6 +1003,9 @@ async function getBracketData(tournamentId) {
         player2Score: m.player2_score ?? 0,
         lockedPlayers: m.locked_players || [],
         roundLocked: m.round_locked || false,
+        p1Report: m.p1_report || null,
+        p2Report: m.p2_report || null,
+        disputeStatus: m.dispute_status || null,
         player1: m.player1_user_id ? {
           userId: m.player1_user_id, username: m.player1_username, avatar_url: m.player1_avatar || null,
           tournamentCard: getCard(m.player1_user_id)
@@ -1101,6 +1113,205 @@ router.get('/scheduled/upcoming', async (req, res) => {
     res.json(result.rows);
   } catch (err) {
     res.status(500).json({ error: err.message });
+  }
+});
+
+
+// ============================================================
+// SELF-REPORT: Player submits their match result
+// POST /:tournamentId/report-result
+// Body: { matchId, myScore, opponentScore, screenshotUrl? }
+// ============================================================
+router.post('/:tournamentId/report-result', verifyAuth, async (req, res) => {
+  try {
+    const { tournamentId } = req.params;
+    const { matchId, myScore, opponentScore, screenshotUrl } = req.body;
+    const userId = req.user.id;
+
+    // Validate tournament is in self-report mode and in-progress
+    const tourResult = await pool.query(
+      'SELECT host_id, status, result_mode FROM tournaments WHERE id = $1', [tournamentId]
+    );
+    if (!tourResult.rows.length) return res.status(404).json({ error: 'Tournament not found' });
+    const t = tourResult.rows[0];
+    if (t.status !== 'in-progress') return res.status(400).json({ error: 'Tournament not in progress' });
+    if (t.result_mode !== 'self-report') return res.status(400).json({ error: 'This tournament uses manual scoring' });
+
+    // Get match and verify player is in it
+    const matchResult = await pool.query(
+      `SELECT m.id, m.player1_id, m.player2_id, m.p1_report, m.p2_report, m.status, m.round_locked
+       FROM tournament_matches m WHERE m.id = $1 AND m.tournament_id = $2`,
+      [matchId, tournamentId]
+    );
+    if (!matchResult.rows.length) return res.status(404).json({ error: 'Match not found' });
+    const match = matchResult.rows[0];
+
+    if (match.status === 'completed') return res.status(400).json({ error: 'Match already completed' });
+    if (!match.round_locked) return res.status(400).json({ error: 'Both players must lock in before reporting' });
+
+    // Determine if this user is player1 or player2
+    const p1Check = await pool.query('SELECT user_id FROM tournament_players WHERE id = $1', [match.player1_id]);
+    const p2Check = await pool.query('SELECT user_id FROM tournament_players WHERE id = $1', [match.player2_id]);
+    const isP1 = p1Check.rows[0]?.user_id === userId;
+    const isP2 = p2Check.rows[0]?.user_id === userId;
+    if (!isP1 && !isP2) return res.status(403).json({ error: 'You are not in this match' });
+
+    const reportField = isP1 ? 'p1_report' : 'p2_report';
+    const report = {
+      myScore: parseInt(myScore) || 0,
+      opponentScore: parseInt(opponentScore) || 0,
+      screenshotUrl: screenshotUrl || null,
+      submittedAt: new Date().toISOString(),
+      userId
+    };
+
+    await pool.query(
+      `UPDATE tournament_matches SET ${reportField} = $1 WHERE id = $2`,
+      [JSON.stringify(report), matchId]
+    );
+
+    // Check if both have now reported
+    const updatedMatch = await pool.query(
+      'SELECT p1_report, p2_report FROM tournament_matches WHERE id = $1', [matchId]
+    );
+    const p1r = updatedMatch.rows[0].p1_report;
+    const p2r = updatedMatch.rows[0].p2_report;
+
+    if (p1r && p2r) {
+      // Both reported — check if they agree (each says same winner)
+      const p1WinsByP1 = p1r.myScore > p1r.opponentScore;
+      const p1WinsByP2 = p2r.opponentScore > p2r.myScore;
+      const agree = p1WinsByP1 === p1WinsByP2;
+
+      if (agree) {
+        // Consensus — auto-advance the winner
+        const winnerId = p1WinsByP1 ? match.player1_id : match.player2_id;
+        // Scores: use average if they differ slightly, p1's version is canonical
+        const p1FinalScore = p1r.myScore;
+        const p2FinalScore = p1r.opponentScore;
+
+        await pool.query(
+          `UPDATE tournament_matches SET winner_id = $1, status = 'completed', completed_at = NOW(),
+           player1_score = $2, player2_score = $3, dispute_status = 'agreed'
+           WHERE id = $4`,
+          [winnerId, p1FinalScore, p2FinalScore, matchId]
+        );
+
+        // Advance winner to next round (same logic as set-winner)
+        try {
+          const curMatch = await pool.query(
+            `SELECT m.match_number, r.round_number FROM tournament_matches m
+             JOIN tournament_rounds r ON m.round_id = r.id WHERE m.id = $1`, [matchId]
+          );
+          if (curMatch.rows.length > 0) {
+            const { match_number, round_number } = curMatch.rows[0];
+            const nextRound = await pool.query(
+              `SELECT r.id FROM tournament_rounds r WHERE r.tournament_id = $1 AND r.round_number = $2`,
+              [tournamentId, round_number + 1]
+            );
+            if (nextRound.rows.length > 0) {
+              const nextMatchNum = Math.floor(match_number / 2);
+              const slot = match_number % 2 === 0 ? 'player1_id' : 'player2_id';
+              await pool.query(
+                `UPDATE tournament_matches SET ${slot} = $1 WHERE round_id = $2 AND match_number = $3`,
+                [winnerId, nextRound.rows[0].id, nextMatchNum]
+              );
+            } else {
+              // Final match — mark tournament complete
+              await pool.query(
+                `UPDATE tournaments SET status = 'completed', winner_id = $1 WHERE id = $2`,
+                [winnerId, tournamentId]
+              );
+            }
+          }
+        } catch (advErr) { console.error('Advance error (non-fatal):', advErr.message); }
+
+        const winnerUserId = p1WinsByP1 ? p1Check.rows[0].user_id : p2Check.rows[0].user_id;
+        return res.json({ status: 'agreed', autoAdvanced: true, winnerId: winnerUserId, matchId });
+      } else {
+        // Dispute — flag for host
+        await pool.query(
+          `UPDATE tournament_matches SET dispute_status = 'disputed' WHERE id = $1`, [matchId]
+        );
+        return res.json({ status: 'disputed', p1Report: p1r, p2Report: p2r });
+      }
+    }
+
+    res.json({ status: 'submitted', waiting: true });
+  } catch (err) {
+    console.error('Report result error:', err);
+    res.status(500).json({ error: 'Failed to submit result' });
+  }
+});
+
+// ============================================================
+// SELF-REPORT: Opponent confirms or disputes a result
+// POST /:tournamentId/confirm-result
+// Body: { matchId, action: 'confirm' | 'dispute' }
+// ============================================================
+router.post('/:tournamentId/confirm-result', verifyAuth, async (req, res) => {
+  try {
+    const { tournamentId } = req.params;
+    const { matchId, action } = req.body;
+    const userId = req.user.id;
+
+    const matchResult = await pool.query(
+      `SELECT m.id, m.player1_id, m.player2_id, m.p1_report, m.p2_report, m.dispute_status
+       FROM tournament_matches m WHERE m.id = $1 AND m.tournament_id = $2`,
+      [matchId, tournamentId]
+    );
+    if (!matchResult.rows.length) return res.status(404).json({ error: 'Match not found' });
+    const match = matchResult.rows[0];
+
+    if (action === 'dispute') {
+      await pool.query(
+        `UPDATE tournament_matches SET dispute_status = 'disputed' WHERE id = $1`, [matchId]
+      );
+      // Notify host
+      const tourResult = await pool.query('SELECT host_id FROM tournaments WHERE id = $1', [tournamentId]);
+      return res.json({ status: 'disputed', hostId: tourResult.rows[0]?.host_id });
+    }
+
+    res.json({ status: 'confirmed' });
+  } catch (err) {
+    console.error('Confirm result error:', err);
+    res.status(500).json({ error: 'Failed to confirm result' });
+  }
+});
+
+// ============================================================
+// SELF-REPORT: Host resolves a dispute
+// POST /:tournamentId/resolve-dispute
+// Body: { matchId, winnerId (user_id), p1Score, p2Score }
+// ============================================================
+router.post('/:tournamentId/resolve-dispute', verifyAuth, async (req, res) => {
+  try {
+    const { tournamentId } = req.params;
+    const { matchId, winnerId, p1Score, p2Score } = req.body;
+
+    const tourResult = await pool.query('SELECT host_id FROM tournaments WHERE id = $1', [tournamentId]);
+    if (!tourResult.rows.length) return res.status(404).json({ error: 'Tournament not found' });
+    if (tourResult.rows[0].host_id !== req.user.id) return res.status(403).json({ error: 'Only host can resolve disputes' });
+
+    // Look up tournament_players.id from user_id
+    const playerResult = await pool.query(
+      'SELECT id FROM tournament_players WHERE tournament_id = $1 AND user_id = $2',
+      [tournamentId, winnerId]
+    );
+    if (!playerResult.rows.length) return res.status(400).json({ error: 'Winner not found in tournament' });
+    const winnerDbId = playerResult.rows[0].id;
+
+    await pool.query(
+      `UPDATE tournament_matches SET winner_id = $1, status = 'completed', completed_at = NOW(),
+       player1_score = $2, player2_score = $3, dispute_status = 'resolved', dispute_resolved_by = $4
+       WHERE id = $5`,
+      [winnerDbId, parseInt(p1Score)||0, parseInt(p2Score)||0, req.user.id, matchId]
+    );
+
+    res.json({ success: true, winnerDbId, matchId });
+  } catch (err) {
+    console.error('Resolve dispute error:', err);
+    res.status(500).json({ error: 'Failed to resolve dispute' });
   }
 });
 

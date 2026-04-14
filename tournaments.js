@@ -136,6 +136,7 @@ async function handleTournamentSubmit(e) {
         hasLosersBracket:     document.getElementById('tournamentLosers')?.checked || false,
         hasPointsTally:       document.getElementById('tournamentPoints')?.checked !== false,
         hostJoinsAsPlayer:    document.getElementById('tournamentHostJoins')?.checked !== false,
+        resultMode:           document.getElementById('tournamentResultMode')?.value || 'manual',
         scheduledStart:       document.getElementById('tournamentScheduleToggle')?.checked
                                 ? document.getElementById('tournamentScheduledTime')?.value || null
                                 : null,
@@ -512,7 +513,7 @@ function showBracketPanel(tournament) {
                       <div style="padding:5px 10px 4px;background:rgba(88,101,242,.12);border-bottom:1px solid rgba(88,101,242,.2);display:flex;align-items:center;justify-content:space-between">
                         <div style="display:flex;align-items:center;gap:5px">
                           <span style="font-size:8px;font-weight:800;text-transform:uppercase;letter-spacing:1px;color:rgba(150,160,255,.8)">Match ${mIdx + 1}</span>
-                          ${match.roundLocked ? `<span style="font-size:8px;font-weight:800;color:#57f287;background:rgba(35,165,90,.15);border:1px solid rgba(35,165,90,.3);border-radius:3px;padding:1px 4px">✅ Ready</span>` : ''}
+                          ${match.roundLocked ? `<span data-lock-ready="${mid}" style="font-size:8px;font-weight:800;color:#57f287;background:rgba(35,165,90,.15);border:1px solid rgba(35,165,90,.3);border-radius:3px;padding:1px 4px">✅ Ready</span>` : `<span data-lock-ready="${mid}" style="display:none;font-size:8px;font-weight:800;color:#57f287;background:rgba(35,165,90,.15);border:1px solid rgba(35,165,90,.3);border-radius:3px;padding:1px 4px">✅ Ready</span>`}
                         </div>
                         <div style="display:flex;gap:4px">
                           <button onclick="bracketSaveScores('${tournament.id}','${mid}')" style="font-size:8px;font-weight:800;padding:3px 7px;background:rgba(88,101,242,.25);color:rgba(160,170,255,.9);border:1px solid rgba(88,101,242,.4);border-radius:4px;cursor:pointer;font-family:inherit;text-transform:uppercase;letter-spacing:.4px" onmouseover="this.style.background='rgba(88,101,242,.45)'" onmouseout="this.style.background='rgba(88,101,242,.25)'">💾 Save</button>
@@ -554,16 +555,36 @@ function showBracketPanel(tournament) {
                 // Lock-in status row — visible to everyone when match has real players & is in-progress
                 if ((p1?.userId || p2?.userId) && tournament.status === 'in-progress' && mid) {
                     const lockRowY = matchCY + MATCH_H + 6;
-                    const statusPill = (name, isLocked) =>
-                        `<div style="flex:1;display:flex;align-items:center;gap:4px;padding:3px 7px;border-radius:5px;background:${isLocked?'rgba(35,165,90,.12)':'rgba(255,255,255,.04)'};border:1px solid ${isLocked?'rgba(35,165,90,.3)':'rgba(255,255,255,.1)'}">
+                    const statusPill = (name, uid, isLocked) =>
+                        `<div data-lock-match="${mid}" data-lock-user="${uid}" data-lock-name="${name||''}" style="flex:1;display:flex;align-items:center;gap:4px;padding:3px 7px;border-radius:5px;background:${isLocked?'rgba(35,165,90,.12)':'rgba(255,255,255,.04)'};border:1px solid ${isLocked?'rgba(35,165,90,.3)':'rgba(255,255,255,.1)'}">
                            <span style="font-size:10px;line-height:1">${isLocked?'✔':'✘'}</span>
                            <span style="font-size:8px;font-weight:700;color:${isLocked?'#57f287':'var(--text-3)'};overflow:hidden;text-overflow:ellipsis;white-space:nowrap;flex:1;min-width:0">${name||'TBD'}</span>
                          </div>`;
 
+                    const isSelfReport = tournament.resultMode === 'self-report';
+                    const bothLocked = p1locked && p2locked;
+                    const myReport = iAmP1 ? match.p1Report : match.p2Report;
+                    const alreadyReported = !!myReport;
+                    const hasDispute = match.disputeStatus === 'disputed';
+
+                    // Report Result button — shown to players in self-report mode once both locked in
+                    const reportBtn = isSelfReport && isInMatch && bothLocked && !alreadyReported && !match.winner
+                        ? `<button onclick="showReportModal('${tournament.id}','${mid}','${p1?.username||''}','${p2?.username||''}','${p1?.userId||''}','${p2?.userId||''}')" style="flex-shrink:0;font-size:8px;font-weight:800;padding:3px 8px;background:rgba(88,101,242,.2);color:rgba(160,170,255,.95);border:1px solid rgba(88,101,242,.35);border-radius:5px;cursor:pointer;font-family:inherit;white-space:nowrap" onmouseover="this.style.background='rgba(88,101,242,.35)'" onmouseout="this.style.background='rgba(88,101,242,.2)'">📊 Report</button>`
+                        : alreadyReported && !match.winner
+                            ? `<span style="flex-shrink:0;font-size:8px;font-weight:700;color:var(--text-3);padding:3px 8px">⏳ Waiting</span>`
+                            : '';
+
+                    // Dispute badge for host
+                    const disputeBtn = hasDispute && isHost && !match.winner
+                        ? `<button onclick="showDisputeModal('${tournament.id}','${mid}','${p1?.username||''}','${p2?.username||''}','${p1?.userId||''}','${p2?.userId||''}')" style="flex-shrink:0;font-size:8px;font-weight:800;padding:3px 8px;background:rgba(237,66,69,.2);color:rgba(255,120,120,.95);border:1px solid rgba(237,66,69,.35);border-radius:5px;cursor:pointer;font-family:inherit;white-space:nowrap;animation:pulse 1s ease infinite alternate" onmouseover="this.style.background='rgba(237,66,69,.35)'" onmouseout="this.style.background='rgba(237,66,69,.2)'">⚠ Dispute</button>`
+                        : '';
+
                     matchCards += `<div style="position:absolute;left:${x}px;top:${lockRowY}px;width:${MATCH_W}px;display:flex;gap:4px;align-items:center">
-                        ${statusPill(p1?.username, p1locked)}
-                        ${statusPill(p2?.username, p2locked)}
-                        ${isInMatch && !myLocked ? `<button onclick="bracketLockIn('${tournament.id}','${mid}')" style="flex-shrink:0;font-size:8px;font-weight:800;padding:3px 8px;background:rgba(250,166,26,.2);color:rgba(250,200,80,.95);border:1px solid rgba(250,166,26,.35);border-radius:5px;cursor:pointer;font-family:inherit;white-space:nowrap" onmouseover="this.style.background='rgba(250,166,26,.35)'" onmouseout="this.style.background='rgba(250,166,26,.2)'">🔒 Lock</button>` : ''}
+                        ${statusPill(p1?.username, p1?.userId, p1locked)}
+                        ${statusPill(p2?.username, p2?.userId, p2locked)}
+                        ${isInMatch && !myLocked ? `<button data-lock-btn="${mid}" onclick="bracketLockIn('${tournament.id}','${mid}')" style="flex-shrink:0;font-size:8px;font-weight:800;padding:3px 8px;background:rgba(250,166,26,.2);color:rgba(250,200,80,.95);border:1px solid rgba(250,166,26,.35);border-radius:5px;cursor:pointer;font-family:inherit;white-space:nowrap" onmouseover="this.style.background='rgba(250,166,26,.35)'" onmouseout="this.style.background='rgba(250,166,26,.2)'">🔒 Lock</button>` : ''}
+                        ${reportBtn}
+                        ${disputeBtn}
                     </div>`;
                 }
             }
@@ -626,9 +647,9 @@ function showBracketPanel(tournament) {
 
     // Sort active players by points desc, exclude winner from main list
     const winnerPlayer      = players.find(p => p.userId === winnerId);
-    // Non-host players only in the active/eliminated lists
-    const activePlayers     = players.filter(p => !eliminatedSet.has(p.userId) && p.userId !== winnerId && p.userId !== tournament.hostId);
-    const eliminatedPlayers = players.filter(p => eliminatedSet.has(p.userId) && p.userId !== tournament.hostId);
+    // Active players — all registered players except the winner (host CAN appear here if they joined as player)
+    const activePlayers     = players.filter(p => !eliminatedSet.has(p.userId) && p.userId !== winnerId);
+    const eliminatedPlayers = players.filter(p => eliminatedSet.has(p.userId));
     activePlayers.sort((a, b) => (pointsMap[b.userId] || 0) - (pointsMap[a.userId] || 0));
 
     const renderPlayerRow = (p, isEliminated) => {
@@ -780,6 +801,7 @@ function showBracketPanel(tournament) {
                   <div style="background:rgba(88,101,242,.08);border:1px solid rgba(88,101,242,.15);border-radius:6px;padding:9px;text-align:center"><div style="font-size:8px;color:var(--text-3);text-transform:uppercase;font-weight:700;margin-bottom:2px">Status</div><div style="font-size:11px;font-weight:800;color:${statusColour}">${tournament.status}</div></div>
                   <div style="background:rgba(88,101,242,.08);border:1px solid rgba(88,101,242,.15);border-radius:6px;padding:9px;text-align:center"><div style="font-size:8px;color:var(--text-3);text-transform:uppercase;font-weight:700;margin-bottom:2px">Players</div><div style="font-size:13px;font-weight:800;color:var(--accent)">${players.length}</div></div>
                   <div style="background:rgba(88,101,242,.08);border:1px solid rgba(88,101,242,.15);border-radius:6px;padding:9px;text-align:center"><div style="font-size:8px;color:var(--text-3);text-transform:uppercase;font-weight:700;margin-bottom:2px">Slots</div><div style="font-size:13px;font-weight:800;color:var(--accent)">${tournament.playerCount}</div></div>
+                  <div style="grid-column:1/-1;background:rgba(88,101,242,.08);border:1px solid rgba(88,101,242,.15);border-radius:6px;padding:7px 9px;display:flex;align-items:center;justify-content:space-between"><div style="font-size:8px;color:var(--text-3);text-transform:uppercase;font-weight:700">Results</div><div style="font-size:10px;font-weight:800;color:${tournament.resultMode==='self-report'?'#57f287':'var(--text-2)'}">${tournament.resultMode==='self-report'?'Self-report':'Manual'}</div></div>
                 </div>
               </div>
               <!-- Actions -->
@@ -1665,6 +1687,203 @@ async function bracketLockIn(tournamentId, matchId) {
 
 window.bracketLockIn = bracketLockIn;
 
+// ── Self-Report: Report Result Modal ─────────────────────────
+function showReportModal(tournamentId, matchId, p1name, p2name, p1uid, p2uid) {
+    document.getElementById('_reportModal')?.remove();
+
+    const iAmP1 = String(p1uid) === String(currentUserId);
+    const myName = iAmP1 ? p1name : p2name;
+    const oppName = iAmP1 ? p2name : p1name;
+
+    const overlay = document.createElement('div');
+    overlay.id = '_reportModal';
+    overlay.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.7);z-index:99998;display:flex;align-items:center;justify-content:center;backdrop-filter:blur(4px)';
+    overlay.innerHTML = `
+      <div style="background:var(--bg-1);border:1.5px solid rgba(255,255,255,.12);border-radius:16px;padding:24px;width:min(400px,90vw);font-family:inherit">
+        <div style="font-size:16px;font-weight:800;color:var(--text-1);margin-bottom:4px">📊 Report Match Result</div>
+        <div style="font-size:12px;color:var(--text-3);margin-bottom:20px">${myName} vs ${oppName}</div>
+
+        <div style="display:grid;grid-template-columns:1fr auto 1fr;gap:12px;align-items:center;margin-bottom:20px">
+          <div style="text-align:center">
+            <div style="font-size:11px;color:var(--text-3);margin-bottom:6px;font-weight:700;text-transform:uppercase;letter-spacing:.4px">You (${myName})</div>
+            <input id="_myScore" type="number" min="0" max="99" value="0" style="width:100%;text-align:center;font-size:28px;font-weight:800;background:var(--bg-3);border:1.5px solid rgba(255,255,255,.15);border-radius:10px;color:var(--text-1);padding:10px;outline:none;font-family:inherit" onfocus="this.style.borderColor='rgba(88,101,242,.6)'" onblur="this.style.borderColor='rgba(255,255,255,.15)'" />
+          </div>
+          <div style="font-size:18px;font-weight:800;color:var(--text-3);padding-top:22px">—</div>
+          <div style="text-align:center">
+            <div style="font-size:11px;color:var(--text-3);margin-bottom:6px;font-weight:700;text-transform:uppercase;letter-spacing:.4px">Opponent (${oppName})</div>
+            <input id="_oppScore" type="number" min="0" max="99" value="0" style="width:100%;text-align:center;font-size:28px;font-weight:800;background:var(--bg-3);border:1.5px solid rgba(255,255,255,.15);border-radius:10px;color:var(--text-1);padding:10px;outline:none;font-family:inherit" onfocus="this.style.borderColor='rgba(88,101,242,.6)'" onblur="this.style.borderColor='rgba(255,255,255,.15)'" />
+          </div>
+        </div>
+
+        <div style="margin-bottom:16px">
+          <div style="font-size:11px;color:var(--text-3);margin-bottom:6px;font-weight:700;text-transform:uppercase;letter-spacing:.4px">Screenshot proof (optional but recommended)</div>
+          <label style="display:flex;align-items:center;gap:10px;padding:10px 12px;background:var(--bg-3);border:1.5px dashed rgba(255,255,255,.15);border-radius:8px;cursor:pointer" onmouseover="this.style.borderColor='rgba(88,101,242,.5)'" onmouseout="this.style.borderColor='rgba(255,255,255,.15)'">
+            <span style="font-size:16px">🖼</span>
+            <span id="_screenshotLabel" style="font-size:12px;color:var(--text-3)">Click to attach screenshot</span>
+            <input type="file" accept="image/*" id="_screenshotInput" style="display:none" onchange="handleReportScreenshot(this)">
+          </label>
+          <div id="_screenshotPreview" style="margin-top:8px;display:none"><img style="width:100%;border-radius:6px;max-height:120px;object-fit:cover" id="_screenshotImg"></div>
+        </div>
+
+        <div style="display:flex;gap:8px">
+          <button onclick="submitMatchReport('${tournamentId}','${matchId}','${iAmP1}')" style="flex:1;padding:11px;background:var(--accent);color:#1a0a10;border:none;border-radius:8px;font-size:13px;font-weight:800;cursor:pointer;font-family:inherit">Submit Result</button>
+          <button onclick="document.getElementById('_reportModal').remove()" style="padding:11px 16px;background:var(--bg-3);color:var(--text-2);border:1px solid rgba(255,255,255,.1);border-radius:8px;font-size:13px;font-weight:700;cursor:pointer;font-family:inherit">Cancel</button>
+        </div>
+      </div>`;
+
+    overlay.addEventListener('click', e => { if (e.target === overlay) overlay.remove(); });
+    document.body.appendChild(overlay);
+    document.getElementById('_myScore')?.focus();
+}
+window.showReportModal = showReportModal;
+
+let _reportScreenshotUrl = null;
+
+function handleReportScreenshot(input) {
+    const file = input.files[0];
+    if (!file) return;
+    const label = document.getElementById('_screenshotLabel');
+    const preview = document.getElementById('_screenshotPreview');
+    const img = document.getElementById('_screenshotImg');
+    if (label) label.textContent = '⏳ Uploading…';
+
+    const fd = new FormData();
+    fd.append('image', file);
+    fetch(`${AUTH_BASE}/tournament-card-image`, {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${localStorage.getItem('vh_token')}` },
+        body: fd
+    }).then(r => r.json()).then(data => {
+        if (data.imageUrl) {
+            _reportScreenshotUrl = data.imageUrl;
+            if (label) label.textContent = '✓ Screenshot attached';
+            if (img) img.src = data.imageUrl;
+            if (preview) preview.style.display = 'block';
+        }
+    }).catch(() => { if (label) label.textContent = 'Upload failed — you can still submit without it'; });
+}
+window.handleReportScreenshot = handleReportScreenshot;
+
+async function submitMatchReport(tournamentId, matchId, iAmP1Str) {
+    const myScore   = parseInt(document.getElementById('_myScore')?.value)   || 0;
+    const oppScore  = parseInt(document.getElementById('_oppScore')?.value)  || 0;
+    const btn = document.querySelector('#_reportModal button');
+
+    try {
+        if (btn) { btn.disabled = true; btn.textContent = 'Submitting…'; }
+        const response = await fetch(`${API_BASE}/api/tournaments/${tournamentId}/report-result`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${localStorage.getItem('vh_token')}` },
+            body: JSON.stringify({ matchId, myScore, opponentScore: oppScore, screenshotUrl: _reportScreenshotUrl })
+        });
+        const data = await response.json();
+        _reportScreenshotUrl = null;
+        document.getElementById('_reportModal')?.remove();
+
+        if (!response.ok) { showNotification(data.error || 'Failed to submit', 'error'); return; }
+
+        if (data.status === 'agreed') {
+            showNotification('✅ Both players agreed — advancing winner!', 'success');
+            // Notify all via WebSocket
+            if (window.socket) window.socket.emit('tournament-result', {
+                tournamentId, matchId, status: 'agreed'
+            });
+            setTimeout(() => openTournamentDetails(tournamentId), 600);
+        } else if (data.status === 'disputed') {
+            showNotification('⚠ Scores don\'t match — host has been notified to resolve', 'error');
+            if (window.socket) window.socket.emit('tournament-result', {
+                tournamentId, matchId, status: 'disputed'
+            });
+        } else {
+            showNotification('📊 Result submitted — waiting for opponent to confirm', 'success');
+            if (window.socket) window.socket.emit('tournament-result', {
+                tournamentId, matchId, status: 'submitted'
+            });
+        }
+    } catch(e) {
+        document.getElementById('_reportModal')?.remove();
+        showNotification(e.message || 'Failed to submit result', 'error');
+    }
+}
+window.submitMatchReport = submitMatchReport;
+
+// ── Self-Report: Host dispute resolution modal ─────────────────
+function showDisputeModal(tournamentId, matchId, p1name, p2name, p1uid, p2uid) {
+    document.getElementById('_disputeModal')?.remove();
+
+    // Fetch match data to show both reports
+    fetch(`${API_BASE}/api/tournaments/${tournamentId}`, {
+        headers: { Authorization: `Bearer ${localStorage.getItem('vh_token')}` }
+    }).then(r => r.json()).then(t => {
+        let match = null;
+        t.bracket?.rounds?.forEach(r => r.matches?.forEach(m => { if (String(m.matchId) === String(matchId)) match = m; }));
+        const p1r = match?.p1Report || {};
+        const p2r = match?.p2Report || {};
+
+        const overlay = document.createElement('div');
+        overlay.id = '_disputeModal';
+        overlay.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.7);z-index:99999;display:flex;align-items:center;justify-content:center;backdrop-filter:blur(4px)';
+        overlay.innerHTML = `
+          <div style="background:var(--bg-1);border:1.5px solid rgba(237,66,69,.3);border-radius:16px;padding:24px;width:min(480px,92vw);font-family:inherit">
+            <div style="font-size:16px;font-weight:800;color:var(--danger);margin-bottom:4px">⚠ Disputed Result</div>
+            <div style="font-size:12px;color:var(--text-3);margin-bottom:18px">${p1name} vs ${p2name} — players reported different scores</div>
+
+            <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:18px">
+              <div style="background:var(--bg-2);border-radius:10px;padding:12px">
+                <div style="font-size:10px;font-weight:700;color:var(--text-3);text-transform:uppercase;letter-spacing:.4px;margin-bottom:8px">${p1name} reported</div>
+                <div style="font-size:24px;font-weight:800;color:var(--text-1);margin-bottom:4px">${p1r.myScore ?? '?'} — ${p1r.opponentScore ?? '?'}</div>
+                <div style="font-size:11px;color:var(--text-3)">Claims: ${(p1r.myScore ?? 0) > (p1r.opponentScore ?? 0) ? `${p1name} won` : `${p2name} won`}</div>
+                ${p1r.screenshotUrl ? `<a href="${p1r.screenshotUrl}" target="_blank" style="display:inline-block;margin-top:6px;font-size:10px;color:var(--accent)">View screenshot</a>` : '<div style="font-size:10px;color:var(--text-3);margin-top:6px">No screenshot</div>'}
+              </div>
+              <div style="background:var(--bg-2);border-radius:10px;padding:12px">
+                <div style="font-size:10px;font-weight:700;color:var(--text-3);text-transform:uppercase;letter-spacing:.4px;margin-bottom:8px">${p2name} reported</div>
+                <div style="font-size:24px;font-weight:800;color:var(--text-1);margin-bottom:4px">${p2r.myScore ?? '?'} — ${p2r.opponentScore ?? '?'}</div>
+                <div style="font-size:11px;color:var(--text-3)">Claims: ${(p2r.myScore ?? 0) > (p2r.opponentScore ?? 0) ? `${p2name} won` : `${p1name} won`}</div>
+                ${p2r.screenshotUrl ? `<a href="${p2r.screenshotUrl}" target="_blank" style="display:inline-block;margin-top:6px;font-size:10px;color:var(--accent)">View screenshot</a>` : '<div style="font-size:10px;color:var(--text-3);margin-top:6px">No screenshot</div>'}
+              </div>
+            </div>
+
+            <div style="font-size:12px;font-weight:700;color:var(--text-2);margin-bottom:10px">Decide the correct result:</div>
+            <div style="display:grid;grid-template-columns:1fr auto 1fr;gap:8px;align-items:center;margin-bottom:16px">
+              <input id="_dp1score" type="number" min="0" max="99" value="${p1r.myScore ?? 0}" placeholder="P1 score" style="text-align:center;font-size:18px;font-weight:700;background:var(--bg-3);border:1px solid rgba(255,255,255,.15);border-radius:8px;color:var(--text-1);padding:8px;outline:none;font-family:inherit">
+              <div style="font-size:14px;color:var(--text-3);font-weight:700">—</div>
+              <input id="_dp2score" type="number" min="0" max="99" value="${p1r.opponentScore ?? 0}" placeholder="P2 score" style="text-align:center;font-size:18px;font-weight:700;background:var(--bg-3);border:1px solid rgba(255,255,255,.15);border-radius:8px;color:var(--text-1);padding:8px;outline:none;font-family:inherit">
+            </div>
+
+            <div style="display:flex;gap:8px;margin-bottom:10px">
+              <button onclick="resolveDispute('${tournamentId}','${matchId}','${p1uid}',true)" style="flex:1;padding:10px;background:rgba(35,165,90,.15);color:#57f287;border:1px solid rgba(35,165,90,.3);border-radius:8px;font-size:12px;font-weight:800;cursor:pointer;font-family:inherit">${p1name} wins</button>
+              <button onclick="resolveDispute('${tournamentId}','${matchId}','${p2uid}',false)" style="flex:1;padding:10px;background:rgba(35,165,90,.15);color:#57f287;border:1px solid rgba(35,165,90,.3);border-radius:8px;font-size:12px;font-weight:800;cursor:pointer;font-family:inherit">${p2name} wins</button>
+            </div>
+            <button onclick="document.getElementById('_disputeModal').remove()" style="width:100%;padding:10px;background:var(--bg-3);color:var(--text-2);border:1px solid rgba(255,255,255,.1);border-radius:8px;font-size:12px;font-weight:700;cursor:pointer;font-family:inherit">Close — decide later</button>
+          </div>`;
+
+        overlay.addEventListener('click', e => { if (e.target === overlay) overlay.remove(); });
+        document.body.appendChild(overlay);
+    }).catch(() => showNotification('Failed to load match data', 'error'));
+}
+window.showDisputeModal = showDisputeModal;
+
+async function resolveDispute(tournamentId, matchId, winnerUid, winnerIsP1) {
+    const p1score = parseInt(document.getElementById('_dp1score')?.value) || 0;
+    const p2score = parseInt(document.getElementById('_dp2score')?.value) || 0;
+    document.getElementById('_disputeModal')?.remove();
+    try {
+        const response = await fetch(`${API_BASE}/api/tournaments/${tournamentId}/resolve-dispute`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${localStorage.getItem('vh_token')}` },
+            body: JSON.stringify({ matchId, winnerId: winnerUid, p1Score: p1score, p2Score: p2score })
+        });
+        const data = await response.json();
+        if (!response.ok) { showNotification(data.error || 'Failed to resolve', 'error'); return; }
+        showNotification('✅ Dispute resolved — bracket updated', 'success');
+        if (window.socket) window.socket.emit('tournament-result', { tournamentId, matchId, status: 'resolved' });
+        setTimeout(() => openTournamentDetails(tournamentId), 400);
+    } catch(e) { showNotification(e.message || 'Failed to resolve dispute', 'error'); }
+}
+window.resolveDispute = resolveDispute;
+
+window.bracketSetScore = bracketSaveScores;
+
 // ── Tournament schedule countdown ─────────────────────────────
 // Polls scheduled tournaments and fires alerts at the right time
 let _scheduleCheckInterval = null;
@@ -1783,11 +2002,47 @@ if (window.socket) {
 
     // Refresh bracket live when any player locks in
     window.socket.on('tournament-lock-in', (data) => {
-        if (window.bracketPanelActive && window.activeTournament?.id == data.tournamentId) {
-            // Silently refresh bracket to show updated lock-in dots
-            const prevScoringMode = window._bracketScoringMode;
-            openTournamentDetails(data.tournamentId).then && openTournamentDetails(data.tournamentId);
-            window._bracketScoringMode = prevScoringMode;
+        if (!window.bracketPanelActive || window.activeTournament?.id != data.tournamentId) return;
+
+        // Update the cached tournament's match lockedPlayers directly
+        const t = window.activeTournament;
+        if (t?.bracket?.rounds) {
+            t.bracket.rounds.forEach(round => {
+                (round.matches || []).forEach(match => {
+                    if (match.matchId == data.matchId) {
+                        if (!match.lockedPlayers) match.lockedPlayers = [];
+                        if (!match.lockedPlayers.includes(data.userId)) {
+                            match.lockedPlayers.push(data.userId);
+                        }
+                        if (data.bothLocked) match.roundLocked = true;
+                    }
+                });
+            });
+        }
+
+        // Update lock pill DOM directly — no full re-render needed
+        const matchId = data.matchId;
+        const userId  = String(data.userId);
+
+        // Update status pills under the match cards
+        document.querySelectorAll(`[data-lock-match="${matchId}"]`).forEach(pill => {
+            if (String(pill.dataset.lockUser) === userId) {
+                pill.innerHTML = `<span style="font-size:10px;line-height:1">✔</span><span style="font-size:8px;font-weight:700;color:#57f287;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;flex:1;min-width:0">${pill.dataset.lockName||''}</span>`;
+                pill.style.background = 'rgba(35,165,90,.12)';
+                pill.style.borderColor = 'rgba(35,165,90,.3)';
+            }
+        });
+
+        // Hide lock button if it's now this user's turn
+        if (String(data.userId) === String(currentUserId)) {
+            const lockBtn = document.querySelector(`[data-lock-btn="${matchId}"]`);
+            if (lockBtn) lockBtn.style.display = 'none';
+        }
+
+        // If both locked, update Ready badge
+        if (data.bothLocked) {
+            const readyBadge = document.querySelector(`[data-lock-ready="${matchId}"]`);
+            if (readyBadge) { readyBadge.style.display = 'inline-flex'; }
         }
     });
 
@@ -1802,6 +2057,36 @@ if (window.socket) {
     });
     window.socket.on('tournament-closed', (data) => {
         loadTournaments();
+    });
+
+    // Self-report result events — refresh bracket and notify
+    window.socket.on('tournament-result', (data) => {
+        if (data.status === 'agreed' || data.status === 'resolved') {
+            // Auto-advance happened — refresh bracket
+            if (window.bracketPanelActive && window.activeTournament?.id == data.tournamentId) {
+                setTimeout(() => openTournamentDetails(data.tournamentId), 300);
+            }
+            loadTournaments();
+        } else if (data.status === 'disputed') {
+            // Host gets a notification with a button to resolve
+            if (window.activeTournament?.hostId == currentUserId || currentUserId === window.activeTournament?.hostId) {
+                if (typeof pushNotif === 'function') {
+                    pushNotif({ type: 'tournament', icon: '⚠', text: `<b>Score dispute</b> in <b>${window.activeTournament?.name || 'tournament'}</b> — players reported different results. Tap to resolve.`,
+                        actions: [{ label: 'Resolve', action: `openTournamentDetails:${data.tournamentId}`, style: 'primary' }]
+                    });
+                }
+                shakeBell();
+            }
+            // Refresh bracket to show dispute badge
+            if (window.bracketPanelActive && window.activeTournament?.id == data.tournamentId) {
+                setTimeout(() => openTournamentDetails(data.tournamentId), 300);
+            }
+        } else if (data.status === 'submitted') {
+            // Opponent sees "waiting for confirmation" update
+            if (window.bracketPanelActive && window.activeTournament?.id == data.tournamentId) {
+                setTimeout(() => openTournamentDetails(data.tournamentId), 300);
+            }
+        }
     });
 }
 

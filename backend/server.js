@@ -347,6 +347,18 @@ wss.on("connection", (ws, req) => {
       return;
     }
 
+    // ── Tournament result submitted / auto-advanced / disputed ──
+    if (msg.type === "tournament-result") {
+      broadcast(user.peerId, {
+        type: "tournament-result",
+        tournamentId: msg.tournamentId,
+        matchId: msg.matchId,
+        status: msg.status,         // 'submitted' | 'agreed' | 'disputed' | 'resolved'
+        targetUserId: msg.targetUserId || null,
+      });
+      return;
+    }
+
     // ── 1-1 call signalling ──────────────────────────────
     if (["call-invite","call-accept","call-decline","call-offer","call-answer","call-candidate","call-end"].includes(msg.type)) {
       const target = clients.get(msg.to);
