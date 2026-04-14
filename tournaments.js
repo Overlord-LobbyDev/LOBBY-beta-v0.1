@@ -135,6 +135,7 @@ async function handleTournamentSubmit(e) {
         prize: document.getElementById('tournamentPrize').value,
         hasLosersBracket:     document.getElementById('tournamentLosers')?.checked || false,
         hasPointsTally:       document.getElementById('tournamentPoints')?.checked !== false,
+        hostJoinsAsPlayer:    document.getElementById('tournamentHostJoins')?.checked !== false,
         scheduledStart:       document.getElementById('tournamentScheduleToggle')?.checked
                                 ? document.getElementById('tournamentScheduledTime')?.value || null
                                 : null,
@@ -426,15 +427,8 @@ function showBracketPanel(tournament) {
         const sBdr    = isWinner ? 'rgba(35,165,90,.3)' : 'rgba(255,255,255,.1)';
         const sClr    = isWinner ? '#57f287' : 'var(--text-3)';
 
-        // Lock-in indicator — green dot on avatar corner, or grey if not locked
-        const lockDot = tournament.status === 'in-progress'
-            ? `<div style="position:absolute;bottom:-1px;right:-1px;width:10px;height:10px;border-radius:50%;background:${isLocked?'#23a55a':'rgba(255,255,255,.15)'};border:1.5px solid var(--bg-1);z-index:2" title="${isLocked?'Locked in':'Not locked in'}"></div>` : '';
-
         return `<div style="display:flex;align-items:center;gap:10px;padding:10px 12px;${cardBg}border:${border};border-radius:10px;${opac}box-shadow:0 3px 10px rgba(0,0,0,.22);height:${CARD_H}px;transition:border-color .15s" onmouseover="this.style.borderColor='rgba(249,168,212,.45)'" onmouseout="this.style.borderColor='${isWinner?'rgba(35,165,90,.45)':hasCustom&&cardData.borderColour?cardData.borderColour:'rgba(255,255,255,.09)'}'">
-            <div style="position:relative;width:34px;height:34px;flex-shrink:0">
-              <div style="width:34px;height:34px;border-radius:9px;overflow:hidden;background:linear-gradient(135deg,var(--accent),var(--accent-h));display:flex;align-items:center;justify-content:center;box-shadow:0 2px 6px rgba(0,0,0,.3)">${avatarContent}</div>
-              ${lockDot}
-            </div>
+            <div style="width:34px;height:34px;border-radius:9px;flex-shrink:0;overflow:hidden;background:linear-gradient(135deg,var(--accent),var(--accent-h));display:flex;align-items:center;justify-content:center;box-shadow:0 2px 6px rgba(0,0,0,.3)">${avatarContent}</div>
             <span style="flex:1;font-size:12px;font-weight:700;color:${nameClr};overflow:hidden;text-overflow:ellipsis;white-space:nowrap;text-shadow:${hasCustom?'0 1px 4px rgba(0,0,0,.7)':''}">${p?.username||'TBD'}</span>
             <span style="font-size:11px;font-weight:700;background:${sBg};border:1px solid ${sBdr};border-radius:5px;padding:3px 8px;min-width:26px;text-align:center;color:${sClr}">${score!=null?score:'-'}</span>
         </div>`;
@@ -545,18 +539,33 @@ function showBracketPanel(tournament) {
                     </div>`;
                 } // end canEdit else
             } else {
-                // Normal view — add lock-in button for players who are in this match
-                const isInMatch = (p1?.userId === currentUserId || p2?.userId === currentUserId) && tournament.status === 'in-progress' && !!mid;
-                const alreadyLocked = isInMatch && (match.lockedPlayers||[]).includes(currentUserId);
-                const lockBtn = isInMatch
-                    ? `<div style="position:absolute;left:${x}px;top:${matchCY + MATCH_H + 4}px;width:${MATCH_W}px;display:flex;justify-content:center">
-                         ${alreadyLocked
-                           ? `<span style="font-size:9px;font-weight:800;color:#57f287;background:rgba(35,165,90,.12);border:1px solid rgba(35,165,90,.25);border-radius:5px;padding:3px 10px">✅ Locked In</span>`
-                           : `<button onclick="bracketLockIn('${tournament.id}','${mid}')" style="font-size:9px;font-weight:800;padding:3px 10px;background:rgba(250,166,26,.15);color:rgba(250,200,80,.9);border:1px solid rgba(250,166,26,.3);border-radius:5px;cursor:pointer;font-family:inherit" onmouseover="this.style.background='rgba(250,166,26,.28)'" onmouseout="this.style.background='rgba(250,166,26,.15)'">🔒 Lock In</button>`}
-                       </div>` : '';
-                matchCards += `<div style="position:absolute;left:${x}px;top:${matchCY}px;width:${MATCH_W}px">${playerCard(p1, p1w, p2w && !p1w, match.player1Score, (match.lockedPlayers||[]).includes(p1?.userId))}</div>`;
-                matchCards += `<div style="position:absolute;left:${x}px;top:${matchCY + CARD_H + CARD_GAP}px;width:${MATCH_W}px">${playerCard(p2, p2w, p1w && !p2w, match.player2Score, (match.lockedPlayers||[]).includes(p2?.userId))}</div>`;
-                if (lockBtn) matchCards += lockBtn;
+                // Normal view
+                // Normalise locked list to strings for safe comparison
+                const locked = (match.lockedPlayers||[]).map(String);
+                const p1locked = locked.includes(String(p1?.userId));
+                const p2locked = locked.includes(String(p2?.userId));
+                const isInMatch = (String(p1?.userId) === String(currentUserId) || String(p2?.userId) === String(currentUserId)) && tournament.status === 'in-progress' && !!mid;
+                const iAmP1 = String(p1?.userId) === String(currentUserId);
+                const myLocked = iAmP1 ? p1locked : p2locked;
+
+                matchCards += `<div style="position:absolute;left:${x}px;top:${matchCY}px;width:${MATCH_W}px">${playerCard(p1, p1w, p2w && !p1w, match.player1Score, false)}</div>`;
+                matchCards += `<div style="position:absolute;left:${x}px;top:${matchCY + CARD_H + CARD_GAP}px;width:${MATCH_W}px">${playerCard(p2, p2w, p1w && !p2w, match.player2Score, false)}</div>`;
+
+                // Lock-in status row — visible to everyone when match has real players & is in-progress
+                if ((p1?.userId || p2?.userId) && tournament.status === 'in-progress' && mid) {
+                    const lockRowY = matchCY + MATCH_H + 6;
+                    const statusPill = (name, isLocked) =>
+                        `<div style="flex:1;display:flex;align-items:center;gap:4px;padding:3px 7px;border-radius:5px;background:${isLocked?'rgba(35,165,90,.12)':'rgba(255,255,255,.04)'};border:1px solid ${isLocked?'rgba(35,165,90,.3)':'rgba(255,255,255,.1)'}">
+                           <span style="font-size:10px;line-height:1">${isLocked?'✔':'✘'}</span>
+                           <span style="font-size:8px;font-weight:700;color:${isLocked?'#57f287':'var(--text-3)'};overflow:hidden;text-overflow:ellipsis;white-space:nowrap;flex:1;min-width:0">${name||'TBD'}</span>
+                         </div>`;
+
+                    matchCards += `<div style="position:absolute;left:${x}px;top:${lockRowY}px;width:${MATCH_W}px;display:flex;gap:4px;align-items:center">
+                        ${statusPill(p1?.username, p1locked)}
+                        ${statusPill(p2?.username, p2locked)}
+                        ${isInMatch && !myLocked ? `<button onclick="bracketLockIn('${tournament.id}','${mid}')" style="flex-shrink:0;font-size:8px;font-weight:800;padding:3px 8px;background:rgba(250,166,26,.2);color:rgba(250,200,80,.95);border:1px solid rgba(250,166,26,.35);border-radius:5px;cursor:pointer;font-family:inherit;white-space:nowrap" onmouseover="this.style.background='rgba(250,166,26,.35)'" onmouseout="this.style.background='rgba(250,166,26,.2)'">🔒 Lock</button>` : ''}
+                    </div>`;
+                }
             }
 
             // Connector to next round — connect from mid-point between the two cards
@@ -622,27 +631,41 @@ function showBracketPanel(tournament) {
     activePlayers.sort((a, b) => (pointsMap[b.userId] || 0) - (pointsMap[a.userId] || 0));
 
     const renderPlayerRow = (p, isEliminated) => {
-        const tag = p.userId === tournament.hostId ? `<span style="font-size:8px;font-weight:700;color:var(--accent);background:rgba(249,168,212,.12);padding:2px 5px;border-radius:4px;flex-shrink:0;margin-left:3px">HOST</span>` : '';
+        const isHost = p.userId === tournament.hostId;
         const pts = pointsMap[p.userId] || 0;
-        const ptsTag = showPoints && tournament.status === 'in-progress'
-            ? `<span style="font-size:10px;font-weight:800;color:var(--accent);background:rgba(249,168,212,.1);border:1px solid rgba(249,168,212,.2);padding:1px 6px;border-radius:10px;flex-shrink:0;margin-left:auto">${pts}pts</span>` : '';
+        const avatarUrl = p.avatar_url;
+        const cardData = p.tournamentCard || {};
+        const hasImg = !!cardData.imageUrl;
+        const bgCss = hasImg
+            ? `background-image:url(${cardData.imageUrl});background-size:cover;background-position:${cardData.bgPos||'50% 50%'};`
+            : cardData.bgColour && cardData.bgColour !== '#2c3440'
+                ? `background-color:${cardData.bgColour};`
+                : 'background:var(--bg-2);';
+        const borderCss = `1px solid ${cardData.borderColour||'rgba(255,255,255,.09)'}`;
+        const nameClrCss = cardData.nameColour || 'var(--text-1)';
+
+        const av = avatarUrl
+            ? `<img src="${avatarUrl}" style="width:100%;height:100%;object-fit:cover;border-radius:7px;${isEliminated?'filter:grayscale(1)':''}">`
+            : `<span style="font-size:11px;font-weight:800;color:#fff">${(p.username||'?')[0].toUpperCase()}</span>`;
+
+        // Right-click context menu for host (setup only)
+        const ctxAttr = (isHost && tournament.status === 'setup' && p.userId !== currentUserId)
+            ? `oncontextmenu="bracketRemovePlayer(event,'${tournament.id}','${p.userId}','${p.username}')"` : '';
 
         if (isEliminated) {
-            // Greyed card for eliminated players
-            const avatarUrl = p.avatar_url;
-            const av = avatarUrl ? `<img src="${avatarUrl}" style="width:100%;height:100%;object-fit:cover;border-radius:7px;filter:grayscale(1)">` : `<span style="font-size:11px;font-weight:800;color:rgba(255,255,255,.3)">${(p.username||'?')[0].toUpperCase()}</span>`;
-            return `<div style="display:flex;align-items:center;gap:8px;padding:7px 10px;background:rgba(255,255,255,.03);border:1px solid rgba(255,255,255,.05);border-radius:8px;opacity:.5">
+            return `<div style="display:flex;align-items:center;gap:8px;padding:7px 10px;background:rgba(255,255,255,.03);border:1px solid rgba(255,255,255,.05);border-radius:8px;opacity:.45" ${ctxAttr}>
               <div style="width:26px;height:26px;flex-shrink:0;border-radius:7px;background:rgba(255,255,255,.08);display:flex;align-items:center;justify-content:center;overflow:hidden">${av}</div>
               <span style="flex:1;font-size:11px;font-weight:600;color:var(--text-3);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;text-decoration:line-through">${p.username||'Unknown'}</span>
-              ${tag}
+              ${isHost ? `<span style="font-size:8px;font-weight:700;color:var(--accent);background:rgba(249,168,212,.12);padding:2px 5px;border-radius:4px;flex-shrink:0">HOST</span>` : ''}
             </div>`;
         }
 
-        const card = playerCard(p, false, false, null, false); // sidebar: no lock dots needed
-        // Inject host tag and points
-        return card
-            .replace(`${p?.username||'TBD'}</span>`, `${p?.username||'Unknown'}</span>${tag}${ptsTag}`)
-            .replace('height:${CARD_H}px', 'height:auto;min-height:${CARD_H}px');
+        return `<div style="display:flex;align-items:center;gap:8px;padding:7px 10px;${bgCss}border:${borderCss};border-radius:8px;overflow:hidden;cursor:${isHost && tournament.status === 'setup' && p.userId !== currentUserId ? 'context-menu' : 'default'}" ${ctxAttr} title="${isHost && tournament.status === 'setup' && p.userId !== currentUserId ? 'Right-click to remove' : ''}">
+          <div style="width:26px;height:26px;flex-shrink:0;border-radius:7px;background:linear-gradient(135deg,var(--accent),var(--accent-h));display:flex;align-items:center;justify-content:center;overflow:hidden">${av}</div>
+          <span style="flex:1;font-size:11px;font-weight:700;color:${hasImg?'#fff':nameClrCss};overflow:hidden;text-overflow:ellipsis;white-space:nowrap;text-shadow:${hasImg?'0 1px 3px rgba(0,0,0,.8)':''}">${p.username||'Unknown'}</span>
+          ${isHost ? `<span style="font-size:8px;font-weight:700;color:var(--accent);background:rgba(249,168,212,.15);padding:2px 5px;border-radius:4px;flex-shrink:0">HOST</span>` : ''}
+          ${showPoints && tournament.status === 'in-progress' ? `<span style="font-size:10px;font-weight:800;color:var(--accent);background:rgba(249,168,212,.1);border:1px solid rgba(249,168,212,.2);padding:1px 6px;border-radius:10px;flex-shrink:0">${pts}pts</span>` : ''}
+        </div>`;
     };
 
     const activeHTML = activePlayers.length === 0
@@ -678,6 +701,9 @@ function showBracketPanel(tournament) {
             actionHTML += `<button style="${btnBase};background:var(--accent);color:#1a0a10" onclick="bracketJoin('${tournament.id}')">🎮 Join Tournament</button>`;
         } else if (!isHost) {
             actionHTML += `<button style="${btnBase};background:var(--bg-3);color:var(--text-2);border:1px solid rgba(255,255,255,.1)" onclick="bracketLeave('${tournament.id}')">🚪 Leave Tournament</button>`;
+        } else if (isHost && isReg) {
+            // Host is registered as player — give option to leave as player (still hosts)
+            actionHTML += `<button style="${btnBase};background:var(--bg-3);color:var(--text-3);border:1px solid rgba(255,255,255,.08);font-size:11px" onclick="bracketLeaveAsHost('${tournament.id}')">🚪 Leave as Player (stay as host)</button>`;
         }
         if (isHost) {
             actionHTML += `<button style="${btnBase};background:rgba(35,165,90,.15);color:#57f287;border:1px solid rgba(35,165,90,.3);${!canStart?'opacity:.45;cursor:not-allowed':''}" onclick="${canStart?`bracketStart('${tournament.id}')`:''}" ${!canStart?'disabled':''}> ▶ Start Tournament</button>`;
@@ -933,6 +959,61 @@ function bracketOpenScoring(tournamentId) {
 
 window.bracketDelete      = bracketDelete;
 window.bracketOpenScoring = bracketOpenScoring;
+
+// Host leaves as player but stays as host
+async function bracketLeaveAsHost(tournamentId) {
+    if (!confirm('Leave the bracket as a player? You will still be the host.')) return;
+    try {
+        const response = await fetch(`${API_BASE}/api/tournaments/${tournamentId}/leave`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${localStorage.getItem('vh_token')}` }
+        });
+        const data = await response.json();
+        if (!response.ok) throw new Error(data.error || 'Failed to leave');
+        showNotification('Left bracket as player', 'success');
+        setTimeout(() => openTournamentDetails(tournamentId), 300);
+    } catch(e) { showNotification(e.message || 'Failed to leave', 'error'); }
+}
+window.bracketLeaveAsHost = bracketLeaveAsHost;
+
+// Host removes a player via right-click context menu
+async function bracketRemovePlayer(event, tournamentId, userId, username) {
+    event.preventDefault();
+
+    // Remove any existing context menu
+    document.getElementById('_bracketCtxMenu')?.remove();
+
+    const menu = document.createElement('div');
+    menu.id = '_bracketCtxMenu';
+    menu.style.cssText = `position:fixed;left:${event.clientX}px;top:${event.clientY}px;background:var(--bg-2);border:1px solid rgba(255,255,255,.12);border-radius:8px;padding:4px;z-index:99999;min-width:160px;box-shadow:0 8px 24px rgba(0,0,0,.4)`;
+    menu.innerHTML = `
+        <div style="padding:6px 10px;font-size:10px;font-weight:700;color:var(--text-3);text-transform:uppercase;letter-spacing:.5px">${username}</div>
+        <div onclick="bracketRemovePlayerConfirm('${tournamentId}','${userId}','${username}')" style="padding:8px 12px;font-size:12px;font-weight:600;color:var(--danger);cursor:pointer;border-radius:5px;display:flex;align-items:center;gap:8px" onmouseover="this.style.background='rgba(237,66,69,.12)'" onmouseout="this.style.background=''">
+            🗑 Remove from tournament
+        </div>`;
+    document.body.appendChild(menu);
+
+    // Close on outside click
+    setTimeout(() => document.addEventListener('click', () => menu.remove(), { once: true }), 0);
+}
+
+async function bracketRemovePlayerConfirm(tournamentId, userId, username) {
+    document.getElementById('_bracketCtxMenu')?.remove();
+    if (!confirm(`Remove ${username} from the tournament?`)) return;
+    try {
+        const response = await fetch(`${API_BASE}/api/tournaments/${tournamentId}/players/${userId}`, {
+            method: 'DELETE',
+            headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${localStorage.getItem('vh_token')}` }
+        });
+        const data = await response.json();
+        if (!response.ok) throw new Error(data.error || 'Failed to remove player');
+        showNotification(`${username} removed from tournament`, 'success');
+        setTimeout(() => openTournamentDetails(tournamentId), 300);
+    } catch(e) { showNotification(e.message || 'Failed to remove player', 'error'); }
+}
+
+window.bracketRemovePlayer        = bracketRemovePlayer;
+window.bracketRemovePlayerConfirm = bracketRemovePlayerConfirm;
 
 // Save both scores for a match at once
 async function bracketSaveScores(tournamentId, matchId) {

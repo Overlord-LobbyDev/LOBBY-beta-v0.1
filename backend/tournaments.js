@@ -52,7 +52,7 @@ function verifyAuth(req, res, next) {
 // ============================================================
 router.post('/create', verifyAuth, async (req, res) => {
   try {
-    const { lobbyId, name, description, format, playerCount, rules, prize, startTime, hasLosersBracket, hasPointsTally, scheduledStart, alertBeforeMinutes } = req.body;
+    const { lobbyId, name, description, format, playerCount, rules, prize, startTime, hasLosersBracket, hasPointsTally, scheduledStart, alertBeforeMinutes, hostJoinsAsPlayer } = req.body;
     
     // Validate input
     if (!lobbyId || !name || !format || !playerCount) {
@@ -98,12 +98,16 @@ router.post('/create', verifyAuth, async (req, res) => {
     
     const tournament = result.rows[0];
     
-    // AUTO-REGISTER THE HOST AS A PLAYER
-    await pool.query(
-      `INSERT INTO tournament_players (tournament_id, user_id, username, joined_at, status)
-       VALUES ($1, $2, $3, $4, $5)`,
-      [tournament.id, req.user.id, req.user.username, new Date(), 'registered']
-    );
+    // Optionally register the host as a player (default: yes)
+    let registeredPlayersList = [];
+    if (hostJoinsAsPlayer !== false) {
+      await pool.query(
+        `INSERT INTO tournament_players (tournament_id, user_id, username, joined_at, status)
+         VALUES ($1, $2, $3, $4, $5)`,
+        [tournament.id, req.user.id, req.user.username, new Date(), 'registered']
+      );
+      registeredPlayersList = [{ userId: req.user.id, username: req.user.username, joinedAt: new Date(), status: 'registered' }];
+    }
     
     // Convert database format to JSON format for frontend
     const responseData = {
@@ -114,12 +118,7 @@ router.post('/create', verifyAuth, async (req, res) => {
       description: tournament.description,
       format: tournament.format,
       playerCount: tournament.player_count,
-      registeredPlayers: [{
-        userId: req.user.id,
-        username: req.user.username,
-        joinedAt: new Date(),
-        status: 'registered'
-      }],
+      registeredPlayers: registeredPlayersList,
       bracket: { rounds: [] },
       status: tournament.status,
       createdAt: tournament.created_at,
@@ -996,6 +995,24 @@ async function getBracketData(tournamentId) {
   
   return { rounds };
 }
+
+// ── HOST: remove a player from tournament (setup only) ───────
+router.delete('/:tournamentId/players/:userId', verifyAuth, async (req, res) => {
+  try {
+    const { tournamentId, userId } = req.params;
+    const tourResult = await pool.query('SELECT host_id, status FROM tournaments WHERE id = $1', [tournamentId]);
+    if (!tourResult.rows.length) return res.status(404).json({ error: 'Tournament not found' });
+    const t = tourResult.rows[0];
+    if (t.host_id !== req.user.id) return res.status(403).json({ error: 'Only host can remove players' });
+    if (t.status !== 'setup') return res.status(400).json({ error: 'Can only remove players before tournament starts' });
+    if (parseInt(userId) === req.user.id) return res.status(400).json({ error: 'Host cannot remove themselves this way — use the join toggle when creating' });
+    await pool.query('DELETE FROM tournament_players WHERE tournament_id = $1 AND user_id = $2', [tournamentId, userId]);
+    res.json({ success: true });
+  } catch (err) {
+    console.error('Remove player error:', err);
+    res.status(500).json({ error: 'Failed to remove player' });
+  }
+});
 
 // ── LOCK-IN: player confirms ready for their match ───────────
 router.post('/:tournamentId/lock-in', verifyAuth, async (req, res) => {

@@ -14005,6 +14005,12 @@ setTimeout(() => { updateMyStatusUI(); }, 100);
       if (track) track.style.background = e.target.checked ? 'var(--accent)' : 'var(--bg-3)';
       if (knob)  knob.style.transform   = e.target.checked ? 'translateX(18px)' : 'translateX(0)';
     }
+    if (e.target.id === 'tournamentHostJoins') {
+      const track = document.getElementById('hostJoinsToggleTrack');
+      const knob  = document.getElementById('hostJoinsToggleKnob');
+      if (track) track.style.background = e.target.checked ? 'var(--accent)' : 'var(--bg-3)';
+      if (knob)  knob.style.transform   = e.target.checked ? 'translateX(18px)' : 'translateX(0)';
+    }
     if (e.target.id === 'tournamentPoints') {
       const track = document.getElementById('pointsToggleTrack');
       const knob  = document.getElementById('pointsToggleKnob');
@@ -14623,6 +14629,18 @@ document.addEventListener("click", () => hideProfileHoverCard());
                     <option value="double">Double Elimination</option>
                     <option value="round-robin">Round Robin</option>
                 </select>
+            </div>
+
+            <div class="form-group">
+                <label style="display:flex;align-items:center;justify-content:space-between;cursor:pointer">
+                    <span>Join as Player</span>
+                    <label style="position:relative;display:inline-block;width:40px;height:22px;cursor:pointer;margin:0">
+                        <input type="checkbox" id="tournamentHostJoins" checked style="opacity:0;width:0;height:0;position:absolute">
+                        <span id="hostJoinsToggleTrack" style="position:absolute;inset:0;background:var(--accent);border-radius:22px;transition:background .2s;border:1.5px solid rgba(255,255,255,.1)"></span>
+                        <span id="hostJoinsToggleKnob" style="position:absolute;top:3px;left:3px;width:14px;height:14px;background:#fff;border-radius:50%;transition:transform .2s;transform:translateX(18px);pointer-events:none"></span>
+                    </label>
+                </label>
+                <div style="font-size:11px;color:var(--text-3);margin-top:4px">Turn off if you want to host without competing in the bracket</div>
             </div>
 
             <div class="form-group">
