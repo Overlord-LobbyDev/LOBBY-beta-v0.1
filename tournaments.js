@@ -16,6 +16,9 @@ function initTournaments(lobbyId, userId) {
     if (typeof me !== 'undefined' && me?.tournamentCard) {
         window.currentUserTournamentCard = me.tournamentCard;
     }
+
+    // Start schedule checker (fires alerts for upcoming tournaments)
+    startScheduleChecker();
     
     // Add tournament button to lobby menu
     addTournamentButton();
@@ -130,8 +133,12 @@ async function handleTournamentSubmit(e) {
         playerCount: selectedPlayerCount,
         rules: document.getElementById('tournamentRules').value,
         prize: document.getElementById('tournamentPrize').value,
-        hasLosersBracket: document.getElementById('tournamentLosers')?.checked || false,
-        hasPointsTally:   document.getElementById('tournamentPoints')?.checked !== false
+        hasLosersBracket:     document.getElementById('tournamentLosers')?.checked || false,
+        hasPointsTally:       document.getElementById('tournamentPoints')?.checked !== false,
+        scheduledStart:       document.getElementById('tournamentScheduleToggle')?.checked
+                                ? document.getElementById('tournamentScheduledTime')?.value || null
+                                : null,
+        alertBeforeMinutes:   parseInt(document.getElementById('tournamentAlertMins')?.value) || 15
     };
 
     try {
@@ -197,12 +204,34 @@ function displayTournaments(tournaments) {
     const container = document.getElementById('tournamentsList');
     if (!container) return;
 
+    // Update status badge in sidebar header
+    if (typeof window._updateTournamentBadge === 'function') {
+        window._updateTournamentBadge(tournaments);
+    }
+
     if (tournaments.length === 0) {
         container.innerHTML = '<p style="color: #7a8591; text-align: center; padding: 2rem;">No tournaments yet. Create one to get started!</p>';
         return;
     }
 
-    container.innerHTML = tournaments.map(tournament => `
+    container.innerHTML = tournaments.map(tournament => {
+        // Build scheduled countdown string if applicable
+        let schedBadge = '';
+        if (tournament.scheduledStart && tournament.status === 'setup') {
+            const ms = new Date(tournament.scheduledStart).getTime() - Date.now();
+            if (ms > 0) {
+                const h = Math.floor(ms / 3600000);
+                const m = Math.floor((ms % 3600000) / 60000);
+                const timeStr = h > 0 ? `${h}h ${m}m` : `${m}m`;
+                const localTime = new Date(tournament.scheduledStart).toLocaleTimeString([], { hour:'2-digit', minute:'2-digit' });
+                schedBadge = `<div style="margin-top:4px;font-size:9px;color:rgba(250,200,80,.85);display:flex;align-items:center;gap:4px">
+                    <span>⏰</span>
+                    <span id="countdown_${tournament.id}">${timeStr}</span>
+                    <span style="color:var(--text-3)">· ${localTime}</span>
+                </div>`;
+            }
+        }
+        return `
         <div class="tournament-card" onclick="openTournamentDetails('${tournament.id}')">
             <div class="tournament-card-header">
                 <div class="tournament-card-title">${tournament.name}</div>
@@ -226,8 +255,9 @@ function displayTournaments(tournaments) {
                     <div class="tournament-detail-value">${new Date(tournament.createdAt).toLocaleDateString()}</div>
                 </div>
             </div>
+            ${schedBadge}
         </div>
-    `).join('');
+    `}).join('');
 }
 
 // Fetch user profile data
@@ -478,12 +508,18 @@ function showBracketPanel(tournament) {
                     matchCards += `
                     <div style="${cardStyle}">
                       <div style="padding:5px 10px 4px;background:rgba(88,101,242,.12);border-bottom:1px solid rgba(88,101,242,.2);display:flex;align-items:center;justify-content:space-between">
-                        <span style="font-size:8px;font-weight:800;text-transform:uppercase;letter-spacing:1px;color:rgba(150,160,255,.8)">Match ${mIdx + 1}</span>
-                        <button onclick="bracketSaveScores('${tournament.id}','${mid}')" style="font-size:8px;font-weight:800;padding:3px 7px;background:rgba(88,101,242,.25);color:rgba(160,170,255,.9);border:1px solid rgba(88,101,242,.4);border-radius:4px;cursor:pointer;font-family:inherit;text-transform:uppercase;letter-spacing:.4px" onmouseover="this.style.background='rgba(88,101,242,.45)'" onmouseout="this.style.background='rgba(88,101,242,.25)'">💾 Save</button>
+                        <div style="display:flex;align-items:center;gap:5px">
+                          <span style="font-size:8px;font-weight:800;text-transform:uppercase;letter-spacing:1px;color:rgba(150,160,255,.8)">Match ${mIdx + 1}</span>
+                          ${match.roundLocked ? `<span style="font-size:8px;font-weight:800;color:#57f287;background:rgba(35,165,90,.15);border:1px solid rgba(35,165,90,.3);border-radius:3px;padding:1px 4px">✅ Ready</span>` : ''}
+                        </div>
+                        <div style="display:flex;gap:4px">
+                          <button onclick="bracketSaveScores('${tournament.id}','${mid}')" style="font-size:8px;font-weight:800;padding:3px 7px;background:rgba(88,101,242,.25);color:rgba(160,170,255,.9);border:1px solid rgba(88,101,242,.4);border-radius:4px;cursor:pointer;font-family:inherit;text-transform:uppercase;letter-spacing:.4px" onmouseover="this.style.background='rgba(88,101,242,.45)'" onmouseout="this.style.background='rgba(88,101,242,.25)'">💾 Save</button>
+                        </div>
                       </div>
                       <div style="display:flex;align-items:center;gap:7px;padding:8px 10px;${rowBg(p1)}border-bottom:1px solid ${rowBorder(p1)}">
                         ${avatarDiv(p1)}
                         <span style="flex:1;font-size:11px;font-weight:700;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:${nameClr(p1)};text-shadow:${p1?.tournamentCard?.imageUrl?'0 1px 3px rgba(0,0,0,.8)':''}">${p1name}</span>
+                        ${(match.lockedPlayers||[]).includes(p1uid) ? `<span style="font-size:9px;color:#57f287;flex-shrink:0">✅</span>` : ''}
                         ${scoreInput(`s_${mid}_1`, p1score)}
                         ${winBtn(p1uid)}
                       </div>
@@ -494,15 +530,25 @@ function showBracketPanel(tournament) {
                       <div style="display:flex;align-items:center;gap:7px;padding:8px 10px;${rowBg(p2)}">
                         ${avatarDiv(p2)}
                         <span style="flex:1;font-size:11px;font-weight:700;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:${nameClr(p2)};text-shadow:${p2?.tournamentCard?.imageUrl?'0 1px 3px rgba(0,0,0,.8)':''}">${p2name}</span>
+                        ${(match.lockedPlayers||[]).includes(p2uid) ? `<span style="font-size:9px;color:#57f287;flex-shrink:0">✅</span>` : ''}
                         ${scoreInput(`s_${mid}_2`, p2score)}
                         ${winBtn(p2uid)}
                       </div>
                     </div>`;
                 } // end canEdit else
             } else {
-                // Normal view
+                // Normal view — add lock-in button for players who are in this match
+                const isInMatch = (p1?.userId === currentUserId || p2?.userId === currentUserId) && tournament.status === 'in-progress' && !!mid;
+                const alreadyLocked = isInMatch && (match.lockedPlayers||[]).includes(currentUserId);
+                const lockBtn = isInMatch
+                    ? `<div style="position:absolute;left:${x}px;top:${matchCY + MATCH_H + 4}px;width:${MATCH_W}px;display:flex;justify-content:center">
+                         ${alreadyLocked
+                           ? `<span style="font-size:9px;font-weight:800;color:#57f287;background:rgba(35,165,90,.12);border:1px solid rgba(35,165,90,.25);border-radius:5px;padding:3px 10px">✅ Locked In</span>`
+                           : `<button onclick="bracketLockIn('${tournament.id}','${mid}')" style="font-size:9px;font-weight:800;padding:3px 10px;background:rgba(250,166,26,.15);color:rgba(250,200,80,.9);border:1px solid rgba(250,166,26,.3);border-radius:5px;cursor:pointer;font-family:inherit" onmouseover="this.style.background='rgba(250,166,26,.28)'" onmouseout="this.style.background='rgba(250,166,26,.15)'">🔒 Lock In</button>`}
+                       </div>` : '';
                 matchCards += `<div style="position:absolute;left:${x}px;top:${matchCY}px;width:${MATCH_W}px">${playerCard(p1, p1w, p2w && !p1w, match.player1Score)}</div>`;
                 matchCards += `<div style="position:absolute;left:${x}px;top:${matchCY + CARD_H + CARD_GAP}px;width:${MATCH_W}px">${playerCard(p2, p2w, p1w && !p2w, match.player2Score)}</div>`;
+                if (lockBtn) matchCards += lockBtn;
             }
 
             // Connector to next round — connect from mid-point between the two cards
@@ -1457,27 +1503,178 @@ style.textContent = `
 document.head.appendChild(style);
 
 // Socket.io integration (if using real-time updates)
+// ── Lock-in ───────────────────────────────────────────────────
+async function bracketLockIn(tournamentId, matchId) {
+    try {
+        const response = await fetch(`${API_BASE}/api/tournaments/${tournamentId}/lock-in`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${localStorage.getItem('vh_token')}` },
+            body: JSON.stringify({ matchId })
+        });
+        const data = await response.json();
+        if (!response.ok) throw new Error(data.error || 'Failed to lock in');
+
+        const btn = document.getElementById(`lockInBtn_${matchId}`);
+        if (btn) {
+            btn.textContent = '✅ Locked';
+            btn.style.background = 'rgba(35,165,90,.25)';
+            btn.style.color = '#57f287';
+            btn.style.borderColor = 'rgba(35,165,90,.4)';
+            btn.disabled = true;
+        }
+
+        if (data.bothLocked) {
+            showNotification('🔒 Both players locked in — match is ready!', 'success');
+        } else {
+            showNotification('🔒 Locked in — waiting for opponent', 'success');
+        }
+
+        // Notify opponent via WebSocket
+        if (window.socket) {
+            window.socket.emit('tournament-notify', {
+                tournamentId,
+                notifType: 'lock-in-request',
+                text: `Your opponent has locked in for their match in <b>${window.activeTournament?.name || 'the tournament'}</b>. Lock in to begin!`,
+                matchId
+            });
+        }
+    } catch(e) { showNotification(e.message || 'Failed to lock in', 'error'); }
+}
+
+window.bracketLockIn = bracketLockIn;
+
+// ── Tournament schedule countdown ─────────────────────────────
+// Polls scheduled tournaments and fires alerts at the right time
+let _scheduleCheckInterval = null;
+
+function startScheduleChecker() {
+    if (_scheduleCheckInterval) clearInterval(_scheduleCheckInterval);
+    _scheduleCheckInterval = setInterval(_checkScheduledTournaments, 60 * 1000); // every minute
+    _checkScheduledTournaments(); // run immediately
+}
+
+async function _checkScheduledTournaments() {
+    try {
+        const response = await fetch(`${API_BASE}/api/tournaments/scheduled/upcoming`, {
+            headers: { 'Authorization': `Bearer ${localStorage.getItem('vh_token')}` }
+        });
+        if (!response.ok) return;
+        const tournaments = await response.json();
+        const now = Date.now();
+
+        tournaments.forEach(t => {
+            const startMs = new Date(t.scheduled_start).getTime();
+            const alertMs = (t.alert_before_minutes || 15) * 60 * 1000;
+            const alertAt = startMs - alertMs;
+            const msUntilAlert = alertAt - now;
+            const msUntilStart = startMs - now;
+
+            // Fire alert notification if within this minute's window
+            if (msUntilAlert >= 0 && msUntilAlert < 65000) {
+                const mins = Math.round(msUntilStart / 60000);
+                _fireTournamentAlert(t, mins);
+            }
+            // Fire start notification
+            if (msUntilStart >= 0 && msUntilStart < 65000) {
+                _fireTournamentAlert(t, 0);
+            }
+        });
+
+        // Update countdown displays in sidebar
+        _updateCountdownDisplays(tournaments);
+    } catch(e) { /* silent */ }
+}
+
+function _fireTournamentAlert(t, minsUntil) {
+    const isStart = minsUntil === 0;
+    const text = isStart
+        ? `🏆 <b>${t.name}</b> is starting now! Head to the bracket.`
+        : `⏰ <b>${t.name}</b> starts in <b>${minsUntil} minute${minsUntil !== 1 ? 's' : ''}</b>. Get ready!`;
+
+    // Push to notification panel
+    if (typeof pushNotif === 'function') {
+        pushNotif({ type: 'tournament', icon: '🏆', text,
+            actions: [{ label: 'View', action: `openTournamentDetails:${t.id}`, style: 'primary' }]
+        });
+    }
+
+    // Shake the bell
+    shakeBell();
+
+    // Notify registered players via WebSocket
+    if (window.socket && t.player_user_ids?.length) {
+        window.socket.emit('tournament-notify', {
+            tournamentId: t.id,
+            tournamentName: t.name,
+            notifType: isStart ? 'round-start' : 'schedule-alert',
+            text,
+            userIds: t.player_user_ids,
+            minutesUntil: minsUntil
+        });
+    }
+}
+
+function _updateCountdownDisplays(tournaments) {
+    // Update any countdown badges in the sidebar tournament cards
+    const now = Date.now();
+    tournaments.forEach(t => {
+        const el = document.getElementById(`countdown_${t.id}`);
+        if (!el || !t.scheduled_start) return;
+        const ms = new Date(t.scheduled_start).getTime() - now;
+        if (ms <= 0) { el.textContent = 'Starting now'; return; }
+        const h = Math.floor(ms / 3600000);
+        const m = Math.floor((ms % 3600000) / 60000);
+        el.textContent = h > 0 ? `in ${h}h ${m}m` : `in ${m}m`;
+    });
+}
+
+// ── Bell shake ────────────────────────────────────────────────
+function shakeBell() {
+    const bell = document.getElementById('notifNavIcon');
+    if (!bell) return;
+    bell.classList.remove('bell-shake');
+    void bell.offsetWidth; // reflow to restart animation
+    bell.classList.add('bell-shake');
+    setTimeout(() => bell.classList.remove('bell-shake'), 800);
+}
+window.shakeBell = shakeBell;
+
+// ── WebSocket: incoming tournament notification ───────────────
 if (window.socket) {
+    window.socket.on('tournament-notify', (data) => {
+        if (data.notifType === 'lock-in-request') {
+            if (typeof pushNotif === 'function') {
+                pushNotif({ type: 'tournament', icon: '🔒', text: data.text,
+                    actions: data.matchId ? [{ label: 'Lock In', action: `lockIn:${data.tournamentId}:${data.matchId}`, style: 'primary' }] : []
+                });
+            }
+            shakeBell();
+        } else if (data.notifType === 'schedule-alert' || data.notifType === 'round-start') {
+            if (typeof pushNotif === 'function') {
+                pushNotif({ type: 'tournament', icon: '🏆', text: data.text,
+                    actions: [{ label: 'View Bracket', action: `openTournamentDetails:${data.tournamentId}`, style: 'primary' }]
+                });
+            }
+            shakeBell();
+        }
+    });
+
     window.socket.on('tournament-update', (data) => {
-        console.log('Tournament update:', data);
         loadTournaments();
     });
-
     window.socket.on('bracket-generated', (data) => {
-        console.log('Bracket generated:', data);
         loadTournaments();
     });
-
     window.socket.on('match-completed', (data) => {
-        console.log('Match completed:', data);
         loadTournaments();
     });
-
     window.socket.on('tournament-closed', (data) => {
-        console.log('Tournament closed:', data);
         loadTournaments();
     });
 }
+
+// Start the schedule checker when tournaments are initialised
+// (called from initTournaments)
 
 // Export functions
 window.initTournaments = initTournaments;

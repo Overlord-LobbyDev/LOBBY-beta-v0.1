@@ -81,6 +81,17 @@ function broadcast(senderId, msg) {
   }
 }
 
+// Send to specific user IDs only (for targeted tournament notifications)
+function broadcastToUserIds(userIds, msg) {
+  const json = JSON.stringify(msg);
+  const idSet = new Set(userIds.map(String));
+  for (const client of clients.values()) {
+    if (idSet.has(String(client.userId)) && client.ws.readyState === 1) {
+      client.ws.send(json);
+    }
+  }
+}
+
 function broadcastOnlineStatus() {
   const onlineUsers = [...clients.values()]
     .filter(c => c.presenceStatus !== "invisible")
@@ -306,6 +317,20 @@ wss.on("connection", (ws, req) => {
         type: "match-result",
         tournamentId: msg.tournamentId,
         winnerName: msg.winnerName
+      });
+      return;
+    }
+
+    // ── Tournament targeted notification (schedule alerts, lock-in requests) ──
+    if (msg.type === "tournament-notify") {
+      broadcastToUserIds(msg.userIds || [], {
+        type: "tournament-notify",
+        tournamentId: msg.tournamentId,
+        tournamentName: msg.tournamentName,
+        notifType: msg.notifType,   // "schedule-alert" | "lock-in-request" | "round-start"
+        text: msg.text,
+        matchId: msg.matchId || null,
+        minutesUntil: msg.minutesUntil || null,
       });
       return;
     }

@@ -21,6 +21,10 @@ if (process.env.DATABASE_URL) {
     "ALTER TABLE tournaments ADD COLUMN IF NOT EXISTS winner_id INTEGER REFERENCES tournament_players(id) ON DELETE SET NULL",
     "ALTER TABLE tournaments ADD COLUMN IF NOT EXISTS has_losers_bracket BOOLEAN DEFAULT FALSE",
     "ALTER TABLE tournaments ADD COLUMN IF NOT EXISTS has_points_tally BOOLEAN DEFAULT TRUE",
+    "ALTER TABLE tournaments ADD COLUMN IF NOT EXISTS scheduled_start TIMESTAMPTZ DEFAULT NULL",
+    "ALTER TABLE tournaments ADD COLUMN IF NOT EXISTS alert_before_minutes INTEGER DEFAULT 15",
+    "ALTER TABLE tournament_matches ADD COLUMN IF NOT EXISTS locked_players JSONB DEFAULT '[]'",
+    "ALTER TABLE tournament_matches ADD COLUMN IF NOT EXISTS round_locked BOOLEAN DEFAULT FALSE",
     "ALTER TABLE tournament_matches ADD COLUMN IF NOT EXISTS player1_score INTEGER DEFAULT 0",
     "ALTER TABLE tournament_matches ADD COLUMN IF NOT EXISTS player2_score INTEGER DEFAULT 0",
     "ALTER TABLE users ADD COLUMN IF NOT EXISTS tournament_card_image_url TEXT DEFAULT NULL",
@@ -48,7 +52,7 @@ function verifyAuth(req, res, next) {
 // ============================================================
 router.post('/create', verifyAuth, async (req, res) => {
   try {
-    const { lobbyId, name, description, format, playerCount, rules, prize, startTime, hasLosersBracket, hasPointsTally } = req.body;
+    const { lobbyId, name, description, format, playerCount, rules, prize, startTime, hasLosersBracket, hasPointsTally, scheduledStart, alertBeforeMinutes } = req.body;
     
     // Validate input
     if (!lobbyId || !name || !format || !playerCount) {
@@ -69,8 +73,9 @@ router.post('/create', verifyAuth, async (req, res) => {
     const result = await pool.query(
       `INSERT INTO tournaments 
         (lobby_id, host_id, name, description, format, player_count, 
-         max_players, status, rules, prize, start_time, has_losers_bracket, has_points_tally)
-       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13)
+         max_players, status, rules, prize, start_time, has_losers_bracket, has_points_tally,
+         scheduled_start, alert_before_minutes)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15)
        RETURNING *`,
       [
         lobbyId,
@@ -85,7 +90,9 @@ router.post('/create', verifyAuth, async (req, res) => {
         prize || null,
         startTime ? new Date(startTime) : null,
         hasLosersBracket ? true : false,
-        hasPointsTally !== false
+        hasPointsTally !== false,
+        scheduledStart ? new Date(scheduledStart) : null,
+        alertBeforeMinutes ? parseInt(alertBeforeMinutes) : 15
       ]
     );
     
@@ -187,7 +194,11 @@ router.get('/lobby/:lobbyId', async (req, res) => {
           registeredPlayers,
           status: tournament.status,
           createdAt: tournament.created_at,
-          startTime: tournament.start_time
+          startTime: tournament.start_time,
+          scheduledStart: tournament.scheduled_start || null,
+          alertBeforeMinutes: tournament.alert_before_minutes || 15,
+          hasLosersBracket: tournament.has_losers_bracket || false,
+          hasPointsTally: tournament.has_points_tally !== false
         };
       })
     );
@@ -269,7 +280,9 @@ router.get('/:tournamentId', async (req, res) => {
       endTime: tournament.end_time,
       rules: tournament.rules,
       prize: tournament.prize,
-      winnerId: null
+      winnerId: null,
+      scheduledStart: tournament.scheduled_start || null,
+      alertBeforeMinutes: tournament.alert_before_minutes || 15
     };
 
     // Resolve winner_id (tournament_players.id) → user_id
@@ -923,7 +936,8 @@ async function getBracketData(tournamentId) {
                 p2.user_id as player2_user_id, p2.username as player2_username,
                 u2.avatar_url as player2_avatar,
                 m.winner_id, m.status,
-                m.player1_score, m.player2_score
+                m.player1_score, m.player2_score,
+                m.locked_players, m.round_locked
          FROM tournament_matches m
          LEFT JOIN tournament_players p1 ON m.player1_id = p1.id
          LEFT JOIN tournament_players p2 ON m.player2_id = p2.id
@@ -959,6 +973,8 @@ async function getBracketData(tournamentId) {
         matchNumber: m.match_number,
         player1Score: m.player1_score ?? 0,
         player2Score: m.player2_score ?? 0,
+        lockedPlayers: m.locked_players || [],
+        roundLocked: m.round_locked || false,
         player1: m.player1_user_id ? {
           userId: m.player1_user_id, username: m.player1_username, avatar_url: m.player1_avatar || null,
           tournamentCard: getCard(m.player1_user_id)
@@ -980,5 +996,75 @@ async function getBracketData(tournamentId) {
   
   return { rounds };
 }
+
+// ── LOCK-IN: player confirms ready for their match ───────────
+router.post('/:tournamentId/lock-in', verifyAuth, async (req, res) => {
+  try {
+    const { tournamentId } = req.params;
+    const { matchId } = req.body;
+    const userId = req.user.id;
+
+    // Get the match
+    const matchResult = await pool.query(
+      `SELECT id, locked_players, player1_id, player2_id, round_locked
+       FROM tournament_matches WHERE id = $1 AND tournament_id = $2`,
+      [matchId, tournamentId]
+    );
+    if (!matchResult.rows.length) return res.status(404).json({ error: 'Match not found' });
+
+    const match = matchResult.rows[0];
+
+    // Verify this user is in this match
+    const playerCheck = await pool.query(
+      `SELECT id FROM tournament_players WHERE tournament_id = $1 AND user_id = $2 AND id IN ($3, $4)`,
+      [tournamentId, userId, match.player1_id || 0, match.player2_id || 0]
+    );
+    if (!playerCheck.rows.length) return res.status(403).json({ error: 'You are not in this match' });
+
+    // Add user to locked_players list
+    const locked = match.locked_players || [];
+    if (!locked.includes(userId)) locked.push(userId);
+    await pool.query(
+      `UPDATE tournament_matches SET locked_players = $1 WHERE id = $2`,
+      [JSON.stringify(locked), matchId]
+    );
+
+    // Check if both players locked in — get the other player's user_id
+    const p1 = await pool.query('SELECT user_id FROM tournament_players WHERE id = $1', [match.player1_id]);
+    const p2 = await pool.query('SELECT user_id FROM tournament_players WHERE id = $1', [match.player2_id]);
+    const p1uid = p1.rows[0]?.user_id;
+    const p2uid = p2.rows[0]?.user_id;
+    const bothLocked = p1uid && p2uid && locked.includes(p1uid) && locked.includes(p2uid);
+
+    if (bothLocked) {
+      await pool.query(`UPDATE tournament_matches SET round_locked = TRUE WHERE id = $1`, [matchId]);
+    }
+
+    res.json({ success: true, lockedPlayers: locked, bothLocked });
+  } catch (err) {
+    console.error('Lock-in error:', err);
+    res.status(500).json({ error: 'Failed to lock in' });
+  }
+});
+
+// ── SCHEDULE: get upcoming scheduled tournaments (for scheduler loop) ──
+router.get('/scheduled/upcoming', async (req, res) => {
+  try {
+    const result = await pool.query(
+      `SELECT t.id, t.name, t.scheduled_start, t.alert_before_minutes, t.lobby_id, t.host_id,
+              ARRAY_AGG(tp.user_id) as player_user_ids
+       FROM tournaments t
+       LEFT JOIN tournament_players tp ON tp.tournament_id = t.id
+       WHERE t.status = 'setup'
+         AND t.scheduled_start IS NOT NULL
+         AND t.scheduled_start > NOW()
+       GROUP BY t.id`,
+      []
+    );
+    res.json(result.rows);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
 
 module.exports = router;

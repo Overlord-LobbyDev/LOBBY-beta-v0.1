@@ -242,7 +242,7 @@
       transform:translateY(-1px); border-color:var(--accent);
     }
     .sidebar-invite-btn.hidden { display:none; }
-    .channel-section { padding:16px 0 4px; }
+    .channel-section { padding:16px 0 4px; overflow:hidden; min-width:0; }
     .channel-section-label {
       display:flex; align-items:center; justify-content:space-between;
       padding:0 12px 6px;
@@ -867,6 +867,19 @@
     #notifNavIcon { color:var(--text-2); }
     #notifNavIcon:hover { color:var(--text-1); }
     #notifNavIcon.has-unread { color:var(--text-1); }
+    @keyframes bell-shake {
+      0%   { transform: rotate(0deg); }
+      10%  { transform: rotate(-18deg); }
+      20%  { transform: rotate(18deg); }
+      30%  { transform: rotate(-14deg); }
+      40%  { transform: rotate(14deg); }
+      50%  { transform: rotate(-8deg); }
+      60%  { transform: rotate(8deg); }
+      75%  { transform: rotate(-4deg); }
+      90%  { transform: rotate(4deg); }
+      100% { transform: rotate(0deg); }
+    }
+    #notifNavIcon.bell-shake { animation: bell-shake 0.8s ease; transform-origin: top center; }
 
     #notifPanel {
       position:fixed; top:72px; left:72px; width:340px;
@@ -2800,11 +2813,16 @@
     .tournament-card {
         background: var(--bg-2, rgba(26, 31, 46, 0.8));
         border: 1px solid rgba(100, 200, 255, 0.15);
-        border-radius: 8px;
-        padding: 10px 12px;
-        margin-bottom: 8px;
+        border-radius: 7px;
+        padding: 8px 10px;
+        margin-bottom: 5px;
         cursor: pointer;
         transition: border-color .2s, background .2s;
+        box-sizing: border-box;
+        width: 100%;
+        max-width: 100%;
+        min-width: 0;
+        overflow: hidden;
     }
 
     .tournament-card:hover {
@@ -2816,25 +2834,26 @@
         display: flex;
         justify-content: space-between;
         align-items: center;
-        margin-bottom: 8px;
+        margin-bottom: 5px;
     }
 
     .tournament-card-title {
-        font-size: 14px;
+        font-size: 13px;
         font-weight: 700;
         color: #64c8ff;
     }
 
     .tournament-card-status {
         display: inline-block;
-        padding: 2px 8px;
+        padding: 1px 6px;
         background: rgba(100, 200, 255, 0.1);
         border: 1px solid rgba(100, 200, 255, 0.3);
-        border-radius: 4px;
-        font-size: 10px;
+        border-radius: 3px;
+        font-size: 9px;
         font-weight: 700;
         color: #64c8ff;
         text-transform: uppercase;
+        letter-spacing: .3px;
     }
 
     .tournament-card-status.in-progress {
@@ -2846,8 +2865,8 @@
     .tournament-card-details {
         display: grid;
         grid-template-columns: repeat(2, 1fr);
-        gap: 5px 8px;
-        font-size: 12px;
+        gap: 3px 8px;
+        font-size: 11px;
     }
 
     .tournament-detail {
@@ -2856,16 +2875,16 @@
     }
 
     .tournament-detail-label {
-        font-size: 9px;
+        font-size: 8px;
         text-transform: uppercase;
         color: #7a8591;
-        margin-bottom: 1px;
+        margin-bottom: 0;
         letter-spacing: .4px;
     }
 
     .tournament-detail-value {
         font-weight: 700;
-        font-size: 12px;
+        font-size: 11px;
         color: #ffffff;
     }
 
@@ -3038,7 +3057,7 @@
       Invite People
     </button>
   </div>
-  <div id="channelSidebarContent" style="flex:1;overflow-y:auto;display:flex;flex-direction:column;"></div>
+  <div id="channelSidebarContent" style="flex:1;overflow-y:auto;overflow-x:hidden;display:flex;flex-direction:column;min-width:0;"></div>
   <div class="user-panel" id="chatUserPanel">
     <div class="user-panel-banner" id="chatPanelBanner"></div>
     <div class="user-panel-row1">
@@ -4900,13 +4919,17 @@ function renderChannelList(channels, members, server) {
   const isAloneOwner = isOwner && members.length <= 1;
 
   html += `<div class="channel-section" style="margin-top:12px;">
-    <div class="channel-section-label">
+    <div class="channel-section-label" onclick="window._toggleTournaments()" style="cursor:pointer;user-select:none;display:flex;align-items:center;justify-content:space-between;">
       <span style="display:flex;align-items:center;gap:6px">
         <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"></polyline></svg>
         Tournaments
+        <span id="tournamentStatusBadge" style="display:none;font-size:8px;font-weight:800;padding:1px 5px;border-radius:3px;text-transform:uppercase;letter-spacing:.3px"></span>
       </span>
+      <svg id="tournamentsChevron" width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" style="transition:transform .2s;flex-shrink:0"><polyline points="6 9 12 15 18 9"></polyline></svg>
     </div>
-    <div id="tournamentsList" class="tournaments-list"></div>
+    <div id="tournamentsDropdown" style="overflow:hidden;max-height:600px;transition:max-height .25s ease,opacity .2s;opacity:1">
+      <div id="tournamentsList" class="tournaments-list" style="padding:0 10px;box-sizing:border-box;width:100%;overflow:hidden;"></div>
+    </div>
   </div>`;
   html += `<div style="margin-top:auto;padding-top:12px">
     <div class="server-actions">
@@ -7714,6 +7737,14 @@ function handleNotifAction(id, action, event) {
   } else if (action === "view-post" && n?.meta?.postId) {
     closeNotifPanel();
     // scroll to post in feed if visible
+  } else if (action?.startsWith('openTournamentDetails:')) {
+    const tId = action.split(':')[1];
+    closeNotifPanel();
+    if (typeof openTournamentDetails === 'function') openTournamentDetails(tId);
+  } else if (action?.startsWith('lockIn:')) {
+    const [, tId, mId] = action.split(':');
+    closeNotifPanel();
+    if (typeof bracketLockIn === 'function') bracketLockIn(tId, mId);
   }
 
   if (!document.getElementById("notifList")?.children.length ||
@@ -12128,7 +12159,33 @@ boot();
   const membersSidebar = document.getElementById("membersSidebar");
   if (membersSidebar) { membersSidebar.style.display="none"; membersSidebar.classList.remove("open"); }
   // Flag: startup call to showHomePanel should NOT open sidebars
-  window._startupComplete = false;
+// ── Tournament sidebar collapse ──────────────────────────────
+window._tournamentsOpen = true;
+window._toggleTournaments = function() {
+  const dropdown = document.getElementById('tournamentsDropdown');
+  const chevron  = document.getElementById('tournamentsChevron');
+  if (!dropdown) return;
+  window._tournamentsOpen = !window._tournamentsOpen;
+  dropdown.style.maxHeight  = window._tournamentsOpen ? '600px' : '0';
+  dropdown.style.opacity    = window._tournamentsOpen ? '1' : '0';
+  if (chevron) chevron.style.transform = window._tournamentsOpen ? '' : 'rotate(-90deg)';
+};
+
+// Called by displayTournaments to update the status badge in the header
+window._updateTournamentBadge = function(tournaments) {
+  const badge = document.getElementById('tournamentStatusBadge');
+  if (!badge) return;
+  const active = (tournaments || []).find(t => t.status === 'in-progress' || t.status === 'setup');
+  if (!active) { badge.style.display = 'none'; return; }
+  const isLive = active.status === 'in-progress';
+  badge.textContent     = isLive ? '● Live' : '· Setup';
+  badge.style.display   = 'inline-block';
+  badge.style.color     = isLive ? '#57f287' : 'var(--yellow, #faa61a)';
+  badge.style.background = isLive ? 'rgba(35,165,90,.15)' : 'rgba(250,166,26,.1)';
+  badge.style.border    = `1px solid ${isLive ? 'rgba(35,165,90,.3)' : 'rgba(250,166,26,.25)'}`;
+};
+
+window._startupComplete = false;
 })();
 showHomePanel();
 // After the startup showHomePanel, mark startup done so future calls open sidebars normally
@@ -13954,6 +14011,22 @@ setTimeout(() => { updateMyStatusUI(); }, 100);
       if (track) track.style.background = e.target.checked ? 'var(--accent)' : 'var(--bg-3)';
       if (knob)  knob.style.transform   = e.target.checked ? 'translateX(18px)' : 'translateX(0)';
     }
+    if (e.target.id === 'tournamentScheduleToggle') {
+      const track  = document.getElementById('scheduleToggleTrack');
+      const knob   = document.getElementById('scheduleToggleKnob');
+      const fields = document.getElementById('scheduleFields');
+      if (track)  track.style.background = e.target.checked ? 'var(--accent)' : 'var(--bg-3)';
+      if (knob)   knob.style.transform   = e.target.checked ? 'translateX(18px)' : 'translateX(0)';
+      if (fields) fields.style.display   = e.target.checked ? 'block' : 'none';
+      // Pre-fill datetime with 1 hour from now if empty
+      if (e.target.checked) {
+        const dt = document.getElementById('tournamentScheduledTime');
+        if (dt && !dt.value) {
+          const d = new Date(Date.now() + 3600000);
+          dt.value = new Date(d.getTime() - d.getTimezoneOffset() * 60000).toISOString().slice(0, 16);
+        }
+      }
+    }
   });
 
   // ── Tournament match card settings ───────────────────────────
@@ -14574,6 +14647,38 @@ document.addEventListener("click", () => hideProfileHoverCard());
                     </label>
                 </label>
                 <div style="font-size:11px;color:var(--text-3);margin-top:4px">Show running point totals next to player names (based on match scores)</div>
+            </div>
+
+            <div class="form-group">
+                <label style="display:flex;align-items:center;justify-content:space-between;cursor:pointer">
+                    <span>Schedule for Later</span>
+                    <label style="position:relative;display:inline-block;width:40px;height:22px;cursor:pointer;margin:0">
+                        <input type="checkbox" id="tournamentScheduleToggle" style="opacity:0;width:0;height:0;position:absolute">
+                        <span id="scheduleToggleTrack" style="position:absolute;inset:0;background:var(--bg-3);border-radius:22px;transition:background .2s;border:1.5px solid rgba(255,255,255,.1)"></span>
+                        <span id="scheduleToggleKnob" style="position:absolute;top:3px;left:3px;width:14px;height:14px;background:#fff;border-radius:50%;transition:transform .2s;pointer-events:none"></span>
+                    </label>
+                </label>
+                <div style="font-size:11px;color:var(--text-3);margin-top:4px">Set a date and time for the tournament to begin</div>
+            </div>
+
+            <div id="scheduleFields" style="display:none">
+                <div class="form-group">
+                    <label for="tournamentScheduledTime">Start Date &amp; Time <span style="font-size:10px;color:var(--text-3)">(your local timezone)</span></label>
+                    <input type="datetime-local" id="tournamentScheduledTime" style="color-scheme:dark">
+                    <div style="font-size:11px;color:var(--text-3);margin-top:4px">Times are shown to all players in their own timezone automatically</div>
+                </div>
+                <div class="form-group">
+                    <label for="tournamentAlertMins">Alert players before start</label>
+                    <select id="tournamentAlertMins" style="color-scheme:dark">
+                        <option value="5">5 minutes before</option>
+                        <option value="10">10 minutes before</option>
+                        <option value="15" selected>15 minutes before</option>
+                        <option value="30">30 minutes before</option>
+                        <option value="60">1 hour before</option>
+                        <option value="120">2 hours before</option>
+                        <option value="1440">1 day before</option>
+                    </select>
+                </div>
             </div>
 
             <div class="form-group">
