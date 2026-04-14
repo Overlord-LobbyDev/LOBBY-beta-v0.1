@@ -20,6 +20,7 @@ if (process.env.DATABASE_URL) {
   const migrations = [
     "ALTER TABLE tournaments ADD COLUMN IF NOT EXISTS winner_id INTEGER REFERENCES tournament_players(id) ON DELETE SET NULL",
     "ALTER TABLE tournaments ADD COLUMN IF NOT EXISTS has_losers_bracket BOOLEAN DEFAULT FALSE",
+    "ALTER TABLE tournaments ADD COLUMN IF NOT EXISTS has_points_tally BOOLEAN DEFAULT TRUE",
     "ALTER TABLE tournament_matches ADD COLUMN IF NOT EXISTS player1_score INTEGER DEFAULT 0",
     "ALTER TABLE tournament_matches ADD COLUMN IF NOT EXISTS player2_score INTEGER DEFAULT 0",
     "ALTER TABLE users ADD COLUMN IF NOT EXISTS tournament_card_image_url TEXT DEFAULT NULL",
@@ -47,7 +48,7 @@ function verifyAuth(req, res, next) {
 // ============================================================
 router.post('/create', verifyAuth, async (req, res) => {
   try {
-    const { lobbyId, name, description, format, playerCount, rules, prize, startTime, hasLosersBracket } = req.body;
+    const { lobbyId, name, description, format, playerCount, rules, prize, startTime, hasLosersBracket, hasPointsTally } = req.body;
     
     // Validate input
     if (!lobbyId || !name || !format || !playerCount) {
@@ -68,8 +69,8 @@ router.post('/create', verifyAuth, async (req, res) => {
     const result = await pool.query(
       `INSERT INTO tournaments 
         (lobby_id, host_id, name, description, format, player_count, 
-         max_players, status, rules, prize, start_time, has_losers_bracket)
-       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)
+         max_players, status, rules, prize, start_time, has_losers_bracket, has_points_tally)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13)
        RETURNING *`,
       [
         lobbyId,
@@ -83,7 +84,8 @@ router.post('/create', verifyAuth, async (req, res) => {
         rules || null,
         prize || null,
         startTime ? new Date(startTime) : null,
-        hasLosersBracket ? true : false
+        hasLosersBracket ? true : false,
+        hasPointsTally !== false
       ]
     );
     
@@ -259,13 +261,24 @@ router.get('/:tournamentId', async (req, res) => {
       playerCount: tournament.player_count,
       registeredPlayers,
       bracket,
+      hasLosersBracket: tournament.has_losers_bracket || false,
+      hasPointsTally: tournament.has_points_tally !== false,
       status: tournament.status,
       createdAt: tournament.created_at,
       startTime: tournament.start_time,
       endTime: tournament.end_time,
       rules: tournament.rules,
-      prize: tournament.prize
+      prize: tournament.prize,
+      winnerId: null
     };
+
+    // Resolve winner_id (tournament_players.id) → user_id
+    if (tournament.winner_id) {
+      const winnerRow = await pool.query(
+        'SELECT user_id FROM tournament_players WHERE id = $1', [tournament.winner_id]
+      );
+      if (winnerRow.rows.length > 0) responseData.winnerId = winnerRow.rows[0].user_id;
+    }
     
     res.json(responseData);
   } catch (error) {
@@ -944,8 +957,8 @@ async function getBracketData(tournamentId) {
       const matches = matchesResult.rows.map(m => ({
         matchId: m.id,
         matchNumber: m.match_number,
-        player1Score: m.player1_score || 0,
-        player2Score: m.player2_score || 0,
+        player1Score: m.player1_score ?? 0,
+        player2Score: m.player2_score ?? 0,
         player1: m.player1_user_id ? {
           userId: m.player1_user_id, username: m.player1_username, avatar_url: m.player1_avatar || null,
           tournamentCard: getCard(m.player1_user_id)

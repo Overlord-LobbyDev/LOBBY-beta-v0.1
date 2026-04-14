@@ -2798,42 +2798,41 @@
 
     /* Tournament Bracket Card */
     .tournament-card {
-        background: linear-gradient(135deg, rgba(26, 31, 46, 0.8) 0%, rgba(15, 20, 25, 0.8) 100%);
-        border: 1px solid rgba(100, 200, 255, 0.2);
+        background: var(--bg-2, rgba(26, 31, 46, 0.8));
+        border: 1px solid rgba(100, 200, 255, 0.15);
         border-radius: 8px;
-        padding: 1rem;
-        margin-bottom: 1rem;
+        padding: 10px 12px;
+        margin-bottom: 8px;
         cursor: pointer;
-        transition: all 0.3s ease;
+        transition: border-color .2s, background .2s;
     }
 
     .tournament-card:hover {
         border-color: #64c8ff;
-        background: linear-gradient(135deg, rgba(26, 31, 46, 1) 0%, rgba(15, 20, 25, 1) 100%);
-        box-shadow: 0 4px 16px rgba(100, 200, 255, 0.2);
+        background: var(--bg-3, rgba(26, 31, 46, 1));
     }
 
     .tournament-card-header {
         display: flex;
         justify-content: space-between;
-        align-items: start;
-        margin-bottom: 0.75rem;
+        align-items: center;
+        margin-bottom: 8px;
     }
 
     .tournament-card-title {
-        font-size: 16px;
-        font-weight: 600;
+        font-size: 14px;
+        font-weight: 700;
         color: #64c8ff;
     }
 
     .tournament-card-status {
         display: inline-block;
-        padding: 0.25rem 0.75rem;
+        padding: 2px 8px;
         background: rgba(100, 200, 255, 0.1);
         border: 1px solid rgba(100, 200, 255, 0.3);
         border-radius: 4px;
-        font-size: 12px;
-        font-weight: 600;
+        font-size: 10px;
+        font-weight: 700;
         color: #64c8ff;
         text-transform: uppercase;
     }
@@ -2847,9 +2846,8 @@
     .tournament-card-details {
         display: grid;
         grid-template-columns: repeat(2, 1fr);
-        gap: 0.75rem;
-        font-size: 13px;
-        color: #b0b8c1;
+        gap: 5px 8px;
+        font-size: 12px;
     }
 
     .tournament-detail {
@@ -2858,14 +2856,16 @@
     }
 
     .tournament-detail-label {
-        font-size: 11px;
+        font-size: 9px;
         text-transform: uppercase;
         color: #7a8591;
-        margin-bottom: 0.25rem;
+        margin-bottom: 1px;
+        letter-spacing: .4px;
     }
 
     .tournament-detail-value {
-        font-weight: 600;
+        font-weight: 700;
+        font-size: 12px;
         color: #ffffff;
     }
 
@@ -13948,6 +13948,12 @@ setTimeout(() => { updateMyStatusUI(); }, 100);
       if (track) track.style.background = e.target.checked ? 'var(--accent)' : 'var(--bg-3)';
       if (knob)  knob.style.transform   = e.target.checked ? 'translateX(18px)' : 'translateX(0)';
     }
+    if (e.target.id === 'tournamentPoints') {
+      const track = document.getElementById('pointsToggleTrack');
+      const knob  = document.getElementById('pointsToggleKnob');
+      if (track) track.style.background = e.target.checked ? 'var(--accent)' : 'var(--bg-3)';
+      if (knob)  knob.style.transform   = e.target.checked ? 'translateX(18px)' : 'translateX(0)';
+    }
   });
 
   // ── Tournament match card settings ───────────────────────────
@@ -14556,6 +14562,18 @@ document.addEventListener("click", () => hideProfileHoverCard());
                     </label>
                 </label>
                 <div style="font-size:11px;color:var(--text-3);margin-top:4px">Eliminated players compete in a second bracket for a chance to return</div>
+            </div>
+
+            <div class="form-group">
+                <label style="display:flex;align-items:center;justify-content:space-between;cursor:pointer">
+                    <span>Points Tally</span>
+                    <label style="position:relative;display:inline-block;width:40px;height:22px;cursor:pointer;margin:0">
+                        <input type="checkbox" id="tournamentPoints" checked style="opacity:0;width:0;height:0;position:absolute">
+                        <span id="pointsToggleTrack" style="position:absolute;inset:0;background:var(--accent);border-radius:22px;transition:background .2s;border:1.5px solid rgba(255,255,255,.1)"></span>
+                        <span id="pointsToggleKnob" style="position:absolute;top:3px;left:3px;width:14px;height:14px;background:#fff;border-radius:50%;transition:transform .2s;transform:translateX(18px);pointer-events:none"></span>
+                    </label>
+                </label>
+                <div style="font-size:11px;color:var(--text-3);margin-top:4px">Show running point totals next to player names (based on match scores)</div>
             </div>
 
             <div class="form-group">

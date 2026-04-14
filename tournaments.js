@@ -130,7 +130,8 @@ async function handleTournamentSubmit(e) {
         playerCount: selectedPlayerCount,
         rules: document.getElementById('tournamentRules').value,
         prize: document.getElementById('tournamentPrize').value,
-        hasLosersBracket: document.getElementById('tournamentLosers')?.checked || false
+        hasLosersBracket: document.getElementById('tournamentLosers')?.checked || false,
+        hasPointsTally:   document.getElementById('tournamentPoints')?.checked !== false
     };
 
     try {
@@ -342,10 +343,13 @@ function showBracketPanel(tournament) {
     const CARD_H  = 52;   // height of one player card
     const CARD_GAP = 6;   // gap between the two player cards in a match
     const MATCH_H = CARD_H * 2 + CARD_GAP;
-    const MATCH_W = 210, COL_GAP = 56, V_PAD = 36;
-    const MATCH_GAP = 32; // gap between different matches in same round
+    const MATCH_W = 210, COL_GAP = 80, V_PAD = 36;
+    // In scoring mode the cards are taller (header + VS row) — give more vertical room
+    const scoringCardH = 130; // approx height of scoring card
+    const MATCH_GAP = window._bracketScoringMode ? 24 : 32;
+    const effectiveMatchH = window._bracketScoringMode ? scoringCardH : MATCH_H;
     const firstCount = rounds[0]?.matches?.length || 1;
-    const slotH0  = MATCH_H + MATCH_GAP;
+    const slotH0  = effectiveMatchH + MATCH_GAP;
     const totalH  = firstCount * slotH0 - MATCH_GAP;
     const totalW  = numRounds * MATCH_W + (numRounds - 1) * COL_GAP;
 
@@ -426,24 +430,75 @@ function showBracketPanel(tournament) {
                 const p1uid = p1?.userId || null;
                 const p2uid = p2?.userId || null;
                 const canEdit = hasRealMatch;
-                const dimmed = !canEdit ? 'opacity:.4;pointer-events:none;' : '';
-                const cardStyle = `position:absolute;left:${x}px;top:${matchCY}px;width:${MATCH_W + 80}px;background:var(--bg-2);border:1.5px solid ${canEdit?'rgba(88,101,242,.5)':'rgba(255,255,255,.1)'};border-radius:10px;padding:10px 12px;box-shadow:0 4px 20px rgba(88,101,242,.15);${dimmed}`;
-                matchCards += `
-                <div style="${cardStyle}">
-                  <div style="font-size:9px;font-weight:700;text-transform:uppercase;color:${canEdit?'#7289da':'var(--text-3)'};margin-bottom:8px;letter-spacing:.5px">${canEdit?'⚙ Edit Match':'⏳ Awaiting Players'}</div>
-                  <div style="display:flex;align-items:center;gap:6px;margin-bottom:6px">
-                    <span style="flex:1;font-size:11px;font-weight:700;color:var(--text-1);overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${p1name}</span>
-                    <input id="s_${mid}_1" type="number" min="0" max="999" value="${p1score}" style="width:48px;background:var(--bg-3);border:1px solid rgba(255,255,255,.15);border-radius:5px;color:var(--text-1);font-size:12px;font-weight:700;padding:4px 6px;text-align:center;outline:none" />
-                    <button style="font-size:10px;padding:4px 8px;background:rgba(35,165,90,.2);color:#57f287;border:1px solid rgba(35,165,90,.4);border-radius:5px;cursor:pointer;font-weight:700;white-space:nowrap" onclick="bracketAdvance('${tournament.id}','${mid}','${p1uid}')">▶ Win</button>
-                  </div>
-                  <div style="height:1px;background:rgba(255,255,255,.07);margin:2px 0"></div>
-                  <div style="display:flex;align-items:center;gap:6px;margin-top:6px">
-                    <span style="flex:1;font-size:11px;font-weight:700;color:var(--text-1);overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${p2name}</span>
-                    <input id="s_${mid}_2" type="number" min="0" max="999" value="${p2score}" style="width:48px;background:var(--bg-3);border:1px solid rgba(255,255,255,.15);border-radius:5px;color:var(--text-1);font-size:12px;font-weight:700;padding:4px 6px;text-align:center;outline:none" />
-                    <button style="font-size:10px;padding:4px 8px;background:rgba(35,165,90,.2);color:#57f287;border:1px solid rgba(35,165,90,.4);border-radius:5px;cursor:pointer;font-weight:700;white-space:nowrap" onclick="bracketAdvance('${tournament.id}','${mid}','${p2uid}')">▶ Win</button>
-                  </div>
-                  ${canEdit ? `<button style="margin-top:8px;width:100%;padding:5px;background:rgba(88,101,242,.2);color:#7289da;border:1px solid rgba(88,101,242,.4);border-radius:5px;cursor:pointer;font-size:11px;font-weight:700;font-family:inherit" onclick="bracketSaveScores('${tournament.id}','${mid}')">💾 Save Scores</button>` : ''}
-                </div>`;
+
+                // Avatar helpers
+                const mkAvatar = (player) => {
+                    if (player?.avatar_url) return `<img src="${player.avatar_url}" style="width:100%;height:100%;object-fit:cover;border-radius:7px;">`;
+                    const ch = (player?.username || '?')[0].toUpperCase();
+                    return `<span style="font-size:11px;font-weight:800;color:#fff">${ch}</span>`;
+                };
+
+                if (!canEdit) {
+                    // Awaiting players — compact greyed placeholder, exact MATCH_W
+                    matchCards += `
+                    <div style="position:absolute;left:${x}px;top:${matchCY}px;width:${MATCH_W}px;background:var(--bg-2);border:1px dashed rgba(255,255,255,.1);border-radius:10px;padding:12px 12px;opacity:.4">
+                      <div style="font-size:8px;font-weight:700;text-transform:uppercase;letter-spacing:1px;color:var(--text-3);margin-bottom:8px">⏳ Awaiting Players</div>
+                      <div style="height:26px;background:rgba(255,255,255,.05);border-radius:6px;margin-bottom:5px"></div>
+                      <div style="height:26px;background:rgba(255,255,255,.05);border-radius:6px"></div>
+                    </div>`;
+                } else {
+                    // Active edit card — exactly MATCH_W wide so it never overflows into next column
+                    const cardStyle = `position:absolute;left:${x}px;top:${matchCY}px;width:${MATCH_W}px;background:var(--bg-1);border:1.5px solid rgba(88,101,242,.45);border-radius:12px;overflow:hidden`;
+
+                    // Per-player card background (respects their custom card style)
+                    const rowBg = (player) => {
+                        const cd = player?.tournamentCard || (player?.userId ? playerCardMap[player.userId] : null) || {};
+                        if (cd.imageUrl) return `background-image:url(${cd.imageUrl});background-size:cover;background-position:${cd.bgPos||'50% 50%'};`;
+                        if (cd.bgColour && cd.bgColour !== '#2c3440') return `background-color:${cd.bgColour};`;
+                        return 'background:var(--bg-2);';
+                    };
+                    const rowBorder = (player) => {
+                        const cd = player?.tournamentCard || (player?.userId ? playerCardMap[player.userId] : null) || {};
+                        return cd.borderColour || 'rgba(255,255,255,.06)';
+                    };
+                    const nameClr = (player) => {
+                        const cd = player?.tournamentCard || (player?.userId ? playerCardMap[player.userId] : null) || {};
+                        return cd.nameColour || 'var(--text-1)';
+                    };
+
+                    const winBtn = (uid) => `<button onclick="bracketAdvance('${tournament.id}','${mid}','${uid}')" style="flex-shrink:0;padding:4px 8px;background:rgba(35,165,90,.18);color:#57f287;border:1px solid rgba(35,165,90,.35);border-radius:6px;cursor:pointer;font-size:10px;font-weight:800;font-family:inherit;white-space:nowrap" onmouseover="this.style.background='rgba(35,165,90,.32)'" onmouseout="this.style.background='rgba(35,165,90,.18)'">▶ Win</button>`;
+
+                    const scoreInput = (id, val) => `<input id="${id}" type="number" min="0" max="999" value="${val}" style="width:40px;flex-shrink:0;background:rgba(0,0,0,.3);border:1px solid rgba(255,255,255,.15);border-radius:5px;color:#fff;font-size:12px;font-weight:700;padding:3px 0;text-align:center;outline:none;font-family:inherit" onfocus="this.style.borderColor='rgba(88,101,242,.7)'" onblur="this.style.borderColor='rgba(255,255,255,.15)'" />`;
+
+                    const avatarDiv = (player) => {
+                        const av = mkAvatar(player);
+                        return `<div style="width:24px;height:24px;flex-shrink:0;border-radius:6px;background:linear-gradient(135deg,var(--accent),var(--accent-h));display:flex;align-items:center;justify-content:center;overflow:hidden">${av}</div>`;
+                    };
+
+                    matchCards += `
+                    <div style="${cardStyle}">
+                      <div style="padding:5px 10px 4px;background:rgba(88,101,242,.12);border-bottom:1px solid rgba(88,101,242,.2);display:flex;align-items:center;justify-content:space-between">
+                        <span style="font-size:8px;font-weight:800;text-transform:uppercase;letter-spacing:1px;color:rgba(150,160,255,.8)">Match ${mIdx + 1}</span>
+                        <button onclick="bracketSaveScores('${tournament.id}','${mid}')" style="font-size:8px;font-weight:800;padding:3px 7px;background:rgba(88,101,242,.25);color:rgba(160,170,255,.9);border:1px solid rgba(88,101,242,.4);border-radius:4px;cursor:pointer;font-family:inherit;text-transform:uppercase;letter-spacing:.4px" onmouseover="this.style.background='rgba(88,101,242,.45)'" onmouseout="this.style.background='rgba(88,101,242,.25)'">💾 Save</button>
+                      </div>
+                      <div style="display:flex;align-items:center;gap:7px;padding:8px 10px;${rowBg(p1)}border-bottom:1px solid ${rowBorder(p1)}">
+                        ${avatarDiv(p1)}
+                        <span style="flex:1;font-size:11px;font-weight:700;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:${nameClr(p1)};text-shadow:${p1?.tournamentCard?.imageUrl?'0 1px 3px rgba(0,0,0,.8)':''}">${p1name}</span>
+                        ${scoreInput(`s_${mid}_1`, p1score)}
+                        ${winBtn(p1uid)}
+                      </div>
+                      <div style="display:flex;align-items:center;justify-content:center;height:14px;position:relative">
+                        <span style="font-size:8px;font-weight:800;color:var(--text-3);letter-spacing:1px;padding:0 5px;background:var(--bg-1);position:relative;z-index:1">VS</span>
+                        <div style="position:absolute;left:10px;right:10px;height:1px;background:rgba(255,255,255,.04)"></div>
+                      </div>
+                      <div style="display:flex;align-items:center;gap:7px;padding:8px 10px;${rowBg(p2)}">
+                        ${avatarDiv(p2)}
+                        <span style="flex:1;font-size:11px;font-weight:700;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:${nameClr(p2)};text-shadow:${p2?.tournamentCard?.imageUrl?'0 1px 3px rgba(0,0,0,.8)':''}">${p2name}</span>
+                        ${scoreInput(`s_${mid}_2`, p2score)}
+                        ${winBtn(p2uid)}
+                      </div>
+                    </div>`;
+                } // end canEdit else
             } else {
                 // Normal view
                 matchCards += `<div style="position:absolute;left:${x}px;top:${matchCY}px;width:${MATCH_W}px">${playerCard(p1, p1w, p2w && !p1w, match.player1Score)}</div>`;
@@ -479,18 +534,87 @@ function showBracketPanel(tournament) {
       </div>`;
 
     // ── Sidebar: players + action buttons ──
-    const playerHTML = players.length === 0
+    const showPoints = tournament.hasPointsTally !== false; // default on
+
+    // Calculate points tally per player from all matches
+    const pointsMap = {};
+    players.forEach(p => { if (p.userId) pointsMap[p.userId] = 0; });
+    const eliminatedSet = new Set();
+    const winnerId = tournament.winnerId || null;  // overall tournament winner user_id
+
+    if (bracket.rounds) {
+        bracket.rounds.forEach(round => {
+            (round.matches || []).forEach(match => {
+                if (match.player1?.userId && match.player1Score != null)
+                    pointsMap[match.player1.userId] = (pointsMap[match.player1.userId] || 0) + (match.player1Score || 0);
+                if (match.player2?.userId && match.player2Score != null)
+                    pointsMap[match.player2.userId] = (pointsMap[match.player2.userId] || 0) + (match.player2Score || 0);
+                // Mark loser as eliminated (only if a winner is set, no losers bracket)
+                if (match.winner && !tournament.hasLosersBracket) {
+                    if (match.player1?.userId && match.winner !== match.player1.userId) eliminatedSet.add(match.player1.userId);
+                    if (match.player2?.userId && match.winner !== match.player2.userId) eliminatedSet.add(match.player2.userId);
+                }
+            });
+        });
+    }
+
+    // Never mark the tournament winner as eliminated
+    if (winnerId) eliminatedSet.delete(winnerId);
+
+    // Sort active players by points desc, exclude winner from main list
+    const winnerPlayer   = players.find(p => p.userId === winnerId);
+    const activePlayers   = players.filter(p => !eliminatedSet.has(p.userId) && p.userId !== winnerId);
+    const eliminatedPlayers = players.filter(p => eliminatedSet.has(p.userId));
+    activePlayers.sort((a, b) => (pointsMap[b.userId] || 0) - (pointsMap[a.userId] || 0));
+
+    const renderPlayerRow = (p, isEliminated) => {
+        const tag = p.userId === tournament.hostId ? `<span style="font-size:8px;font-weight:700;color:var(--accent);background:rgba(249,168,212,.12);padding:2px 5px;border-radius:4px;flex-shrink:0;margin-left:3px">HOST</span>` : '';
+        const pts = pointsMap[p.userId] || 0;
+        const ptsTag = showPoints && tournament.status === 'in-progress'
+            ? `<span style="font-size:10px;font-weight:800;color:var(--accent);background:rgba(249,168,212,.1);border:1px solid rgba(249,168,212,.2);padding:1px 6px;border-radius:10px;flex-shrink:0;margin-left:auto">${pts}pts</span>` : '';
+
+        if (isEliminated) {
+            // Greyed card for eliminated players
+            const avatarUrl = p.avatar_url;
+            const av = avatarUrl ? `<img src="${avatarUrl}" style="width:100%;height:100%;object-fit:cover;border-radius:7px;filter:grayscale(1)">` : `<span style="font-size:11px;font-weight:800;color:rgba(255,255,255,.3)">${(p.username||'?')[0].toUpperCase()}</span>`;
+            return `<div style="display:flex;align-items:center;gap:8px;padding:7px 10px;background:rgba(255,255,255,.03);border:1px solid rgba(255,255,255,.05);border-radius:8px;opacity:.5">
+              <div style="width:26px;height:26px;flex-shrink:0;border-radius:7px;background:rgba(255,255,255,.08);display:flex;align-items:center;justify-content:center;overflow:hidden">${av}</div>
+              <span style="flex:1;font-size:11px;font-weight:600;color:var(--text-3);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;text-decoration:line-through">${p.username||'Unknown'}</span>
+              ${tag}
+            </div>`;
+        }
+
+        const card = playerCard(p, false, false, null);
+        // Inject host tag and points
+        return card
+            .replace(`${p?.username||'TBD'}</span>`, `${p?.username||'Unknown'}</span>${tag}${ptsTag}`)
+            .replace('height:${CARD_H}px', 'height:auto;min-height:${CARD_H}px');
+    };
+
+    const activeHTML = activePlayers.length === 0
         ? '<div style="color:var(--text-3);font-size:12px">No players yet</div>'
-        : players.map(p => {
-            const tag = p.userId === tournament.hostId ? `<span style="font-size:9px;font-weight:700;color:var(--accent);background:rgba(249,168,212,.12);padding:2px 5px;border-radius:4px;flex-shrink:0;margin-left:4px">HOST</span>` : '';
-            // Reuse playerCard but inject host tag — wrap in relative div
-            const card = playerCard(p, false, false, null);
-            // Replace the closing </div> to inject host tag before it
-            return card.replace(
-                `${p?.username||'TBD'}</span>`,
-                `${p?.username||'Unknown'}</span>${tag}`
-            );
-          }).join('');
+        : activePlayers.map(p => renderPlayerRow(p, false)).join('');
+
+    const eliminatedHTML = eliminatedPlayers.length > 0
+        ? `<div style="margin-top:12px">
+             <div style="font-size:8px;font-weight:800;text-transform:uppercase;letter-spacing:1px;color:var(--text-3);margin-bottom:6px;display:flex;align-items:center;gap:6px">
+               <span style="flex:1;height:1px;background:rgba(255,255,255,.08)"></span>ELIMINATED<span style="flex:1;height:1px;background:rgba(255,255,255,.08)"></span>
+             </div>
+             <div style="display:flex;flex-direction:column;gap:4px">${eliminatedPlayers.map(p => renderPlayerRow(p, true)).join('')}</div>
+           </div>` : '';
+
+    const winnerHTML = winnerPlayer
+        ? `<div style="margin-bottom:10px">
+             <div style="font-size:8px;font-weight:800;text-transform:uppercase;letter-spacing:1px;color:rgba(255,200,50,.7);margin-bottom:6px;display:flex;align-items:center;gap:6px">
+               🏆 CHAMPION
+             </div>
+             <div style="position:relative">
+               ${renderPlayerRow(winnerPlayer, false)}
+               <div style="position:absolute;top:-2px;right:-2px;background:rgba(255,200,50,.15);border:1px solid rgba(255,200,50,.4);border-radius:6px;padding:2px 6px;font-size:9px;font-weight:800;color:rgba(255,200,50,.9)">🏆 Winner</div>
+             </div>
+           </div>` : '';
+
+    const playerHTML = winnerHTML + activeHTML + eliminatedHTML;
 
     const btnBase = 'display:flex;align-items:center;justify-content:center;gap:6px;width:100%;padding:9px 14px;border:none;border-radius:8px;font-size:13px;font-weight:700;cursor:pointer;font-family:inherit;transition:opacity .15s;margin-bottom:6px';
 
@@ -576,13 +700,97 @@ function showBracketPanel(tournament) {
                 </span>
                 ${window._bracketScoringMode && isHost ? `<button onclick="window._bracketScoringMode=false;openTournamentDetails('${tournament.id}')" style="font-size:11px;padding:5px 12px;background:rgba(88,101,242,.2);color:#7289da;border:1px solid rgba(88,101,242,.4);border-radius:6px;cursor:pointer;font-family:inherit;font-weight:700">↺ Refresh Bracket</button>` : ''}
               </div>
-              <div style="flex:1;overflow:auto;padding:28px 32px;${bgStyle}" id="bracketInnerScroll">
-                ${bracketInner}
+              <div style="flex:1;overflow:hidden;position:relative;background:var(--bg-0,var(--bg-2))" id="bracketViewport">
+                <div id="bracketCanvas" style="position:absolute;top:0;left:0;transform-origin:0 0;will-change:transform;padding:28px 32px;cursor:grab;${bgStyle}">
+                  ${bracketInner}
+                </div>
+                <!-- Zoom controls -->
+                <div style="position:absolute;bottom:14px;right:14px;display:flex;flex-direction:column;gap:4px;z-index:10">
+                  <button onclick="bracketZoom(0.15)" style="width:28px;height:28px;background:var(--bg-2);border:1px solid rgba(255,255,255,.12);border-radius:6px;color:var(--text-1);font-size:16px;cursor:pointer;display:flex;align-items:center;justify-content:center;line-height:1" title="Zoom in">+</button>
+                  <button onclick="bracketZoom(-0.15)" style="width:28px;height:28px;background:var(--bg-2);border:1px solid rgba(255,255,255,.12);border-radius:6px;color:var(--text-1);font-size:16px;cursor:pointer;display:flex;align-items:center;justify-content:center;line-height:1" title="Zoom out">−</button>
+                  <button onclick="bracketResetView()" style="width:28px;height:28px;background:var(--bg-2);border:1px solid rgba(255,255,255,.12);border-radius:6px;color:var(--text-2);font-size:9px;cursor:pointer;display:flex;align-items:center;justify-content:center;font-weight:700" title="Reset view">FIT</button>
+                </div>
+                <div style="position:absolute;bottom:14px;left:14px;font-size:9px;color:var(--text-3);pointer-events:none">Drag to pan · Ctrl+scroll to zoom</div>
               </div>
             </div>
           </div>`;
+        // Init pan/zoom after DOM is ready
+        setTimeout(_initBracketPanZoom, 0);
     }
 }
+
+// ── Bracket pan/zoom ──────────────────────────────────────────
+let _bpz = { scale: 1, x: 0, y: 0, dragging: false, startX: 0, startY: 0 };
+
+function _bracketApplyTransform() {
+    const canvas = document.getElementById('bracketCanvas');
+    if (canvas) canvas.style.transform = `translate(${_bpz.x}px,${_bpz.y}px) scale(${_bpz.scale})`;
+}
+
+function bracketZoom(delta, cx, cy) {
+    const vp = document.getElementById('bracketViewport');
+    if (!vp) return;
+    const rect = vp.getBoundingClientRect();
+    const ox = cx !== undefined ? cx - rect.left : rect.width / 2;
+    const oy = cy !== undefined ? cy - rect.top  : rect.height / 2;
+    const newScale = Math.max(0.3, Math.min(2.5, _bpz.scale + delta));
+    const factor = newScale / _bpz.scale;
+    _bpz.x = ox - factor * (ox - _bpz.x);
+    _bpz.y = oy - factor * (oy - _bpz.y);
+    _bpz.scale = newScale;
+    _bracketApplyTransform();
+}
+
+function bracketResetView() {
+    const vp = document.getElementById('bracketViewport');
+    const canvas = document.getElementById('bracketCanvas');
+    if (!vp || !canvas) return;
+    const scale = Math.min(1, Math.min(vp.clientWidth / canvas.scrollWidth, vp.clientHeight / canvas.scrollHeight) * 0.9);
+    _bpz.scale = scale;
+    _bpz.x = (vp.clientWidth  - canvas.scrollWidth  * scale) / 2;
+    _bpz.y = (vp.clientHeight - canvas.scrollHeight * scale) / 2;
+    _bracketApplyTransform();
+}
+
+function _initBracketPanZoom() {
+    const vp = document.getElementById('bracketViewport');
+    const canvas = document.getElementById('bracketCanvas');
+    if (!vp || !canvas) return;
+    _bpz = { scale: 1, x: 0, y: 0, dragging: false, startX: 0, startY: 0 };
+    setTimeout(bracketResetView, 30);
+
+    vp.addEventListener('mousedown', e => {
+        if (e.target.closest('button') || e.target.closest('input')) return;
+        _bpz.dragging = true;
+        _bpz.startX = e.clientX - _bpz.x;
+        _bpz.startY = e.clientY - _bpz.y;
+        canvas.style.cursor = 'grabbing';
+        e.preventDefault();
+    });
+    window.addEventListener('mousemove', e => {
+        if (!_bpz.dragging) return;
+        _bpz.x = e.clientX - _bpz.startX;
+        _bpz.y = e.clientY - _bpz.startY;
+        _bracketApplyTransform();
+    });
+    window.addEventListener('mouseup', () => {
+        if (_bpz.dragging) { _bpz.dragging = false; const c = document.getElementById('bracketCanvas'); if (c) c.style.cursor = 'grab'; }
+    });
+
+    vp.addEventListener('wheel', e => {
+        if (e.ctrlKey || e.metaKey) {
+            e.preventDefault();
+            bracketZoom(e.deltaY > 0 ? -0.1 : 0.1, e.clientX, e.clientY);
+        } else {
+            e.preventDefault();
+            _bpz.x -= e.deltaX; _bpz.y -= e.deltaY;
+            _bracketApplyTransform();
+        }
+    }, { passive: false });
+}
+
+window.bracketZoom      = bracketZoom;
+window.bracketResetView = bracketResetView;
 
 // Bracket panel action helpers
 async function bracketJoin(tournamentId) {
