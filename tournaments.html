@@ -11,7 +11,7 @@
       padding: 0;
     }
 
-    /* Default theme (inherits from parent document if available) */
+    /* Default theme */
     :root {
       --bg-0: #141820;
       --bg-1: #202630;
@@ -29,82 +29,29 @@
       --font: "gg sans", "Noto Sans", Whitney, Helvetica Neue, Helvetica, Arial, sans-serif;
     }
 
-    /* Midnight theme */
     [data-theme="midnight"] {
-      --bg-0: #0a0a0f;
-      --bg-1: #111118;
-      --bg-2: #1a1a24;
-      --bg-3: #22222f;
-      --accent: #7c3aed;
-      --accent-h: #6d28d9;
-      --text-1: #f0f0ff;
-      --text-2: #a0a0c0;
-      --text-3: #606080;
+      --bg-0: #0a0a0f; --bg-1: #111118; --bg-2: #1a1a24; --bg-3: #22222f;
+      --accent: #7c3aed; --accent-h: #6d28d9; --text-1: #f0f0ff; --text-2: #a0a0c0; --text-3: #606080;
     }
-
-    /* Forest theme */
     [data-theme="forest"] {
-      --bg-0: #0d1a0f;
-      --bg-1: #142018;
-      --bg-2: #1a2d1f;
-      --bg-3: #213828;
-      --accent: #16a34a;
-      --accent-h: #15803d;
-      --text-1: #ecfdf5;
-      --text-2: #86efac;
-      --text-3: #4ade80;
+      --bg-0: #0d1a0f; --bg-1: #142018; --bg-2: #1a2d1f; --bg-3: #213828;
+      --accent: #16a34a; --accent-h: #15803d; --text-1: #ecfdf5; --text-2: #86efac; --text-3: #4ade80;
     }
-
-    /* Ocean theme */
     [data-theme="ocean"] {
-      --bg-0: #030d1a;
-      --bg-1: #071828;
-      --bg-2: #0c2236;
-      --bg-3: #112c44;
-      --accent: #0ea5e9;
-      --accent-h: #0284c7;
-      --text-1: #f0f9ff;
-      --text-2: #7dd3fc;
-      --text-3: #38bdf8;
+      --bg-0: #030d1a; --bg-1: #071828; --bg-2: #0c2236; --bg-3: #112c44;
+      --accent: #0ea5e9; --accent-h: #0284c7; --text-1: #f0f9ff; --text-2: #7dd3fc; --text-3: #38bdf8;
     }
-
-    /* Sunset theme */
     [data-theme="sunset"] {
-      --bg-0: #1a0a0a;
-      --bg-1: #2a1010;
-      --bg-2: #381818;
-      --bg-3: #442020;
-      --accent: #f97316;
-      --accent-h: #ea580c;
-      --text-1: #fff7ed;
-      --text-2: #fdba74;
-      --text-3: #fb923c;
+      --bg-0: #1a0a0a; --bg-1: #2a1010; --bg-2: #381818; --bg-3: #442020;
+      --accent: #f97316; --accent-h: #ea580c; --text-1: #fff7ed; --text-2: #fdba74; --text-3: #fb923c;
     }
-
-    /* Rose theme */
     [data-theme="rose"] {
-      --bg-0: #1a0a10;
-      --bg-1: #2a1020;
-      --bg-2: #38182c;
-      --bg-3: #442038;
-      --accent: #e11d48;
-      --accent-h: #be123c;
-      --text-1: #fff1f2;
-      --text-2: #fda4af;
-      --text-3: #fb7185;
+      --bg-0: #1a0a10; --bg-1: #2a1020; --bg-2: #38182c; --bg-3: #442038;
+      --accent: #e11d48; --accent-h: #be123c; --text-1: #fff1f2; --text-2: #fda4af; --text-3: #fb7185;
     }
-
-    /* Light theme */
     [data-theme="light"] {
-      --bg-0: #f2f3f5;
-      --bg-1: #ffffff;
-      --bg-2: #e9eaec;
-      --bg-3: #d9dade;
-      --accent: #5865f2;
-      --accent-h: #4752c4;
-      --text-1: #060607;
-      --text-2: #4e5058;
-      --text-3: #80848e;
+      --bg-0: #f2f3f5; --bg-1: #ffffff; --bg-2: #e9eaec; --bg-3: #d9dade;
+      --accent: #5865f2; --accent-h: #4752c4; --text-1: #060607; --text-2: #4e5058; --text-3: #80848e;
     }
 
     body {
@@ -202,20 +149,9 @@
       letter-spacing: 0.5px;
     }
 
-    .tournament-card-status.in-progress {
-      background: rgba(35, 165, 90, 0.15);
-      color: var(--green);
-    }
-
-    .tournament-card-status.pending {
-      background: rgba(240, 178, 50, 0.15);
-      color: var(--yellow);
-    }
-
-    .tournament-card-status.completed {
-      background: rgba(88, 101, 242, 0.15);
-      color: #5865f2;
-    }
+    .tournament-card-status.in-progress { background: rgba(35, 165, 90, 0.15); color: var(--green); }
+    .tournament-card-status.pending { background: rgba(240, 178, 50, 0.15); color: var(--yellow); }
+    .tournament-card-status.completed { background: rgba(88, 101, 242, 0.15); color: #5865f2; }
 
     .tournament-card-meta {
       display: flex;
@@ -234,10 +170,7 @@
       color: var(--text-3);
     }
 
-    .tournament-card-meta-label {
-      color: var(--text-2);
-      font-weight: 600;
-    }
+    .tournament-card-meta-label { color: var(--text-2); font-weight: 600; }
 
     .tournament-card-description {
       font-size: 13px;
@@ -246,7 +179,25 @@
       line-height: 1.4;
     }
 
-    /* ──────────── TOURNAMENT MODAL ──────────── */
+    /* ──────────── RESULT MODE BADGE ──────────── */
+    .result-mode-badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 4px;
+      padding: 3px 8px;
+      border-radius: 5px;
+      font-size: 10px;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+    }
+    .result-mode-badge.manual   { background: rgba(255,255,255,0.06); color: var(--text-3); }
+    .result-mode-badge.self-report { background: rgba(35,165,90,0.12); color: var(--green); }
+    .result-mode-badge.riot-api { background: rgba(229,60,60,0.12); color: #e53c3c; }
+    .result-mode-badge.chess    { background: rgba(240,178,50,0.12); color: var(--yellow); }
+    .result-mode-badge.lichess  { background: rgba(88,101,242,0.12); color: #7289da; }
+
+    /* ──────────── MODAL ──────────── */
     .modal {
       display: none;
       position: fixed;
@@ -259,16 +210,14 @@
       padding: 20px;
     }
 
-    .modal.open {
-      display: flex;
-    }
+    .modal.open { display: flex; }
 
     .modal-content {
       background: var(--bg-1);
       border: 1px solid rgba(255, 255, 255, 0.1);
       border-radius: var(--radius);
       max-width: 700px;
-      max-height: 80vh;
+      max-height: 86vh;
       overflow-y: auto;
       width: 100%;
       position: relative;
@@ -284,11 +233,7 @@
       flex-shrink: 0;
     }
 
-    .modal-title {
-      font-size: 20px;
-      font-weight: 700;
-      color: var(--text-1);
-    }
+    .modal-title { font-size: 20px; font-weight: 700; color: var(--text-1); }
 
     .modal-close {
       background: none;
@@ -304,14 +249,9 @@
       justify-content: center;
     }
 
-    .modal-close:hover {
-      color: var(--text-1);
-      background: rgba(255, 255, 255, 0.08);
-    }
+    .modal-close:hover { color: var(--text-1); background: rgba(255, 255, 255, 0.08); }
 
-    .modal-body {
-      padding: 20px;
-    }
+    .modal-body { padding: 20px; }
 
     .tournament-info {
       display: grid;
@@ -322,10 +262,7 @@
       border-bottom: 1px solid rgba(255, 255, 255, 0.06);
     }
 
-    .tournament-info-item {
-      display: flex;
-      flex-direction: column;
-    }
+    .tournament-info-item { display: flex; flex-direction: column; }
 
     .tournament-info-label {
       font-size: 11px;
@@ -336,11 +273,7 @@
       margin-bottom: 4px;
     }
 
-    .tournament-info-value {
-      font-size: 14px;
-      font-weight: 500;
-      color: var(--text-1);
-    }
+    .tournament-info-value { font-size: 14px; font-weight: 500; color: var(--text-1); }
 
     .tournament-description {
       font-size: 13px;
@@ -354,9 +287,7 @@
     }
 
     /* ──────────── REGISTERED PLAYERS ──────────── */
-    .registered-players-section {
-      margin-bottom: 20px;
-    }
+    .registered-players-section { margin-bottom: 20px; }
 
     .section-title {
       font-size: 13px;
@@ -370,11 +301,7 @@
       display: inline-block;
     }
 
-    .players-list {
-      display: flex;
-      flex-wrap: wrap;
-      gap: 8px;
-    }
+    .players-list { display: flex; flex-wrap: wrap; gap: 8px; }
 
     .player-badge {
       display: flex;
@@ -388,11 +315,7 @@
       color: var(--text-2);
     }
 
-    .player-badge.host {
-      background: rgba(249, 168, 212, 0.12);
-      border-color: var(--accent);
-      color: var(--accent);
-    }
+    .player-badge.host { background: rgba(249, 168, 212, 0.12); border-color: var(--accent); color: var(--accent); }
 
     .player-avatar {
       width: 24px;
@@ -409,11 +332,7 @@
       flex-shrink: 0;
     }
 
-    .player-avatar img {
-      width: 100%;
-      height: 100%;
-      object-fit: cover;
-    }
+    .player-avatar img { width: 100%; height: 100%; object-fit: cover; }
 
     .host-badge {
       font-size: 10px;
@@ -423,7 +342,7 @@
       border-radius: 3px;
     }
 
-    /* ──────────── BRACKET SECTION ──────────── */
+    /* ──────────── BRACKET ──────────── */
     .bracket-section {
       margin-bottom: 24px;
       padding-bottom: 24px;
@@ -455,27 +374,11 @@
       width: 100%;
     }
 
-    .bracket-empty-icon {
-      font-size: 40px;
-      opacity: 0.5;
-    }
+    .bracket-empty-icon { font-size: 40px; opacity: 0.5; }
+    .bracket-empty-text { font-size: 14px; }
 
-    .bracket-empty-text {
-      font-size: 14px;
-    }
-
-    .bracket {
-      display: flex;
-      gap: 40px;
-      min-width: min-content;
-    }
-
-    .bracket-round {
-      display: flex;
-      flex-direction: column;
-      gap: 12px;
-      flex-shrink: 0;
-    }
+    .bracket { display: flex; gap: 40px; min-width: min-content; }
+    .bracket-round { display: flex; flex-direction: column; gap: 12px; flex-shrink: 0; }
 
     .bracket-round-title {
       font-size: 11px;
@@ -540,10 +443,7 @@
       box-shadow: 0 0 8px rgba(88, 101, 242, 0.2);
     }
 
-    .match-divider {
-      height: 1px;
-      background: rgba(255, 255, 255, 0.06);
-    }
+    .match-divider { height: 1px; background: rgba(255, 255, 255, 0.06); }
 
     /* ──────────── ACTION BUTTONS ──────────── */
     .action-buttons {
@@ -568,16 +468,8 @@
       gap: 6px;
     }
 
-    .btn-primary {
-      background: var(--accent);
-      color: #fff;
-      flex: 1;
-    }
-
-    .btn-primary:hover {
-      background: var(--accent-h);
-      transform: translateY(-2px);
-    }
+    .btn-primary { background: var(--accent); color: #fff; flex: 1; }
+    .btn-primary:hover { background: var(--accent-h); transform: translateY(-2px); }
 
     .btn-secondary {
       background: var(--bg-2);
@@ -585,23 +477,10 @@
       border: 1px solid rgba(255, 255, 255, 0.1);
       flex: 1;
     }
+    .btn-secondary:hover { background: var(--bg-3); color: var(--text-1); border-color: rgba(255, 255, 255, 0.15); }
 
-    .btn-secondary:hover {
-      background: var(--bg-3);
-      color: var(--text-1);
-      border-color: rgba(255, 255, 255, 0.15);
-    }
-
-    .btn-danger {
-      background: rgba(237, 66, 69, 0.15);
-      color: var(--danger);
-      border: 1px solid rgba(237, 66, 69, 0.3);
-    }
-
-    .btn-danger:hover {
-      background: rgba(237, 66, 69, 0.25);
-      border-color: var(--danger);
-    }
+    .btn-danger { background: rgba(237, 66, 69, 0.15); color: var(--danger); border: 1px solid rgba(237, 66, 69, 0.3); }
+    .btn-danger:hover { background: rgba(237, 66, 69, 0.25); border-color: var(--danger); }
 
     .btn-delete {
       background: rgba(237, 66, 69, 0.12);
@@ -609,22 +488,12 @@
       border: 1px solid rgba(237, 66, 69, 0.25);
       flex: 1;
     }
+    .btn-delete:hover { background: rgba(237, 66, 69, 0.2); border-color: var(--danger); transform: translateY(-2px); }
 
-    .btn-delete:hover {
-      background: rgba(237, 66, 69, 0.2);
-      border-color: var(--danger);
-      transform: translateY(-2px);
-    }
-
-    .btn-small {
-      padding: 6px 12px;
-      font-size: 12px;
-    }
+    .btn-small { padding: 6px 12px; font-size: 12px; }
 
     /* ──────────── FORM ELEMENTS ──────────── */
-    .form-group {
-      margin-bottom: 16px;
-    }
+    .form-group { margin-bottom: 16px; }
 
     .form-label {
       display: block;
@@ -652,14 +521,170 @@
 
     .form-input:focus,
     .form-select:focus,
-    .form-textarea:focus {
-      outline: none;
-      border-color: var(--accent);
+    .form-textarea:focus { outline: none; border-color: var(--accent); }
+
+    .form-textarea { resize: vertical; min-height: 80px; }
+
+    /* ──────────── RESULT MODE SELECTOR ──────────── */
+    .result-mode-options {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 8px;
     }
 
-    .form-textarea {
-      resize: vertical;
-      min-height: 80px;
+    .result-mode-option {
+      position: relative;
+      cursor: pointer;
+    }
+
+    .result-mode-option input[type="radio"] {
+      position: absolute;
+      opacity: 0;
+      width: 0;
+      height: 0;
+    }
+
+    .result-mode-card {
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+      padding: 12px;
+      border-radius: 8px;
+      border: 1.5px solid rgba(255,255,255,0.08);
+      background: var(--bg-2);
+      transition: all 0.15s;
+      cursor: pointer;
+      user-select: none;
+    }
+
+    .result-mode-card:hover {
+      border-color: rgba(255,255,255,0.18);
+      background: var(--bg-3);
+    }
+
+    .result-mode-option input:checked + .result-mode-card {
+      border-color: var(--accent);
+      background: rgba(249,168,212,0.07);
+    }
+
+    .result-mode-card-icon { font-size: 18px; }
+    .result-mode-card-name { font-size: 13px; font-weight: 700; color: var(--text-1); }
+    .result-mode-card-desc { font-size: 11px; color: var(--text-3); line-height: 1.4; }
+    .result-mode-card-tag {
+      display: inline-block;
+      font-size: 9px;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      padding: 2px 6px;
+      border-radius: 4px;
+      margin-top: 2px;
+    }
+    .tag-open   { background: rgba(35,165,90,0.15); color: var(--green); }
+    .tag-api    { background: rgba(229,60,60,0.12); color: #e57373; }
+    .tag-manual { background: rgba(255,255,255,0.06); color: var(--text-3); }
+
+    /* ──────────── RIOT / CHESS GAME SECTION ──────────── */
+    .api-game-section {
+      display: none;
+      margin-top: 12px;
+      padding: 14px;
+      background: var(--bg-2);
+      border-radius: 8px;
+      border: 1px solid rgba(255,255,255,0.08);
+    }
+
+    .api-game-section.visible { display: block; }
+
+    .game-select-grid {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 8px;
+      margin-top: 8px;
+    }
+
+    .game-option {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 4px;
+      padding: 10px 6px;
+      border-radius: 8px;
+      border: 1.5px solid rgba(255,255,255,0.08);
+      background: var(--bg-3);
+      cursor: pointer;
+      transition: all 0.15s;
+      font-size: 11px;
+      color: var(--text-2);
+      font-weight: 600;
+      text-align: center;
+      user-select: none;
+    }
+
+    .game-option:hover { border-color: rgba(255,255,255,0.2); color: var(--text-1); }
+    .game-option.selected { border-color: var(--accent); background: rgba(249,168,212,0.08); color: var(--text-1); }
+    .game-option-icon { font-size: 20px; }
+
+    /* ──────────── DISPUTE TIMEOUT ──────────── */
+    .timeout-row {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      margin-top: 12px;
+    }
+
+    .timeout-row .form-input {
+      width: 80px;
+      flex-shrink: 0;
+    }
+
+    .timeout-label { font-size: 13px; color: var(--text-2); }
+
+    /* ──────────── RIOT ACCOUNT LINK BANNER ──────────── */
+    .riot-link-banner {
+      display: none;
+      align-items: center;
+      gap: 10px;
+      padding: 10px 14px;
+      background: rgba(229,60,60,0.08);
+      border: 1px solid rgba(229,60,60,0.2);
+      border-radius: 8px;
+      font-size: 12px;
+      color: #e57373;
+      margin-top: 10px;
+    }
+
+    .riot-link-banner.visible { display: flex; }
+
+    .riot-link-btn {
+      margin-left: auto;
+      padding: 4px 10px;
+      border-radius: 5px;
+      border: 1px solid rgba(229,60,60,0.4);
+      background: rgba(229,60,60,0.15);
+      color: #e57373;
+      font-size: 11px;
+      font-weight: 700;
+      cursor: pointer;
+      flex-shrink: 0;
+    }
+
+    .riot-link-btn:hover { background: rgba(229,60,60,0.25); }
+
+    /* ──────────── FORM DIVIDER ──────────── */
+    .form-divider {
+      height: 1px;
+      background: rgba(255,255,255,0.06);
+      margin: 18px 0;
+    }
+
+    .form-section-title {
+      font-size: 11px;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 1px;
+      color: var(--text-3);
+      margin-bottom: 12px;
     }
 
     /* ──────────── LOADING & STATES ──────────── */
@@ -681,41 +706,19 @@
       animation: spin 0.8s linear infinite;
     }
 
-    @keyframes spin {
-      to {
-        transform: rotate(360deg);
-      }
-    }
+    @keyframes spin { to { transform: rotate(360deg); } }
 
     /* ──────────── RESPONSIVE ──────────── */
     @media (max-width: 768px) {
-      .tournaments-list {
-        grid-template-columns: 1fr;
-      }
-
-      .tournament-info {
-        grid-template-columns: 1fr;
-      }
-
-      .modal-content {
-        border-radius: var(--radius);
-      }
-
-      .bracket {
-        gap: 20px;
-      }
-
-      .bracket-match {
-        width: 160px;
-      }
-
-      .action-buttons {
-        flex-direction: column-reverse;
-      }
-
-      .btn {
-        width: 100%;
-      }
+      .tournaments-list { grid-template-columns: 1fr; }
+      .tournament-info { grid-template-columns: 1fr; }
+      .modal-content { border-radius: var(--radius); }
+      .bracket { gap: 20px; }
+      .bracket-match { width: 160px; }
+      .action-buttons { flex-direction: column-reverse; }
+      .btn { width: 100%; }
+      .result-mode-options { grid-template-columns: 1fr; }
+      .game-select-grid { grid-template-columns: repeat(2, 1fr); }
     }
   </style>
 </head>
@@ -742,22 +745,16 @@
       </div>
 
       <div class="modal-body">
-        <!-- Tournament Info Grid -->
         <div class="tournament-info" id="tournamentInfo"></div>
-
-        <!-- Description -->
         <div class="tournament-description" id="tournamentDescription"></div>
 
-        <!-- Registered Players -->
         <div class="registered-players-section">
           <h3 class="section-title">Registered Players (<span id="playerCount">0</span>)</h3>
           <div class="players-list" id="playersList"></div>
         </div>
 
-        <!-- Join Button for Non-Registered Players -->
         <div id="joinButtonContainer"></div>
 
-        <!-- Bracket Section -->
         <div class="bracket-section">
           <h3 class="section-title">Bracket</h3>
           <div class="bracket-container" id="bracketContainer">
@@ -768,7 +765,6 @@
           </div>
         </div>
 
-        <!-- Action Buttons -->
         <div class="action-buttons">
           <button class="btn btn-secondary" onclick="closeTournamentModal()">Close</button>
           <button class="btn btn-primary" id="generateBracketBtn" onclick="generateBracket()" style="display: none;">
@@ -782,7 +778,9 @@
     </div>
   </div>
 
-  <!-- Create Tournament Modal -->
+  <!-- ══════════════════════════════════════════
+       CREATE TOURNAMENT MODAL
+       ══════════════════════════════════════════ -->
   <div class="modal" id="createModal">
     <div class="modal-content">
       <div class="modal-header">
@@ -792,6 +790,8 @@
 
       <div class="modal-body">
         <form onsubmit="submitCreateTournament(event)">
+
+          <!-- Basic Info -->
           <div class="form-group">
             <label class="form-label">Tournament Name</label>
             <input type="text" class="form-input" id="tournamentNameInput" placeholder="e.g., Spring Championship" required />
@@ -817,6 +817,116 @@
             <textarea class="form-textarea" id="descriptionInput" placeholder="Add details about this tournament..."></textarea>
           </div>
 
+          <div class="form-divider"></div>
+
+          <!-- ── Result Mode ── -->
+          <div class="form-section-title">Result Mode</div>
+          <div class="form-group">
+            <div class="result-mode-options">
+
+              <!-- Manual -->
+              <label class="result-mode-option">
+                <input type="radio" name="resultMode" value="manual" checked onchange="onResultModeChange(this.value)" />
+                <div class="result-mode-card">
+                  <span class="result-mode-card-icon">🖊️</span>
+                  <span class="result-mode-card-name">Manual</span>
+                  <span class="result-mode-card-desc">Host updates scores and advances players.</span>
+                  <span class="result-mode-card-tag tag-manual">All games</span>
+                </div>
+              </label>
+
+              <!-- Self-Report -->
+              <label class="result-mode-option">
+                <input type="radio" name="resultMode" value="self-report" onchange="onResultModeChange(this.value)" />
+                <div class="result-mode-card">
+                  <span class="result-mode-card-icon">🤝</span>
+                  <span class="result-mode-card-name">Self-Report</span>
+                  <span class="result-mode-card-desc">Players submit scores. Both must agree — disputes go to host.</span>
+                  <span class="result-mode-card-tag tag-open">All games</span>
+                </div>
+              </label>
+
+              <!-- Riot API -->
+              <label class="result-mode-option">
+                <input type="radio" name="resultMode" value="riot-api" onchange="onResultModeChange(this.value)" />
+                <div class="result-mode-card">
+                  <span class="result-mode-card-icon">⚔️</span>
+                  <span class="result-mode-card-name">Riot API</span>
+                  <span class="result-mode-card-desc">Auto-pulls results from Riot servers. No input needed.</span>
+                  <span class="result-mode-card-tag tag-api">LoL · VALORANT · TFT</span>
+                </div>
+              </label>
+
+              <!-- Chess.com / Lichess -->
+              <label class="result-mode-option">
+                <input type="radio" name="resultMode" value="chess-api" onchange="onResultModeChange(this.value)" />
+                <div class="result-mode-card">
+                  <span class="result-mode-card-icon">♟️</span>
+                  <span class="result-mode-card-name">Chess API</span>
+                  <span class="result-mode-card-desc">Auto-pulls results from Chess.com or Lichess.</span>
+                  <span class="result-mode-card-tag tag-open">Chess.com · Lichess</span>
+                </div>
+              </label>
+
+            </div>
+          </div>
+
+          <!-- ── Self-Report: Dispute Timeout ── -->
+          <div id="selfReportOptions" style="display:none;">
+            <div class="timeout-row">
+              <label class="form-label" style="margin:0;white-space:nowrap;">Dispute timeout:</label>
+              <input type="number" class="form-input" id="disputeTimeoutInput" value="30" min="5" max="240" style="width:80px;" />
+              <span class="timeout-label">minutes — then host is auto-notified</span>
+            </div>
+          </div>
+
+          <!-- ── Riot API: Game + linked account ── -->
+          <div id="riotApiOptions" class="api-game-section">
+            <div class="form-section-title">Select Game</div>
+            <div class="game-select-grid">
+              <div class="game-option selected" data-riot-game="lol" onclick="selectRiotGame(this, 'lol')">
+                <span class="game-option-icon">⚔️</span>
+                League of Legends
+              </div>
+              <div class="game-option" data-riot-game="valorant" onclick="selectRiotGame(this, 'valorant')">
+                <span class="game-option-icon">🔫</span>
+                VALORANT
+              </div>
+              <div class="game-option" data-riot-game="tft" onclick="selectRiotGame(this, 'tft')">
+                <span class="game-option-icon">🎲</span>
+                TFT
+              </div>
+            </div>
+            <input type="hidden" id="riotGameSelect" value="lol" />
+
+            <!-- Riot account link status — populated by JS -->
+            <div class="riot-link-banner" id="riotLinkBanner">
+              ⚠️ Players need a linked Riot account in their profile for auto-pull to work.
+              <button type="button" class="riot-link-btn" onclick="openProfileSettings('riot')">Link Account</button>
+            </div>
+          </div>
+
+          <!-- ── Chess API: Platform ── -->
+          <div id="chessApiOptions" class="api-game-section">
+            <div class="form-section-title">Chess Platform</div>
+            <div class="game-select-grid" style="grid-template-columns: 1fr 1fr;">
+              <div class="game-option selected" data-chess-platform="chess.com" onclick="selectChessPlatform(this, 'chess.com')">
+                <span class="game-option-icon">♟️</span>
+                Chess.com
+              </div>
+              <div class="game-option" data-chess-platform="lichess" onclick="selectChessPlatform(this, 'lichess')">
+                <span class="game-option-icon">🐴</span>
+                Lichess
+              </div>
+            </div>
+            <input type="hidden" id="chessPlatformSelect" value="chess.com" />
+            <p style="margin-top:10px;font-size:11px;color:var(--text-3);">
+              Players must have a matching Chess.com or Lichess username set in their LOBBY profile. Results are pulled automatically after each match ends.
+            </p>
+          </div>
+
+          <div class="form-divider"></div>
+
           <div class="action-buttons">
             <button type="button" class="btn btn-secondary" onclick="closeCreateModal()">Cancel</button>
             <button type="submit" class="btn btn-primary">Create Tournament</button>
@@ -827,5 +937,78 @@
   </div>
 
   <script src="tournaments.js"></script>
+  <script>
+    // ── Result mode UI controller ────────────────────────────────
+    function onResultModeChange(value) {
+      document.getElementById('selfReportOptions').style.display = value === 'self-report' ? 'block' : 'none';
+      document.getElementById('riotApiOptions').classList.toggle('visible', value === 'riot-api');
+      document.getElementById('chessApiOptions').classList.toggle('visible', value === 'chess-api');
+
+      // Show riot account link banner if riot mode is selected
+      if (value === 'riot-api') {
+        checkRiotLinkStatus();
+      }
+    }
+
+    // Check if the current user has a Riot account linked
+    async function checkRiotLinkStatus() {
+      const banner = document.getElementById('riotLinkBanner');
+      try {
+        const token = localStorage.getItem('vh_token');
+        if (!token) { banner.classList.add('visible'); return; }
+        const res = await fetch('https://lobby-auth-server.onrender.com/me', {
+          headers: { 'Authorization': `Bearer ${token}` }
+        });
+        if (!res.ok) throw new Error();
+        const me = await res.json();
+        // Show banner if no riot_puuid linked
+        banner.classList.toggle('visible', !me.riot_puuid);
+      } catch {
+        banner.classList.add('visible');
+      }
+    }
+
+    function selectRiotGame(el, value) {
+      document.querySelectorAll('[data-riot-game]').forEach(e => e.classList.remove('selected'));
+      el.classList.add('selected');
+      document.getElementById('riotGameSelect').value = value;
+    }
+
+    function selectChessPlatform(el, value) {
+      document.querySelectorAll('[data-chess-platform]').forEach(e => e.classList.remove('selected'));
+      el.classList.add('selected');
+      document.getElementById('chessPlatformSelect').value = value;
+    }
+
+    // Patch submitCreateTournament to include new fields
+    // (Override the one in tournaments.js if needed — runs after it loads)
+    document.addEventListener('DOMContentLoaded', () => {
+      const form = document.querySelector('#createModal form');
+      if (!form) return;
+
+      form.addEventListener('submit', (e) => {
+        // tournaments.js handles the actual submit via onsubmit=
+        // We just enrich the data object there by reading these fields
+        // The data reading happens in submitCreateTournament() in tournaments.js
+        // which already reads #tournamentResultMode — we just renamed the IDs here
+        // so we patch window before submit fires:
+        const mode = document.querySelector('input[name="resultMode"]:checked')?.value || 'manual';
+        window._pendingResultMode = mode;
+        window._pendingDisputeTimeout = parseInt(document.getElementById('disputeTimeoutInput')?.value) || 30;
+        window._pendingRiotGame = document.getElementById('riotGameSelect')?.value || 'lol';
+        window._pendingChessPlatform = document.getElementById('chessPlatformSelect')?.value || 'chess.com';
+        window._pendingApiGame = mode === 'riot-api' ? window._pendingRiotGame : (mode === 'chess-api' ? window._pendingChessPlatform : null);
+      }, true); // capture phase — fires before onsubmit
+    });
+
+    // Helper for opening profile settings (wire to your existing profile nav)
+    function openProfileSettings(section) {
+      if (typeof window.navigateTo === 'function') {
+        window.navigateTo('userprofile.html', { section });
+      } else if (window.api?.navigate) {
+        window.api.navigate('userprofile.html');
+      }
+    }
+  </script>
 </body>
 </html>

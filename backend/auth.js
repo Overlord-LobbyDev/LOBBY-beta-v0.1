@@ -136,7 +136,15 @@ app.post("/login", async (req, res) => {
 });
 
 app.get("/me", requireAuth, async (req, res) => {
-  const r = await pool.query("SELECT id, username, avatar_url, is_admin, is_banned, banned_until, tournament_card_image_url, tournament_card_bg_colour, tournament_card_border_colour, tournament_card_name_colour, tournament_card_bg_pos FROM users WHERE id = $1", [req.userId]);
+  const r = await pool.query(
+    `SELECT id, username, avatar_url, is_admin, is_banned, banned_until,
+            tournament_card_image_url, tournament_card_bg_colour,
+            tournament_card_border_colour, tournament_card_name_colour, tournament_card_bg_pos,
+            riot_puuid, riot_gamename, riot_tagline,
+            chess_username, lichess_username
+     FROM users WHERE id = $1`,
+    [req.userId]
+  );
   const user = r.rows[0];
   if (!user) return res.status(404).json({ error: "User not found" });
   if (isCurrentlyBanned(user)) return res.status(403).json({ error: "Account banned" });
@@ -147,13 +155,90 @@ app.get("/me", requireAuth, async (req, res) => {
     isAdmin: user.is_admin,
     is_admin: user.is_admin,
     tournamentCard: {
-      imageUrl:      user.tournament_card_image_url   || null,
-      bgColour:      user.tournament_card_bg_colour   || '#2c3440',
+      imageUrl:      user.tournament_card_image_url     || null,
+      bgColour:      user.tournament_card_bg_colour     || '#2c3440',
       borderColour:  user.tournament_card_border_colour || '#f9a8d4',
-      nameColour:    user.tournament_card_name_colour || '#fdf2f8',
-      bgPos:         user.tournament_card_bg_pos      || '50% 50%',
-    }
+      nameColour:    user.tournament_card_name_colour   || '#fdf2f8',
+      bgPos:         user.tournament_card_bg_pos        || '50% 50%',
+    },
+    // Linked game accounts (used by API result modes)
+    riot_puuid:       user.riot_puuid       || null,
+    riot_gamename:    user.riot_gamename    || null,
+    riot_tagline:     user.riot_tagline     || null,
+    chess_username:   user.chess_username   || null,
+    lichess_username: user.lichess_username || null,
   });
+});
+
+// ── Link Riot account ────────────────────────────────────────
+app.post("/link-riot", requireAuth, async (req, res) => {
+  const { gameName, tagLine } = req.body;
+  if (!gameName || !tagLine) return res.status(400).json({ error: "gameName and tagLine required" });
+  const RIOT_API_KEY = process.env.RIOT_API_KEY;
+  if (!RIOT_API_KEY) return res.status(503).json({ error: "Riot API not configured on server" });
+  try {
+    const axios = require("axios");
+    const resp = await axios.get(
+      `https://europe.api.riotgames.com/riot/account/v1/accounts/by-riot-id/${encodeURIComponent(gameName)}/${encodeURIComponent(tagLine)}`,
+      { headers: { "X-Riot-Token": RIOT_API_KEY } }
+    );
+    const { puuid, gameName: gn, tagLine: tl } = resp.data;
+    await pool.query(
+      "UPDATE users SET riot_puuid = $1, riot_gamename = $2, riot_tagline = $3 WHERE id = $4",
+      [puuid, gn, tl, req.userId]
+    );
+    res.json({ success: true, gameName: gn, tagLine: tl });
+  } catch (err) {
+    const is404 = err.response?.status === 404;
+    res.status(is404 ? 404 : 500).json({
+      error: is404 ? "Riot account not found — check your Game Name and Tagline" : "Failed to link Riot account"
+    });
+  }
+});
+
+// ── Unlink Riot account ───────────────────────────────────────
+app.delete("/link-riot", requireAuth, async (req, res) => {
+  await pool.query("UPDATE users SET riot_puuid = NULL, riot_gamename = NULL, riot_tagline = NULL WHERE id = $1", [req.userId]);
+  res.json({ success: true });
+});
+
+// ── Link Chess.com or Lichess account ────────────────────────
+app.post("/link-chess", requireAuth, async (req, res) => {
+  const { platform, username } = req.body;
+  if (!platform || !username) return res.status(400).json({ error: "platform and username required" });
+  try {
+    const axios = require("axios");
+    if (platform === "chess.com") {
+      const check = await axios.get(`https://api.chess.com/pub/player/${username.toLowerCase()}`, {
+        headers: { "User-Agent": "LOBBY-App/1.0" }
+      });
+      if (check.status !== 200) throw Object.assign(new Error("Not found"), { response: { status: 404 } });
+      await pool.query("UPDATE users SET chess_username = $1 WHERE id = $2", [username, req.userId]);
+    } else if (platform === "lichess") {
+      const check = await axios.get(`https://lichess.org/api/user/${username.toLowerCase()}`);
+      if (!check.data?.id) throw Object.assign(new Error("Not found"), { response: { status: 404 } });
+      await pool.query("UPDATE users SET lichess_username = $1 WHERE id = $2", [username, req.userId]);
+    } else {
+      return res.status(400).json({ error: "Unknown platform — use 'chess.com' or 'lichess'" });
+    }
+    res.json({ success: true, platform, username });
+  } catch (err) {
+    const is404 = err.response?.status === 404;
+    res.status(is404 ? 404 : 500).json({
+      error: is404 ? `${platform} account not found` : "Failed to link chess account"
+    });
+  }
+});
+
+// ── Unlink Chess account ──────────────────────────────────────
+app.delete("/link-chess", requireAuth, async (req, res) => {
+  const { platform } = req.body;
+  if (platform === "lichess") {
+    await pool.query("UPDATE users SET lichess_username = NULL WHERE id = $1", [req.userId]);
+  } else {
+    await pool.query("UPDATE users SET chess_username = NULL WHERE id = $1", [req.userId]);
+  }
+  res.json({ success: true });
 });
 
 // GET /me/invites — fetch all pending server invites for the logged-in user

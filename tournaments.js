@@ -149,7 +149,20 @@ async function handleTournamentSubmit(e) {
         hasLosersBracket:     document.getElementById('tournamentLosers')?.checked || false,
         hasPointsTally:       document.getElementById('tournamentPoints')?.checked !== false,
         hostJoinsAsPlayer:    document.getElementById('tournamentHostJoins')?.checked !== false,
-        resultMode:           document.getElementById('tournamentResultMode')?.value || 'manual',
+        // Result mode — reads from radio buttons (tournaments.html new UI) or legacy select
+        resultMode:           (document.querySelector('input[name="resultMode"]:checked')?.value)
+                                || document.getElementById('tournamentResultMode')?.value
+                                || window._pendingResultMode
+                                || 'manual',
+        // API game (riot: lol/valorant/tft, chess: chess.com/lichess)
+        apiGame:              document.getElementById('riotGameSelect')?.value
+                                || document.getElementById('chessPlatformSelect')?.value
+                                || window._pendingApiGame
+                                || null,
+        // Dispute timeout for self-report mode (minutes)
+        disputeTimeout:       parseInt(document.getElementById('disputeTimeoutInput')?.value)
+                                || window._pendingDisputeTimeout
+                                || 30,
         scheduledStart:       document.getElementById('tournamentScheduleToggle')?.checked
                                 ? document.getElementById('tournamentScheduledTime')?.value || null
                                 : null,
@@ -577,10 +590,11 @@ function showBracketPanel(tournament) {
                          </div>`;
 
                     const isSelfReport = tournament.resultMode === 'self-report';
+                    const isApiMode    = tournament.resultMode === 'riot-api' || tournament.resultMode === 'chess-api';
                     const bothLocked = p1locked && p2locked;
                     const myReport = iAmP1 ? match.p1Report : match.p2Report;
                     const alreadyReported = !!myReport;
-                    const hasDispute = match.disputeStatus === 'disputed';
+                    const hasDispute = match.disputeStatus === 'disputed' || match.disputeStatus === 'timeout';
 
                     // Report Result button — shown to players in self-report mode once both locked in
                     const reportBtn = isSelfReport && isInMatch && bothLocked && !alreadyReported && !match.winner
@@ -589,9 +603,14 @@ function showBracketPanel(tournament) {
                             ? `<span style="flex-shrink:0;font-size:8px;font-weight:700;color:var(--text-3);padding:3px 8px">⏳ Waiting</span>`
                             : '';
 
-                    // Dispute badge for host
+                    // Dispute badge for host (disputed or timed out)
                     const disputeBtn = hasDispute && isHost && !match.winner
-                        ? `<button onclick="showDisputeModal('${tournament.id}','${mid}','${p1?.username||''}','${p2?.username||''}','${p1?.userId||''}','${p2?.userId||''}')" style="flex-shrink:0;font-size:8px;font-weight:800;padding:3px 8px;background:rgba(237,66,69,.2);color:rgba(255,120,120,.95);border:1px solid rgba(237,66,69,.35);border-radius:5px;cursor:pointer;font-family:inherit;white-space:nowrap;animation:pulse 1s ease infinite alternate" onmouseover="this.style.background='rgba(237,66,69,.35)'" onmouseout="this.style.background='rgba(237,66,69,.2)'">⚠ Dispute</button>`
+                        ? `<button onclick="showDisputeModal('${tournament.id}','${mid}','${p1?.username||''}','${p2?.username||''}','${p1?.userId||''}','${p2?.userId||''}')" style="flex-shrink:0;font-size:8px;font-weight:800;padding:3px 8px;background:rgba(237,66,69,.2);color:rgba(255,120,120,.95);border:1px solid rgba(237,66,69,.35);border-radius:5px;cursor:pointer;font-family:inherit;white-space:nowrap;animation:pulse 1s ease infinite alternate" onmouseover="this.style.background='rgba(237,66,69,.35)'" onmouseout="this.style.background='rgba(237,66,69,.2)'">${match.disputeStatus === 'timeout' ? '⏰ Timeout' : '⚠ Dispute'}</button>`
+                        : '';
+
+                    // API mode: "Check Result" button — shown to both players and host once both locked in
+                    const apiCheckBtn = isApiMode && bothLocked && !match.winner && mid
+                        ? `<button onclick="bracketApiPoll('${tournament.id}','${mid}')" style="flex-shrink:0;font-size:8px;font-weight:800;padding:3px 8px;background:rgba(88,101,242,.2);color:rgba(160,170,255,.95);border:1px solid rgba(88,101,242,.35);border-radius:5px;cursor:pointer;font-family:inherit;white-space:nowrap" onmouseover="this.style.background='rgba(88,101,242,.35)'" onmouseout="this.style.background='rgba(88,101,242,.2)'">🔍 Check Result</button>`
                         : '';
 
                     matchCards += `<div style="position:absolute;left:${x}px;top:${lockRowY}px;width:${MATCH_W}px;display:flex;gap:4px;align-items:center">
@@ -599,6 +618,7 @@ function showBracketPanel(tournament) {
                         ${statusPill(p2?.username, p2?.userId, p2locked)}
                         ${isInMatch && !myLocked ? `<button data-lock-btn="${mid}" onclick="bracketLockIn('${tournament.id}','${mid}')" style="flex-shrink:0;font-size:8px;font-weight:800;padding:3px 8px;background:rgba(250,166,26,.2);color:rgba(250,200,80,.95);border:1px solid rgba(250,166,26,.35);border-radius:5px;cursor:pointer;font-family:inherit;white-space:nowrap" onmouseover="this.style.background='rgba(250,166,26,.35)'" onmouseout="this.style.background='rgba(250,166,26,.2)'">🔒 Lock</button>` : ''}
                         ${reportBtn}
+                        ${apiCheckBtn}
                         ${disputeBtn}
                     </div>`;
                 }
@@ -816,7 +836,17 @@ function showBracketPanel(tournament) {
                   <div style="background:rgba(88,101,242,.08);border:1px solid rgba(88,101,242,.15);border-radius:6px;padding:9px;text-align:center"><div style="font-size:8px;color:var(--text-3);text-transform:uppercase;font-weight:700;margin-bottom:2px">Status</div><div style="font-size:11px;font-weight:800;color:${statusColour}">${tournament.status}</div></div>
                   <div style="background:rgba(88,101,242,.08);border:1px solid rgba(88,101,242,.15);border-radius:6px;padding:9px;text-align:center"><div style="font-size:8px;color:var(--text-3);text-transform:uppercase;font-weight:700;margin-bottom:2px">Players</div><div style="font-size:13px;font-weight:800;color:var(--accent)">${players.length}</div></div>
                   <div style="background:rgba(88,101,242,.08);border:1px solid rgba(88,101,242,.15);border-radius:6px;padding:9px;text-align:center"><div style="font-size:8px;color:var(--text-3);text-transform:uppercase;font-weight:700;margin-bottom:2px">Slots</div><div style="font-size:13px;font-weight:800;color:var(--accent)">${tournament.playerCount}</div></div>
-                  <div style="grid-column:1/-1;background:rgba(88,101,242,.08);border:1px solid rgba(88,101,242,.15);border-radius:6px;padding:7px 9px;display:flex;align-items:center;justify-content:space-between"><div style="font-size:8px;color:var(--text-3);text-transform:uppercase;font-weight:700">Results</div><div style="font-size:10px;font-weight:800;color:${tournament.resultMode==='self-report'?'#57f287':'var(--text-2)'}">${tournament.resultMode==='self-report'?'Self-report':'Manual'}</div></div>
+                  <div style="grid-column:1/-1;background:rgba(88,101,242,.08);border:1px solid rgba(88,101,242,.15);border-radius:6px;padding:7px 9px;display:flex;align-items:center;justify-content:space-between"><div style="font-size:8px;color:var(--text-3);text-transform:uppercase;font-weight:700">Results</div><div style="font-size:10px;font-weight:800;color:${
+                    tournament.resultMode==='self-report' ? '#57f287'
+                    : tournament.resultMode==='riot-api'  ? '#e57373'
+                    : tournament.resultMode==='chess-api' ? 'var(--yellow)'
+                    : 'var(--text-2)'
+                  }">${
+                    tournament.resultMode==='self-report' ? '🤝 Self-report'
+                    : tournament.resultMode==='riot-api'  ? `⚔️ Riot API${tournament.apiGame ? ' · ' + tournament.apiGame.toUpperCase() : ''}`
+                    : tournament.resultMode==='chess-api' ? `♟️ ${tournament.apiGame === 'lichess' ? 'Lichess' : 'Chess.com'}`
+                    : '🖊️ Manual'
+                  }</div></div>
                 </div>
               </div>
               <!-- Actions -->
@@ -1702,6 +1732,39 @@ async function bracketLockIn(tournamentId, matchId) {
 
 window.bracketLockIn = bracketLockIn;
 
+// ── API Mode: Check Result (Riot / Chess.com / Lichess) ───────
+async function bracketApiPoll(tournamentId, matchId) {
+    const btn = event?.target;
+    if (btn) { btn.disabled = true; btn.textContent = '⏳ Checking…'; }
+    try {
+        const response = await fetch(`${API_BASE}/api/tournaments/${tournamentId}/api-poll`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${localStorage.getItem('vh_token')}` },
+            body: JSON.stringify({ matchId })
+        });
+        const data = await response.json();
+
+        if (data.status === 'found' && data.autoAdvanced) {
+            showNotification('✅ Result found — winner auto-advanced!', 'success');
+            if (ws) wsSend('tournament-result', { tournamentId, matchId, status: 'agreed' });
+            setTimeout(() => openTournamentDetails(tournamentId), 500);
+        } else if (data.status === 'already_completed') {
+            showNotification('This match is already completed', 'success');
+            setTimeout(() => openTournamentDetails(tournamentId), 300);
+        } else if (data.status === 'not_found') {
+            showNotification(`⏳ No result found yet${data.reason ? ' — ' + data.reason : '. Play your match and check again.'}`, 'error');
+            if (btn) { btn.disabled = false; btn.textContent = '🔍 Check Result'; }
+        } else {
+            showNotification(data.error || 'Failed to check result', 'error');
+            if (btn) { btn.disabled = false; btn.textContent = '🔍 Check Result'; }
+        }
+    } catch(e) {
+        showNotification(e.message || 'Failed to check result', 'error');
+        if (btn) { btn.disabled = false; btn.textContent = '🔍 Check Result'; }
+    }
+}
+window.bracketApiPoll = bracketApiPoll;
+
 // ── Self-Report: Report Result Modal ─────────────────────────
 function showReportModal(tournamentId, matchId, p1name, p2name, p1uid, p2uid) {
     document.getElementById('_reportModal')?.remove();
@@ -2063,8 +2126,10 @@ function _handleTournamentWsMsg(msg) {
         if (data.bothLocked) {
             const badge = document.querySelector(`[data-lock-ready="${mid}"]`);
             if (badge) badge.style.display = 'inline-flex';
-            // Also show Report button if self-report mode — just refresh
-            if (window.activeTournament?.resultMode === 'self-report') {
+            // Also show Report/Check button if self-report or API mode — just refresh
+            if (window.activeTournament?.resultMode === 'self-report' ||
+                window.activeTournament?.resultMode === 'riot-api' ||
+                window.activeTournament?.resultMode === 'chess-api') {
                 setTimeout(() => openTournamentDetails(data.tournamentId), 200);
             }
         }
@@ -2072,7 +2137,7 @@ function _handleTournamentWsMsg(msg) {
     }
 
     if (data.type === 'tournament-result') {
-        if (data.status === 'agreed' || data.status === 'resolved') {
+        if (data.status === 'agreed' || data.status === 'resolved' || data.status === 'api-resolved') {
             if (window.bracketPanelActive && window.activeTournament?.id == data.tournamentId) {
                 setTimeout(() => openTournamentDetails(data.tournamentId), 300);
             }

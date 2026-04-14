@@ -305,8 +305,28 @@ async function initDb() {
       "ALTER TABLE users ADD COLUMN IF NOT EXISTS tournament_card_name_colour  TEXT DEFAULT NULL",
       "ALTER TABLE users ADD COLUMN IF NOT EXISTS tournament_card_bg_pos       TEXT DEFAULT NULL",
       "ALTER TABLE tournaments ADD COLUMN IF NOT EXISTS has_losers_bracket BOOLEAN DEFAULT FALSE",
-      "ALTER TABLE tournament_matches ADD COLUMN IF NOT EXISTS player1_score INTEGER DEFAULT 0",
-      "ALTER TABLE tournament_matches ADD COLUMN IF NOT EXISTS player2_score INTEGER DEFAULT 0",
+      "ALTER TABLE tournament_matches ADD COLUMN IF NOT EXISTS player1_score   INTEGER DEFAULT 0",
+      "ALTER TABLE tournament_matches ADD COLUMN IF NOT EXISTS player2_score   INTEGER DEFAULT 0",
+      // Self-report / API result mode columns
+      "ALTER TABLE tournaments ADD COLUMN IF NOT EXISTS result_mode       TEXT DEFAULT 'manual'",
+      "ALTER TABLE tournaments ADD COLUMN IF NOT EXISTS api_game          TEXT DEFAULT NULL",
+      "ALTER TABLE tournaments ADD COLUMN IF NOT EXISTS dispute_timeout   INTEGER DEFAULT 30",
+      "ALTER TABLE tournaments ADD COLUMN IF NOT EXISTS has_points_tally  BOOLEAN DEFAULT TRUE",
+      "ALTER TABLE tournaments ADD COLUMN IF NOT EXISTS scheduled_start   TIMESTAMPTZ DEFAULT NULL",
+      "ALTER TABLE tournaments ADD COLUMN IF NOT EXISTS alert_before_minutes INTEGER DEFAULT 15",
+      "ALTER TABLE tournaments ADD COLUMN IF NOT EXISTS winner_id         INTEGER DEFAULT NULL",
+      "ALTER TABLE tournament_matches ADD COLUMN IF NOT EXISTS locked_players  JSONB DEFAULT '[]'",
+      "ALTER TABLE tournament_matches ADD COLUMN IF NOT EXISTS round_locked    BOOLEAN DEFAULT FALSE",
+      "ALTER TABLE tournament_matches ADD COLUMN IF NOT EXISTS p1_report       JSONB DEFAULT NULL",
+      "ALTER TABLE tournament_matches ADD COLUMN IF NOT EXISTS p2_report       JSONB DEFAULT NULL",
+      "ALTER TABLE tournament_matches ADD COLUMN IF NOT EXISTS dispute_status  TEXT DEFAULT NULL",
+      "ALTER TABLE tournament_matches ADD COLUMN IF NOT EXISTS dispute_resolved_by INTEGER DEFAULT NULL",
+      // Linked game accounts (for API result modes)
+      "ALTER TABLE users ADD COLUMN IF NOT EXISTS riot_puuid        TEXT DEFAULT NULL",
+      "ALTER TABLE users ADD COLUMN IF NOT EXISTS riot_gamename     TEXT DEFAULT NULL",
+      "ALTER TABLE users ADD COLUMN IF NOT EXISTS riot_tagline      TEXT DEFAULT NULL",
+      "ALTER TABLE users ADD COLUMN IF NOT EXISTS chess_username    TEXT DEFAULT NULL",
+      "ALTER TABLE users ADD COLUMN IF NOT EXISTS lichess_username  TEXT DEFAULT NULL",
     ];
     for (const sql of alters) await pool.query(sql).catch(() => {});
 
