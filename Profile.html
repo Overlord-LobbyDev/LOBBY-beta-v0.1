@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8" />
-  <title>VoiceHub — Profile Settings</title>
+  <title>VoiceHub — Profile</title>
   <link rel="stylesheet" href="transitions.css" />
   <script src="nav.js"></script>
   <style>
@@ -13,762 +13,328 @@
       --green:#23a55a; --text-1:#f2f3f5; --text-2:#b5bac1; --text-3:#80848e;
       --radius:8px; --font:"gg sans","Noto Sans",Whitney,Helvetica Neue,Helvetica,Arial,sans-serif;
     }
-    body { background:var(--bg-0); color:var(--text-1); font-family:var(--font); min-height:100vh; display:flex; flex-direction:column; }
+    body { background:var(--bg-0); color:var(--text-1); font-family:var(--font); min-height:100vh; display:flex; align-items:center; justify-content:center; }
 
-    /* ── Top bar ── */
-    .topbar {
-      height:48px; background:var(--bg-1); border-bottom:1px solid rgba(0,0,0,.3);
-      display:flex; align-items:center; padding:0 24px; gap:12px; flex-shrink:0;
+    .profile-card {
+      background:var(--bg-1); border-radius:16px; overflow:hidden;
+      width:min(480px, 92vw); box-shadow:0 24px 64px rgba(0,0,0,.5);
     }
-    .topbar-back { background:none; border:none; color:var(--text-2); font-size:20px; cursor:pointer; padding:4px 8px; border-radius:6px; }
-    .topbar-back:hover { background:var(--bg-3); color:var(--text-1); }
-    .topbar-title { font-size:16px; font-weight:700; }
 
-    /* ── Layout ── */
-    .page { display:flex; flex:1; overflow:hidden; }
+    .profile-banner {
+      height:120px; background:var(--accent);
+      background-size:cover; background-position:center;
+    }
 
-    /* ── Sidebar nav ── */
-    .settings-nav {
-      width:220px; min-width:220px; background:var(--bg-1);
-      padding:16px 8px; border-right:1px solid rgba(0,0,0,.2);
-      display:flex; flex-direction:column; gap:2px;
+    .profile-header {
+      padding:0 20px 20px;
+      display:flex; flex-direction:column;
     }
-    .nav-label { font-size:11px; font-weight:700; text-transform:uppercase; letter-spacing:.8px; color:var(--text-3); padding:8px 10px 4px; }
-    .nav-btn {
-      padding:9px 12px; border-radius:6px; border:none; background:none;
-      color:var(--text-2); font-size:14px; font-family:var(--font);
-      cursor:pointer; text-align:left; transition:background .1s, color .1s;
-      display:flex; align-items:center; gap:10px;
-    }
-    .nav-btn:hover { background:var(--bg-3); color:var(--text-1); }
-    .nav-btn.active { background:var(--bg-3); color:var(--text-1); font-weight:600; }
 
-    /* ── Content ── */
-    .settings-content { flex:1; overflow-y:auto; padding:32px 48px; max-width:740px; }
-    .settings-content h2 { font-size:20px; font-weight:800; margin-bottom:24px; padding-bottom:12px; border-bottom:1px solid rgba(255,255,255,.06); }
+    .avatar-wrap {
+      margin-top:-40px; margin-bottom:12px;
+      display:flex; align-items:flex-end; justify-content:space-between;
+    }
 
-    /* ── Profile preview card ── */
-    .profile-preview {
-      background:var(--bg-1); border-radius:12px; overflow:hidden;
-      margin-bottom:28px; border:1px solid rgba(255,255,255,.06);
-    }
-    .preview-banner {
-      height:80px; position:relative; cursor:pointer;
-      transition: opacity .15s;
-    }
-    .preview-banner:hover { opacity: .85; }
-    .preview-banner::after {
-      content: "Click to change"; position:absolute; inset:0;
+    .profile-avatar {
+      width:80px; height:80px; border-radius:50%;
+      border:4px solid var(--bg-1); background:var(--accent);
       display:flex; align-items:center; justify-content:center;
-      font-size:13px; color:#fff; background:rgba(0,0,0,.4);
-      opacity:0; transition:opacity .15s;
+      font-size:32px; font-weight:700; overflow:hidden; flex-shrink:0;
     }
-    .preview-banner:hover::after { opacity:1; }
-    .preview-avatar-wrap {
-      position:relative; margin:-28px 0 0 16px; display:inline-block;
+    .profile-avatar img { width:100%; height:100%; object-fit:cover; }
+
+    .profile-actions { display:flex; gap:8px; }
+
+    .btn {
+      padding:8px 16px; border-radius:var(--radius); border:none;
+      font-size:13px; font-weight:600; font-family:var(--font); cursor:pointer;
+      transition:background .15s;
     }
-    .preview-avatar {
-      width:72px; height:72px; border-radius:50%; border:4px solid var(--bg-1);
-      background:var(--accent); display:flex; align-items:center; justify-content:center;
-      font-size:28px; font-weight:700; overflow:hidden; cursor:pointer;
+    .btn-primary { background:var(--accent); color:#fff; }
+    .btn-primary:hover { background:var(--accent-h); }
+    .btn-grey { background:var(--bg-3); color:var(--text-2); }
+    .btn-grey:hover { background:var(--bg-0); color:var(--text-1); }
+
+    .profile-username { font-size:22px; font-weight:800; }
+    .profile-status { font-size:13px; margin-top:4px; display:flex; align-items:center; gap:6px; }
+    .status-dot { width:10px; height:10px; border-radius:50%; background:var(--green); flex-shrink:0; }
+    .status-dot.offline { background:var(--text-3); }
+
+    .profile-bio {
+      font-size:14px; color:var(--text-2); line-height:1.6;
+      margin-top:12px; padding-top:12px; border-top:1px solid rgba(255,255,255,.06);
     }
-    .preview-avatar img { width:100%; height:100%; object-fit:cover; }
-    .preview-avatar:hover { opacity:.85; }
-    .preview-body { padding:8px 16px 16px; }
-    .preview-username { font-size:18px; font-weight:800; margin-top:4px; }
-    .preview-status { font-size:13px; color:var(--text-3); margin-top:2px; }
-    .preview-bio { font-size:14px; color:var(--text-2); margin-top:8px; line-height:1.5; }
 
-    /* ── Form sections ── */
-    .section { display:none; }
-    .section.active { display:block; }
-
-    .form-group { display:flex; flex-direction:column; gap:6px; margin-bottom:20px; }
-    .form-group label { font-size:12px; font-weight:700; text-transform:uppercase; letter-spacing:.6px; color:var(--text-2); }
-    .form-group input, .form-group textarea, .form-group select {
-      background:var(--bg-3); border:1.5px solid rgba(255,255,255,.06);
-      border-radius:var(--radius); color:var(--text-1); font-size:15px;
-      font-family:var(--font); padding:10px 14px; outline:none; transition:border-color .15s;
+    .profile-meta {
+      margin-top:12px; font-size:12px; color:var(--text-3);
+      display:flex; gap:16px;
     }
-    .form-group input:focus, .form-group textarea:focus, .form-group select:focus { border-color:var(--accent); }
-    .form-group textarea { resize:vertical; min-height:80px; }
-    .form-hint { font-size:12px; color:var(--text-3); margin-top:2px; }
 
-    /* Colour picker row */
-    .colour-row { display:flex; align-items:center; gap:12px; }
-    .colour-picker { width:48px; height:48px; border-radius:var(--radius); border:2px solid rgba(255,255,255,.1); cursor:pointer; padding:2px; background:none; }
-    .colour-presets { display:flex; gap:8px; flex-wrap:wrap; }
-    .colour-preset {
-      width:28px; height:28px; border-radius:50%; cursor:pointer;
-      border:2px solid transparent; transition:transform .1s, border-color .1s;
+    .close-btn {
+      position:absolute; top:16px; right:16px;
+      background:rgba(0,0,0,.4); border:none; color:#fff;
+      width:32px; height:32px; border-radius:50%; font-size:16px;
+      cursor:pointer; display:flex; align-items:center; justify-content:center;
     }
-    .colour-preset:hover { transform:scale(1.15); }
-    .colour-preset.selected { border-color:#fff; }
+    .close-btn:hover { background:rgba(0,0,0,.7); }
 
-    /* Upload buttons */
-    .upload-btn {
-      display:inline-flex; align-items:center; gap:8px;
-      background:var(--bg-3); border:1.5px solid rgba(255,255,255,.08);
-      border-radius:var(--radius); color:var(--text-2); font-size:14px;
-      font-family:var(--font); padding:9px 16px; cursor:pointer;
-      transition:background .15s, color .15s;
-    }
-    .upload-btn:hover { background:var(--accent); color:#fff; border-color:var(--accent); }
-
-    /* Save button */
-    .save-btn {
-      background:var(--accent); color:#fff; border:none;
-      border-radius:var(--radius); font-size:15px; font-weight:700;
-      font-family:var(--font); padding:11px 28px; cursor:pointer;
-      transition:background .15s, transform .1s; margin-top:8px;
-    }
-    .save-btn:hover { background:var(--accent-h); }
-    .save-btn:active { transform:scale(.97); }
-
-    /* Messages */
-    .msg { font-size:13px; padding:10px 14px; border-radius:var(--radius); margin-top:12px; display:none; }
-    .msg.success { background:rgba(35,165,90,.15); color:#57f287; display:block; }
-    .msg.error   { background:rgba(237,66,69,.15);  color:#ff7b7d;  display:block; }
-
-    /* Danger zone */
-    .danger-zone { border:1px solid rgba(237,66,69,.3); border-radius:var(--radius); padding:20px; margin-top:24px; }
-    .danger-zone h3 { color:var(--danger); font-size:15px; margin-bottom:8px; }
-    .danger-zone p { font-size:13px; color:var(--text-3); margin-bottom:16px; }
-    .btn-danger { background:var(--danger); color:#fff; border:none; border-radius:var(--radius); padding:9px 20px; font-size:14px; font-weight:600; font-family:var(--font); cursor:pointer; }
-    .btn-danger:hover { background:#c03537; }
-
-    /* Hidden file inputs */
-    input[type="file"] { display:none; }
+    .wrapper { position:relative; }
 
     ::-webkit-scrollbar { width:6px; }
     ::-webkit-scrollbar-thumb { background:var(--bg-3); border-radius:3px; }
-
-    /* Volume sliders */
-    .volume-row {
-      display: flex;
-      align-items: center;
-      gap: 10px;
-    }
-    .volume-icon { font-size: 16px; color: var(--text-3); width: 20px; text-align: center; flex-shrink: 0; }
-    .volume-slider-wrap { flex: 1; position: relative; height: 20px; display: flex; align-items: center; }
-    input[type="range"] {
-      -webkit-appearance: none;
-      appearance: none;
-      width: 100%;
-      height: 4px;
-      border-radius: 2px;
-      background: var(--bg-3);
-      outline: none;
-      cursor: pointer;
-    }
-    input[type="range"]::-webkit-slider-thumb {
-      -webkit-appearance: none;
-      appearance: none;
-      width: 16px;
-      height: 16px;
-      border-radius: 50%;
-      background: var(--accent);
-      cursor: pointer;
-      border: 2px solid var(--bg-1);
-      box-shadow: 0 1px 4px rgba(0,0,0,.4);
-      transition: transform .1s, background .15s;
-    }
-    input[type="range"]::-webkit-slider-thumb:hover { transform: scale(1.2); background: var(--accent-h); }
-    .volume-label {
-      font-size: 12px;
-      color: var(--text-3);
-      width: 36px;
-      text-align: right;
-      flex-shrink: 0;
-    }
   </style>
 </head>
 <body>
 
-<div class="topbar">
-  <button class="topbar-back" id="backBtn">←</button>
-  <span class="topbar-title">⚙️ Profile Settings</span>
-</div>
-
-<div class="page">
-  <!-- Settings nav -->
-  <nav class="settings-nav">
-    <div class="nav-label">My Account</div>
-    <button class="nav-btn active" data-section="profile">👤 Profile</button>
-    <button class="nav-btn" data-section="appearance">🎨 Appearance</button>
-    <button class="nav-btn" data-section="security">🔒 Password</button>
-    <div class="nav-label" style="margin-top:12px">App Settings</div>
-    <button class="nav-btn" data-section="audiovideo">🎙 Audio & Video</button>
-  </nav>
-
-  <!-- Settings content -->
-  <div class="settings-content">
-
-    <!-- ── Profile section ── -->
-    <div class="section active" id="section-profile">
-      <h2>My Profile</h2>
-
-      <!-- Live preview card -->
-      <div class="profile-preview">
-        <div class="preview-banner" id="previewBanner" onclick="document.getElementById('bannerImgInput').click()"></div>
-        <div class="preview-avatar-wrap">
-          <div class="preview-avatar" id="previewAvatar" onclick="document.getElementById('avatarInput').click()">U</div>
-        </div>
-        <div class="preview-body">
-          <div class="preview-username" id="previewUsername">Loading…</div>
-          <div class="preview-status" id="previewStatusText">● Online</div>
-          <div class="preview-bio" id="previewBioText"></div>
-        </div>
+<div class="wrapper">
+  <div class="profile-card" id="profileCard">
+    <div class="profile-banner" id="profileBanner"></div>
+    <div class="profile-header">
+      <div class="avatar-wrap">
+        <div class="profile-avatar" id="profileAvatar">?</div>
+        <div class="profile-actions" id="profileActions"></div>
       </div>
-
-      <div class="form-group">
-        <label>Avatar</label>
-        <label class="upload-btn" for="avatarInput">📷 Upload Avatar <span style="font-size:11px;color:var(--text-3)">(GIF, PNG, JPG, WebP · max 8MB)</span></label>
-        <input type="file" id="avatarInput" accept="image/*" />
-        <div class="form-hint">Animated GIFs are supported and will play everywhere.</div>
+      <div class="profile-username" id="profileUsername">Loading…</div>
+      <div class="profile-status" id="profileStatus">
+        <div class="status-dot" id="statusDot"></div>
+        <span id="statusText">Online</span>
       </div>
-
-      <div class="form-group">
-        <label>Status Message</label>
-        <input type="text" id="statusInput" placeholder="What are you up to?" maxlength="100" />
-      </div>
-
-      <div class="form-group">
-        <label>Bio</label>
-        <textarea id="bioInput" placeholder="Tell people a bit about yourself…" maxlength="300"></textarea>
-        <div class="form-hint" id="bioCounter">0 / 300</div>
-      </div>
-
-      <div class="form-group">
-        <label>Default Post Visibility</label>
-        <select id="postVisibilitySelect">
-          <option value="public">🌐 Public — anyone can see your posts</option>
-          <option value="friends">👥 Friends only — only friends can see your posts</option>
-        </select>
-        <div class="form-hint">This sets the default when you create a new post. You can change it per post.</div>
-      </div>
-
-      <button class="save-btn" onclick="saveProfile()">Save Changes</button>
-      <div class="msg" id="profileMsg"></div>
+      <div class="profile-bio" id="profileBio" style="display:none"></div>
+      <div class="profile-meta" id="profileMeta"></div>
     </div>
-
-    <!-- ── Appearance section ── -->
-    <div class="section" id="section-appearance">
-      <h2>Profile Appearance</h2>
-
-      <div class="form-group">
-        <label>Banner Image</label>
-        <label class="upload-btn" for="bannerImgInput">🖼 Upload Banner Image <span style="font-size:11px;color:var(--text-3)">(GIF, PNG, JPG · max 8MB)</span></label>
-        <input type="file" id="bannerImgInput" accept="image/*" />
-        <div class="form-hint">Shows at the top of your profile. Animated GIFs supported.</div>
-      </div>
-
-      <div class="form-group">
-        <label>Banner Colour <span style="font-size:11px;color:var(--text-3);text-transform:none;letter-spacing:0">(used when no image is set)</span></label>
-        <div class="colour-row">
-          <input type="color" class="colour-picker" id="bannerColourPicker" />
-          <div class="colour-presets" id="colourPresets"></div>
-        </div>
-      </div>
-
-      <button class="save-btn" onclick="saveAppearance()">Save Appearance</button>
-      <div class="msg" id="appearanceMsg"></div>
-    </div>
-
-    <!-- ── Security section ── -->
-    <div class="section" id="section-security">
-      <h2>Change Password</h2>
-
-      <div class="form-group">
-        <label>Current Password</label>
-        <input type="password" id="currentPassword" placeholder="Enter your current password" />
-      </div>
-      <div class="form-group">
-        <label>New Password</label>
-        <input type="password" id="newPassword" placeholder="At least 6 characters" />
-      </div>
-      <div class="form-group">
-        <label>Confirm New Password</label>
-        <input type="password" id="confirmPassword" placeholder="Repeat new password" />
-      </div>
-
-      <button class="save-btn" onclick="changePassword()">Change Password</button>
-      <div class="msg" id="passwordMsg"></div>
-    </div>
-
-    <!-- ── Audio & Video section ── -->
-    <div class="section" id="section-audiovideo">
-      <h2>Audio & Video</h2>
-
-      <div class="form-group">
-        <label>Microphone</label>
-        <select id="micSelect"></select>
-        <div class="form-hint">The microphone used for calls and voice chat.</div>
-      </div>
-
-      <div class="form-group">
-        <label>Input Volume <span id="inputVolLabel" style="color:var(--text-2);font-weight:400;text-transform:none;letter-spacing:0;font-size:12px">100%</span></label>
-        <div class="volume-row">
-          <span class="volume-icon">🔇</span>
-          <div class="volume-slider-wrap">
-            <input type="range" id="inputVolume" min="0" max="100" value="100" />
-          </div>
-          <span class="volume-icon">🎙</span>
-        </div>
-        <div class="form-hint">Controls how loud your microphone is captured.</div>
-      </div>
-
-      <div class="form-group">
-        <label>Webcam</label>
-        <select id="webcamSelect"></select>
-        <div class="form-hint">The camera used for video calls.</div>
-      </div>
-
-      <div class="form-group">
-        <label>Speaker / Output Device</label>
-        <select id="speakerSelect"></select>
-        <div class="form-hint">Where you hear audio from calls.</div>
-      </div>
-
-      <div class="form-group">
-        <label>Output Volume <span id="outputVolLabel" style="color:var(--text-2);font-weight:400;text-transform:none;letter-spacing:0;font-size:12px">100%</span></label>
-        <div class="volume-row">
-          <span class="volume-icon">🔇</span>
-          <div class="volume-slider-wrap">
-            <input type="range" id="outputVolume" min="0" max="100" value="100" />
-          </div>
-          <span class="volume-icon">🔊</span>
-        </div>
-        <div class="form-hint">Controls how loud you hear other participants.</div>
-      </div>
-
-      <div class="form-group">
-        <label>Webcam Quality</label>
-        <select id="camQualitySelect">
-          <option value="720p30">720p 30fps</option>
-          <option value="720p60">720p 60fps</option>
-          <option value="1080p30" selected>1080p 30fps</option>
-          <option value="1080p60">1080p 60fps</option>
-          <option value="1440p30">1440p 30fps</option>
-          <option value="1440p60">1440p 60fps</option>
-          <option value="source">Source (max)</option>
-        </select>
-      </div>
-
-      <div class="form-group">
-        <label>Screen Share Quality</label>
-        <select id="screenQualitySelect">
-          <option value="720p30">720p 30fps</option>
-          <option value="720p60">720p 60fps</option>
-          <option value="1080p30" selected>1080p 30fps</option>
-          <option value="1080p60">1080p 60fps</option>
-          <option value="1440p30">1440p 30fps</option>
-          <option value="1440p60">1440p 60fps</option>
-          <option value="source">Source (max)</option>
-        </select>
-      </div>
-
-      <!-- Mic test -->
-      <div class="form-group">
-        <label>Test Microphone</label>
-        <div style="display:flex;gap:10px;align-items:center">
-          <button class="save-btn" id="testMicBtn" style="margin-top:0;padding:9px 20px;font-size:14px">🎤 Test Mic</button>
-          <span id="testMicStatus" style="font-size:13px;color:var(--text-3)">Click to test your microphone</span>
-        </div>
-        <canvas id="micMeter" width="300" height="24" style="margin-top:10px;border-radius:4px;background:var(--bg-3);display:block"></canvas>
-      </div>
-
-      <button class="save-btn" id="saveAvBtn">Save Audio & Video</button>
-      <div class="msg" id="avMsg"></div>
-    </div>
-
   </div>
 </div>
-
-<!-- Hidden file inputs -->
-<input type="file" id="avatarInput" accept="image/*" />
-<input type="file" id="bannerImgInput" accept="image/*" />
 
 <script>
 const AUTH_URL = "https://lobby-auth-server.onrender.com";
 const token    = localStorage.getItem("vh_token") || sessionStorage.getItem("vh_token");
 if (!token) smoothNavigate("login.html", "down");
 
-let me = null;
-let pendingBannerColour = null;
+// Get user ID from URL param
+const params = new URLSearchParams(window.location.search);
+const userId = params.get("id");
+const returnTo = params.get("from") || "chat.html";
 
-function authHeaders() { return { Authorization: `Bearer ${token}`, "Content-Type": "application/json" }; }
+if (!userId) smoothNavigate(returnTo, "down");
+
 async function api(path, opts = {}) {
-  return fetch(`${AUTH_URL}${path}`, { ...opts, headers: { ...authHeaders(), ...(opts.headers || {}) } }).then(r => r.json());
+  return fetch(`${AUTH_URL}${path}`, {
+    ...opts,
+    headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json", ...(opts.headers || {}) }
+  }).then(r => r.json());
 }
 
-// ── Colour presets ────────────────────────────────────────────
-const PRESETS = ["#5865f2","#eb459e","#ed4245","#fee75c","#57f287","#00b0f4","#f47fff","#ff7b7d","#23a55a","#1e1f22"];
-
-function buildColourPresets(selected) {
-  const container = document.getElementById("colourPresets");
-  container.innerHTML = PRESETS.map(c => `
-    <div class="colour-preset ${c === selected ? "selected" : ""}"
-      style="background:${c}" title="${c}"
-      onclick="selectColour('${c}')"></div>
-  `).join("");
-}
-
-function selectColour(colour) {
-  pendingBannerColour = colour;
-  document.getElementById("bannerColourPicker").value = colour;
-  document.querySelectorAll(".colour-preset").forEach(el => {
-    el.classList.toggle("selected", el.title === colour);
-  });
-  updateBannerPreview(null, colour);
-}
-
-document.getElementById("bannerColourPicker").addEventListener("input", e => {
-  pendingBannerColour = e.target.value;
-  document.querySelectorAll(".colour-preset").forEach(el => el.classList.remove("selected"));
-  updateBannerPreview(null, e.target.value);
-});
-
-// ── Boot ─────────────────────────────────────────────────────
 async function boot() {
-  me = await api("/me");
-  if (me.error) { smoothNavigate("login.html", "down"); return; }
+  const [me, profile] = await Promise.all([api("/me"), api(`/profile/${userId}`)]);
 
-  const profile = await api(`/profile/${me.id}`);
-
-  // Populate preview
-  updateAvatarPreview(profile.avatar_url);
-  updateBannerPreview(profile.banner_url, profile.banner_colour || "#5865f2");
-  document.getElementById("previewUsername").textContent = profile.username;
-  document.getElementById("previewStatusText").textContent = profile.status ? `● ${profile.status}` : "● Online";
-  document.getElementById("previewBioText").textContent = profile.bio || "";
-
-  // Populate form fields
-  document.getElementById("statusInput").value = profile.status || "";
-  document.getElementById("bioInput").value = profile.bio || "";
-  updateBioCounter();
-
-  // Colour picker
-  const colour = profile.banner_colour || "#5865f2";
-  document.getElementById("bannerColourPicker").value = colour;
-  pendingBannerColour = colour;
-  buildColourPresets(colour);
-}
-
-function updateAvatarPreview(url) {
-  const el = document.getElementById("previewAvatar");
-  if (url) {
-    el.innerHTML = `<img src="${url}" alt="avatar" />`;
-  } else {
-    el.textContent = me?.username?.slice(0, 1).toUpperCase() || "U";
-  }
-}
-
-function updateBannerPreview(imageUrl, colour) {
-  const el = document.getElementById("previewBanner");
-  if (imageUrl) {
-    el.style.backgroundImage = `url(${imageUrl})`;
-    el.style.backgroundSize  = "cover";
-    el.style.backgroundPosition = "center";
-    el.style.backgroundColor = "transparent";
-  } else {
-    el.style.backgroundImage = "none";
-    el.style.backgroundColor = colour || "#5865f2";
-  }
-}
-
-function updateBioCounter() {
-  const val = document.getElementById("bioInput").value;
-  document.getElementById("bioCounter").textContent = `${val.length} / 300`;
-  document.getElementById("previewBioText").textContent = val;
-}
-document.getElementById("bioInput").addEventListener("input", updateBioCounter);
-document.getElementById("statusInput").addEventListener("input", e => {
-  document.getElementById("previewStatusText").textContent = e.target.value ? `● ${e.target.value}` : "● Online";
-});
-
-// ── Avatar upload ─────────────────────────────────────────────
-document.getElementById("avatarInput").addEventListener("change", async e => {
-  const file = e.target.files[0];
-  if (!file) return;
-
-  // Show preview immediately
-  const reader = new FileReader();
-  reader.onload = ev => updateAvatarPreview(ev.target.result);
-  reader.readAsDataURL(file);
-
-  // Upload
-  const form = new FormData();
-  form.append("avatar", file);
-  const r = await fetch(`${AUTH_URL}/avatar`, {
-    method: "POST",
-    headers: { Authorization: `Bearer ${token}` },
-    body: form
-  }).then(r => r.json());
-
-  if (r.avatarUrl) {
-    showMsg("profileMsg", "Avatar updated!", "success");
-  } else {
-    showMsg("profileMsg", r.error || "Upload failed", "error");
-  }
-  e.target.value = "";
-});
-
-// ── Banner image upload ───────────────────────────────────────
-document.getElementById("bannerImgInput").addEventListener("change", async e => {
-  const file = e.target.files[0];
-  if (!file) return;
-
-  // Preview immediately
-  const reader = new FileReader();
-  reader.onload = ev => updateBannerPreview(ev.target.result, null);
-  reader.readAsDataURL(file);
-
-  // Upload
-  const form = new FormData();
-  form.append("banner", file);
-  const r = await fetch(`${AUTH_URL}/banner`, {
-    method: "POST",
-    headers: { Authorization: `Bearer ${token}` },
-    body: form
-  }).then(r => r.json());
-
-  if (r.bannerUrl) {
-    showMsg("appearanceMsg", "Banner image updated!", "success");
-  } else {
-    showMsg("appearanceMsg", r.error || "Upload failed", "error");
-  }
-  e.target.value = "";
-});
-
-// ── Save profile ──────────────────────────────────────────────
-async function saveProfile() {
-  const bio        = document.getElementById("bioInput").value.trim();
-  const status     = document.getElementById("statusInput").value.trim();
-  const visibility = document.getElementById("postVisibilitySelect").value;
-
-  const r = await api("/profile", {
-    method: "PATCH",
-    body: JSON.stringify({ bio, status })
-  });
-
-  // Save visibility separately
-  await api("/profile/visibility", {
-    method: "PATCH",
-    body: JSON.stringify({ visibility })
-  });
-
-  if (r.success) {
-    showMsg("profileMsg", "Profile saved!", "success");
-  } else {
-    showMsg("profileMsg", r.error || "Failed to save", "error");
-  }
-}
-
-// ── Save appearance ───────────────────────────────────────────
-async function saveAppearance() {
-  const r = await api("/profile", {
-    method: "PATCH",
-    body: JSON.stringify({ bannerColour: pendingBannerColour })
-  });
-
-  if (r.success) {
-    showMsg("appearanceMsg", "Appearance saved!", "success");
-    buildColourPresets(pendingBannerColour);
-  } else {
-    showMsg("appearanceMsg", r.error || "Failed to save", "error");
-  }
-}
-
-// ── Change password ───────────────────────────────────────────
-async function changePassword() {
-  const current  = document.getElementById("currentPassword").value;
-  const newPass  = document.getElementById("newPassword").value;
-  const confirm  = document.getElementById("confirmPassword").value;
-
-  if (!current || !newPass) { showMsg("passwordMsg", "Please fill in all fields", "error"); return; }
-  if (newPass !== confirm)   { showMsg("passwordMsg", "Passwords do not match", "error"); return; }
-  if (newPass.length < 6)    { showMsg("passwordMsg", "Password must be at least 6 characters", "error"); return; }
-
-  const r = await api("/profile/password", {
-    method: "PATCH",
-    body: JSON.stringify({ currentPassword: current, newPassword: newPass })
-  });
-
-  if (r.success) {
-    showMsg("passwordMsg", "Password changed successfully!", "success");
-    document.getElementById("currentPassword").value = "";
-    document.getElementById("newPassword").value = "";
-    document.getElementById("confirmPassword").value = "";
-  } else {
-    showMsg("passwordMsg", r.error || "Failed to change password", "error");
-  }
-}
-
-// ── Audio & Video ─────────────────────────────────────────────
-let testMicStream = null;
-let micMeterAnim  = null;
-
-async function loadAVDevices() {
-  try { await navigator.mediaDevices.getUserMedia({ audio: true, video: true }); } catch {}
-
-  const devices = await navigator.mediaDevices.enumerateDevices();
-  const mics     = devices.filter(d => d.kind === "audioinput");
-  const cams     = devices.filter(d => d.kind === "videoinput");
-  const speakers = devices.filter(d => d.kind === "audiooutput");
-
-  const savedMic     = localStorage.getItem("vh_mic")           || "";
-  const savedCam     = localStorage.getItem("vh_cam")           || "";
-  const savedSpeaker = localStorage.getItem("vh_speaker")       || "";
-  const savedCamQ    = localStorage.getItem("vh_camQuality")    || "1080p30";
-  const savedScreenQ = localStorage.getItem("vh_screenQuality") || "1080p30";
-  const savedInputVol  = localStorage.getItem("vh_inputVolume")  || "100";
-  const savedOutputVol = localStorage.getItem("vh_outputVolume") || "100";
-
-  populateSelect("micSelect",     mics,     savedMic);
-  populateSelect("webcamSelect",  cams,     savedCam);
-  populateSelect("speakerSelect", speakers, savedSpeaker);
-
-  document.getElementById("camQualitySelect").value    = savedCamQ;
-  document.getElementById("screenQualitySelect").value = savedScreenQ;
-
-  // Volume sliders
-  const inputSlider  = document.getElementById("inputVolume");
-  const outputSlider = document.getElementById("outputVolume");
-  inputSlider.value  = savedInputVol;
-  outputSlider.value = savedOutputVol;
-  document.getElementById("inputVolLabel").textContent  = `${savedInputVol}%`;
-  document.getElementById("outputVolLabel").textContent = `${savedOutputVol}%`;
-
-  function updateSliderFill(slider) {
-    const pct = ((slider.value - slider.min) / (slider.max - slider.min)) * 100;
-    slider.style.background = `linear-gradient(to right, var(--accent) ${pct}%, var(--bg-3) ${pct}%)`;
-  }
-
-  updateSliderFill(inputSlider);
-  updateSliderFill(outputSlider);
-
-  inputSlider.addEventListener("input", () => {
-    document.getElementById("inputVolLabel").textContent = `${inputSlider.value}%`;
-    updateSliderFill(inputSlider);
-  });
-  outputSlider.addEventListener("input", () => {
-    document.getElementById("outputVolLabel").textContent = `${outputSlider.value}%`;
-    updateSliderFill(outputSlider);
-  });
-}
-
-function populateSelect(id, devices, savedValue) {
-  const sel = document.getElementById(id);
-  sel.innerHTML = "";
-  if (!devices.length) {
-    sel.innerHTML = `<option value="">No devices found</option>`;
+  if (profile.error) {
+    document.getElementById("profileUsername").textContent = "User not found";
     return;
   }
-  devices.forEach((d, i) => {
-    const opt = document.createElement("option");
-    opt.value = d.deviceId;
-    opt.text  = d.label || `Device ${i + 1}`;
-    if (d.deviceId === savedValue) opt.selected = true;
-    sel.appendChild(opt);
-  });
+
+  // Banner
+  const banner = document.getElementById("profileBanner");
+  if (profile.banner_url) {
+    banner.style.backgroundImage = `url(${profile.banner_url})`;
+    banner.style.backgroundSize  = "cover";
+  } else {
+    banner.style.background = profile.banner_colour || "#5865f2";
+  }
+
+  // Avatar
+  const avatarEl = document.getElementById("profileAvatar");
+  if (profile.avatar_url) {
+    avatarEl.innerHTML = `<img src="${profile.avatar_url}" alt="${profile.username}" />`;
+  } else {
+    avatarEl.textContent = profile.username.slice(0,1).toUpperCase();
+  }
+
+  // Username
+  document.getElementById("profileUsername").textContent = profile.username;
+
+  // Status
+  const statusText = profile.status || "Online";
+  document.getElementById("statusText").textContent = statusText;
+  document.title = `${profile.username} — VoiceHub`;
+
+  // Bio
+  if (profile.bio) {
+    const bioEl = document.getElementById("profileBio");
+    bioEl.textContent = profile.bio;
+    bioEl.style.display = "block";
+  }
+
+  // Member since
+  const joined = new Date(profile.created_at).toLocaleDateString("en-GB", { day:"numeric", month:"long", year:"numeric" });
+  document.getElementById("profileMeta").innerHTML = `<span>📅 Member since ${joined}</span>`;
+
+  // Actions — show edit button if own profile, otherwise show message button
+  const actionsEl = document.getElementById("profileActions");
+  if (parseInt(userId) === me.id) {
+    actionsEl.innerHTML = `<button class="btn btn-grey" onclick="smoothNavigate('profile.html', 'up')">✏️ Edit Profile</button>`;
+
+    // ── Chess account linking ──────────────────────────────────
+    const card = document.getElementById('profileCard');
+    const chessSection = document.createElement('div');
+    chessSection.style.cssText = 'margin-top:10px;background:var(--bg-1);border-radius:16px;overflow:hidden;width:min(480px,92vw);box-shadow:0 24px 64px rgba(0,0,0,.5);padding:16px 20px;';
+    chessSection.innerHTML = `
+      <div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.8px;color:var(--text-3);margin-bottom:12px">♟️ Chess Accounts — for Tournament Auto-Results</div>
+      <div style="display:flex;flex-direction:column;gap:10px">
+
+        <div style="display:flex;align-items:center;gap:10px">
+          <div style="width:28px;height:28px;border-radius:6px;background:rgba(255,255,255,.06);display:flex;align-items:center;justify-content:center;font-size:15px;flex-shrink:0">♟️</div>
+          <div style="flex:1;min-width:0">
+            <div style="font-size:11px;font-weight:600;color:var(--text-2);margin-bottom:3px">Chess.com username</div>
+            <input id="chesscomInput" placeholder="e.g. hikaru" value="${me.chess_username||''}"
+              style="width:100%;background:var(--bg-2);border:1px solid rgba(255,255,255,.1);border-radius:6px;padding:7px 10px;color:var(--text-1);font-size:13px;font-family:var(--font);outline:none;transition:border-color .15s"
+              onfocus="this.style.borderColor='var(--accent)'" onblur="this.style.borderColor='rgba(255,255,255,.1)'" />
+          </div>
+          <button onclick="linkChess('chess.com')"
+            style="flex-shrink:0;padding:8px 14px;background:var(--accent);color:#fff;border:none;border-radius:6px;font-size:12px;font-weight:700;cursor:pointer;font-family:var(--font);white-space:nowrap">
+            ${me.chess_username ? 'Update' : 'Link'}
+          </button>
+          ${me.chess_username ? `<button onclick="unlinkChess('chess.com')" title="Unlink" style="flex-shrink:0;padding:8px 10px;background:rgba(237,66,69,.12);color:var(--danger);border:1px solid rgba(237,66,69,.25);border-radius:6px;font-size:12px;cursor:pointer;font-family:var(--font)">✕</button>` : ''}
+        </div>
+
+        <div style="display:flex;align-items:center;gap:10px">
+          <div style="width:28px;height:28px;border-radius:6px;background:rgba(255,255,255,.06);display:flex;align-items:center;justify-content:center;font-size:15px;flex-shrink:0">🐴</div>
+          <div style="flex:1;min-width:0">
+            <div style="font-size:11px;font-weight:600;color:var(--text-2);margin-bottom:3px">Lichess username</div>
+            <input id="lichessInput" placeholder="e.g. DrNykterstein" value="${me.lichess_username||''}"
+              style="width:100%;background:var(--bg-2);border:1px solid rgba(255,255,255,.1);border-radius:6px;padding:7px 10px;color:var(--text-1);font-size:13px;font-family:var(--font);outline:none;transition:border-color .15s"
+              onfocus="this.style.borderColor='var(--accent)'" onblur="this.style.borderColor='rgba(255,255,255,.1)'" />
+          </div>
+          <button onclick="linkChess('lichess')"
+            style="flex-shrink:0;padding:8px 14px;background:var(--accent);color:#fff;border:none;border-radius:6px;font-size:12px;font-weight:700;cursor:pointer;font-family:var(--font);white-space:nowrap">
+            ${me.lichess_username ? 'Update' : 'Link'}
+          </button>
+          ${me.lichess_username ? `<button onclick="unlinkChess('lichess')" title="Unlink" style="flex-shrink:0;padding:8px 10px;background:rgba(237,66,69,.12);color:var(--danger);border:1px solid rgba(237,66,69,.25);border-radius:6px;font-size:12px;cursor:pointer;font-family:var(--font)">✕</button>` : ''}
+        </div>
+
+        <div id="chessLinkStatus" style="font-size:11px;min-height:16px;padding:2px 0"></div>
+      </div>`;
+    card.after(chessSection);
+
+  } else {
+    actionsEl.innerHTML = `
+      <button class="btn btn-primary" onclick="openDMAndReturn(${profile.id}, '${profile.username}')">💬 Message</button>
+      <button class="btn btn-grey" onclick="smoothNavigate('${returnTo}', 'down')">✕ Close</button>`;
+  }
 }
 
-// Mic test with level meter
-document.getElementById("testMicBtn").addEventListener("click", async () => {
-  if (testMicStream) {
-    // Stop test
-    testMicStream.getTracks().forEach(t => t.stop());
-    testMicStream = null;
-    cancelAnimationFrame(micMeterAnim);
-    document.getElementById("testMicBtn").textContent = "🎤 Test Mic";
-    document.getElementById("testMicStatus").textContent = "Click to test your microphone";
-    const ctx = document.getElementById("micMeter").getContext("2d");
-    ctx.clearRect(0, 0, 300, 24);
+function openDMAndReturn(userId, username) {
+  localStorage.setItem("pendingDM", JSON.stringify({ userId, username }));
+  smoothNavigate("chat.html", "down");
+}
+
+let chessVerificationState = {};
+
+async function linkChess(platform) {
+  const statusEl = document.getElementById('chessLinkStatus');
+  const username = platform === 'lichess'
+    ? document.getElementById('lichessInput')?.value?.trim()
+    : document.getElementById('chesscomInput')?.value?.trim();
+
+  if (!username) {
+    statusEl.style.color = 'var(--danger)';
+    statusEl.textContent = `Enter your ${platform} username first.`;
     return;
   }
+
+  // Check if we're in code-entry mode
+  if (chessVerificationState[platform] === 'awaiting-code') {
+    return submitChessCode(platform);
+  }
+
+  // Step 1: Start verification
+  statusEl.style.color = 'var(--text-3)';
+  statusEl.textContent = 'Sending verification code…';
 
   try {
-    const deviceId = document.getElementById("micSelect").value;
-    testMicStream = await navigator.mediaDevices.getUserMedia({
-      audio: { deviceId: deviceId ? { exact: deviceId } : undefined },
-      video: false
+    const res = await fetch(`${AUTH_URL}/link-chess/start`, {
+      method: 'POST',
+      headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ platform, username })
     });
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.error || 'Failed to start verification');
 
-    document.getElementById("testMicBtn").textContent = "⏹ Stop Test";
-    document.getElementById("testMicStatus").textContent = "Speak into your mic…";
-
-    // Draw level meter
-    const audioCtx  = new AudioContext();
-    const analyser  = audioCtx.createAnalyser();
-    const source    = audioCtx.createMediaStreamSource(testMicStream);
-    source.connect(analyser);
-    analyser.fftSize = 256;
-    const data = new Uint8Array(analyser.frequencyBinCount);
-    const canvas = document.getElementById("micMeter");
-    const ctx    = canvas.getContext("2d");
-
-    function draw() {
-      micMeterAnim = requestAnimationFrame(draw);
-      analyser.getByteFrequencyData(data);
-      const avg   = data.reduce((a, b) => a + b, 0) / data.length;
-      const width = (avg / 128) * canvas.width;
-      ctx.clearRect(0, 0, canvas.width, canvas.height);
-      const grad = ctx.createLinearGradient(0, 0, canvas.width, 0);
-      grad.addColorStop(0,   "#23a55a");
-      grad.addColorStop(0.6, "#fee75c");
-      grad.addColorStop(1,   "#ed4245");
-      ctx.fillStyle = grad;
-      ctx.fillRect(0, 0, width, canvas.height);
-    }
-    draw();
-  } catch (e) {
-    document.getElementById("testMicStatus").textContent = "Could not access microphone: " + e.message;
+    // Now show code-entry UI
+    chessVerificationState[platform] = 'awaiting-code';
+    statusEl.style.color = '#fee75c';
+    statusEl.innerHTML = `
+      <div style="margin-top:10px">
+        <p style="margin-bottom:8px">📧 Verification code sent to your ${platform} email!</p>
+        <div style="display:flex;gap:6px;margin-bottom:8px">
+          <input id="chess-code-${platform}" type="text" placeholder="Enter 6-digit code" 
+            maxlength="6" style="width:120px;padding:6px 8px;background:var(--bg-2);border:1px solid rgba(255,255,255,.1);border-radius:4px;color:var(--text-1);font-size:13px;font-family:var(--font);text-align:center;letter-spacing:4px" />
+          <button onclick="submitChessCode('${platform}')" style="padding:6px 12px;background:var(--accent);color:#fff;border:none;border-radius:4px;font-size:12px;font-weight:600;cursor:pointer;font-family:var(--font)">Confirm</button>
+        </div>
+        <p style="font-size:11px;color:var(--text-3)">Code expires in 10 minutes</p>
+      </div>
+    `;
+  } catch(e) {
+    statusEl.style.color = 'var(--danger)';
+    statusEl.textContent = `❌ ${e.message}`;
+    chessVerificationState[platform] = null;
   }
-});
+}
 
-// Save AV settings to localStorage
-document.getElementById("saveAvBtn").addEventListener("click", () => {
-  localStorage.setItem("vh_mic",           document.getElementById("micSelect").value);
-  localStorage.setItem("vh_cam",           document.getElementById("webcamSelect").value);
-  localStorage.setItem("vh_speaker",       document.getElementById("speakerSelect").value);
-  localStorage.setItem("vh_camQuality",    document.getElementById("camQualitySelect").value);
-  localStorage.setItem("vh_screenQuality", document.getElementById("screenQualitySelect").value);
-  localStorage.setItem("vh_inputVolume",   document.getElementById("inputVolume").value);
-  localStorage.setItem("vh_outputVolume",  document.getElementById("outputVolume").value);
-  showMsg("avMsg", "Audio & Video settings saved!", "success");
-});
+async function submitChessCode(platform) {
+  const statusEl = document.getElementById('chessLinkStatus');
+  const codeInput = document.getElementById(`chess-code-${platform}`);
+  const code = codeInput?.value?.trim();
 
-// Load devices when tab is opened
-document.querySelector("[data-section='audiovideo']").addEventListener("click", loadAVDevices);
+  if (!code || code.length !== 6) {
+    statusEl.style.color = 'var(--danger)';
+    statusEl.textContent = '❌ Please enter a valid 6-digit code';
+    return;
+  }
 
-// ── Nav tabs ──────────────────────────────────────────────────
-document.querySelectorAll(".nav-btn[data-section]").forEach(btn => {
-  btn.addEventListener("click", () => {
-    document.querySelectorAll(".nav-btn").forEach(b => b.classList.remove("active"));
-    document.querySelectorAll(".section").forEach(s => s.classList.remove("active"));
-    btn.classList.add("active");
-    document.getElementById(`section-${btn.dataset.section}`).classList.add("active");
-  });
-});
+  statusEl.style.color = 'var(--text-3)';
+  statusEl.textContent = 'Verifying code…';
 
-// ── Back button ───────────────────────────────────────────────
-document.getElementById("backBtn").addEventListener("click", () => {
-  smoothNavigate("chat.html", "down");
-});
+  try {
+    const res = await fetch(`${AUTH_URL}/link-chess/confirm`, {
+      method: 'POST',
+      headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ platform, code })
+    });
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.error || 'Invalid code');
 
-// ── Helpers ───────────────────────────────────────────────────
-let msgTimers = {};
-function showMsg(id, text, type) {
-  const el = document.getElementById(id);
-  el.textContent = text;
-  el.className = `msg ${type}`;
-  clearTimeout(msgTimers[id]);
-  msgTimers[id] = setTimeout(() => el.className = "msg", 4000);
+    statusEl.style.color = '#57f287';
+    statusEl.textContent = `✅ ${platform === 'lichess' ? 'Lichess' : 'Chess.com'} linked successfully!`;
+    chessVerificationState[platform] = null;
+    // Reload page to reflect update buttons
+    setTimeout(() => window.location.reload(), 1200);
+  } catch(e) {
+    statusEl.style.color = 'var(--danger)';
+    statusEl.textContent = `❌ ${e.message}`;
+  }
+}
+
+async function unlinkChess(platform) {
+  const statusEl = document.getElementById('chessLinkStatus');
+  statusEl.style.color = 'var(--text-3)';
+  statusEl.textContent = 'Unlinking…';
+  try {
+    const res = await fetch(`${AUTH_URL}/link-chess`, {
+      method: 'DELETE',
+      headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ platform })
+    });
+    if (!res.ok) throw new Error('Failed to unlink');
+    statusEl.style.color = 'var(--text-3)';
+    statusEl.textContent = `Unlinked.`;
+    setTimeout(() => window.location.reload(), 800);
+  } catch(e) {
+    statusEl.style.color = 'var(--danger)';
+    statusEl.textContent = `❌ ${e.message}`;
+  }
 }
 
 boot();
 </script>
-<script src="settingspanel.js"></script>
 </body>
 </html>
