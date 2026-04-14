@@ -327,6 +327,8 @@ async function initDb() {
       "ALTER TABLE users ADD COLUMN IF NOT EXISTS riot_tagline      TEXT DEFAULT NULL",
       "ALTER TABLE users ADD COLUMN IF NOT EXISTS chess_username    TEXT DEFAULT NULL",
       "ALTER TABLE users ADD COLUMN IF NOT EXISTS lichess_username  TEXT DEFAULT NULL",
+      // Email — added later, existing users will be prompted on next login
+      "ALTER TABLE users ADD COLUMN IF NOT EXISTS email             TEXT DEFAULT NULL",
     ];
     for (const sql of alters) await pool.query(sql).catch(() => {});
 

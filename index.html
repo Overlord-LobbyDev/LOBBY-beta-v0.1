@@ -4350,6 +4350,12 @@ async function boot() {
     document.getElementById("myPanelName").textContent = "Not connected";
     return;
   }
+
+  // ── Email prompt for existing users who have no email set ────
+  if (me.needs_email) {
+    showEmailPromptModal();
+    return; // Don't continue boot until email is saved
+  }
   document.getElementById("myPanelName").textContent = me.username;
   // Show unique lobby tag derived from user ID
   const tagEl = document.getElementById("myPanelLobbyTag");
@@ -12147,6 +12153,110 @@ async function renderProfileGames(body) {
 // Rewire openProfile and openUserProfile to use the panel instead of navigating away
 function openProfile(userId) { openProfilePanel(userId); }
 function openUserProfile(userId) { openProfilePanel(userId); }
+
+// ── Email prompt modal — shown once to users without an email ─
+function showEmailPromptModal() {
+  // Inject styles once
+  if (!document.getElementById('_emailPromptStyles')) {
+    const s = document.createElement('style');
+    s.id = '_emailPromptStyles';
+    s.textContent = `
+      #_emailPromptOverlay {
+        position:fixed;inset:0;background:rgba(0,0,0,.75);
+        z-index:99999;display:flex;align-items:center;justify-content:center;
+        backdrop-filter:blur(6px);font-family:var(--font);
+      }
+      #_emailPromptBox {
+        background:var(--bg-1);border:1px solid rgba(255,255,255,.1);
+        border-radius:16px;padding:32px 28px;width:min(420px,92vw);
+        box-shadow:0 24px 64px rgba(0,0,0,.5);
+      }
+      #_emailPromptBox h2 { font-size:20px;font-weight:800;margin-bottom:6px;color:var(--text-1); }
+      #_emailPromptBox p  { font-size:13px;color:var(--text-2);line-height:1.5;margin-bottom:20px; }
+      #_emailPromptInput  {
+        width:100%;background:var(--bg-2);border:1px solid rgba(255,255,255,.1);
+        border-radius:8px;padding:11px 14px;color:var(--text-1);font-size:14px;
+        font-family:var(--font);outline:none;transition:border-color .15s;margin-bottom:8px;
+      }
+      #_emailPromptInput:focus { border-color:var(--accent); }
+      #_emailPromptErr  { font-size:12px;color:var(--danger);min-height:16px;margin-bottom:12px; }
+      #_emailPromptBtn  {
+        width:100%;padding:12px;background:var(--accent);color:#fff;border:none;
+        border-radius:8px;font-size:14px;font-weight:700;cursor:pointer;
+        font-family:var(--font);transition:background .15s;
+      }
+      #_emailPromptBtn:hover { background:var(--accent-h); }
+      #_emailPromptSkip {
+        display:block;text-align:center;margin-top:12px;font-size:12px;
+        color:var(--text-3);cursor:pointer;text-decoration:underline;
+      }
+      #_emailPromptSkip:hover { color:var(--text-2); }
+    `;
+    document.head.appendChild(s);
+  }
+
+  const overlay = document.createElement('div');
+  overlay.id = '_emailPromptOverlay';
+  overlay.innerHTML = `
+    <div id="_emailPromptBox">
+      <h2>📧 Add your email</h2>
+      <p>Your account doesn't have an email address yet. Add one to enable features like chess account verification and account recovery.</p>
+      <input id="_emailPromptInput" type="email" placeholder="your@email.com" autocomplete="email" />
+      <div id="_emailPromptErr"></div>
+      <button id="_emailPromptBtn" onclick="submitEmailPrompt()">Save Email</button>
+      <span id="_emailPromptSkip" onclick="skipEmailPrompt()">Skip for now — I'll add it later</span>
+    </div>`;
+  document.body.appendChild(overlay);
+
+  // Focus input
+  setTimeout(() => document.getElementById('_emailPromptInput')?.focus(), 100);
+
+  // Allow Enter key to submit
+  document.getElementById('_emailPromptInput')?.addEventListener('keydown', e => {
+    if (e.key === 'Enter') submitEmailPrompt();
+  });
+}
+
+async function submitEmailPrompt() {
+  const input  = document.getElementById('_emailPromptInput');
+  const errEl  = document.getElementById('_emailPromptErr');
+  const btn    = document.getElementById('_emailPromptBtn');
+  const email  = input?.value?.trim();
+
+  errEl.textContent = '';
+  if (!email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+    errEl.textContent = 'Please enter a valid email address.';
+    return;
+  }
+
+  btn.disabled = true;
+  btn.textContent = 'Saving…';
+
+  try {
+    const r = await api('/update-email', {
+      method: 'POST',
+      body: JSON.stringify({ email })
+    });
+    if (r.error) throw new Error(r.error);
+
+    // Success — remove modal and continue boot
+    document.getElementById('_emailPromptOverlay')?.remove();
+    me.needs_email = false;
+    boot(); // Resume normal boot flow
+  } catch(e) {
+    errEl.textContent = e.message || 'Failed to save email. Try again.';
+    btn.disabled = false;
+    btn.textContent = 'Save Email';
+  }
+}
+
+function skipEmailPrompt() {
+  // Let them in but remind them next login (don't persist skip)
+  document.getElementById('_emailPromptOverlay')?.remove();
+  me.needs_email = false;
+  boot(); // Continue boot without email
+}
+
 boot();
 // Don't auto-open sidebars on startup — let user open manually
 (function() {

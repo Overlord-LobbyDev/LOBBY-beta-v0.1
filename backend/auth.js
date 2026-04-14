@@ -135,44 +135,100 @@ function isCurrentlyBanned(user) {
 // ── Auth routes ──────────────────────────────────────────────
 
 app.post("/register", async (req, res) => {
-  const { username, password } = req.body;
+  const { username, password, email } = req.body;
   if (!username || !password) return res.status(400).json({ error: "Username and password required" });
   if (username.length < 2 || username.length > 32) return res.status(400).json({ error: "Username must be 2-32 characters" });
   if (password.length < 6) return res.status(400).json({ error: "Password must be at least 6 characters" });
+  if (email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) return res.status(400).json({ error: "Invalid email address" });
   try {
     const hash = await bcrypt.hash(password, SALT_ROUNDS);
     const r = await pool.query(
-      "INSERT INTO users (username, password_hash) VALUES ($1, $2) RETURNING id, username, avatar_url, is_admin",
-      [username.trim(), hash]
+      "INSERT INTO users (username, password_hash, email) VALUES ($1, $2, $3) RETURNING id, username, avatar_url, is_admin, email",
+      [username.trim(), hash, email ? email.toLowerCase().trim() : null]
     );
     const user  = r.rows[0];
     const token = jwt.sign({ id: user.id, username: user.username }, SECRET, { expiresIn: "30d" });
-    res.json({ token, user: { id: user.id, username: user.username, avatarUrl: user.avatar_url, isAdmin: user.is_admin } });
+    res.json({ token, user: { id: user.id, username: user.username, avatarUrl: user.avatar_url, isAdmin: user.is_admin }, needs_email: !user.email });
   } catch (err) {
     if (err.code === "23505") return res.status(409).json({ error: "Username already taken" });
     res.status(500).json({ error: "Server error" });
   }
 });
 
+// ── Lobby tag helper (mirrors frontend lobbyTagFromId) ────────
+function lobbyTagFromId(userId) {
+  const n = (Math.abs(userId * 2654435761) >>> 0) % 9000 + 1000;
+  return `#${n}`;
+}
+
 app.post("/login", async (req, res) => {
   const { username, password } = req.body;
   if (!username || !password) return res.status(400).json({ error: "Username and password required" });
+
   try {
-    const r = await pool.query(
-      "SELECT id, username, password_hash, avatar_url, is_admin, is_banned, banned_until, ban_reason FROM users WHERE username = $1",
-      [username.trim()]
-    );
-    const user = r.rows[0];
-    if (!user) return res.status(401).json({ error: "Invalid username or password" });
-    if (!await bcrypt.compare(password, user.password_hash)) return res.status(401).json({ error: "Invalid username or password" });
+    let user = null;
+    const input   = username.trim();
+    const isEmail = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(input);
+    const isTag   = !isEmail && input.includes('#');
+
+    if (isEmail) {
+      // ── Email login (case-insensitive) ──────────────────────
+      const r = await pool.query(
+        "SELECT id, username, password_hash, avatar_url, is_admin, is_banned, banned_until, ban_reason, email FROM users WHERE LOWER(email) = $1",
+        [input.toLowerCase()]
+      );
+      user = r.rows[0] || null;
+      if (!user) return res.status(401).json({ error: "No account found with that email address" });
+
+    } else if (isTag) {
+      // ── Username#TAG login ──────────────────────────────────
+      const hashIdx   = input.lastIndexOf('#');
+      const unamePart = input.slice(0, hashIdx).trim();
+      const tagPart   = input.slice(hashIdx); // includes the #
+
+      if (!unamePart) return res.status(400).json({ error: "Invalid format — use Username#TAG or your email" });
+
+      const r = await pool.query(
+        "SELECT id, username, password_hash, avatar_url, is_admin, is_banned, banned_until, ban_reason, email FROM users WHERE username = $1",
+        [unamePart]
+      );
+      const candidate = r.rows[0];
+      if (!candidate || lobbyTagFromId(candidate.id) !== tagPart) {
+        return res.status(401).json({ error: "Invalid username or tag" });
+      }
+      user = candidate;
+
+    } else {
+      // ── Plain username (backwards compat) ───────────────────
+      const r = await pool.query(
+        "SELECT id, username, password_hash, avatar_url, is_admin, is_banned, banned_until, ban_reason, email FROM users WHERE username = $1",
+        [input]
+      );
+      user = r.rows[0] || null;
+      if (!user) return res.status(401).json({ error: "Invalid username or password" });
+    }
+
+    if (!await bcrypt.compare(password, user.password_hash)) {
+      return res.status(401).json({ error: "Incorrect password" });
+    }
+
     if (isCurrentlyBanned(user)) {
       const until  = user.banned_until ? `until ${new Date(user.banned_until).toLocaleString()}` : "permanently";
       const reason = user.ban_reason ? ` Reason: ${user.ban_reason}` : "";
       return res.status(403).json({ error: `Account banned ${until}.${reason}` });
     }
+
     const token = jwt.sign({ id: user.id, username: user.username }, SECRET, { expiresIn: "30d" });
-    res.json({ token, user: { id: user.id, username: user.username, avatarUrl: user.avatar_url, isAdmin: user.is_admin } });
-  } catch (err) { console.error("[login error]", err); res.status(500).json({ error: "Server error" }); }
+    res.json({
+      token,
+      user: { id: user.id, username: user.username, avatarUrl: user.avatar_url, isAdmin: user.is_admin },
+      needs_email: !user.email
+    });
+
+  } catch (err) {
+    console.error("[login error]", err);
+    res.status(500).json({ error: "Server error" });
+  }
 });
 
 app.get("/me", requireAuth, async (req, res) => {
@@ -181,7 +237,7 @@ app.get("/me", requireAuth, async (req, res) => {
             tournament_card_image_url, tournament_card_bg_colour,
             tournament_card_border_colour, tournament_card_name_colour, tournament_card_bg_pos,
             riot_puuid, riot_gamename, riot_tagline,
-            chess_username, lichess_username
+            chess_username, lichess_username, email
      FROM users WHERE id = $1`,
     [req.userId]
   );
@@ -194,6 +250,7 @@ app.get("/me", requireAuth, async (req, res) => {
     avatarUrl: user.avatar_url,
     isAdmin: user.is_admin,
     is_admin: user.is_admin,
+    needs_email: !user.email,
     tournamentCard: {
       imageUrl:      user.tournament_card_image_url     || null,
       bgColour:      user.tournament_card_bg_colour     || '#2c3440',
@@ -201,13 +258,31 @@ app.get("/me", requireAuth, async (req, res) => {
       nameColour:    user.tournament_card_name_colour   || '#fdf2f8',
       bgPos:         user.tournament_card_bg_pos        || '50% 50%',
     },
-    // Linked game accounts (used by API result modes)
     riot_puuid:       user.riot_puuid       || null,
     riot_gamename:    user.riot_gamename    || null,
     riot_tagline:     user.riot_tagline     || null,
     chess_username:   user.chess_username   || null,
     lichess_username: user.lichess_username || null,
   });
+});
+
+// ── Set / update email ────────────────────────────────────────
+app.post("/update-email", requireAuth, async (req, res) => {
+  const { email } = req.body;
+  if (!email) return res.status(400).json({ error: "Email required" });
+  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) return res.status(400).json({ error: "Invalid email address" });
+  try {
+    const existing = await pool.query(
+      "SELECT id FROM users WHERE LOWER(email) = $1 AND id != $2",
+      [email.toLowerCase().trim(), req.userId]
+    );
+    if (existing.rows.length) return res.status(409).json({ error: "Email already in use by another account" });
+    await pool.query("UPDATE users SET email = $1 WHERE id = $2", [email.toLowerCase().trim(), req.userId]);
+    res.json({ success: true });
+  } catch (err) {
+    console.error("[update-email]", err);
+    res.status(500).json({ error: "Failed to save email" });
+  }
 });
 
 // ── Link Riot account ────────────────────────────────────────

@@ -250,14 +250,14 @@
   <!-- ── Login form ── -->
   <form class="form" id="loginForm" autocomplete="on">
     <div class="field">
-      <label for="loginUsername">Username</label>
-      <input type="text" id="loginUsername" placeholder="Enter your username" autocomplete="username" />
+      <label for="loginUsername">Username#Tag or Email</label>
+      <input type="text" id="loginUsername" placeholder="Overlord#1226 or you@email.com" autocomplete="username" />
     </div>
     <div class="field">
       <label for="loginPassword">Password</label>
       <input type="password" id="loginPassword" placeholder="Enter your password" autocomplete="current-password" />
     </div>
-    <div class="case-sensitive-warning">⚠️ Your username and password are <strong>BOTH case sensitive</strong></div>
+    <div class="case-sensitive-warning">⚠️ Username &amp; password are <strong>case sensitive</strong>. Email is not.</div>
     <label class="remember">
       <input type="checkbox" id="rememberMe" checked />
       Keep me signed in
@@ -271,6 +271,10 @@
     <div class="field">
       <label for="regUsername">Username</label>
       <input type="text" id="regUsername" placeholder="Choose a username (2–32 chars)" autocomplete="off" />
+    </div>
+    <div class="field">
+      <label for="regEmail">Email <span style="font-weight:400;text-transform:none;letter-spacing:0;color:var(--text-3)">(recommended — enables chess verification &amp; login by email)</span></label>
+      <input type="email" id="regEmail" placeholder="you@email.com" autocomplete="email" />
     </div>
     <div class="field">
       <label for="regPassword">Password</label>
@@ -397,12 +401,14 @@
     e.preventDefault();
     const btn   = document.getElementById("registerBtn");
     const uname = document.getElementById("regUsername").value.trim();
+    const email = document.getElementById("regEmail").value.trim();
     const pass1 = document.getElementById("regPassword").value;
     const pass2 = document.getElementById("regPassword2").value;
 
     if (!uname || !pass1) return showMsg("registerMsg", "Please fill in all fields.", "error");
     if (pass1 !== pass2)  return showMsg("registerMsg", "Passwords do not match.", "error");
     if (pass1.length < 6) return showMsg("registerMsg", "Password must be at least 6 characters.", "error");
+    if (email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) return showMsg("registerMsg", "Invalid email address.", "error");
 
     btn.disabled = true;
     btn.textContent = "Creating account…";
@@ -412,7 +418,7 @@
       const res  = await fetch(`${AUTH_URL}/register`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ username: uname, password: pass1 })
+        body: JSON.stringify({ username: uname, password: pass1, email: email || undefined })
       });
       const data = await res.json();
 
