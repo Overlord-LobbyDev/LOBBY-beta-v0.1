@@ -260,11 +260,33 @@ router.get('/:tournamentId', async (req, res) => {
     
     // Get bracket data
     const bracket = await getBracketData(tournamentId);
+
+    // Always fetch host's profile for the host card (even if not registered as player)
+    const hostInfoResult = await pool.query(
+      `SELECT id, username, avatar_url,
+              tournament_card_image_url, tournament_card_bg_colour,
+              tournament_card_border_colour, tournament_card_name_colour, tournament_card_bg_pos
+       FROM users WHERE id = $1`, [tournament.host_id]
+    );
+    const hi = hostInfoResult.rows[0] || {};
+    const hostInfo = {
+      userId: tournament.host_id,
+      username: hi.username || 'Host',
+      avatar_url: hi.avatar_url || null,
+      tournamentCard: {
+        imageUrl:     hi.tournament_card_image_url     || null,
+        bgColour:     hi.tournament_card_bg_colour     || '#2c3440',
+        borderColour: hi.tournament_card_border_colour || '#f9a8d4',
+        nameColour:   hi.tournament_card_name_colour   || '#fdf2f8',
+        bgPos:        hi.tournament_card_bg_pos        || '50% 50%',
+      }
+    };
     
     const responseData = {
       id: tournament.id,
       lobbyId: tournament.lobby_id,
       hostId: tournament.host_id,
+      hostInfo,
       name: tournament.name,
       description: tournament.description,
       format: tournament.format,

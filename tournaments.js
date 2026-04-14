@@ -626,7 +626,6 @@ function showBracketPanel(tournament) {
 
     // Sort active players by points desc, exclude winner from main list
     const winnerPlayer      = players.find(p => p.userId === winnerId);
-    const hostPlayer        = players.find(p => p.userId === tournament.hostId);
     // Non-host players only in the active/eliminated lists
     const activePlayers     = players.filter(p => !eliminatedSet.has(p.userId) && p.userId !== winnerId && p.userId !== tournament.hostId);
     const eliminatedPlayers = players.filter(p => eliminatedSet.has(p.userId) && p.userId !== tournament.hostId);
@@ -691,13 +690,21 @@ function showBracketPanel(tournament) {
              </div>
            </div>` : '';
 
-    // Host card — always shown at top, separate from players
+    // Host card — always shown at top, uses server-provided hostInfo (works even if host left as player)
     const hostCard = (() => {
-        const h = hostPlayer || { userId: tournament.hostId, username: 'Host', avatar_url: null, tournamentCard: {} };
-        const av = h.avatar_url ? `<img src="${h.avatar_url}" style="width:100%;height:100%;object-fit:cover;border-radius:6px;">` : `<span style="font-size:10px;font-weight:800;color:#fff">${(h.username||'?')[0].toUpperCase()}</span>`;
-        return `<div style="display:flex;align-items:center;gap:8px;padding:7px 10px;background:rgba(249,168,212,.06);border:1px solid rgba(249,168,212,.18);border-radius:8px">
+        const h = tournament.hostInfo || { userId: tournament.hostId, username: 'Host', avatar_url: null, tournamentCard: {} };
+        const cd = h.tournamentCard || {};
+        const hasImg = !!cd.imageUrl;
+        const bgCss = hasImg
+            ? `background-image:url(${cd.imageUrl});background-size:cover;background-position:${cd.bgPos||'50% 50%'};`
+            : cd.bgColour && cd.bgColour !== '#2c3440' ? `background-color:${cd.bgColour};` : 'background:rgba(249,168,212,.06);';
+        const borderCss = cd.borderColour ? `1px solid ${cd.borderColour}` : '1px solid rgba(249,168,212,.18)';
+        const av = h.avatar_url
+            ? `<img src="${h.avatar_url}" style="width:100%;height:100%;object-fit:cover;border-radius:6px;">`
+            : `<span style="font-size:10px;font-weight:800;color:#fff">${(h.username||'?')[0].toUpperCase()}</span>`;
+        return `<div style="display:flex;align-items:center;gap:8px;padding:7px 10px;${bgCss}border:${borderCss};border-radius:8px;overflow:hidden">
           <div style="width:26px;height:26px;flex-shrink:0;border-radius:6px;background:linear-gradient(135deg,var(--accent),var(--accent-h));display:flex;align-items:center;justify-content:center;overflow:hidden">${av}</div>
-          <span style="flex:1;font-size:11px;font-weight:700;color:var(--text-1);overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${h.username||'Host'}</span>
+          <span style="flex:1;font-size:11px;font-weight:700;color:${hasImg?'#fff':cd.nameColour||'var(--text-1)'};overflow:hidden;text-overflow:ellipsis;white-space:nowrap;text-shadow:${hasImg?'0 1px 3px rgba(0,0,0,.8)':''}">${h.username||'Host'}</span>
           <span style="font-size:8px;font-weight:800;color:var(--accent);background:rgba(249,168,212,.12);border:1px solid rgba(249,168,212,.2);padding:2px 6px;border-radius:4px;flex-shrink:0">HOST</span>
         </div>`;
     })();
