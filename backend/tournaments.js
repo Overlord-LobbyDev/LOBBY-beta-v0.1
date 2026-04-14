@@ -593,10 +593,10 @@ router.post('/:tournamentId/set-winner', verifyAuth, async (req, res) => {
 
         if (nextRound.rows.length > 0) {
           const nextRoundId = nextRound.rows[0].id;
-          // Winner goes into match ceil(match_number/2) of next round
-          // Odd match_number → player1 slot, even → player2 slot
-          const nextMatchNumber = Math.ceil(match_number / 2);
-          const slot = match_number % 2 !== 0 ? 'player1_id' : 'player2_id';
+          // match_number is 0-indexed: 0,1 -> next match 0; 2,3 -> next match 1
+          const nextMatchNumber = Math.floor(match_number / 2);
+          // even match_number (0,2,4...) → player1 slot; odd (1,3,5...) → player2 slot
+          const slot = match_number % 2 === 0 ? 'player1_id' : 'player2_id';
 
           const nextMatch = await pool.query(
             `SELECT id FROM tournament_matches WHERE round_id = $1 AND match_number = $2`,

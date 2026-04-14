@@ -565,7 +565,12 @@ function showBracketPanel(tournament) {
             </div>
             <!-- Bracket area -->
             <div style="flex:1;display:flex;flex-direction:column;overflow:hidden;min-width:0">
-              <div style="padding:10px 18px;background:var(--bg-1);border-bottom:1px solid rgba(255,255,255,.06);font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.6px;color:var(--text-3);flex-shrink:0">Tournament Bracket</div>
+              <div style="padding:10px 18px;background:var(--bg-1);border-bottom:1px solid rgba(255,255,255,.06);display:flex;align-items:center;justify-content:space-between;flex-shrink:0">
+                <span style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.6px;color:var(--text-3)">
+                  ${window._bracketScoringMode && isHost ? '<span style="color:#7289da">⚙ Editing Scores</span>' : 'Tournament Bracket'}
+                </span>
+                ${window._bracketScoringMode && isHost ? `<button onclick="window._bracketScoringMode=false;openTournamentDetails('${tournament.id}')" style="font-size:11px;padding:5px 12px;background:rgba(88,101,242,.2);color:#7289da;border:1px solid rgba(88,101,242,.4);border-radius:6px;cursor:pointer;font-family:inherit;font-weight:700">↺ Refresh Bracket</button>` : ''}
+              </div>
               <div style="flex:1;overflow:auto;padding:28px 32px;${bgStyle}" id="bracketInnerScroll">
                 ${bracketInner}
               </div>
@@ -689,11 +694,12 @@ async function bracketAdvance(tournamentId, matchId, winnerUserId) {
 
         // Check if tournament just completed — show winner popup
         if (data.tournamentStatus === 'completed' && data.winner) {
+            window._bracketScoringMode = false;
             showWinnerPopup(data.winner, tournamentId);
         } else {
             showNotification('Player advanced ✓', 'success');
             window._bracketScoringMode = true;
-            setTimeout(() => openTournamentDetails(tournamentId), 400);
+            setTimeout(() => openTournamentDetails(tournamentId), 300);
         }
     } catch(e) { showNotification(e.message || 'Failed to advance', 'error'); }
 }
