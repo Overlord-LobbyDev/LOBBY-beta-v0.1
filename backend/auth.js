@@ -155,16 +155,9 @@ app.post("/register", async (req, res) => {
   }
 });
 
-// ── Lobby tag helper (mirrors frontend lobbyTagFromId) ────────
-function lobbyTagFromId(userId) {
-  const n = (Math.abs(userId * 2654435761) >>> 0) % 9000 + 1000;
-  return `#${n}`;
-}
-
 app.post("/login", async (req, res) => {
   const { username, password } = req.body;
   if (!username || !password) return res.status(400).json({ error: "Username and password required" });
-
   try {
     let user = null;
     const input   = username.trim();
@@ -172,34 +165,28 @@ app.post("/login", async (req, res) => {
     const isTag   = !isEmail && input.includes('#');
 
     if (isEmail) {
-      // ── Email login (case-insensitive) ──────────────────────
       const r = await pool.query(
         "SELECT id, username, password_hash, avatar_url, is_admin, is_banned, banned_until, ban_reason, email FROM users WHERE LOWER(email) = $1",
         [input.toLowerCase()]
       );
       user = r.rows[0] || null;
       if (!user) return res.status(401).json({ error: "No account found with that email address" });
-
     } else if (isTag) {
-      // ── Username#TAG login ──────────────────────────────────
       const hashIdx   = input.lastIndexOf('#');
       const unamePart = input.slice(0, hashIdx).trim();
-      const tagPart   = input.slice(hashIdx); // includes the #
-
-      if (!unamePart) return res.status(400).json({ error: "Invalid format — use Username#TAG or your email" });
-
+      const tagPart   = input.slice(hashIdx);
+      if (!unamePart) return res.status(400).json({ error: "Invalid format — use Username#Tag or your email" });
       const r = await pool.query(
         "SELECT id, username, password_hash, avatar_url, is_admin, is_banned, banned_until, ban_reason, email FROM users WHERE username = $1",
         [unamePart]
       );
       const candidate = r.rows[0];
-      if (!candidate || lobbyTagFromId(candidate.id) !== tagPart) {
-        return res.status(401).json({ error: "Invalid username or tag" });
-      }
+      // Compute tag server-side using same formula as frontend
+      const computedTag = candidate ? (() => { const n = (Math.abs(candidate.id * 2654435761) >>> 0) % 9000 + 1000; return `#${n}`; })() : null;
+      if (!candidate || computedTag !== tagPart) return res.status(401).json({ error: "Invalid username or tag" });
       user = candidate;
-
     } else {
-      // ── Plain username (backwards compat) ───────────────────
+      // Plain username — backwards compat
       const r = await pool.query(
         "SELECT id, username, password_hash, avatar_url, is_admin, is_banned, banned_until, ban_reason, email FROM users WHERE username = $1",
         [input]
@@ -208,27 +195,16 @@ app.post("/login", async (req, res) => {
       if (!user) return res.status(401).json({ error: "Invalid username or password" });
     }
 
-    if (!await bcrypt.compare(password, user.password_hash)) {
-      return res.status(401).json({ error: "Incorrect password" });
-    }
+    if (!await bcrypt.compare(password, user.password_hash)) return res.status(401).json({ error: "Incorrect password" });
 
     if (isCurrentlyBanned(user)) {
       const until  = user.banned_until ? `until ${new Date(user.banned_until).toLocaleString()}` : "permanently";
       const reason = user.ban_reason ? ` Reason: ${user.ban_reason}` : "";
       return res.status(403).json({ error: `Account banned ${until}.${reason}` });
     }
-
     const token = jwt.sign({ id: user.id, username: user.username }, SECRET, { expiresIn: "30d" });
-    res.json({
-      token,
-      user: { id: user.id, username: user.username, avatarUrl: user.avatar_url, isAdmin: user.is_admin },
-      needs_email: !user.email
-    });
-
-  } catch (err) {
-    console.error("[login error]", err);
-    res.status(500).json({ error: "Server error" });
-  }
+    res.json({ token, user: { id: user.id, username: user.username, avatarUrl: user.avatar_url, isAdmin: user.is_admin }, needs_email: !user.email });
+  } catch (err) { console.error("[login error]", err); res.status(500).json({ error: "Server error" }); }
 });
 
 app.get("/me", requireAuth, async (req, res) => {
@@ -237,20 +213,28 @@ app.get("/me", requireAuth, async (req, res) => {
             tournament_card_image_url, tournament_card_bg_colour,
             tournament_card_border_colour, tournament_card_name_colour, tournament_card_bg_pos,
             riot_puuid, riot_gamename, riot_tagline,
-            chess_username, lichess_username, email
+            chess_username, lichess_username
      FROM users WHERE id = $1`,
     [req.userId]
   );
   const user = r.rows[0];
   if (!user) return res.status(404).json({ error: "User not found" });
   if (isCurrentlyBanned(user)) return res.status(403).json({ error: "Account banned" });
+
+  // Email fetched separately — safe if column not yet migrated
+  let email = null;
+  try {
+    const er = await pool.query("SELECT email FROM users WHERE id = $1", [req.userId]);
+    email = er.rows[0]?.email || null;
+  } catch(e) { /* column not yet migrated — safe to ignore */ }
+
   res.json({
     id: user.id,
     username: user.username,
     avatarUrl: user.avatar_url,
     isAdmin: user.is_admin,
     is_admin: user.is_admin,
-    needs_email: !user.email,
+    needs_email: !email,
     tournamentCard: {
       imageUrl:      user.tournament_card_image_url     || null,
       bgColour:      user.tournament_card_bg_colour     || '#2c3440',
@@ -266,22 +250,69 @@ app.get("/me", requireAuth, async (req, res) => {
   });
 });
 
-// ── Set / update email ────────────────────────────────────────
-app.post("/update-email", requireAuth, async (req, res) => {
+// ── Send email verification code ──────────────────────────────
+app.post("/email-verify/send", requireAuth, async (req, res) => {
   const { email } = req.body;
   if (!email) return res.status(400).json({ error: "Email required" });
   if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) return res.status(400).json({ error: "Invalid email address" });
+  const normalised = email.toLowerCase().trim();
   try {
-    const existing = await pool.query(
-      "SELECT id FROM users WHERE LOWER(email) = $1 AND id != $2",
-      [email.toLowerCase().trim(), req.userId]
+    const taken = await pool.query(
+      "SELECT id FROM users WHERE LOWER(email) = $1 AND id != $2", [normalised, req.userId]
     );
-    if (existing.rows.length) return res.status(409).json({ error: "Email already in use by another account" });
-    await pool.query("UPDATE users SET email = $1 WHERE id = $2", [email.toLowerCase().trim(), req.userId]);
+    if (taken.rows.length) return res.status(409).json({ error: "Email already linked to another account" });
+
+    const code      = Math.floor(100000 + Math.random() * 900000).toString();
+    const expiresAt = new Date(Date.now() + 10 * 60 * 1000); // 10 mins
+
+    await pool.query("DELETE FROM email_verifications WHERE user_id = $1", [req.userId]);
+    await pool.query(
+      "INSERT INTO email_verifications (user_id, email, verification_code, code_expires_at) VALUES ($1,$2,$3,$4)",
+      [req.userId, normalised, code, expiresAt]
+    );
+
+    const sent = await sendVerificationEmail(normalised, "LOBBY", code);
+    if (!sent) return res.status(500).json({ error: "Failed to send email — check EMAIL_USER and EMAIL_PASSWORD in your .env" });
+
     res.json({ success: true });
-  } catch (err) {
-    console.error("[update-email]", err);
-    res.status(500).json({ error: "Failed to save email" });
+  } catch(err) {
+    console.error("[email-verify/send]", err);
+    res.status(500).json({ error: "Server error" });
+  }
+});
+
+// ── Confirm email verification code ──────────────────────────
+app.post("/email-verify/confirm", requireAuth, async (req, res) => {
+  const { code } = req.body;
+  if (!code) return res.status(400).json({ error: "Code required" });
+  try {
+    const r = await pool.query(
+      "SELECT * FROM email_verifications WHERE user_id = $1 AND verification_code = $2",
+      [req.userId, code.trim()]
+    );
+
+    if (!r.rows.length) {
+      // Increment attempts on any matching pending row
+      await pool.query("UPDATE email_verifications SET attempts = attempts + 1 WHERE user_id = $1", [req.userId]).catch(() => {});
+      return res.status(400).json({ error: "Invalid verification code" });
+    }
+
+    const verif = r.rows[0];
+    if (new Date() > new Date(verif.code_expires_at)) {
+      await pool.query("DELETE FROM email_verifications WHERE id = $1", [verif.id]);
+      return res.status(400).json({ error: "Code expired — request a new one" });
+    }
+    if (verif.attempts >= 5) {
+      return res.status(429).json({ error: "Too many attempts — request a new code" });
+    }
+
+    await pool.query("UPDATE users SET email = $1 WHERE id = $2", [verif.email, req.userId]);
+    await pool.query("DELETE FROM email_verifications WHERE id = $1", [verif.id]);
+
+    res.json({ success: true, email: verif.email });
+  } catch(err) {
+    console.error("[email-verify/confirm]", err);
+    res.status(500).json({ error: "Verification failed" });
   }
 });
 

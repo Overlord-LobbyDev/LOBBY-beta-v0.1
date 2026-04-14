@@ -4351,10 +4351,10 @@ async function boot() {
     return;
   }
 
-  // ── Email prompt for existing users who have no email set ────
+  // ── Email prompt: shown once to users who have no email set ──
   if (me.needs_email) {
-    showEmailPromptModal();
-    return; // Don't continue boot until email is saved
+    _showEmailPromptModal();
+    return; // Pause boot until email is verified
   }
   document.getElementById("myPanelName").textContent = me.username;
   // Show unique lobby tag derived from user ID
@@ -12154,107 +12154,163 @@ async function renderProfileGames(body) {
 function openProfile(userId) { openProfilePanel(userId); }
 function openUserProfile(userId) { openProfilePanel(userId); }
 
-// ── Email prompt modal — shown once to users without an email ─
-function showEmailPromptModal() {
-  // Inject styles once
-  if (!document.getElementById('_emailPromptStyles')) {
+// ── Email prompt modal ────────────────────────────────────────
+// Shown on first login for users without an email address.
+// Full verification flow: enter email → send code → confirm code → boot resumes.
+function _showEmailPromptModal() {
+  if (!document.getElementById('_epStyles')) {
     const s = document.createElement('style');
-    s.id = '_emailPromptStyles';
+    s.id = '_epStyles';
     s.textContent = `
-      #_emailPromptOverlay {
-        position:fixed;inset:0;background:rgba(0,0,0,.75);
-        z-index:99999;display:flex;align-items:center;justify-content:center;
-        backdrop-filter:blur(6px);font-family:var(--font);
+      #_epOverlay {
+        position:fixed;inset:0;background:rgba(0,0,0,.8);z-index:99999;
+        display:flex;align-items:center;justify-content:center;
+        backdrop-filter:blur(8px);font-family:var(--font);
       }
-      #_emailPromptBox {
-        background:var(--bg-1);border:1px solid rgba(255,255,255,.1);
-        border-radius:16px;padding:32px 28px;width:min(420px,92vw);
-        box-shadow:0 24px 64px rgba(0,0,0,.5);
+      #_epBox {
+        background:var(--bg-1);border:1px solid rgba(255,255,255,.1);border-radius:16px;
+        padding:32px 28px;width:min(420px,92vw);box-shadow:0 24px 64px rgba(0,0,0,.6);
       }
-      #_emailPromptBox h2 { font-size:20px;font-weight:800;margin-bottom:6px;color:var(--text-1); }
-      #_emailPromptBox p  { font-size:13px;color:var(--text-2);line-height:1.5;margin-bottom:20px; }
-      #_emailPromptInput  {
-        width:100%;background:var(--bg-2);border:1px solid rgba(255,255,255,.1);
+      #_epBox h2 { font-size:20px;font-weight:800;color:var(--text-1);margin-bottom:6px; }
+      #_epBox p  { font-size:13px;color:var(--text-2);line-height:1.5;margin-bottom:20px; }
+      .ep-input {
+        width:100%;background:var(--bg-2);border:1.5px solid rgba(255,255,255,.1);
         border-radius:8px;padding:11px 14px;color:var(--text-1);font-size:14px;
         font-family:var(--font);outline:none;transition:border-color .15s;margin-bottom:8px;
+        display:block;
       }
-      #_emailPromptInput:focus { border-color:var(--accent); }
-      #_emailPromptErr  { font-size:12px;color:var(--danger);min-height:16px;margin-bottom:12px; }
-      #_emailPromptBtn  {
+      .ep-input:focus { border-color:var(--accent); }
+      .ep-code { text-align:center;letter-spacing:8px;font-size:22px;font-weight:700; }
+      #_epErr  { font-size:12px;color:var(--danger);min-height:16px;margin-bottom:10px; }
+      #_epOk   { font-size:12px;color:var(--green);min-height:16px;margin-bottom:10px; }
+      .ep-btn  {
         width:100%;padding:12px;background:var(--accent);color:#fff;border:none;
         border-radius:8px;font-size:14px;font-weight:700;cursor:pointer;
-        font-family:var(--font);transition:background .15s;
+        font-family:var(--font);transition:background .15s;margin-bottom:8px;
       }
-      #_emailPromptBtn:hover { background:var(--accent-h); }
-      #_emailPromptSkip {
-        display:block;text-align:center;margin-top:12px;font-size:12px;
-        color:var(--text-3);cursor:pointer;text-decoration:underline;
+      .ep-btn:hover:not(:disabled) { background:var(--accent-h); }
+      .ep-btn:disabled { opacity:.5;cursor:default; }
+      .ep-btn-ghost {
+        width:100%;padding:10px;background:none;color:var(--text-3);border:none;
+        font-size:12px;cursor:pointer;font-family:var(--font);text-decoration:underline;
       }
-      #_emailPromptSkip:hover { color:var(--text-2); }
+      .ep-btn-ghost:hover { color:var(--text-2); }
     `;
     document.head.appendChild(s);
   }
 
   const overlay = document.createElement('div');
-  overlay.id = '_emailPromptOverlay';
+  overlay.id = '_epOverlay';
   overlay.innerHTML = `
-    <div id="_emailPromptBox">
+    <div id="_epBox">
       <h2>📧 Add your email</h2>
-      <p>Your account doesn't have an email address yet. Add one to enable features like chess account verification and account recovery.</p>
-      <input id="_emailPromptInput" type="email" placeholder="your@email.com" autocomplete="email" />
-      <div id="_emailPromptErr"></div>
-      <button id="_emailPromptBtn" onclick="submitEmailPrompt()">Save Email</button>
-      <span id="_emailPromptSkip" onclick="skipEmailPrompt()">Skip for now — I'll add it later</span>
+      <p>Add an email address to your account. This lets you log in with your email, verify chess accounts for tournament auto-results, and recover your account if needed.</p>
+      <div id="_epStep1">
+        <input class="ep-input" type="email" id="_epEmailInput" placeholder="your@email.com" autocomplete="email" />
+        <div id="_epErr"></div>
+        <div id="_epOk"></div>
+        <button class="ep-btn" id="_epSendBtn" onclick="_epSendCode()">Send Verification Code</button>
+        <button class="ep-btn-ghost" onclick="_epSkip()">Skip for now — I'll add it later in my profile</button>
+      </div>
+      <div id="_epStep2" style="display:none">
+        <p style="margin-bottom:12px">Enter the 6-digit code sent to <strong id="_epEmailDisplay"></strong></p>
+        <input class="ep-input ep-code" type="text" id="_epCodeInput" placeholder="000000" maxlength="6" inputmode="numeric" />
+        <div id="_epErr2"></div>
+        <button class="ep-btn" id="_epConfirmBtn" onclick="_epConfirmCode()">Verify &amp; Save</button>
+        <button class="ep-btn-ghost" onclick="_epBackToEmail()">← Use a different email</button>
+      </div>
     </div>`;
   document.body.appendChild(overlay);
 
-  // Focus input
-  setTimeout(() => document.getElementById('_emailPromptInput')?.focus(), 100);
-
-  // Allow Enter key to submit
-  document.getElementById('_emailPromptInput')?.addEventListener('keydown', e => {
-    if (e.key === 'Enter') submitEmailPrompt();
-  });
+  setTimeout(() => document.getElementById('_epEmailInput')?.focus(), 100);
+  document.getElementById('_epEmailInput')?.addEventListener('keydown', e => { if (e.key === 'Enter') _epSendCode(); });
+  document.getElementById('_epCodeInput')?.addEventListener('keydown', e => { if (e.key === 'Enter') _epConfirmCode(); });
 }
 
-async function submitEmailPrompt() {
-  const input  = document.getElementById('_emailPromptInput');
-  const errEl  = document.getElementById('_emailPromptErr');
-  const btn    = document.getElementById('_emailPromptBtn');
-  const email  = input?.value?.trim();
+async function _epSendCode() {
+  const emailInput = document.getElementById('_epEmailInput');
+  const errEl      = document.getElementById('_epErr');
+  const okEl       = document.getElementById('_epOk');
+  const btn        = document.getElementById('_epSendBtn');
+  const email      = emailInput?.value?.trim();
 
   errEl.textContent = '';
+  okEl.textContent  = '';
   if (!email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
     errEl.textContent = 'Please enter a valid email address.';
     return;
   }
 
   btn.disabled = true;
-  btn.textContent = 'Saving…';
+  btn.textContent = 'Sending…';
 
   try {
-    const r = await api('/update-email', {
+    const r = await api('/email-verify/send', {
       method: 'POST',
       body: JSON.stringify({ email })
     });
     if (r.error) throw new Error(r.error);
 
-    // Success — remove modal and continue boot
-    document.getElementById('_emailPromptOverlay')?.remove();
-    me.needs_email = false;
-    boot(); // Resume normal boot flow
+    // Switch to code entry step
+    document.getElementById('_epEmailDisplay').textContent = email;
+    document.getElementById('_epStep1').style.display = 'none';
+    document.getElementById('_epStep2').style.display = 'block';
+    setTimeout(() => document.getElementById('_epCodeInput')?.focus(), 100);
   } catch(e) {
-    errEl.textContent = e.message || 'Failed to save email. Try again.';
+    errEl.textContent = e.message || 'Failed to send code. Try again.';
     btn.disabled = false;
-    btn.textContent = 'Save Email';
+    btn.textContent = 'Send Verification Code';
   }
 }
 
-function skipEmailPrompt() {
-  // Let them in but remind them next login (don't persist skip)
-  document.getElementById('_emailPromptOverlay')?.remove();
+async function _epConfirmCode() {
+  const codeInput = document.getElementById('_epCodeInput');
+  const errEl     = document.getElementById('_epErr2');
+  const btn       = document.getElementById('_epConfirmBtn');
+  const code      = codeInput?.value?.trim();
+
+  errEl.textContent = '';
+  if (!code || code.length !== 6 || !/^\d{6}$/.test(code)) {
+    errEl.textContent = 'Enter the 6-digit code from your email.';
+    return;
+  }
+
+  btn.disabled = true;
+  btn.textContent = 'Verifying…';
+
+  try {
+    const r = await api('/email-verify/confirm', {
+      method: 'POST',
+      body: JSON.stringify({ code })
+    });
+    if (r.error) throw new Error(r.error);
+
+    // Success — dismiss and resume boot
+    document.getElementById('_epOverlay')?.remove();
+    me.needs_email = false;
+    boot();
+  } catch(e) {
+    errEl.textContent = e.message || 'Invalid or expired code. Try again.';
+    btn.disabled = false;
+    btn.textContent = 'Verify & Save';
+  }
+}
+
+function _epBackToEmail() {
+  document.getElementById('_epStep2').style.display = 'none';
+  document.getElementById('_epStep1').style.display = 'block';
+  document.getElementById('_epErr').textContent  = '';
+  document.getElementById('_epOk').textContent   = '';
+  const btn = document.getElementById('_epSendBtn');
+  btn.disabled = false;
+  btn.textContent = 'Send Verification Code';
+  setTimeout(() => document.getElementById('_epEmailInput')?.focus(), 50);
+}
+
+function _epSkip() {
+  document.getElementById('_epOverlay')?.remove();
   me.needs_email = false;
-  boot(); // Continue boot without email
+  boot();
 }
 
 boot();

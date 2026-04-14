@@ -327,10 +327,24 @@ async function initDb() {
       "ALTER TABLE users ADD COLUMN IF NOT EXISTS riot_tagline      TEXT DEFAULT NULL",
       "ALTER TABLE users ADD COLUMN IF NOT EXISTS chess_username    TEXT DEFAULT NULL",
       "ALTER TABLE users ADD COLUMN IF NOT EXISTS lichess_username  TEXT DEFAULT NULL",
-      // Email — added later, existing users will be prompted on next login
+      // Email — existing users prompted on next login
       "ALTER TABLE users ADD COLUMN IF NOT EXISTS email             TEXT DEFAULT NULL",
     ];
     for (const sql of alters) await pool.query(sql).catch(() => {});
+
+    // ── Email verification codes (for email prompt on login) ──
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS email_verifications (
+        id                SERIAL PRIMARY KEY,
+        user_id           INTEGER REFERENCES users(id) ON DELETE CASCADE,
+        email             TEXT NOT NULL,
+        verification_code TEXT NOT NULL,
+        code_expires_at   TIMESTAMPTZ NOT NULL,
+        attempts          INTEGER NOT NULL DEFAULT 0,
+        created_at        TIMESTAMPTZ DEFAULT NOW()
+      );
+    `);
+    await pool.query(`CREATE INDEX IF NOT EXISTS idx_email_verif_user ON email_verifications(user_id);`).catch(() => {});
 
     // ==================== CHESS VERIFICATION ====================
     await pool.query(`
