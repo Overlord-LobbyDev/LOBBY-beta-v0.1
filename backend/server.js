@@ -335,6 +335,18 @@ wss.on("connection", (ws, req) => {
       return;
     }
 
+    // ── Tournament lock-in state change — broadcast to ALL so bracket updates live ──
+    if (msg.type === "tournament-lock-in") {
+      broadcast(user.peerId, {
+        type: "tournament-lock-in",
+        tournamentId: msg.tournamentId,
+        matchId: msg.matchId,
+        userId: msg.userId,
+        bothLocked: msg.bothLocked
+      });
+      return;
+    }
+
     // ── 1-1 call signalling ──────────────────────────────
     if (["call-invite","call-accept","call-decline","call-offer","call-answer","call-candidate","call-end"].includes(msg.type)) {
       const target = clients.get(msg.to);

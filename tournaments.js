@@ -396,7 +396,7 @@ function showBracketPanel(tournament) {
         }
     });
 
-    function playerCard(p, isWinner, isLoser, score) {
+    function playerCard(p, isWinner, isLoser, score, isLocked) {
         // Use player's own card data from server (works for all players, not just current user)
         const cardData = p?.tournamentCard || (p?.userId ? playerCardMap[p.userId] : null) || {};
         const hasCustom = !!(cardData.imageUrl || (cardData.bgColour && cardData.bgColour !== '#2c3440') || (cardData.borderColour && cardData.borderColour !== '#f9a8d4'));
@@ -425,8 +425,16 @@ function showBracketPanel(tournament) {
         const sBg     = isWinner ? 'rgba(35,165,90,.22)' : 'var(--bg-3)';
         const sBdr    = isWinner ? 'rgba(35,165,90,.3)' : 'rgba(255,255,255,.1)';
         const sClr    = isWinner ? '#57f287' : 'var(--text-3)';
+
+        // Lock-in indicator — green dot on avatar corner, or grey if not locked
+        const lockDot = tournament.status === 'in-progress'
+            ? `<div style="position:absolute;bottom:-1px;right:-1px;width:10px;height:10px;border-radius:50%;background:${isLocked?'#23a55a':'rgba(255,255,255,.15)'};border:1.5px solid var(--bg-1);z-index:2" title="${isLocked?'Locked in':'Not locked in'}"></div>` : '';
+
         return `<div style="display:flex;align-items:center;gap:10px;padding:10px 12px;${cardBg}border:${border};border-radius:10px;${opac}box-shadow:0 3px 10px rgba(0,0,0,.22);height:${CARD_H}px;transition:border-color .15s" onmouseover="this.style.borderColor='rgba(249,168,212,.45)'" onmouseout="this.style.borderColor='${isWinner?'rgba(35,165,90,.45)':hasCustom&&cardData.borderColour?cardData.borderColour:'rgba(255,255,255,.09)'}'">
-            <div style="width:34px;height:34px;border-radius:9px;flex-shrink:0;overflow:hidden;background:linear-gradient(135deg,var(--accent),var(--accent-h));display:flex;align-items:center;justify-content:center;box-shadow:0 2px 6px rgba(0,0,0,.3)">${avatarContent}</div>
+            <div style="position:relative;width:34px;height:34px;flex-shrink:0">
+              <div style="width:34px;height:34px;border-radius:9px;overflow:hidden;background:linear-gradient(135deg,var(--accent),var(--accent-h));display:flex;align-items:center;justify-content:center;box-shadow:0 2px 6px rgba(0,0,0,.3)">${avatarContent}</div>
+              ${lockDot}
+            </div>
             <span style="flex:1;font-size:12px;font-weight:700;color:${nameClr};overflow:hidden;text-overflow:ellipsis;white-space:nowrap;text-shadow:${hasCustom?'0 1px 4px rgba(0,0,0,.7)':''}">${p?.username||'TBD'}</span>
             <span style="font-size:11px;font-weight:700;background:${sBg};border:1px solid ${sBdr};border-radius:5px;padding:3px 8px;min-width:26px;text-align:center;color:${sClr}">${score!=null?score:'-'}</span>
         </div>`;
@@ -546,8 +554,8 @@ function showBracketPanel(tournament) {
                            ? `<span style="font-size:9px;font-weight:800;color:#57f287;background:rgba(35,165,90,.12);border:1px solid rgba(35,165,90,.25);border-radius:5px;padding:3px 10px">✅ Locked In</span>`
                            : `<button onclick="bracketLockIn('${tournament.id}','${mid}')" style="font-size:9px;font-weight:800;padding:3px 10px;background:rgba(250,166,26,.15);color:rgba(250,200,80,.9);border:1px solid rgba(250,166,26,.3);border-radius:5px;cursor:pointer;font-family:inherit" onmouseover="this.style.background='rgba(250,166,26,.28)'" onmouseout="this.style.background='rgba(250,166,26,.15)'">🔒 Lock In</button>`}
                        </div>` : '';
-                matchCards += `<div style="position:absolute;left:${x}px;top:${matchCY}px;width:${MATCH_W}px">${playerCard(p1, p1w, p2w && !p1w, match.player1Score)}</div>`;
-                matchCards += `<div style="position:absolute;left:${x}px;top:${matchCY + CARD_H + CARD_GAP}px;width:${MATCH_W}px">${playerCard(p2, p2w, p1w && !p2w, match.player2Score)}</div>`;
+                matchCards += `<div style="position:absolute;left:${x}px;top:${matchCY}px;width:${MATCH_W}px">${playerCard(p1, p1w, p2w && !p1w, match.player1Score, (match.lockedPlayers||[]).includes(p1?.userId))}</div>`;
+                matchCards += `<div style="position:absolute;left:${x}px;top:${matchCY + CARD_H + CARD_GAP}px;width:${MATCH_W}px">${playerCard(p2, p2w, p1w && !p2w, match.player2Score, (match.lockedPlayers||[]).includes(p2?.userId))}</div>`;
                 if (lockBtn) matchCards += lockBtn;
             }
 
@@ -630,7 +638,7 @@ function showBracketPanel(tournament) {
             </div>`;
         }
 
-        const card = playerCard(p, false, false, null);
+        const card = playerCard(p, false, false, null, false); // sidebar: no lock dots needed
         // Inject host tag and points
         return card
             .replace(`${p?.username||'TBD'}</span>`, `${p?.username||'Unknown'}</span>${tag}${ptsTag}`)
@@ -1529,7 +1537,17 @@ async function bracketLockIn(tournamentId, matchId) {
             showNotification('🔒 Locked in — waiting for opponent', 'success');
         }
 
-        // Notify opponent via WebSocket
+        // Broadcast lock-in state change so all viewers update their bracket
+        if (window.socket) {
+            window.socket.emit('tournament-lock-in', {
+                tournamentId,
+                matchId,
+                userId: currentUserId,
+                bothLocked: data.bothLocked
+            });
+        }
+
+        // Also notify opponent to lock in
         if (window.socket) {
             window.socket.emit('tournament-notify', {
                 tournamentId,
@@ -1656,6 +1674,16 @@ if (window.socket) {
                 });
             }
             shakeBell();
+        }
+    });
+
+    // Refresh bracket live when any player locks in
+    window.socket.on('tournament-lock-in', (data) => {
+        if (window.bracketPanelActive && window.activeTournament?.id == data.tournamentId) {
+            // Silently refresh bracket to show updated lock-in dots
+            const prevScoringMode = window._bracketScoringMode;
+            openTournamentDetails(data.tournamentId).then && openTournamentDetails(data.tournamentId);
+            window._bracketScoringMode = prevScoringMode;
         }
     });
 
