@@ -15,6 +15,25 @@ if (process.env.DATABASE_URL) {
   pool = new Pool({ host: process.env.PG_HOST || 'localhost', port: process.env.PG_PORT || 5432, database: process.env.PG_DB || 'lobby', user: process.env.PG_USER || 'postgres', password: process.env.PG_PASSWORD, ssl: false });
 }
 
+// ── Ensure required columns exist ────────────────────────────
+(async () => {
+  const migrations = [
+    "ALTER TABLE tournaments ADD COLUMN IF NOT EXISTS winner_id INTEGER REFERENCES tournament_players(id) ON DELETE SET NULL",
+    "ALTER TABLE tournaments ADD COLUMN IF NOT EXISTS has_losers_bracket BOOLEAN DEFAULT FALSE",
+    "ALTER TABLE tournament_matches ADD COLUMN IF NOT EXISTS player1_score INTEGER DEFAULT 0",
+    "ALTER TABLE tournament_matches ADD COLUMN IF NOT EXISTS player2_score INTEGER DEFAULT 0",
+    "ALTER TABLE users ADD COLUMN IF NOT EXISTS tournament_card_image_url TEXT DEFAULT NULL",
+    "ALTER TABLE users ADD COLUMN IF NOT EXISTS tournament_card_bg_colour TEXT DEFAULT NULL",
+    "ALTER TABLE users ADD COLUMN IF NOT EXISTS tournament_card_border_colour TEXT DEFAULT NULL",
+    "ALTER TABLE users ADD COLUMN IF NOT EXISTS tournament_card_name_colour TEXT DEFAULT NULL",
+    "ALTER TABLE users ADD COLUMN IF NOT EXISTS tournament_card_bg_pos TEXT DEFAULT NULL",
+  ];
+  for (const sql of migrations) {
+    try { await pool.query(sql); } catch(e) { /* column may already exist */ }
+  }
+  console.log('[✓] Tournament columns verified');
+})();
+
 // Auth middleware - expects req.user to be set by your auth system
 function verifyAuth(req, res, next) {
   if (!req.user || !req.user.id) {
@@ -546,28 +565,27 @@ router.post('/:tournamentId/set-winner', verifyAuth, async (req, res) => {
       matchId = matchResult.rows[0].id;
     }
     
-    // Get the winner user ID for database (if needed)
-    let winnerDbId = winnerId;
+    // Look up tournament_players.id from user_id
+    let winnerDbId = null;
     if (winnerId) {
-      // Verify winner is a valid player in tournament
       const playerCheck = await pool.query(
         `SELECT id FROM tournament_players WHERE tournament_id = $1 AND user_id = $2`,
         [tournamentId, winnerId]
       );
-      
       if (playerCheck.rows.length === 0) {
-        return res.status(400).json({ error: 'Invalid winner user ID' });
+        return res.status(400).json({ error: 'Player not found in this tournament' });
       }
-      
       winnerDbId = playerCheck.rows[0].id;
+    } else {
+      return res.status(400).json({ error: 'Winner ID required' });
     }
     
     // Update match with winner
     await pool.query(
       `UPDATE tournament_matches 
-       SET winner_id = $1, status = $2, completed_at = $3
-       WHERE id = $4`,
-      [winnerDbId, 'completed', new Date(), matchId]
+       SET winner_id = $1, status = $2
+       WHERE id = $3`,
+      [winnerDbId, 'completed', matchId]
     );
 
     // ── Advance winner to next round ──────────────────────────
@@ -612,12 +630,13 @@ router.post('/:tournamentId/set-winner', verifyAuth, async (req, res) => {
         } else {
           // No next round — this is the final. Check if tournament is complete.
           const allMatches = await pool.query(
-            `SELECT COUNT(*) as total, COUNT(winner_id) as completed
+            `SELECT COUNT(*) as total, COUNT(winner_id) as done
              FROM tournament_matches WHERE tournament_id = $1`,
             [tournamentId]
           );
-          const { total, completed } = allMatches.rows[0];
-          if (parseInt(total) === parseInt(completed)) {
+          const total = parseInt(allMatches.rows[0].total);
+          const done  = parseInt(allMatches.rows[0].done);
+          if (total > 0 && total === done) {
             await pool.query(
               `UPDATE tournaments SET status = 'completed', winner_id = $1 WHERE id = $2`,
               [winnerDbId, tournamentId]
