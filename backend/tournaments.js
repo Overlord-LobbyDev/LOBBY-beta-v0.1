@@ -583,31 +583,34 @@ router.post('/:tournamentId/set-winner', verifyAuth, async (req, res) => {
     // Update match with winner
     await pool.query(
       `UPDATE tournament_matches 
-       SET winner_id = $1, status = $2
-       WHERE id = $3`,
-      [winnerDbId, 'completed', matchId]
+       SET winner_id = $1, status = $2, completed_at = $3
+       WHERE id = $4`,
+      [winnerDbId, 'completed', new Date(), matchId]
     );
 
     // ── Advance winner to next round ──────────────────────────
     try {
       // Get current match info: round, match_number, player slots
       const curMatch = await pool.query(
-        `SELECT m.match_number, m.player1_id, m.player2_id, r.round_number
+        `SELECT m.match_number, m.player1_id, m.player2_id, r.round_number, r.tournament_id
          FROM tournament_matches m
          JOIN tournament_rounds r ON m.round_id = r.id
          WHERE m.id = $1`,
         [matchId]
       );
+      console.log('[advance] curMatch rows:', curMatch.rows.length, curMatch.rows[0] || '');
 
       if (curMatch.rows.length > 0) {
         const { match_number, round_number } = curMatch.rows[0];
 
         // Find next round
+        console.log('[advance] looking for round', round_number + 1, 'in tournament', tournamentId);
         const nextRound = await pool.query(
           `SELECT r.id FROM tournament_rounds r
            WHERE r.tournament_id = $1 AND r.round_number = $2`,
           [tournamentId, round_number + 1]
         );
+        console.log('[advance] nextRound rows:', nextRound.rows.length);
 
         if (nextRound.rows.length > 0) {
           const nextRoundId = nextRound.rows[0].id;
@@ -620,12 +623,16 @@ router.post('/:tournamentId/set-winner', verifyAuth, async (req, res) => {
             `SELECT id FROM tournament_matches WHERE round_id = $1 AND match_number = $2`,
             [nextRoundId, nextMatchNumber]
           );
+          console.log('[advance] nextMatch rows:', nextMatch.rows.length, 'slot:', slot, 'nextMatchNumber:', nextMatchNumber);
 
           if (nextMatch.rows.length > 0) {
             await pool.query(
               `UPDATE tournament_matches SET ${slot} = $1 WHERE id = $2`,
               [winnerDbId, nextMatch.rows[0].id]
             );
+            console.log('[advance] SUCCESS - updated', nextMatch.rows[0].id);
+          } else {
+            console.log('[advance] WARN - no next match found for round_id:', nextRoundId, 'match_number:', nextMatchNumber);
           }
         } else {
           // No next round — this is the final. Check if tournament is complete.

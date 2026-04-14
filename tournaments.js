@@ -415,29 +415,34 @@ function showBracketPanel(tournament) {
             const p1w = !!(match.winner && match.winner === p1?.userId);
             const p2w = !!(match.winner && match.winner === p2?.userId);
             const scoringMode = window._bracketScoringMode && isHost && tournament.status === 'in-progress';
-            const mid = match.matchId || `${rIdx}-${mIdx}`;
+            const mid = match.matchId || null;
+            const hasRealMatch = !!mid;
 
             if (scoringMode) {
-                // Scoring mode: show editable score inputs + advance button
                 const p1name = p1?.username || 'TBD';
                 const p2name = p2?.username || 'TBD';
                 const p1score = match.player1Score ?? 0;
                 const p2score = match.player2Score ?? 0;
-                const cardStyle = `position:absolute;left:${x}px;top:${matchCY}px;width:${MATCH_W + 60}px;background:var(--bg-2);border:1.5px solid rgba(88,101,242,.4);border-radius:10px;padding:10px 12px;box-shadow:0 4px 20px rgba(88,101,242,.2)`;
+                const p1uid = p1?.userId || null;
+                const p2uid = p2?.userId || null;
+                const canEdit = hasRealMatch;
+                const dimmed = !canEdit ? 'opacity:.4;pointer-events:none;' : '';
+                const cardStyle = `position:absolute;left:${x}px;top:${matchCY}px;width:${MATCH_W + 80}px;background:var(--bg-2);border:1.5px solid ${canEdit?'rgba(88,101,242,.5)':'rgba(255,255,255,.1)'};border-radius:10px;padding:10px 12px;box-shadow:0 4px 20px rgba(88,101,242,.15);${dimmed}`;
                 matchCards += `
                 <div style="${cardStyle}">
-                  <div style="font-size:9px;font-weight:700;text-transform:uppercase;color:#7289da;margin-bottom:8px;letter-spacing:.5px">⚙ Edit Match</div>
+                  <div style="font-size:9px;font-weight:700;text-transform:uppercase;color:${canEdit?'#7289da':'var(--text-3)'};margin-bottom:8px;letter-spacing:.5px">${canEdit?'⚙ Edit Match':'⏳ Awaiting Players'}</div>
                   <div style="display:flex;align-items:center;gap:6px;margin-bottom:6px">
                     <span style="flex:1;font-size:11px;font-weight:700;color:var(--text-1);overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${p1name}</span>
-                    <input type="number" min="0" max="999" value="${p1score}" style="width:52px;background:var(--bg-3);border:1px solid rgba(255,255,255,.15);border-radius:5px;color:var(--text-1);font-size:12px;font-weight:700;padding:4px 6px;text-align:center;outline:none" onchange="bracketSetScore('${tournament.id}','${mid}',1,this.value)" />
-                    <button style="font-size:10px;padding:4px 7px;background:rgba(35,165,90,.2);color:#57f287;border:1px solid rgba(35,165,90,.4);border-radius:5px;cursor:pointer;font-weight:700;white-space:nowrap" onclick="bracketAdvance('${tournament.id}','${mid}','${p1?.userId||null}')">▶ Win</button>
+                    <input id="s_${mid}_1" type="number" min="0" max="999" value="${p1score}" style="width:48px;background:var(--bg-3);border:1px solid rgba(255,255,255,.15);border-radius:5px;color:var(--text-1);font-size:12px;font-weight:700;padding:4px 6px;text-align:center;outline:none" />
+                    <button style="font-size:10px;padding:4px 8px;background:rgba(35,165,90,.2);color:#57f287;border:1px solid rgba(35,165,90,.4);border-radius:5px;cursor:pointer;font-weight:700;white-space:nowrap" onclick="bracketAdvance('${tournament.id}','${mid}','${p1uid}')">▶ Win</button>
                   </div>
-                  <div style="height:1px;background:rgba(255,255,255,.07);margin:4px 0"></div>
+                  <div style="height:1px;background:rgba(255,255,255,.07);margin:2px 0"></div>
                   <div style="display:flex;align-items:center;gap:6px;margin-top:6px">
                     <span style="flex:1;font-size:11px;font-weight:700;color:var(--text-1);overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${p2name}</span>
-                    <input type="number" min="0" max="999" value="${p2score}" style="width:52px;background:var(--bg-3);border:1px solid rgba(255,255,255,.15);border-radius:5px;color:var(--text-1);font-size:12px;font-weight:700;padding:4px 6px;text-align:center;outline:none" onchange="bracketSetScore('${tournament.id}','${mid}',2,this.value)" />
-                    <button style="font-size:10px;padding:4px 7px;background:rgba(35,165,90,.2);color:#57f287;border:1px solid rgba(35,165,90,.4);border-radius:5px;cursor:pointer;font-weight:700;white-space:nowrap" onclick="bracketAdvance('${tournament.id}','${mid}','${p2?.userId||null}')">▶ Win</button>
+                    <input id="s_${mid}_2" type="number" min="0" max="999" value="${p2score}" style="width:48px;background:var(--bg-3);border:1px solid rgba(255,255,255,.15);border-radius:5px;color:var(--text-1);font-size:12px;font-weight:700;padding:4px 6px;text-align:center;outline:none" />
+                    <button style="font-size:10px;padding:4px 8px;background:rgba(35,165,90,.2);color:#57f287;border:1px solid rgba(35,165,90,.4);border-radius:5px;cursor:pointer;font-weight:700;white-space:nowrap" onclick="bracketAdvance('${tournament.id}','${mid}','${p2uid}')">▶ Win</button>
                   </div>
+                  ${canEdit ? `<button style="margin-top:8px;width:100%;padding:5px;background:rgba(88,101,242,.2);color:#7289da;border:1px solid rgba(88,101,242,.4);border-radius:5px;cursor:pointer;font-size:11px;font-weight:700;font-family:inherit" onclick="bracketSaveScores('${tournament.id}','${mid}')">💾 Save Scores</button>` : ''}
                 </div>`;
             } else {
                 // Normal view
@@ -667,21 +672,37 @@ function bracketOpenScoring(tournamentId) {
 window.bracketDelete      = bracketDelete;
 window.bracketOpenScoring = bracketOpenScoring;
 
-// Set score for a match player inline
-async function bracketSetScore(tournamentId, matchId, player, score) {
+// Save both scores for a match at once
+async function bracketSaveScores(tournamentId, matchId) {
+    const s1 = parseInt(document.getElementById(`s_${matchId}_1`)?.value) || 0;
+    const s2 = parseInt(document.getElementById(`s_${matchId}_2`)?.value) || 0;
     try {
-        const response = await fetch(`${API_BASE}/api/tournaments/${tournamentId}/match-score`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${localStorage.getItem('vh_token')}` },
-            body: JSON.stringify({ matchId, player, score: parseInt(score) || 0 })
-        });
-        const data = await response.json();
-        if (!response.ok) throw new Error(data.error || 'Failed to set score');
-    } catch(e) { showNotification(e.message || 'Failed to set score', 'error'); }
+        const [r1, r2] = await Promise.all([
+            fetch(`${API_BASE}/api/tournaments/${tournamentId}/match-score`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${localStorage.getItem('vh_token')}` },
+                body: JSON.stringify({ matchId, player: 1, score: s1 })
+            }),
+            fetch(`${API_BASE}/api/tournaments/${tournamentId}/match-score`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${localStorage.getItem('vh_token')}` },
+                body: JSON.stringify({ matchId, player: 2, score: s2 })
+            })
+        ]);
+        if (!r1.ok || !r2.ok) throw new Error('Failed to save scores');
+        showNotification('Scores saved ✓', 'success');
+    } catch(e) { showNotification(e.message || 'Failed to save scores', 'error'); }
 }
 
+window.bracketSaveScores = bracketSaveScores;
+
 async function bracketAdvance(tournamentId, matchId, winnerUserId) {
-    if (!winnerUserId || winnerUserId === 'null') { showNotification('Cannot advance TBD player', 'error'); return; }
+    if (!winnerUserId || winnerUserId === 'null' || winnerUserId === 'undefined') {
+        showNotification('Cannot advance TBD player', 'error'); return;
+    }
+    if (!matchId || matchId === 'null') {
+        showNotification('This match has no real DB record yet — advance the previous round first', 'error'); return;
+    }
     if (!confirm('Advance this player to the next round?')) return;
     try {
         const response = await fetch(`${API_BASE}/api/tournaments/${tournamentId}/set-winner`, {
@@ -690,9 +711,9 @@ async function bracketAdvance(tournamentId, matchId, winnerUserId) {
             body: JSON.stringify({ matchId, winnerId: winnerUserId })
         });
         const data = await response.json();
+        console.log('[bracketAdvance] response:', data);
         if (!response.ok) throw new Error(data.error || 'Failed to advance player');
 
-        // Check if tournament just completed — show winner popup
         if (data.tournamentStatus === 'completed' && data.winner) {
             window._bracketScoringMode = false;
             showWinnerPopup(data.winner, tournamentId);
@@ -758,7 +779,7 @@ function showWinnerPopup(winner, tournamentId) {
     popup.addEventListener('click', e => { if (e.target === popup) popup.remove(); });
 }
 
-window.bracketSetScore  = bracketSetScore;
+window.bracketSaveScores = bracketSaveScores;
 window.bracketAdvance   = bracketAdvance;
 window.showWinnerPopup  = showWinnerPopup;
 
