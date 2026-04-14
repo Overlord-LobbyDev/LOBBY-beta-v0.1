@@ -412,10 +412,8 @@ router.post('/:tournamentId/leave', verifyAuth, async (req, res) => {
       return res.status(400).json({ error: 'Cannot leave a tournament that has already started' });
     }
 
-    // Host cannot leave their own tournament
-    if (tournament.host_id === userId) {
-      return res.status(400).json({ error: 'Host cannot leave their own tournament. End the tournament instead.' });
-    }
+    // Host CAN leave as a player (they stay as host, just not in the bracket)
+    // Regular players cannot leave after tournament starts (handled above)
 
     // Check if registered
     const existing = await pool.query(

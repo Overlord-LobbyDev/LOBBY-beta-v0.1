@@ -625,9 +625,11 @@ function showBracketPanel(tournament) {
     if (winnerId) eliminatedSet.delete(winnerId);
 
     // Sort active players by points desc, exclude winner from main list
-    const winnerPlayer   = players.find(p => p.userId === winnerId);
-    const activePlayers   = players.filter(p => !eliminatedSet.has(p.userId) && p.userId !== winnerId);
-    const eliminatedPlayers = players.filter(p => eliminatedSet.has(p.userId));
+    const winnerPlayer      = players.find(p => p.userId === winnerId);
+    const hostPlayer        = players.find(p => p.userId === tournament.hostId);
+    // Non-host players only in the active/eliminated lists
+    const activePlayers     = players.filter(p => !eliminatedSet.has(p.userId) && p.userId !== winnerId && p.userId !== tournament.hostId);
+    const eliminatedPlayers = players.filter(p => eliminatedSet.has(p.userId) && p.userId !== tournament.hostId);
     activePlayers.sort((a, b) => (pointsMap[b.userId] || 0) - (pointsMap[a.userId] || 0));
 
     const renderPlayerRow = (p, isEliminated) => {
@@ -669,27 +671,36 @@ function showBracketPanel(tournament) {
     };
 
     const activeHTML = activePlayers.length === 0
-        ? '<div style="color:var(--text-3);font-size:12px">No players yet</div>'
+        ? '<div style="color:var(--text-3);font-size:11px;padding:4px 0">No players yet</div>'
         : activePlayers.map(p => renderPlayerRow(p, false)).join('');
 
     const eliminatedHTML = eliminatedPlayers.length > 0
-        ? `<div style="margin-top:12px">
-             <div style="font-size:8px;font-weight:800;text-transform:uppercase;letter-spacing:1px;color:var(--text-3);margin-bottom:6px;display:flex;align-items:center;gap:6px">
-               <span style="flex:1;height:1px;background:rgba(255,255,255,.08)"></span>ELIMINATED<span style="flex:1;height:1px;background:rgba(255,255,255,.08)"></span>
+        ? `<div style="margin-top:10px">
+             <div style="font-size:8px;font-weight:800;text-transform:uppercase;letter-spacing:1px;color:var(--text-3);margin-bottom:5px;display:flex;align-items:center;gap:5px">
+               <span style="flex:1;height:1px;background:rgba(255,255,255,.07)"></span>ELIMINATED<span style="flex:1;height:1px;background:rgba(255,255,255,.07)"></span>
              </div>
              <div style="display:flex;flex-direction:column;gap:4px">${eliminatedPlayers.map(p => renderPlayerRow(p, true)).join('')}</div>
            </div>` : '';
 
     const winnerHTML = winnerPlayer
         ? `<div style="margin-bottom:10px">
-             <div style="font-size:8px;font-weight:800;text-transform:uppercase;letter-spacing:1px;color:rgba(255,200,50,.7);margin-bottom:6px;display:flex;align-items:center;gap:6px">
-               🏆 CHAMPION
-             </div>
+             <div style="font-size:8px;font-weight:800;text-transform:uppercase;letter-spacing:1px;color:rgba(255,200,50,.7);margin-bottom:5px">🏆 CHAMPION</div>
              <div style="position:relative">
                ${renderPlayerRow(winnerPlayer, false)}
-               <div style="position:absolute;top:-2px;right:-2px;background:rgba(255,200,50,.15);border:1px solid rgba(255,200,50,.4);border-radius:6px;padding:2px 6px;font-size:9px;font-weight:800;color:rgba(255,200,50,.9)">🏆 Winner</div>
+               <div style="position:absolute;top:-2px;right:-2px;background:rgba(255,200,50,.15);border:1px solid rgba(255,200,50,.4);border-radius:5px;padding:1px 6px;font-size:8px;font-weight:800;color:rgba(255,200,50,.9)">🏆 Winner</div>
              </div>
            </div>` : '';
+
+    // Host card — always shown at top, separate from players
+    const hostCard = (() => {
+        const h = hostPlayer || { userId: tournament.hostId, username: 'Host', avatar_url: null, tournamentCard: {} };
+        const av = h.avatar_url ? `<img src="${h.avatar_url}" style="width:100%;height:100%;object-fit:cover;border-radius:6px;">` : `<span style="font-size:10px;font-weight:800;color:#fff">${(h.username||'?')[0].toUpperCase()}</span>`;
+        return `<div style="display:flex;align-items:center;gap:8px;padding:7px 10px;background:rgba(249,168,212,.06);border:1px solid rgba(249,168,212,.18);border-radius:8px">
+          <div style="width:26px;height:26px;flex-shrink:0;border-radius:6px;background:linear-gradient(135deg,var(--accent),var(--accent-h));display:flex;align-items:center;justify-content:center;overflow:hidden">${av}</div>
+          <span style="flex:1;font-size:11px;font-weight:700;color:var(--text-1);overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${h.username||'Host'}</span>
+          <span style="font-size:8px;font-weight:800;color:var(--accent);background:rgba(249,168,212,.12);border:1px solid rgba(249,168,212,.2);padding:2px 6px;border-radius:4px;flex-shrink:0">HOST</span>
+        </div>`;
+    })();
 
     const playerHTML = winnerHTML + activeHTML + eliminatedHTML;
 
@@ -766,10 +777,15 @@ function showBracketPanel(tournament) {
               </div>
               <!-- Actions -->
               ${actionHTML ? `<div style="padding:12px 16px;border-bottom:1px solid rgba(255,255,255,.06)">${actionHTML}</div>` : ''}
+              <!-- Host -->
+              <div style="padding:10px 14px;border-bottom:1px solid rgba(255,255,255,.06)">
+                <div style="font-size:8px;font-weight:800;text-transform:uppercase;letter-spacing:1px;color:var(--text-3);margin-bottom:6px">Host</div>
+                ${hostCard}
+              </div>
               <!-- Players -->
-              <div style="padding:14px 16px;flex:1">
-                <div style="font-size:9px;font-weight:800;text-transform:uppercase;letter-spacing:1px;color:var(--text-3);margin-bottom:10px">Players (${players.length})</div>
-                <div style="display:flex;flex-direction:column;gap:6px">${playerHTML}</div>
+              <div style="padding:10px 14px;flex:1">
+                <div style="font-size:8px;font-weight:800;text-transform:uppercase;letter-spacing:1px;color:var(--text-3);margin-bottom:6px">Players (${activePlayers.length + eliminatedPlayers.length})</div>
+                <div style="display:flex;flex-direction:column;gap:5px">${playerHTML}</div>
               </div>
             </div>
             <!-- Bracket area -->
