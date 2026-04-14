@@ -711,7 +711,7 @@ async function bracketAdvance(tournamentId, matchId, winnerUserId) {
             body: JSON.stringify({ matchId, winnerId: winnerUserId })
         });
         const data = await response.json();
-        console.log('[bracketAdvance] response:', data);
+        console.log('[bracketAdvance] status:', response.status, 'data:', JSON.stringify(data));
         if (!response.ok) throw new Error(data.error || 'Failed to advance player');
 
         if (data.tournamentStatus === 'completed' && data.winner) {

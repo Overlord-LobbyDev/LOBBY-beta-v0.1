@@ -908,19 +908,10 @@ async function getBracketData(tournamentId) {
         `SELECT m.id, m.match_number,
                 p1.user_id as player1_user_id, p1.username as player1_username,
                 u1.avatar_url as player1_avatar,
-                u1.tournament_card_image_url as p1_card_image,
-                u1.tournament_card_bg_colour as p1_card_bg,
-                u1.tournament_card_border_colour as p1_card_border,
-                u1.tournament_card_name_colour as p1_card_name,
-                u1.tournament_card_bg_pos as p1_card_pos,
                 p2.user_id as player2_user_id, p2.username as player2_username,
                 u2.avatar_url as player2_avatar,
-                u2.tournament_card_image_url as p2_card_image,
-                u2.tournament_card_bg_colour as p2_card_bg,
-                u2.tournament_card_border_colour as p2_card_border,
-                u2.tournament_card_name_colour as p2_card_name,
-                u2.tournament_card_bg_pos as p2_card_pos,
-                m.winner_id, m.status
+                m.winner_id, m.status,
+                m.player1_score, m.player2_score
          FROM tournament_matches m
          LEFT JOIN tournament_players p1 ON m.player1_id = p1.id
          LEFT JOIN tournament_players p2 ON m.player2_id = p2.id
@@ -931,16 +922,38 @@ async function getBracketData(tournamentId) {
         [round.id]
       );
 
+      // Load tournament card data separately (safe — columns may not exist yet)
+      const cardCache = {};
+      const userIds = matchesResult.rows.flatMap(m => [m.player1_user_id, m.player2_user_id]).filter(Boolean);
+      if (userIds.length > 0) {
+        try {
+          const cardResult = await pool.query(
+            `SELECT id, tournament_card_image_url, tournament_card_bg_colour,
+                    tournament_card_border_colour, tournament_card_name_colour, tournament_card_bg_pos
+             FROM users WHERE id = ANY($1)`,
+            [userIds]
+          );
+          cardResult.rows.forEach(u => { cardCache[u.id] = u; });
+        } catch(e) { /* columns don't exist yet — skip */ }
+      }
+
+      const getCard = (userId) => {
+        const u = cardCache[userId] || {};
+        return { imageUrl: u.tournament_card_image_url || null, bgColour: u.tournament_card_bg_colour || '#2c3440', borderColour: u.tournament_card_border_colour || '#f9a8d4', nameColour: u.tournament_card_name_colour || '#fdf2f8', bgPos: u.tournament_card_bg_pos || '50% 50%' };
+      };
+
       const matches = matchesResult.rows.map(m => ({
         matchId: m.id,
         matchNumber: m.match_number,
+        player1Score: m.player1_score || 0,
+        player2Score: m.player2_score || 0,
         player1: m.player1_user_id ? {
           userId: m.player1_user_id, username: m.player1_username, avatar_url: m.player1_avatar || null,
-          tournamentCard: { imageUrl: m.p1_card_image || null, bgColour: m.p1_card_bg || '#2c3440', borderColour: m.p1_card_border || '#f9a8d4', nameColour: m.p1_card_name || '#fdf2f8', bgPos: m.p1_card_pos || '50% 50%' }
+          tournamentCard: getCard(m.player1_user_id)
         } : null,
         player2: m.player2_user_id ? {
           userId: m.player2_user_id, username: m.player2_username, avatar_url: m.player2_avatar || null,
-          tournamentCard: { imageUrl: m.p2_card_image || null, bgColour: m.p2_card_bg || '#2c3440', borderColour: m.p2_card_border || '#f9a8d4', nameColour: m.p2_card_name || '#fdf2f8', bgPos: m.p2_card_pos || '50% 50%' }
+          tournamentCard: getCard(m.player2_user_id)
         } : null,
         winner: m.winner_id,
         status: m.status
