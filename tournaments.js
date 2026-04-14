@@ -613,14 +613,25 @@ function showBracketPanel(tournament) {
                         ? `<button onclick="bracketApiPoll('${tournament.id}','${mid}')" style="flex-shrink:0;font-size:8px;font-weight:800;padding:3px 8px;background:rgba(88,101,242,.2);color:rgba(160,170,255,.95);border:1px solid rgba(88,101,242,.35);border-radius:5px;cursor:pointer;font-family:inherit;white-space:nowrap" onmouseover="this.style.background='rgba(88,101,242,.35)'" onmouseout="this.style.background='rgba(88,101,242,.2)'">🔍 Check Result</button>`
                         : '';
 
-                    matchCards += `<div style="position:absolute;left:${x}px;top:${lockRowY}px;width:${MATCH_W}px;display:flex;gap:4px;align-items:center">
+                    // Watch Live button — shown when game_url is set (chess-api mode)
+                    const gameUrl = match.gameUrl || null;
+                    const platform = tournament.apiGame || '';
+                    const watchBtn = gameUrl && tournament.resultMode === 'chess-api'
+                        ? platform === 'lichess'
+                            ? `<button onclick="toggleLiveBoard('${mid}','${gameUrl}')" style="flex-shrink:0;font-size:8px;font-weight:800;padding:3px 8px;background:rgba(35,165,90,.15);color:#57f287;border:1px solid rgba(35,165,90,.3);border-radius:5px;cursor:pointer;font-family:inherit;white-space:nowrap">📺 Watch</button>`
+                            : `<a href="${gameUrl}" target="_blank" style="flex-shrink:0;font-size:8px;font-weight:800;padding:3px 8px;background:rgba(35,165,90,.15);color:#57f287;border:1px solid rgba(35,165,90,.3);border-radius:5px;cursor:pointer;font-family:inherit;white-space:nowrap;text-decoration:none">🔗 Watch</a>`
+                        : '';
+
+                    matchCards += `<div style="position:absolute;left:${x}px;top:${lockRowY}px;width:${MATCH_W}px;display:flex;gap:4px;align-items:center;flex-wrap:wrap">
                         ${statusPill(p1?.username, p1?.userId, p1locked)}
                         ${statusPill(p2?.username, p2?.userId, p2locked)}
                         ${isInMatch && !myLocked ? `<button data-lock-btn="${mid}" onclick="bracketLockIn('${tournament.id}','${mid}')" style="flex-shrink:0;font-size:8px;font-weight:800;padding:3px 8px;background:rgba(250,166,26,.2);color:rgba(250,200,80,.95);border:1px solid rgba(250,166,26,.35);border-radius:5px;cursor:pointer;font-family:inherit;white-space:nowrap" onmouseover="this.style.background='rgba(250,166,26,.35)'" onmouseout="this.style.background='rgba(250,166,26,.2)'">🔒 Lock</button>` : ''}
                         ${reportBtn}
                         ${apiCheckBtn}
                         ${disputeBtn}
-                    </div>`;
+                        ${watchBtn}
+                    </div>
+                    <div id="liveBoard_${mid}" style="display:none;position:absolute;left:${x}px;top:${lockRowY + 34}px;width:${MATCH_W}px;z-index:10"></div>`;
                 }
             }
 
@@ -1746,7 +1757,7 @@ async function bracketApiPoll(tournamentId, matchId) {
 
         if (data.status === 'found' && data.autoAdvanced) {
             showNotification('✅ Result found — winner auto-advanced!', 'success');
-            if (ws) wsSend('tournament-result', { tournamentId, matchId, status: 'agreed' });
+            if (ws) wsSend('tournament-result', { tournamentId, matchId, status: 'agreed', gameUrl: data.gameUrl || null });
             setTimeout(() => openTournamentDetails(tournamentId), 500);
         } else if (data.status === 'already_completed') {
             showNotification('This match is already completed', 'success');
@@ -1764,6 +1775,36 @@ async function bracketApiPoll(tournamentId, matchId) {
     }
 }
 window.bracketApiPoll = bracketApiPoll;
+
+// ── Watch Live: toggle Lichess board embed under a match card ──
+function toggleLiveBoard(matchId, gameUrl) {
+    const el = document.getElementById(`liveBoard_${matchId}`);
+    if (!el) return;
+    const isOpen = el.style.display !== 'none';
+    if (isOpen) {
+        el.style.display = 'none';
+        el.innerHTML = '';
+        return;
+    }
+    // Lichess embed — dark theme, no ad, no chat
+    const embedUrl = gameUrl.replace('lichess.org/', 'lichess.org/embed/game/') + '?theme=brown&bg=dark';
+    el.style.display = 'block';
+    el.innerHTML = `
+        <div style="background:var(--bg-1);border:1px solid rgba(35,165,90,.3);border-radius:8px;overflow:hidden;margin-top:4px">
+            <div style="display:flex;align-items:center;justify-content:space-between;padding:5px 10px;background:rgba(35,165,90,.08);border-bottom:1px solid rgba(35,165,90,.15)">
+                <span style="font-size:9px;font-weight:700;color:#57f287;text-transform:uppercase;letter-spacing:.6px">📺 Live Game</span>
+                <div style="display:flex;gap:6px">
+                    <a href="${gameUrl}" target="_blank" style="font-size:9px;color:var(--text-3);text-decoration:none;font-weight:600">Open ↗</a>
+                    <button onclick="toggleLiveBoard('${matchId}','${gameUrl}')" style="background:none;border:none;color:var(--text-3);cursor:pointer;font-size:11px;padding:0;line-height:1">✕</button>
+                </div>
+            </div>
+            <iframe src="${embedUrl}"
+                style="width:100%;height:240px;border:none;display:block"
+                allowtransparency="true">
+            </iframe>
+        </div>`;
+}
+window.toggleLiveBoard = toggleLiveBoard;
 
 // ── Self-Report: Report Result Modal ─────────────────────────
 function showReportModal(tournamentId, matchId, p1name, p2name, p1uid, p2uid) {
@@ -2138,6 +2179,16 @@ function _handleTournamentWsMsg(msg) {
 
     if (data.type === 'tournament-result') {
         if (data.status === 'agreed' || data.status === 'resolved' || data.status === 'api-resolved') {
+            // If a game_url came through, cache it on the match before refreshing
+            if (data.gameUrl && window.activeTournament?.bracket?.rounds) {
+                window.activeTournament.bracket.rounds.forEach(round => {
+                    (round.matches || []).forEach(match => {
+                        if (String(match.matchId) === String(data.matchId)) {
+                            match.gameUrl = data.gameUrl;
+                        }
+                    });
+                });
+            }
             if (window.bracketPanelActive && window.activeTournament?.id == data.tournamentId) {
                 setTimeout(() => openTournamentDetails(data.tournamentId), 300);
             }

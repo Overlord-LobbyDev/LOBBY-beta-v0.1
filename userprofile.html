@@ -172,6 +172,49 @@ async function boot() {
   const actionsEl = document.getElementById("profileActions");
   if (parseInt(userId) === me.id) {
     actionsEl.innerHTML = `<button class="btn btn-grey" onclick="smoothNavigate('profile.html', 'up')">✏️ Edit Profile</button>`;
+
+    // ── Chess account linking ──────────────────────────────────
+    const card = document.getElementById('profileCard');
+    const chessSection = document.createElement('div');
+    chessSection.style.cssText = 'margin-top:10px;background:var(--bg-1);border-radius:16px;overflow:hidden;width:min(480px,92vw);box-shadow:0 24px 64px rgba(0,0,0,.5);padding:16px 20px;';
+    chessSection.innerHTML = `
+      <div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.8px;color:var(--text-3);margin-bottom:12px">♟️ Chess Accounts — for Tournament Auto-Results</div>
+      <div style="display:flex;flex-direction:column;gap:10px">
+
+        <div style="display:flex;align-items:center;gap:10px">
+          <div style="width:28px;height:28px;border-radius:6px;background:rgba(255,255,255,.06);display:flex;align-items:center;justify-content:center;font-size:15px;flex-shrink:0">♟️</div>
+          <div style="flex:1;min-width:0">
+            <div style="font-size:11px;font-weight:600;color:var(--text-2);margin-bottom:3px">Chess.com username</div>
+            <input id="chesscomInput" placeholder="e.g. hikaru" value="${me.chess_username||''}"
+              style="width:100%;background:var(--bg-2);border:1px solid rgba(255,255,255,.1);border-radius:6px;padding:7px 10px;color:var(--text-1);font-size:13px;font-family:var(--font);outline:none;transition:border-color .15s"
+              onfocus="this.style.borderColor='var(--accent)'" onblur="this.style.borderColor='rgba(255,255,255,.1)'" />
+          </div>
+          <button onclick="linkChess('chess.com')"
+            style="flex-shrink:0;padding:8px 14px;background:var(--accent);color:#fff;border:none;border-radius:6px;font-size:12px;font-weight:700;cursor:pointer;font-family:var(--font);white-space:nowrap">
+            ${me.chess_username ? 'Update' : 'Link'}
+          </button>
+          ${me.chess_username ? `<button onclick="unlinkChess('chess.com')" title="Unlink" style="flex-shrink:0;padding:8px 10px;background:rgba(237,66,69,.12);color:var(--danger);border:1px solid rgba(237,66,69,.25);border-radius:6px;font-size:12px;cursor:pointer;font-family:var(--font)">✕</button>` : ''}
+        </div>
+
+        <div style="display:flex;align-items:center;gap:10px">
+          <div style="width:28px;height:28px;border-radius:6px;background:rgba(255,255,255,.06);display:flex;align-items:center;justify-content:center;font-size:15px;flex-shrink:0">🐴</div>
+          <div style="flex:1;min-width:0">
+            <div style="font-size:11px;font-weight:600;color:var(--text-2);margin-bottom:3px">Lichess username</div>
+            <input id="lichessInput" placeholder="e.g. DrNykterstein" value="${me.lichess_username||''}"
+              style="width:100%;background:var(--bg-2);border:1px solid rgba(255,255,255,.1);border-radius:6px;padding:7px 10px;color:var(--text-1);font-size:13px;font-family:var(--font);outline:none;transition:border-color .15s"
+              onfocus="this.style.borderColor='var(--accent)'" onblur="this.style.borderColor='rgba(255,255,255,.1)'" />
+          </div>
+          <button onclick="linkChess('lichess')"
+            style="flex-shrink:0;padding:8px 14px;background:var(--accent);color:#fff;border:none;border-radius:6px;font-size:12px;font-weight:700;cursor:pointer;font-family:var(--font);white-space:nowrap">
+            ${me.lichess_username ? 'Update' : 'Link'}
+          </button>
+          ${me.lichess_username ? `<button onclick="unlinkChess('lichess')" title="Unlink" style="flex-shrink:0;padding:8px 10px;background:rgba(237,66,69,.12);color:var(--danger);border:1px solid rgba(237,66,69,.25);border-radius:6px;font-size:12px;cursor:pointer;font-family:var(--font)">✕</button>` : ''}
+        </div>
+
+        <div id="chessLinkStatus" style="font-size:11px;min-height:16px;padding:2px 0"></div>
+      </div>`;
+    card.after(chessSection);
+
   } else {
     actionsEl.innerHTML = `
       <button class="btn btn-primary" onclick="openDMAndReturn(${profile.id}, '${profile.username}')">💬 Message</button>
@@ -180,9 +223,61 @@ async function boot() {
 }
 
 function openDMAndReturn(userId, username) {
-  // Store pending DM to open in chat
   localStorage.setItem("pendingDM", JSON.stringify({ userId, username }));
   smoothNavigate("chat.html", "down");
+}
+
+async function linkChess(platform) {
+  const statusEl = document.getElementById('chessLinkStatus');
+  const username = platform === 'lichess'
+    ? document.getElementById('lichessInput')?.value?.trim()
+    : document.getElementById('chesscomInput')?.value?.trim();
+
+  if (!username) {
+    statusEl.style.color = 'var(--danger)';
+    statusEl.textContent = `Enter your ${platform} username first.`;
+    return;
+  }
+
+  statusEl.style.color = 'var(--text-3)';
+  statusEl.textContent = 'Verifying…';
+
+  try {
+    const res = await fetch(`${AUTH_URL}/link-chess`, {
+      method: 'POST',
+      headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ platform, username })
+    });
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.error || 'Failed');
+    statusEl.style.color = '#57f287';
+    statusEl.textContent = `✅ ${platform === 'lichess' ? 'Lichess' : 'Chess.com'} linked as ${data.username}`;
+    // Reload page to reflect update buttons
+    setTimeout(() => window.location.reload(), 1200);
+  } catch(e) {
+    statusEl.style.color = 'var(--danger)';
+    statusEl.textContent = `❌ ${e.message}`;
+  }
+}
+
+async function unlinkChess(platform) {
+  const statusEl = document.getElementById('chessLinkStatus');
+  statusEl.style.color = 'var(--text-3)';
+  statusEl.textContent = 'Unlinking…';
+  try {
+    const res = await fetch(`${AUTH_URL}/link-chess`, {
+      method: 'DELETE',
+      headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ platform })
+    });
+    if (!res.ok) throw new Error('Failed to unlink');
+    statusEl.style.color = 'var(--text-3)';
+    statusEl.textContent = `Unlinked.`;
+    setTimeout(() => window.location.reload(), 800);
+  } catch(e) {
+    statusEl.style.color = 'var(--danger)';
+    statusEl.textContent = `❌ ${e.message}`;
+  }
 }
 
 boot();

@@ -261,6 +261,21 @@
     document.getElementById('sSlots').textContent   = t.playerCount;
     document.getElementById('sPC').textContent      = players.length;
 
+    // Result mode badge in stats grid
+    const modeLabel = t.resultMode === 'self-report' ? '🤝 Self-report'
+      : t.resultMode === 'riot-api'  ? `⚔️ Riot${t.apiGame ? ' · ' + t.apiGame.toUpperCase() : ''}`
+      : t.resultMode === 'chess-api' ? `♟️ ${t.apiGame === 'lichess' ? 'Lichess' : 'Chess.com'}`
+      : '🖊️ Manual';
+    const modeCard = document.createElement('div');
+    modeCard.className = 'stat-card';
+    modeCard.style.gridColumn = '1 / -1';
+    modeCard.innerHTML = `<div class="stat-label">Results</div><div class="stat-value" style="font-size:11px;color:${t.resultMode==='self-report'||t.resultMode==='chess-api'||t.resultMode==='riot-api'?'var(--green)':'var(--accent)'}">${modeLabel}</div>`;
+    // Only add once
+    if (!document.getElementById('_modeStat')) {
+      modeCard.id = '_modeStat';
+      document.querySelector('.stat-grid')?.appendChild(modeCard);
+    }
+
     renderActions(t, isHost, isReg);
     renderPlayers(t, players);
     renderBracket(t);
@@ -405,6 +420,36 @@
 
         html += `<div style="position:absolute;left:${x}px;top:${matchCY}px;width:${MATCH_W}px">${playerCardHTML(p1, p1w, p2w && !p1w, match.player1Score)}</div>`;
         html += `<div style="position:absolute;left:${x}px;top:${matchCY + CARD_H + CARD_GAP}px;width:${MATCH_W}px">${playerCardHTML(p2, p2w, p1w && !p2w, match.player2Score)}</div>`;
+
+        // Watch Live / Watch link for chess-api mode
+        if (match.gameUrl && t.resultMode === 'chess-api') {
+          const platform = t.apiGame || '';
+          const watchY = matchCY + MATCH_H + 6;
+          if (platform === 'lichess') {
+            html += `<div style="position:absolute;left:${x}px;top:${watchY}px;width:${MATCH_W}px">
+              <button onclick="toggleViewerLiveBoard('m${rIdx}_${mIdx}','${match.gameUrl}')"
+                style="width:100%;padding:4px 0;font-size:9px;font-weight:700;background:rgba(35,165,90,.12);color:#57f287;border:1px solid rgba(35,165,90,.25);border-radius:5px;cursor:pointer;font-family:inherit;text-transform:uppercase;letter-spacing:.4px">
+                📺 Watch Live
+              </button>
+              <div id="vboard_m${rIdx}_${mIdx}" style="display:none;margin-top:4px;border-radius:8px;overflow:hidden;border:1px solid rgba(35,165,90,.2)">
+                <div style="display:flex;align-items:center;justify-content:space-between;padding:4px 8px;background:rgba(35,165,90,.08)">
+                  <span style="font-size:9px;font-weight:700;color:#57f287">🎮 Live Game</span>
+                  <a href="${match.gameUrl}" target="_blank" style="font-size:9px;color:var(--text-3);text-decoration:none">Open ↗</a>
+                </div>
+                <iframe src="${match.gameUrl.replace('lichess.org/','lichess.org/embed/game/')}?theme=brown&bg=dark"
+                  style="width:100%;height:220px;border:none;display:block" allowtransparency="true"></iframe>
+              </div>
+            </div>`;
+          } else {
+            // Chess.com — just a link
+            html += `<div style="position:absolute;left:${x}px;top:${watchY}px;width:${MATCH_W}px">
+              <a href="${match.gameUrl}" target="_blank"
+                style="display:block;width:100%;padding:4px 0;font-size:9px;font-weight:700;background:rgba(35,165,90,.12);color:#57f287;border:1px solid rgba(35,165,90,.25);border-radius:5px;cursor:pointer;font-family:inherit;text-transform:uppercase;letter-spacing:.4px;text-decoration:none;text-align:center">
+                🔗 Watch on Chess.com
+              </a>
+            </div>`;
+          }
+        }
       });
     });
 
@@ -496,6 +541,61 @@
     el.className = `toast ${type} show`;
     setTimeout(() => el.className = `toast ${type}`, 3200);
   }
+
+  function toggleViewerLiveBoard(id, gameUrl) {
+    const el = document.getElementById(`vboard_${id}`);
+    if (!el) return;
+    el.style.display = el.style.display === 'none' ? 'block' : 'none';
+  }
+
+  // ── WebSocket: live bracket updates ──────────────────────────
+  // Connects to the WebSocket server so viewers get auto-refresh
+  // when a result is submitted without needing to reload.
+  const WS_URL = 'wss://lobby-websocket-server.onrender.com';
+  let _viewerWs = null;
+  let _viewerWsRetry = 0;
+
+  function connectViewerWs() {
+    try {
+      _viewerWs = new WebSocket(`${WS_URL}?token=${encodeURIComponent(token)}`);
+
+      _viewerWs.onopen = () => {
+        _viewerWsRetry = 0;
+        console.log('[viewer-ws] connected');
+      };
+
+      _viewerWs.onmessage = (e) => {
+        let msg;
+        try { msg = JSON.parse(e.data); } catch { return; }
+
+        // Refresh bracket on any tournament result or update for THIS tournament
+        if (
+          (msg.type === 'tournament-result' || msg.type === 'tournament-update' ||
+           msg.type === 'bracket-generated' || msg.type === 'match-completed') &&
+          String(msg.tournamentId) === String(TOURNAMENT_ID)
+        ) {
+          load();
+        }
+
+        // Live score update (lock-in)
+        if (msg.type === 'tournament-lock-in' && String(msg.tournamentId) === String(TOURNAMENT_ID)) {
+          load();
+        }
+      };
+
+      _viewerWs.onclose = () => {
+        // Exponential back-off reconnect
+        const delay = Math.min(1000 * Math.pow(2, _viewerWsRetry++), 30000);
+        setTimeout(connectViewerWs, delay);
+      };
+
+      _viewerWs.onerror = () => _viewerWs.close();
+    } catch(e) {
+      console.warn('[viewer-ws] failed to connect:', e.message);
+    }
+  }
+
+  connectViewerWs();
 
   function goBack() { window.history.back(); }
   load();
