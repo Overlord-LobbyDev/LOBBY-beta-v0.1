@@ -453,12 +453,12 @@ router.post('/:tournamentId/generate-bracket', verifyAuth, async (req, res) => {
     // Round up to nearest power of 2 for bracket size
     const numPlayers = shuffled.length;
     const slots = Math.pow(2, Math.ceil(Math.log2(Math.max(numPlayers, 2))));
-    const numRounds = Math.log2(slots);
+    const numRounds = Math.log2(slots);  // always an integer
 
-    // Delete existing rounds/matches if any
+    // Delete existing rounds/matches
     await pool.query('DELETE FROM tournament_rounds WHERE tournament_id = $1', [tournamentId]);
 
-    // Create ALL rounds upfront (empty), then fill in round 1 with real players
+    // ── Step 1: Create all rounds and empty matches upfront ──
     const roundIds = {};
     for (let r = 1; r <= numRounds; r++) {
       const rResult = await pool.query(
@@ -466,63 +466,58 @@ router.post('/:tournamentId/generate-bracket', verifyAuth, async (req, res) => {
         [tournamentId, r]
       );
       roundIds[r] = rResult.rows[0].id;
-
-      const matchesThisRound = slots / Math.pow(2, r);
-      for (let m = 0; m < matchesThisRound; m++) {
-        if (r === 1) {
-          // Seed real players into round 1; pad with null for byes
-          const p1 = shuffled[m * 2]?.tournament_player_id || null;
-          const p2 = shuffled[m * 2 + 1]?.tournament_player_id || null;
-          await pool.query(
-            `INSERT INTO tournament_matches (round_id, tournament_id, match_number, player1_id, player2_id, status)
-             VALUES ($1, $2, $3, $4, $5, $6)`,
-            [roundIds[r], tournamentId, m, p1, p2, 'pending']
-          );
-        } else {
-          // Future rounds start empty
-          await pool.query(
-            `INSERT INTO tournament_matches (round_id, tournament_id, match_number, status)
-             VALUES ($1, $2, $3, $4)`,
-            [roundIds[r], tournamentId, m, 'pending']
-          );
-        }
+      const matchCount = slots / Math.pow(2, r);
+      for (let m = 0; m < matchCount; m++) {
+        const p1 = (r === 1) ? (shuffled[m * 2]?.tournament_player_id || null) : null;
+        const p2 = (r === 1) ? (shuffled[m * 2 + 1]?.tournament_player_id || null) : null;
+        await pool.query(
+          `INSERT INTO tournament_matches (round_id, tournament_id, match_number, player1_id, player2_id, status)
+           VALUES ($1, $2, $3, $4, $5, $6)`,
+          [roundIds[r], tournamentId, m, p1, p2, 'pending']
+        );
       }
     }
-    
-    // Auto-advance byes in round 1 (player set, no opponent)
-    const byeMatches = await pool.query(
-      `SELECT m.id, m.match_number, m.player1_id, m.player2_id
-       FROM tournament_matches m
-       JOIN tournament_rounds r ON m.round_id = r.id
-       WHERE r.tournament_id = $1 AND r.round_number = 1
-         AND ((m.player1_id IS NOT NULL AND m.player2_id IS NULL)
-           OR (m.player1_id IS NULL AND m.player2_id IS NOT NULL))`,
-      [tournamentId]
-    );
-    for (const bye of byeMatches.rows) {
-      const byeWinnerId = bye.player1_id || bye.player2_id;
-      const nextMatchNumber = Math.floor(bye.match_number / 2);
-      const slot = bye.match_number % 2 === 0 ? 'player1_id' : 'player2_id';
-      // Mark bye match complete
-      await pool.query(
-        `UPDATE tournament_matches SET winner_id = $1, status = 'bye' WHERE id = $2`,
-        [byeWinnerId, bye.id]
-      );
-      // Advance to round 2
-      const nextRound = await pool.query(
-        `SELECT r.id FROM tournament_rounds r WHERE r.tournament_id = $1 AND r.round_number = 2`,
-        [tournamentId]
-      );
-      if (nextRound.rows.length > 0) {
-        const nextMatch = await pool.query(
-          `SELECT id FROM tournament_matches WHERE round_id = $1 AND match_number = $2`,
-          [nextRound.rows[0].id, nextMatchNumber]
+
+    // ── Step 2: Cascade byes across ALL rounds iteratively ──────
+    // Loop until no more changes — handles cascading byes at any depth
+    let changed = true;
+    while (changed) {
+      changed = false;
+      for (let r = 1; r < numRounds; r++) {
+        const byeResult = await pool.query(
+          `SELECT m.id, m.match_number, m.player1_id, m.player2_id
+           FROM tournament_matches m
+           JOIN tournament_rounds tr ON m.round_id = tr.id
+           WHERE tr.tournament_id = $1 AND tr.round_number = $2
+             AND m.status != 'bye'
+             AND (m.player1_id IS NULL OR m.player2_id IS NULL)`,
+          [tournamentId, r]
         );
-        if (nextMatch.rows.length > 0) {
-          await pool.query(
-            `UPDATE tournament_matches SET ${slot} = $1 WHERE id = $2`,
-            [byeWinnerId, nextMatch.rows[0].id]
-          );
+
+        for (const match of byeResult.rows) {
+          const p1 = match.player1_id, p2 = match.player2_id;
+          changed = true;
+
+          if (!p1 && !p2) {
+            // Double-bye: mark skipped, nothing to advance
+            await pool.query(
+              `UPDATE tournament_matches SET status = 'bye' WHERE id = $1`, [match.id]
+            );
+          } else {
+            // Single-bye: advance the one player automatically
+            const winner = p1 || p2;
+            await pool.query(
+              `UPDATE tournament_matches SET winner_id = $1, status = 'bye' WHERE id = $2`,
+              [winner, match.id]
+            );
+            const nextMatchNum = Math.floor(match.match_number / 2);
+            const slot = match.match_number % 2 === 0 ? 'player1_id' : 'player2_id';
+            await pool.query(
+              `UPDATE tournament_matches SET ${slot} = $1
+               WHERE round_id = $2 AND match_number = $3`,
+              [winner, roundIds[r + 1], nextMatchNum]
+            );
+          }
         }
       }
     }
@@ -636,33 +631,23 @@ router.post('/:tournamentId/set-winner', verifyAuth, async (req, res) => {
 
         if (nextRound.rows.length > 0) {
           const nextRoundId = nextRound.rows[0].id;
-          // match_number is 0-indexed: 0,1 -> next match 0; 2,3 -> next match 1
           const nextMatchNumber = Math.floor(match_number / 2);
-          // even match_number (0,2,4...) → player1 slot; odd (1,3,5...) → player2 slot
           const slot = match_number % 2 === 0 ? 'player1_id' : 'player2_id';
 
-          const nextMatch = await pool.query(
-            `SELECT id FROM tournament_matches WHERE round_id = $1 AND match_number = $2`,
-            [nextRoundId, nextMatchNumber]
+          // Use UPDATE directly — no need to SELECT first
+          const updateResult = await pool.query(
+            `UPDATE tournament_matches SET ${slot} = $1
+             WHERE round_id = $2 AND match_number = $3`,
+            [winnerDbId, nextRoundId, nextMatchNumber]
           );
-          console.log('[advance] nextMatch rows:', nextMatch.rows.length, 'slot:', slot, 'nextMatchNumber:', nextMatchNumber);
-
-          if (nextMatch.rows.length > 0) {
-            await pool.query(
-              `UPDATE tournament_matches SET ${slot} = $1 WHERE id = $2`,
-              [winnerDbId, nextMatch.rows[0].id]
-            );
-            console.log('[advance] SUCCESS - updated', nextMatch.rows[0].id);
-          } else {
-            console.log('[advance] WARN - no next match found for round_id:', nextRoundId, 'match_number:', nextMatchNumber);
-          }
+          console.log('[advance] advanced to round', round_number + 1, 'match', nextMatchNumber, 'slot', slot, '— rows updated:', updateResult.rowCount);
         } else {
-          // No next round — this is the final. Mark complete if this match has a winner.
+          // No next round — this is the final round. Tournament complete.
           await pool.query(
             `UPDATE tournaments SET status = 'completed', winner_id = $1 WHERE id = $2`,
             [winnerDbId, tournamentId]
           );
-          console.log('[advance] Tournament completed, winner_id:', winnerDbId);
+          console.log('[advance] Tournament', tournamentId, 'completed. Winner db id:', winnerDbId);
         }
       }
     } catch (advanceErr) {
