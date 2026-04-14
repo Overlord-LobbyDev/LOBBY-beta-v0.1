@@ -12801,6 +12801,7 @@ setTimeout(() => { updateMyStatusUI(); }, 100);
       <button class="sp-nav-btn" data-sp="themes">🖌 Themes</button>
       <button class="sp-nav-btn" data-sp="security">🔒 Password</button>
       <button class="sp-nav-btn" data-sp="steam">🎮 Steam</button>
+      <button class="sp-nav-btn" data-sp="chess">♟️ Chess</button>
       <div class="sp-nav-label" style="margin-top:10px">App Settings</div>
       <button class="sp-nav-btn" data-sp="audiovideo">🎙 Audio & Video</button>
       <button class="sp-nav-btn" data-sp="sounds">🔔 Sounds</button>
@@ -12999,6 +13000,40 @@ setTimeout(() => { updateMyStatusUI(); }, 100);
           </div>
           <div class="sp-msg" id="spSteamMsg"></div>
         </div>
+      </div>
+
+      <!-- ── Chess ── -->
+      <div class="sp-section" id="sp-chess">
+        <h2>♟️ Chess Accounts</h2>
+        <p style="font-size:13px;color:var(--text-3);margin-top:-12px;margin-bottom:20px">Link your Chess.com and Lichess accounts so tournaments can automatically fetch match results.</p>
+
+        <!-- Chess.com row -->
+        <div class="sp-form-group">
+          <label class="sp-label">Chess.com Username</label>
+          <div style="display:flex;gap:8px;align-items:center">
+            <input class="sp-input" id="spChesscomInput" placeholder="e.g. hikaru" style="flex:1" />
+            <button id="spChesscomLinkBtn" onclick="spLinkChess('chess.com')"
+              style="flex-shrink:0;padding:9px 16px;background:var(--accent);color:#fff;border:none;border-radius:8px;font-size:13px;font-weight:700;cursor:pointer;font-family:var(--font);white-space:nowrap;transition:background .15s"
+              onmouseover="this.style.background='var(--accent-h)'" onmouseout="this.style.background='var(--accent)'">Link</button>
+            <button id="spChesscomUnlinkBtn" onclick="spUnlinkChess('chess.com')" style="display:none;flex-shrink:0;padding:9px 10px;background:rgba(237,66,69,.12);color:var(--danger);border:1px solid rgba(237,66,69,.25);border-radius:8px;font-size:13px;cursor:pointer;font-family:var(--font)" title="Unlink">✕</button>
+          </div>
+          <div id="spChesscomStatus" style="font-size:12px;color:var(--text-3);margin-top:4px;min-height:16px"></div>
+        </div>
+
+        <!-- Lichess row -->
+        <div class="sp-form-group">
+          <label class="sp-label">Lichess Username</label>
+          <div style="display:flex;gap:8px;align-items:center">
+            <input class="sp-input" id="spLichessInput" placeholder="e.g. DrNykterstein" style="flex:1" />
+            <button id="spLichessLinkBtn" onclick="spLinkChess('lichess')"
+              style="flex-shrink:0;padding:9px 16px;background:var(--accent);color:#fff;border:none;border-radius:8px;font-size:13px;font-weight:700;cursor:pointer;font-family:var(--font);white-space:nowrap;transition:background .15s"
+              onmouseover="this.style.background='var(--accent-h)'" onmouseout="this.style.background='var(--accent)'">Link</button>
+            <button id="spLichessUnlinkBtn" onclick="spUnlinkChess('lichess')" style="display:none;flex-shrink:0;padding:9px 10px;background:rgba(237,66,69,.12);color:var(--danger);border:1px solid rgba(237,66,69,.25);border-radius:8px;font-size:13px;cursor:pointer;font-family:var(--font)" title="Unlink">✕</button>
+          </div>
+          <div id="spLichessStatus" style="font-size:12px;color:var(--text-3);margin-top:4px;min-height:16px"></div>
+        </div>
+
+        <div class="sp-msg" id="spChessMsg"></div>
       </div>
 
       <div class="sp-section" id="sp-audiovideo">
@@ -13248,6 +13283,7 @@ setTimeout(() => { updateMyStatusUI(); }, 100);
         if (btn.dataset.sp === "audiovideo")  loadAVDevices();
         if (btn.dataset.sp === "themes")      loadThemeSection();
         if (btn.dataset.sp === "steam")       loadSteamSection();
+        if (btn.dataset.sp === "chess")       loadChessSection();
         if (btn.dataset.sp === "tournaments") window.initTournamentSection();
       });
     });
@@ -13843,6 +13879,110 @@ setTimeout(() => { updateMyStatusUI(); }, 100);
       if (typeof loadRecents === "function") loadRecents();
     } catch(e) { spShowMsg("spSteamMsg", "Failed to disconnect", "error"); }
   }
+
+  /* ── Chess Integration ─────────────────────────────────────── */
+  async function loadChessSection() {
+    if (!token()) return;
+    try {
+      const me = spMe || await api("/me");
+      // Pre-fill inputs and toggle unlink buttons
+      const chesscomInput   = document.getElementById("spChesscomInput");
+      const lichessInput    = document.getElementById("spLichessInput");
+      const chesscomUnlink  = document.getElementById("spChesscomUnlinkBtn");
+      const lichessUnlink   = document.getElementById("spLichessUnlinkBtn");
+      const chesscomLinkBtn = document.getElementById("spChesscomLinkBtn");
+      const lichessLinkBtn  = document.getElementById("spLichessLinkBtn");
+      if (me.chess_username) {
+        if (chesscomInput)   chesscomInput.value = me.chess_username;
+        if (chesscomUnlink)  chesscomUnlink.style.display = "inline-flex";
+        if (chesscomLinkBtn) chesscomLinkBtn.textContent = "Update";
+      } else {
+        if (chesscomInput)   chesscomInput.value = "";
+        if (chesscomUnlink)  chesscomUnlink.style.display = "none";
+        if (chesscomLinkBtn) chesscomLinkBtn.textContent = "Link";
+      }
+      if (me.lichess_username) {
+        if (lichessInput)   lichessInput.value = me.lichess_username;
+        if (lichessUnlink)  lichessUnlink.style.display = "inline-flex";
+        if (lichessLinkBtn) lichessLinkBtn.textContent = "Update";
+      } else {
+        if (lichessInput)   lichessInput.value = "";
+        if (lichessUnlink)  lichessUnlink.style.display = "none";
+        if (lichessLinkBtn) lichessLinkBtn.textContent = "Link";
+      }
+    } catch(e) { console.error("[chess section]", e); }
+  }
+
+  async function spLinkChess(platform) {
+    const isLichess  = platform === "lichess";
+    const inputId    = isLichess ? "spLichessInput"   : "spChesscomInput";
+    const statusId   = isLichess ? "spLichessStatus"  : "spChesscomStatus";
+    const unlinkId   = isLichess ? "spLichessUnlinkBtn" : "spChesscomUnlinkBtn";
+    const linkBtnId  = isLichess ? "spLichessLinkBtn"  : "spChesscomLinkBtn";
+    const username   = document.getElementById(inputId)?.value?.trim();
+    const statusEl   = document.getElementById(statusId);
+
+    if (!username) {
+      if (statusEl) { statusEl.style.color = "var(--danger)"; statusEl.textContent = "Enter your username first."; }
+      return;
+    }
+    if (statusEl) { statusEl.style.color = "var(--text-3)"; statusEl.textContent = "Verifying…"; }
+
+    try {
+      const res = await fetch(`${AUTH_URL}/link-chess`, {
+        method: "POST",
+        headers: { Authorization: `Bearer ${token()}`, "Content-Type": "application/json" },
+        body: JSON.stringify({ platform, username })
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "Failed");
+      if (statusEl) { statusEl.style.color = "#57f287"; statusEl.textContent = `✅ Linked as ${data.username}`; }
+      const unlinkBtn = document.getElementById(unlinkId);
+      const linkBtn   = document.getElementById(linkBtnId);
+      if (unlinkBtn) unlinkBtn.style.display = "inline-flex";
+      if (linkBtn)   linkBtn.textContent = "Update";
+      // Refresh spMe cache
+      spMe = await api("/me");
+      setTimeout(() => { if (statusEl) statusEl.textContent = ""; }, 3000);
+    } catch(e) {
+      if (statusEl) { statusEl.style.color = "var(--danger)"; statusEl.textContent = `❌ ${e.message}`; }
+    }
+  }
+
+  async function spUnlinkChess(platform) {
+    const isLichess = platform === "lichess";
+    const statusId  = isLichess ? "spLichessStatus"    : "spChesscomStatus";
+    const unlinkId  = isLichess ? "spLichessUnlinkBtn" : "spChesscomUnlinkBtn";
+    const inputId   = isLichess ? "spLichessInput"     : "spChesscomInput";
+    const linkBtnId = isLichess ? "spLichessLinkBtn"   : "spChesscomLinkBtn";
+    const statusEl  = document.getElementById(statusId);
+
+    if (!confirm(`Unlink your ${isLichess ? "Lichess" : "Chess.com"} account?`)) return;
+    if (statusEl) { statusEl.style.color = "var(--text-3)"; statusEl.textContent = "Unlinking…"; }
+
+    try {
+      const res = await fetch(`${AUTH_URL}/link-chess`, {
+        method: "DELETE",
+        headers: { Authorization: `Bearer ${token()}`, "Content-Type": "application/json" },
+        body: JSON.stringify({ platform })
+      });
+      if (!res.ok) throw new Error("Failed to unlink");
+      const inputEl   = document.getElementById(inputId);
+      const unlinkBtn = document.getElementById(unlinkId);
+      const linkBtn   = document.getElementById(linkBtnId);
+      if (inputEl)   inputEl.value = "";
+      if (unlinkBtn) unlinkBtn.style.display = "none";
+      if (linkBtn)   linkBtn.textContent = "Link";
+      if (statusEl) { statusEl.style.color = "var(--text-3)"; statusEl.textContent = "Unlinked."; }
+      spMe = await api("/me");
+      setTimeout(() => { if (statusEl) statusEl.textContent = ""; }, 2000);
+    } catch(e) {
+      if (statusEl) { statusEl.style.color = "var(--danger)"; statusEl.textContent = `❌ ${e.message}`; }
+    }
+  }
+
+  window.spLinkChess   = spLinkChess;
+  window.spUnlinkChess = spUnlinkChess;
 
   const spMsgTimers = {};
   function spShowMsg(id, text, type) {
