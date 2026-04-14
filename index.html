@@ -4477,18 +4477,21 @@ function connectWS() {
   ws = new WebSocket(`wss://lobby-websocket-server.onrender.com?token=${encodeURIComponent(_t)}`);
   ws.onopen = () => {
     console.log("[ws] connected");
-    // Restore saved presence status on (re)connect
     const _savedStatus = localStorage.getItem("vh_presence_status") || "online";
     if (_savedStatus !== "online") {
       ws.send(JSON.stringify({ type: "presence-update", status: _savedStatus }));
     }
     if (typeof setupCallSignalling==="function") setupCallSignalling();
     if (typeof setupVoiceChannel==="function") setupVoiceChannel();
+    // Re-register tournament handlers whenever connection is established
+    if (typeof window.registerTournamentSocketHandlers === 'function') window.registerTournamentSocketHandlers();
   };
   ws.onclose = () => setTimeout(connectWS, 3000);
   if (typeof initRTC === "function") initRTC();
   ws.onmessage = async ({ data }) => {
     const msg = JSON.parse(data);
+    // Route tournament-specific messages to the tournament handler
+    if (typeof window._handleTournamentWsMsg === 'function') window._handleTournamentWsMsg(msg);
     if (msg.type === "channel-message") {
       if (currentView?.type === "channel" && msg.channelId === currentView.id) {
         if (msg.message?.user_id !== me?.id) {

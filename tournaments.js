@@ -25,6 +25,19 @@ function initTournaments(lobbyId, userId) {
     
     // Load existing tournaments for this lobby
     loadTournaments();
+
+    // Register WebSocket handlers — retry until socket is ready
+    registerTournamentSocketHandlers();
+    if (!ws) {
+        const _sockPoll = setInterval(() => {
+            if (ws) {
+                clearInterval(_sockPoll);
+                registerTournamentSocketHandlers();
+            }
+        }, 500);
+    }
+    // Also re-register whenever the socket reconnects
+    window._tournamentSocketRegistered = true;
     
     // Set up event listeners only once
     if (!_tournamentListenersAttached) {
@@ -167,8 +180,8 @@ async function handleTournamentSubmit(e) {
         showNotification('Tournament created successfully!', 'success');
         
         // Emit socket event
-        if (window.socket) {
-            window.socket.emit('tournament-created', {
+        if (ws) {
+            wsSend('tournament-created', {
                 tournamentId: data.tournament.id,
                 lobbyId: currentLobbyId
             });
@@ -376,9 +389,11 @@ function showBracketPanel(tournament) {
     const CARD_GAP = 6;   // gap between the two player cards in a match
     const MATCH_H = CARD_H * 2 + CARD_GAP;
     const MATCH_W = 210, COL_GAP = 80, V_PAD = 36;
-    // In scoring mode the cards are taller (header + VS row) — give more vertical room
-    const scoringCardH = 130; // approx height of scoring card
-    const MATCH_GAP = window._bracketScoringMode ? 24 : 32;
+    // Lock row sits below match cards: 28px row + 6px gap above + 10px gap below = 44px
+    const LOCK_ROW_H = 44;
+    const scoringCardH = 130;
+    // slotH must include the match cards + lock row + padding before the next match
+    const MATCH_GAP = window._bracketScoringMode ? (LOCK_ROW_H + 28) : (LOCK_ROW_H + 14);
     const effectiveMatchH = window._bracketScoringMode ? scoringCardH : MATCH_H;
     const firstCount = rounds[0]?.matches?.length || 1;
     const slotH0  = effectiveMatchH + MATCH_GAP;
@@ -554,7 +569,7 @@ function showBracketPanel(tournament) {
 
                 // Lock-in status row — visible to everyone when match has real players & is in-progress
                 if ((p1?.userId || p2?.userId) && tournament.status === 'in-progress' && mid) {
-                    const lockRowY = matchCY + MATCH_H + 6;
+                    const lockRowY = matchCY + MATCH_H + 8;
                     const statusPill = (name, uid, isLocked) =>
                         `<div data-lock-match="${mid}" data-lock-user="${uid}" data-lock-name="${name||''}" style="flex:1;display:flex;align-items:center;gap:4px;padding:3px 7px;border-radius:5px;background:${isLocked?'rgba(35,165,90,.12)':'rgba(255,255,255,.04)'};border:1px solid ${isLocked?'rgba(35,165,90,.3)':'rgba(255,255,255,.1)'}">
                            <span style="font-size:10px;line-height:1">${isLocked?'✔':'✘'}</span>
@@ -1436,8 +1451,8 @@ async function setWinner(tournamentId, roundNumber, matchIdx, winnerUserId, btnE
         showNotification('✓ Winner Declared', 'success');
         
         // Emit socket event
-        if (window.socket) {
-            window.socket.emit('match-result', {
+        if (ws) {
+            wsSend('match-result', {
                 tournamentId,
                 roundNumber,
                 matchNumber: matchIdx,
@@ -1477,8 +1492,8 @@ async function closeTournament(tournamentId) {
         loadTournaments();
 
         // Emit socket event
-        if (window.socket) {
-            window.socket.emit('tournament-closed', { tournamentId });
+        if (ws) {
+            wsSend('tournament-closed', { tournamentId });
         }
     } catch (error) {
         console.error('Close tournament error:', error);
@@ -1574,8 +1589,8 @@ async function deleteTournament(tournamentId) {
         loadTournaments();
 
         // Emit socket event
-        if (window.socket) {
-            window.socket.emit('tournament-deleted', { tournamentId });
+        if (ws) {
+            wsSend('tournament-deleted', { tournamentId });
         }
     } catch (error) {
         console.error('Delete tournament error:', error);
@@ -1664,8 +1679,8 @@ async function bracketLockIn(tournamentId, matchId) {
         }
 
         // Broadcast lock-in state change so all viewers update their bracket
-        if (window.socket) {
-            window.socket.emit('tournament-lock-in', {
+        if (ws) {
+            wsSend('tournament-lock-in', {
                 tournamentId,
                 matchId,
                 userId: currentUserId,
@@ -1674,8 +1689,8 @@ async function bracketLockIn(tournamentId, matchId) {
         }
 
         // Also notify opponent to lock in
-        if (window.socket) {
-            window.socket.emit('tournament-notify', {
+        if (ws) {
+            wsSend('tournament-notify', {
                 tournamentId,
                 notifType: 'lock-in-request',
                 text: `Your opponent has locked in for their match in <b>${window.activeTournament?.name || 'the tournament'}</b>. Lock in to begin!`,
@@ -1785,18 +1800,18 @@ async function submitMatchReport(tournamentId, matchId, iAmP1Str) {
         if (data.status === 'agreed') {
             showNotification('✅ Both players agreed — advancing winner!', 'success');
             // Notify all via WebSocket
-            if (window.socket) window.socket.emit('tournament-result', {
+            if (ws) wsSend('tournament-result', {
                 tournamentId, matchId, status: 'agreed'
             });
             setTimeout(() => openTournamentDetails(tournamentId), 600);
         } else if (data.status === 'disputed') {
             showNotification('⚠ Scores don\'t match — host has been notified to resolve', 'error');
-            if (window.socket) window.socket.emit('tournament-result', {
+            if (ws) wsSend('tournament-result', {
                 tournamentId, matchId, status: 'disputed'
             });
         } else {
             showNotification('📊 Result submitted — waiting for opponent to confirm', 'success');
-            if (window.socket) window.socket.emit('tournament-result', {
+            if (ws) wsSend('tournament-result', {
                 tournamentId, matchId, status: 'submitted'
             });
         }
@@ -1876,7 +1891,7 @@ async function resolveDispute(tournamentId, matchId, winnerUid, winnerIsP1) {
         const data = await response.json();
         if (!response.ok) { showNotification(data.error || 'Failed to resolve', 'error'); return; }
         showNotification('✅ Dispute resolved — bracket updated', 'success');
-        if (window.socket) window.socket.emit('tournament-result', { tournamentId, matchId, status: 'resolved' });
+        if (ws) wsSend('tournament-result', { tournamentId, matchId, status: 'resolved' });
         setTimeout(() => openTournamentDetails(tournamentId), 400);
     } catch(e) { showNotification(e.message || 'Failed to resolve dispute', 'error'); }
 }
@@ -1943,8 +1958,8 @@ function _fireTournamentAlert(t, minsUntil) {
     shakeBell();
 
     // Notify registered players via WebSocket
-    if (window.socket && t.player_user_ids?.length) {
-        window.socket.emit('tournament-notify', {
+    if (ws && t.player_user_ids?.length) {
+        wsSend('tournament-notify', {
             tournamentId: t.id,
             tournamentName: t.name,
             notifType: isStart ? 'round-start' : 'schedule-alert',
@@ -1980,9 +1995,21 @@ function shakeBell() {
 }
 window.shakeBell = shakeBell;
 
-// ── WebSocket: incoming tournament notification ───────────────
-if (window.socket) {
-    window.socket.on('tournament-notify', (data) => {
+// ── WebSocket send helper ─────────────────────────────────────
+function wsSend(type, payload) {
+    if (typeof ws !== 'undefined' && ws && ws.readyState === WebSocket.OPEN) {
+        ws.send(JSON.stringify({ type, ...payload }));
+    }
+}
+window.wsSend = wsSend;
+
+// ── WebSocket: incoming tournament message handler ─────────────
+// Hooks into the existing ws.onmessage by registering a sub-handler
+// stored on window so index.html's onmessage dispatcher can call it
+function _handleTournamentWsMsg(msg) {
+    const data = msg;
+
+    if (data.type === 'tournament-notify') {
         if (data.notifType === 'lock-in-request') {
             if (typeof pushNotif === 'function') {
                 pushNotif({ type: 'tournament', icon: '🔒', text: data.text,
@@ -1998,103 +2025,99 @@ if (window.socket) {
             }
             shakeBell();
         }
-    });
+        return;
+    }
 
-    // Refresh bracket live when any player locks in
-    window.socket.on('tournament-lock-in', (data) => {
+    if (data.type === 'tournament-lock-in') {
         if (!window.bracketPanelActive || window.activeTournament?.id != data.tournamentId) return;
 
-        // Update the cached tournament's match lockedPlayers directly
+        // Update cached match state
         const t = window.activeTournament;
         if (t?.bracket?.rounds) {
             t.bracket.rounds.forEach(round => {
                 (round.matches || []).forEach(match => {
                     if (match.matchId == data.matchId) {
                         if (!match.lockedPlayers) match.lockedPlayers = [];
-                        if (!match.lockedPlayers.includes(data.userId)) {
-                            match.lockedPlayers.push(data.userId);
-                        }
+                        const uid = String(data.userId);
+                        if (!match.lockedPlayers.map(String).includes(uid)) match.lockedPlayers.push(data.userId);
                         if (data.bothLocked) match.roundLocked = true;
                     }
                 });
             });
         }
 
-        // Update lock pill DOM directly — no full re-render needed
-        const matchId = data.matchId;
-        const userId  = String(data.userId);
-
-        // Update status pills under the match cards
-        document.querySelectorAll(`[data-lock-match="${matchId}"]`).forEach(pill => {
-            if (String(pill.dataset.lockUser) === userId) {
+        // Update pills directly in the DOM — no full re-render
+        const mid = String(data.matchId);
+        const uid = String(data.userId);
+        document.querySelectorAll(`[data-lock-match="${mid}"]`).forEach(pill => {
+            if (String(pill.dataset.lockUser) === uid) {
                 pill.innerHTML = `<span style="font-size:10px;line-height:1">✔</span><span style="font-size:8px;font-weight:700;color:#57f287;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;flex:1;min-width:0">${pill.dataset.lockName||''}</span>`;
                 pill.style.background = 'rgba(35,165,90,.12)';
                 pill.style.borderColor = 'rgba(35,165,90,.3)';
             }
         });
-
-        // Hide lock button if it's now this user's turn
-        if (String(data.userId) === String(currentUserId)) {
-            const lockBtn = document.querySelector(`[data-lock-btn="${matchId}"]`);
-            if (lockBtn) lockBtn.style.display = 'none';
-        }
-
-        // If both locked, update Ready badge
+        // Hide lock button for the person who just locked
+        const lockBtn = document.querySelector(`[data-lock-btn="${mid}"]`);
+        if (lockBtn && uid === String(currentUserId)) lockBtn.style.display = 'none';
+        // Show ready badge if both locked
         if (data.bothLocked) {
-            const readyBadge = document.querySelector(`[data-lock-ready="${matchId}"]`);
-            if (readyBadge) { readyBadge.style.display = 'inline-flex'; }
+            const badge = document.querySelector(`[data-lock-ready="${mid}"]`);
+            if (badge) badge.style.display = 'inline-flex';
+            // Also show Report button if self-report mode — just refresh
+            if (window.activeTournament?.resultMode === 'self-report') {
+                setTimeout(() => openTournamentDetails(data.tournamentId), 200);
+            }
         }
-    });
+        return;
+    }
 
-    window.socket.on('tournament-update', (data) => {
-        loadTournaments();
-    });
-    window.socket.on('bracket-generated', (data) => {
-        loadTournaments();
-    });
-    window.socket.on('match-completed', (data) => {
-        loadTournaments();
-    });
-    window.socket.on('tournament-closed', (data) => {
-        loadTournaments();
-    });
-
-    // Self-report result events — refresh bracket and notify
-    window.socket.on('tournament-result', (data) => {
+    if (data.type === 'tournament-result') {
         if (data.status === 'agreed' || data.status === 'resolved') {
-            // Auto-advance happened — refresh bracket
             if (window.bracketPanelActive && window.activeTournament?.id == data.tournamentId) {
                 setTimeout(() => openTournamentDetails(data.tournamentId), 300);
             }
             loadTournaments();
         } else if (data.status === 'disputed') {
-            // Host gets a notification with a button to resolve
-            if (window.activeTournament?.hostId == currentUserId || currentUserId === window.activeTournament?.hostId) {
+            if (String(window.activeTournament?.hostId) === String(currentUserId)) {
                 if (typeof pushNotif === 'function') {
-                    pushNotif({ type: 'tournament', icon: '⚠', text: `<b>Score dispute</b> in <b>${window.activeTournament?.name || 'tournament'}</b> — players reported different results. Tap to resolve.`,
+                    pushNotif({ type: 'tournament', icon: '⚠', text: `<b>Score dispute</b> in <b>${window.activeTournament?.name || 'a tournament'}</b> — players reported different results.`,
                         actions: [{ label: 'Resolve', action: `openTournamentDetails:${data.tournamentId}`, style: 'primary' }]
                     });
                 }
                 shakeBell();
             }
-            // Refresh bracket to show dispute badge
             if (window.bracketPanelActive && window.activeTournament?.id == data.tournamentId) {
                 setTimeout(() => openTournamentDetails(data.tournamentId), 300);
             }
         } else if (data.status === 'submitted') {
-            // Opponent sees "waiting for confirmation" update
             if (window.bracketPanelActive && window.activeTournament?.id == data.tournamentId) {
                 setTimeout(() => openTournamentDetails(data.tournamentId), 300);
             }
         }
-    });
+        return;
+    }
+
+    if (['tournament-update','bracket-generated','match-completed','tournament-closed'].includes(data.type)) {
+        loadTournaments();
+        return;
+    }
 }
+
+// Register the handler on window so index.html's ws.onmessage can call it
+window._handleTournamentWsMsg = _handleTournamentWsMsg;
+
+function registerTournamentSocketHandlers() {
+    // Nothing to do — handler is registered via window._handleTournamentWsMsg
+    // which index.html's ws.onmessage calls for every message
+}
+window.registerTournamentSocketHandlers = registerTournamentSocketHandlers;
 
 // Start the schedule checker when tournaments are initialised
 // (called from initTournaments)
 
 // Export functions
 window.initTournaments = initTournaments;
+window.registerTournamentSocketHandlers = registerTournamentSocketHandlers;
 window.openTournamentModal = openTournamentModal;
 window.closeTournamentModal = closeTournamentModal;
 window.openTournamentDetails = openTournamentDetails;
