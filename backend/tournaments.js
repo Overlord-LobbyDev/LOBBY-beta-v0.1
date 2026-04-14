@@ -449,62 +449,84 @@ router.post('/:tournamentId/generate-bracket', verifyAuth, async (req, res) => {
     
     // Shuffle players
     const shuffled = [...players].sort(() => Math.random() - 0.5);
-    
+
+    // Round up to nearest power of 2 for bracket size
+    const numPlayers = shuffled.length;
+    const slots = Math.pow(2, Math.ceil(Math.log2(Math.max(numPlayers, 2))));
+    const numRounds = Math.log2(slots);
+
     // Delete existing rounds/matches if any
     await pool.query('DELETE FROM tournament_rounds WHERE tournament_id = $1', [tournamentId]);
-    
-    // Create first round
-    const firstRoundResult = await pool.query(
-      `INSERT INTO tournament_rounds (tournament_id, round_number)
-       VALUES ($1, $2)
-       RETURNING id`,
-      [tournamentId, 1]
-    );
-    
-    const firstRoundId = firstRoundResult.rows[0].id;
-    
-    // Create first round matches
-    for (let i = 0; i < shuffled.length; i += 2) {
-      const player1Id = shuffled[i]?.tournament_player_id || null;
-      const player2Id = shuffled[i + 1]?.tournament_player_id || null;
-      
-      await pool.query(
-        `INSERT INTO tournament_matches 
-          (round_id, tournament_id, match_number, player1_id, player2_id, status)
-         VALUES ($1, $2, $3, $4, $5, $6)`,
-        [firstRoundId, tournamentId, Math.floor(i / 2), player1Id, player2Id, 'pending']
+
+    // Create ALL rounds upfront (empty), then fill in round 1 with real players
+    const roundIds = {};
+    for (let r = 1; r <= numRounds; r++) {
+      const rResult = await pool.query(
+        `INSERT INTO tournament_rounds (tournament_id, round_number) VALUES ($1, $2) RETURNING id`,
+        [tournamentId, r]
       );
-    }
-    
-    // Create subsequent rounds for single elimination
-    if (tournament.format === 'single') {
-      let currentRoundNum = 2;
-      let matchesInRound = Math.floor(shuffled.length / 4);
-      
-      while (matchesInRound > 0) {
-        const nextRoundResult = await pool.query(
-          `INSERT INTO tournament_rounds (tournament_id, round_number)
-           VALUES ($1, $2)
-           RETURNING id`,
-          [tournamentId, currentRoundNum]
-        );
-        
-        const nextRoundId = nextRoundResult.rows[0].id;
-        
-        for (let i = 0; i < matchesInRound; i++) {
+      roundIds[r] = rResult.rows[0].id;
+
+      const matchesThisRound = slots / Math.pow(2, r);
+      for (let m = 0; m < matchesThisRound; m++) {
+        if (r === 1) {
+          // Seed real players into round 1; pad with null for byes
+          const p1 = shuffled[m * 2]?.tournament_player_id || null;
+          const p2 = shuffled[m * 2 + 1]?.tournament_player_id || null;
           await pool.query(
-            `INSERT INTO tournament_matches 
-              (round_id, tournament_id, match_number, status)
+            `INSERT INTO tournament_matches (round_id, tournament_id, match_number, player1_id, player2_id, status)
+             VALUES ($1, $2, $3, $4, $5, $6)`,
+            [roundIds[r], tournamentId, m, p1, p2, 'pending']
+          );
+        } else {
+          // Future rounds start empty
+          await pool.query(
+            `INSERT INTO tournament_matches (round_id, tournament_id, match_number, status)
              VALUES ($1, $2, $3, $4)`,
-            [nextRoundId, tournamentId, i, 'pending']
+            [roundIds[r], tournamentId, m, 'pending']
           );
         }
-        
-        currentRoundNum++;
-        matchesInRound = Math.floor(matchesInRound / 2);
       }
     }
     
+    // Auto-advance byes in round 1 (player set, no opponent)
+    const byeMatches = await pool.query(
+      `SELECT m.id, m.match_number, m.player1_id, m.player2_id
+       FROM tournament_matches m
+       JOIN tournament_rounds r ON m.round_id = r.id
+       WHERE r.tournament_id = $1 AND r.round_number = 1
+         AND ((m.player1_id IS NOT NULL AND m.player2_id IS NULL)
+           OR (m.player1_id IS NULL AND m.player2_id IS NOT NULL))`,
+      [tournamentId]
+    );
+    for (const bye of byeMatches.rows) {
+      const byeWinnerId = bye.player1_id || bye.player2_id;
+      const nextMatchNumber = Math.floor(bye.match_number / 2);
+      const slot = bye.match_number % 2 === 0 ? 'player1_id' : 'player2_id';
+      // Mark bye match complete
+      await pool.query(
+        `UPDATE tournament_matches SET winner_id = $1, status = 'bye' WHERE id = $2`,
+        [byeWinnerId, bye.id]
+      );
+      // Advance to round 2
+      const nextRound = await pool.query(
+        `SELECT r.id FROM tournament_rounds r WHERE r.tournament_id = $1 AND r.round_number = 2`,
+        [tournamentId]
+      );
+      if (nextRound.rows.length > 0) {
+        const nextMatch = await pool.query(
+          `SELECT id FROM tournament_matches WHERE round_id = $1 AND match_number = $2`,
+          [nextRound.rows[0].id, nextMatchNumber]
+        );
+        if (nextMatch.rows.length > 0) {
+          await pool.query(
+            `UPDATE tournament_matches SET ${slot} = $1 WHERE id = $2`,
+            [byeWinnerId, nextMatch.rows[0].id]
+          );
+        }
+      }
+    }
+
     // Update tournament status
     await pool.query(
       `UPDATE tournaments 
@@ -635,20 +657,12 @@ router.post('/:tournamentId/set-winner', verifyAuth, async (req, res) => {
             console.log('[advance] WARN - no next match found for round_id:', nextRoundId, 'match_number:', nextMatchNumber);
           }
         } else {
-          // No next round — this is the final. Check if tournament is complete.
-          const allMatches = await pool.query(
-            `SELECT COUNT(*) as total, COUNT(winner_id) as done
-             FROM tournament_matches WHERE tournament_id = $1`,
-            [tournamentId]
+          // No next round — this is the final. Mark complete if this match has a winner.
+          await pool.query(
+            `UPDATE tournaments SET status = 'completed', winner_id = $1 WHERE id = $2`,
+            [winnerDbId, tournamentId]
           );
-          const total = parseInt(allMatches.rows[0].total);
-          const done  = parseInt(allMatches.rows[0].done);
-          if (total > 0 && total === done) {
-            await pool.query(
-              `UPDATE tournaments SET status = 'completed', winner_id = $1 WHERE id = $2`,
-              [winnerDbId, tournamentId]
-            );
-          }
+          console.log('[advance] Tournament completed, winner_id:', winnerDbId);
         }
       }
     } catch (advanceErr) {
