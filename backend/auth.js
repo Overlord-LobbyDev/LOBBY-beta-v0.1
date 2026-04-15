@@ -373,8 +373,15 @@ app.post("/link-chess", requireAuth, async (req, res) => {
       });
     }
 
-    // For Chess.com: use email verification from Chess.com profile
-    // Verify Chess.com username exists and get their email
+    // For Chess.com: use email verification via LOBBY account
+    // Get user's LOBBY email (they already verified this when signing up)
+    const userRow = await pool.query("SELECT email FROM users WHERE id = $1", [userId]);
+    if (!userRow.rows.length || !userRow.rows[0].email) {
+      return res.status(400).json({ error: "No email found on your LOBBY account" });
+    }
+    const userEmail = userRow.rows[0].email;
+
+    // Verify Chess.com username exists (public API check)
     const axios = require("axios");
     let chessProfile;
     try {
@@ -382,11 +389,7 @@ app.post("/link-chess", requireAuth, async (req, res) => {
         `https://api.chess.com/pub/player/${encodeURIComponent(username.toLowerCase())}`,
         { headers: { "User-Agent": "LOBBY-App/1.0" } }
       );
-      if (check.status !== 200 || !check.data?.email) {
-        return res.status(400).json({ 
-          error: "Chess.com profile not found or email not public. Make sure your email is visible in your Chess.com settings."
-        });
-      }
+      if (check.status !== 200) throw new Error("not found");
       chessProfile = check.data;
     } catch (err) {
       const is404 = err.response?.status === 404 || err.message?.includes("not found");
@@ -395,14 +398,7 @@ app.post("/link-chess", requireAuth, async (req, res) => {
       });
     }
 
-    const chessEmail = chessProfile.email;
-    if (!chessEmail) {
-      return res.status(400).json({
-        error: "Your Chess.com profile doesn't have a public email. Go to chess.com/settings and make sure your email is visible."
-      });
-    }
-
-    // Generate verification code and email
+    // Generate verification code
     const crypto = require("crypto");
     const verifyCode = crypto.randomBytes(24).toString("hex").toUpperCase();
 
@@ -417,7 +413,7 @@ app.post("/link-chess", requireAuth, async (req, res) => {
       [userId, username, verifyCode, new Date(Date.now() + 15 * 60 * 1000)]
     );
 
-    // Send verification email to their Chess.com email
+    // Send verification email to their LOBBY email
     const verifyLink = `https://lobby-auth-server.onrender.com/chess/verify-email?code=${verifyCode}&userId=${userId}`;
     const emailHtml = `
       <html>
@@ -430,7 +426,7 @@ app.post("/link-chess", requireAuth, async (req, res) => {
           </div>
           
           <p style="color:#b5bac1;line-height:1.6">
-            Someone (hopefully you) requested to link the Chess.com account <strong style="color:#f2f3f5">${username}</strong> to a LOBBY profile.
+            You requested to link the Chess.com account <strong style="color:#f2f3f5">${username}</strong> to your LOBBY profile.
           </p>
           
           <div style="background:#313338;border-radius:8px;padding:20px;margin:20px 0;text-align:center">
@@ -461,16 +457,16 @@ app.post("/link-chess", requireAuth, async (req, res) => {
 
     await transporter.sendMail({
       from: process.env.EMAIL_FROM || process.env.EMAIL_USER,
-      to: chessEmail,
+      to: userEmail,
       subject: `Verify your Chess.com account for LOBBY`,
       html: emailHtml
     });
 
-    console.log(`[/link-chess] Sent verification email to ${chessEmail} for Chess.com account "${username}"`);
+    console.log(`[/link-chess] Sent verification email to ${userEmail} for Chess.com account "${username}"`);
 
     res.json({
       success: true,
-      message: `Verification email sent to ${chessEmail} (the email on your Chess.com account). Please check your email to confirm.`
+      message: `Verification email sent to ${userEmail}. Check your email to confirm linking your Chess.com account.`
     });
 
   } catch (err) {
