@@ -4351,11 +4351,6 @@ async function boot() {
     return;
   }
 
-  // ── Email prompt: shown once to users who have no email set ──
-  if (me.needs_email) {
-    _showEmailPromptModal();
-    return; // Pause boot until email is verified
-  }
   document.getElementById("myPanelName").textContent = me.username;
   // Show unique lobby tag derived from user ID
   const tagEl = document.getElementById("myPanelLobbyTag");
@@ -12154,165 +12149,6 @@ async function renderProfileGames(body) {
 function openProfile(userId) { openProfilePanel(userId); }
 function openUserProfile(userId) { openProfilePanel(userId); }
 
-// ── Email prompt modal ────────────────────────────────────────
-// Shown on first login for users without an email address.
-// Full verification flow: enter email → send code → confirm code → boot resumes.
-function _showEmailPromptModal() {
-  if (!document.getElementById('_epStyles')) {
-    const s = document.createElement('style');
-    s.id = '_epStyles';
-    s.textContent = `
-      #_epOverlay {
-        position:fixed;inset:0;background:rgba(0,0,0,.8);z-index:99999;
-        display:flex;align-items:center;justify-content:center;
-        backdrop-filter:blur(8px);font-family:var(--font);
-      }
-      #_epBox {
-        background:var(--bg-1);border:1px solid rgba(255,255,255,.1);border-radius:16px;
-        padding:32px 28px;width:min(420px,92vw);box-shadow:0 24px 64px rgba(0,0,0,.6);
-      }
-      #_epBox h2 { font-size:20px;font-weight:800;color:var(--text-1);margin-bottom:6px; }
-      #_epBox p  { font-size:13px;color:var(--text-2);line-height:1.5;margin-bottom:20px; }
-      .ep-input {
-        width:100%;background:var(--bg-2);border:1.5px solid rgba(255,255,255,.1);
-        border-radius:8px;padding:11px 14px;color:var(--text-1);font-size:14px;
-        font-family:var(--font);outline:none;transition:border-color .15s;margin-bottom:8px;
-        display:block;
-      }
-      .ep-input:focus { border-color:var(--accent); }
-      .ep-code { text-align:center;letter-spacing:8px;font-size:22px;font-weight:700; }
-      #_epErr  { font-size:12px;color:var(--danger);min-height:16px;margin-bottom:10px; }
-      #_epOk   { font-size:12px;color:var(--green);min-height:16px;margin-bottom:10px; }
-      .ep-btn  {
-        width:100%;padding:12px;background:var(--accent);color:#fff;border:none;
-        border-radius:8px;font-size:14px;font-weight:700;cursor:pointer;
-        font-family:var(--font);transition:background .15s;margin-bottom:8px;
-      }
-      .ep-btn:hover:not(:disabled) { background:var(--accent-h); }
-      .ep-btn:disabled { opacity:.5;cursor:default; }
-      .ep-btn-ghost {
-        width:100%;padding:10px;background:none;color:var(--text-3);border:none;
-        font-size:12px;cursor:pointer;font-family:var(--font);text-decoration:underline;
-      }
-      .ep-btn-ghost:hover { color:var(--text-2); }
-    `;
-    document.head.appendChild(s);
-  }
-
-  const overlay = document.createElement('div');
-  overlay.id = '_epOverlay';
-  overlay.innerHTML = `
-    <div id="_epBox">
-      <h2>📧 Add your email</h2>
-      <p>Add an email address to your account. This lets you log in with your email, verify chess accounts for tournament auto-results, and recover your account if needed.</p>
-      <div id="_epStep1">
-        <input class="ep-input" type="email" id="_epEmailInput" placeholder="your@email.com" autocomplete="email" />
-        <div id="_epErr"></div>
-        <div id="_epOk"></div>
-        <button class="ep-btn" id="_epSendBtn" onclick="_epSendCode()">Send Verification Code</button>
-        <button class="ep-btn-ghost" onclick="_epSkip()">Skip for now — I'll add it later in my profile</button>
-      </div>
-      <div id="_epStep2" style="display:none">
-        <p style="margin-bottom:12px">Enter the 6-digit code sent to <strong id="_epEmailDisplay"></strong></p>
-        <input class="ep-input ep-code" type="text" id="_epCodeInput" placeholder="000000" maxlength="6" inputmode="numeric" />
-        <div id="_epErr2"></div>
-        <button class="ep-btn" id="_epConfirmBtn" onclick="_epConfirmCode()">Verify &amp; Save</button>
-        <button class="ep-btn-ghost" onclick="_epBackToEmail()">← Use a different email</button>
-      </div>
-    </div>`;
-  document.body.appendChild(overlay);
-
-  setTimeout(() => document.getElementById('_epEmailInput')?.focus(), 100);
-  document.getElementById('_epEmailInput')?.addEventListener('keydown', e => { if (e.key === 'Enter') _epSendCode(); });
-  document.getElementById('_epCodeInput')?.addEventListener('keydown', e => { if (e.key === 'Enter') _epConfirmCode(); });
-}
-
-async function _epSendCode() {
-  const emailInput = document.getElementById('_epEmailInput');
-  const errEl      = document.getElementById('_epErr');
-  const okEl       = document.getElementById('_epOk');
-  const btn        = document.getElementById('_epSendBtn');
-  const email      = emailInput?.value?.trim();
-
-  errEl.textContent = '';
-  okEl.textContent  = '';
-  if (!email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
-    errEl.textContent = 'Please enter a valid email address.';
-    return;
-  }
-
-  btn.disabled = true;
-  btn.textContent = 'Sending…';
-
-  try {
-    const r = await api('/email-verify/send', {
-      method: 'POST',
-      body: JSON.stringify({ email })
-    });
-    if (r.error) throw new Error(r.error);
-
-    // Switch to code entry step
-    document.getElementById('_epEmailDisplay').textContent = email;
-    document.getElementById('_epStep1').style.display = 'none';
-    document.getElementById('_epStep2').style.display = 'block';
-    setTimeout(() => document.getElementById('_epCodeInput')?.focus(), 100);
-  } catch(e) {
-    errEl.textContent = e.message || 'Failed to send code. Try again.';
-    btn.disabled = false;
-    btn.textContent = 'Send Verification Code';
-  }
-}
-
-async function _epConfirmCode() {
-  const codeInput = document.getElementById('_epCodeInput');
-  const errEl     = document.getElementById('_epErr2');
-  const btn       = document.getElementById('_epConfirmBtn');
-  const code      = codeInput?.value?.trim();
-
-  errEl.textContent = '';
-  if (!code || code.length !== 6 || !/^\d{6}$/.test(code)) {
-    errEl.textContent = 'Enter the 6-digit code from your email.';
-    return;
-  }
-
-  btn.disabled = true;
-  btn.textContent = 'Verifying…';
-
-  try {
-    const r = await api('/email-verify/confirm', {
-      method: 'POST',
-      body: JSON.stringify({ code })
-    });
-    if (r.error) throw new Error(r.error);
-
-    // Success — dismiss and resume boot
-    document.getElementById('_epOverlay')?.remove();
-    me.needs_email = false;
-    boot();
-  } catch(e) {
-    errEl.textContent = e.message || 'Invalid or expired code. Try again.';
-    btn.disabled = false;
-    btn.textContent = 'Verify & Save';
-  }
-}
-
-function _epBackToEmail() {
-  document.getElementById('_epStep2').style.display = 'none';
-  document.getElementById('_epStep1').style.display = 'block';
-  document.getElementById('_epErr').textContent  = '';
-  document.getElementById('_epOk').textContent   = '';
-  const btn = document.getElementById('_epSendBtn');
-  btn.disabled = false;
-  btn.textContent = 'Send Verification Code';
-  setTimeout(() => document.getElementById('_epEmailInput')?.focus(), 50);
-}
-
-function _epSkip() {
-  document.getElementById('_epOverlay')?.remove();
-  me.needs_email = false;
-  boot();
-}
-
 boot();
 // Don't auto-open sidebars on startup — let user open manually
 (function() {
@@ -13189,7 +13025,7 @@ setTimeout(() => { updateMyStatusUI(); }, 100);
         <!-- Lichess row -->
         <div class="sp-form-group">
           <label class="sp-label">Lichess Username</label>
-          <div style="display:flex;gap:8px;align-items:center">
+          <div id="spLichessRow" style="display:flex;gap:8px;align-items:center">
             <input class="sp-input" id="spLichessInput" placeholder="e.g. DrNykterstein" style="flex:1" />
             <button id="spLichessLinkBtn" onclick="spLinkChess('lichess')"
               style="flex-shrink:0;padding:9px 16px;background:var(--accent);color:#fff;border:none;border-radius:8px;font-size:13px;font-weight:700;cursor:pointer;font-family:var(--font);white-space:nowrap;transition:background .15s"
@@ -14092,27 +13928,69 @@ setTimeout(() => { updateMyStatusUI(); }, 100);
       if (statusEl) { statusEl.style.color = "var(--danger)"; statusEl.textContent = "Enter your username first."; }
       return;
     }
-    if (statusEl) { statusEl.style.color = "var(--text-3)"; statusEl.textContent = "Verifying…"; }
+
+    const tok = token();
+    if (!tok) { if (statusEl) { statusEl.style.color = "var(--danger)"; statusEl.textContent = "Not logged in."; } return; }
+
+    // ── Step 1: Verify the username exists on the platform's public API ──
+    if (statusEl) { statusEl.style.color = "var(--text-3)"; statusEl.textContent = `Checking ${isLichess ? "Lichess" : "Chess.com"} profile…`; }
 
     try {
-      const res = await fetch(`${AUTH_URL}/link-chess`, {
-        method: "POST",
-        headers: { Authorization: `Bearer ${token()}`, "Content-Type": "application/json" },
-        body: JSON.stringify({ platform, username })
-      });
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.error || "Failed");
-      if (statusEl) { statusEl.style.color = "#57f287"; statusEl.textContent = `✅ Linked as ${data.username}`; }
-      const unlinkBtn = document.getElementById(unlinkId);
-      const linkBtn   = document.getElementById(linkBtnId);
-      if (unlinkBtn) unlinkBtn.style.display = "inline-flex";
-      if (linkBtn)   linkBtn.textContent = "Update";
-      // Refresh spMe cache
-      spMe = await api("/me");
-      setTimeout(() => { if (statusEl) statusEl.textContent = ""; }, 3000);
+      const verifyUrl = isLichess
+        ? `https://lichess.org/api/user/${encodeURIComponent(username)}`
+        : `https://api.chess.com/pub/player/${encodeURIComponent(username.toLowerCase())}`;
+
+      const verifyRes = await fetch(verifyUrl);
+      if (!verifyRes.ok) {
+        if (statusEl) { statusEl.style.color = "var(--danger)"; statusEl.textContent = `❌ "${username}" not found on ${isLichess ? "Lichess" : "Chess.com"}. Check the spelling.`; }
+        return;
+      }
     } catch(e) {
-      if (statusEl) { statusEl.style.color = "var(--danger)"; statusEl.textContent = `❌ ${e.message}`; }
+      if (statusEl) { statusEl.style.color = "var(--danger)"; statusEl.textContent = `❌ Could not reach ${isLichess ? "Lichess" : "Chess.com"} — check your connection.`; }
+      return;
     }
+
+    // ── Step 2: Open confirmation window (mirrors Steam OAuth flow) ──
+    const linkUrl = `${AUTH_URL}/chess/auth?platform=${encodeURIComponent(platform)}&username=${encodeURIComponent(username)}&token=${encodeURIComponent(tok)}`;
+
+    if (statusEl) { statusEl.style.color = "var(--text-3)"; statusEl.textContent = `Opening ${isLichess ? "Lichess" : "Chess.com"} verification…`; }
+
+    if (window.electronAPI?.openSteamWindow) {
+      // Reuse the same Electron popup window mechanism as Steam
+      window.electronAPI.openSteamWindow(linkUrl);
+    } else {
+      window.open(linkUrl, `Link ${platform}`, "width=600,height=500");
+    }
+
+    // ── Step 3: Poll backend for completion (same pattern as Steam) ──
+    let attempts = 0;
+    const maxAttempts = 60;
+    if (statusEl) { statusEl.style.color = "var(--text-3)"; statusEl.textContent = `Waiting for ${isLichess ? "Lichess" : "Chess.com"} confirmation…`; }
+
+    const poll = setInterval(async () => {
+      attempts++;
+      if (attempts > maxAttempts) {
+        clearInterval(poll);
+        if (statusEl) { statusEl.style.color = "var(--danger)"; statusEl.textContent = "Timed out — close the window and try again."; }
+        return;
+      }
+      try {
+        const me = await api("/me");
+        const linked = isLichess ? me.lichess_username : me.chess_username;
+        if (linked) {
+          clearInterval(poll);
+          const unlinkBtn = document.getElementById(unlinkId);
+          const linkBtn   = document.getElementById(linkBtnId);
+          const inputEl   = document.getElementById(inputId);
+          if (inputEl)   inputEl.value = linked;
+          if (unlinkBtn) unlinkBtn.style.display = "inline-flex";
+          if (linkBtn)   linkBtn.textContent = "Update";
+          if (statusEl) { statusEl.style.color = "#57f287"; statusEl.textContent = `✅ Linked as ${linked}`; }
+          spMe = me;
+          setTimeout(() => { if (statusEl) statusEl.textContent = ""; }, 4000);
+        }
+      } catch(e) {}
+    }, 2000);
   }
 
   async function spUnlinkChess(platform) {
@@ -14127,7 +14005,7 @@ setTimeout(() => { updateMyStatusUI(); }, 100);
     if (statusEl) { statusEl.style.color = "var(--text-3)"; statusEl.textContent = "Unlinking…"; }
 
     try {
-      const res = await fetch(`${AUTH_URL}/link-chess`, {
+      const res = await fetch(`${AUTH_URL}/chess/unlink`, {
         method: "DELETE",
         headers: { Authorization: `Bearer ${token()}`, "Content-Type": "application/json" },
         body: JSON.stringify({ platform })

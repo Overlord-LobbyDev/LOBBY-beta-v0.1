@@ -349,161 +349,182 @@ app.delete("/link-riot", requireAuth, async (req, res) => {
 });
 
 // ── Step 1: Start Chess Account Verification ──────────────────
-app.post("/link-chess/start", requireAuth, async (req, res) => {
-  const { platform, username } = req.body;
-  
-  if (!platform || !username) {
-    return res.status(400).json({ error: "platform and username required" });
+// ── Chess Integration (OAuth-window pattern, mirrors Steam) ─────
+
+// GET /chess/auth — shows a confirmation page in a popup window
+app.get("/chess/auth", async (req, res) => {
+  const { platform, username, token: queryToken } = req.query;
+
+  // Authenticate from query token (same as Steam)
+  let userId = null;
+  if (queryToken) {
+    try {
+      const payload = jwt.verify(queryToken, SECRET);
+      userId = payload.id;
+    } catch { return res.status(401).send("Invalid token"); }
   }
-  
+  if (!userId) return res.status(401).send("Unauthorized");
+
+  if (!platform || !username) {
+    return res.send(`<html><body style="background:#1e1f22;color:#fff;font-family:sans-serif;display:flex;align-items:center;justify-content:center;height:100vh;margin:0">
+      <div style="text-align:center"><div style="font-size:48px">❌</div><div style="margin-top:12px">Missing platform or username</div></div>
+      <script>setTimeout(() => window.close(), 3000);</script>
+    </body></html>`);
+  }
+
+  if (!["chess.com", "lichess"].includes(platform)) {
+    return res.send(`<html><body style="background:#1e1f22;color:#fff;font-family:sans-serif;display:flex;align-items:center;justify-content:center;height:100vh;margin:0">
+      <div style="text-align:center"><div style="font-size:48px">❌</div><div style="margin-top:12px">Invalid platform</div></div>
+      <script>setTimeout(() => window.close(), 3000);</script>
+    </body></html>`);
+  }
+
+  const isLichess = platform === "lichess";
+  const platformName = isLichess ? "Lichess" : "Chess.com";
+  const profileUrl = isLichess
+    ? `https://lichess.org/@/${encodeURIComponent(username)}`
+    : `https://www.chess.com/member/${encodeURIComponent(username)}`;
+
+  // Show confirmation page
+  res.send(`
+    <html>
+    <head><title>Link ${platformName} — LOBBY</title></head>
+    <body style="background:#1e1f22;color:#f2f3f5;font-family:'Segoe UI',sans-serif;display:flex;align-items:center;justify-content:center;height:100vh;margin:0">
+      <div style="background:#2b2d31;border-radius:16px;padding:40px;max-width:420px;width:90%;text-align:center;box-shadow:0 24px 64px rgba(0,0,0,.5)">
+        <div style="font-size:48px;margin-bottom:16px">${isLichess ? "🐴" : "♟️"}</div>
+        <div style="font-size:20px;font-weight:800;margin-bottom:8px">Link ${platformName}</div>
+        <div style="font-size:14px;color:#b5bac1;margin-bottom:24px">
+          You're about to link the ${platformName} account <strong style="color:#f2f3f5">${username}</strong> to your LOBBY profile.
+        </div>
+        <div style="font-size:12px;color:#80848e;margin-bottom:24px">
+          <a href="${profileUrl}" target="_blank" style="color:#5865f2;text-decoration:none">View profile on ${platformName} ↗</a>
+        </div>
+        <div id="status" style="font-size:13px;color:#b5bac1;margin-bottom:16px;min-height:20px"></div>
+        <button id="confirmBtn" onclick="confirmLink()" style="width:100%;padding:13px;background:#5865f2;color:#fff;border:none;border-radius:8px;font-size:15px;font-weight:700;cursor:pointer;font-family:inherit;transition:background .15s"
+          onmouseover="this.style.background='#4752c4'" onmouseout="this.style.background='#5865f2'">
+          Confirm Link
+        </button>
+        <button onclick="window.close()" style="width:100%;padding:10px;background:transparent;color:#80848e;border:1px solid rgba(255,255,255,.1);border-radius:8px;font-size:13px;cursor:pointer;font-family:inherit;margin-top:8px;transition:background .15s"
+          onmouseover="this.style.background='rgba(255,255,255,.05)'" onmouseout="this.style.background='transparent'">
+          Cancel
+        </button>
+      </div>
+      <script>
+        async function confirmLink() {
+          const btn = document.getElementById('confirmBtn');
+          const status = document.getElementById('status');
+          btn.disabled = true;
+          btn.textContent = 'Linking…';
+          btn.style.opacity = '0.6';
+          status.textContent = 'Verifying account on ${platformName}…';
+          status.style.color = '#b5bac1';
+
+          try {
+            const res = await fetch(window.location.origin + '/chess/callback', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({
+                platform: '${platform}',
+                username: ${JSON.stringify(username)},
+                userId: ${userId}
+              })
+            });
+            const data = await res.json();
+            if (!res.ok) throw new Error(data.error || 'Failed to link');
+
+            status.style.color = '#57f287';
+            status.textContent = '';
+            document.querySelector('div[style*="max-width"]').innerHTML = \`
+              <div style="font-size:48px;margin-bottom:16px">✅</div>
+              <div style="font-size:18px;font-weight:700">Linked as \${data.username}</div>
+              <div style="font-size:13px;color:#80848e;margin-top:8px">You can close this window and return to LOBBY</div>
+            \`;
+            try { window.opener?.postMessage({ type: 'chess-linked', platform: '${platform}', username: data.username }, '*'); } catch(e) {}
+            setTimeout(() => { try { window.close(); } catch(e) {} }, 2500);
+          } catch(e) {
+            status.style.color = '#ed4245';
+            status.textContent = e.message;
+            btn.disabled = false;
+            btn.textContent = 'Retry';
+            btn.style.opacity = '1';
+          }
+        }
+      </script>
+    </body></html>
+  `);
+});
+
+// POST /chess/callback — server-side verification and linking
+app.post("/chess/callback", async (req, res) => {
+  const { platform, username, userId } = req.body;
+
+  if (!platform || !username || !userId) {
+    return res.status(400).json({ error: "Missing platform, username, or userId" });
+  }
+
   if (!["chess.com", "lichess"].includes(platform)) {
     return res.status(400).json({ error: "Invalid platform" });
   }
 
   try {
     const axios = require("axios");
-    
-    // Verify account exists on chess platform
-    if (platform === "chess.com") {
+    const isLichess = platform === "lichess";
+
+    // Verify account exists on the chess platform
+    let verifiedUsername = username;
+    if (isLichess) {
       const check = await axios.get(
-        `https://api.chess.com/pub/player/${username.toLowerCase()}`,
+        `https://lichess.org/api/user/${encodeURIComponent(username.toLowerCase())}`,
+        { headers: { Accept: "application/json" } }
+      );
+      if (!check.data?.id) throw new Error("Account not found on Lichess");
+      verifiedUsername = check.data.username; // Use canonical casing from Lichess
+    } else {
+      const check = await axios.get(
+        `https://api.chess.com/pub/player/${encodeURIComponent(username.toLowerCase())}`,
         { headers: { "User-Agent": "LOBBY-App/1.0" } }
       );
-      if (check.status !== 200) throw new Error("Account not found");
-    } else if (platform === "lichess") {
-      const check = await axios.get(
-        `https://lichess.org/api/user/${username.toLowerCase()}`
-      );
-      if (!check.data?.id) throw new Error("Account not found");
+      if (check.status !== 200) throw new Error("Account not found on Chess.com");
+      verifiedUsername = check.data?.username || username; // Use canonical casing from Chess.com
     }
 
-    // Generate verification code
-    const code = generateVerificationCode();
-    const expiresAt = new Date(Date.now() + 10 * 60 * 1000); // 10 minutes
-
-    // Get user email
-    const userResult = await pool.query("SELECT email FROM users WHERE id = $1", [req.userId]);
-    if (userResult.rows.length === 0) {
-      return res.status(404).json({ error: "User not found" });
-    }
-    const userEmail = userResult.rows[0].email;
-
-    // Clear any existing verification for this platform
-    await pool.query(
-      "DELETE FROM chess_verifications WHERE user_id = $1 AND platform = $2",
-      [req.userId, platform]
-    );
-
-    // Insert new verification record
-    await pool.query(
-      `INSERT INTO chess_verifications (user_id, platform, username, verification_code, code_expires_at)
-       VALUES ($1, $2, $3, $4, $5)`,
-      [req.userId, platform, username, code, expiresAt]
-    );
-
-    // Send verification email
-    const emailSent = await sendVerificationEmail(userEmail, platform, code);
-    
-    if (!emailSent) {
-      return res.status(500).json({ error: "Failed to send verification email" });
-    }
-
-    res.json({
-      success: true,
-      message: "Verification code sent to your email",
-      platform,
-      username
-    });
-
-  } catch (err) {
-    console.error("Chess linking error:", err);
-    // axios throws on non-2xx — its message is "Request failed with status code 404"
-    const is404 = err.response?.status === 404 || err.message?.includes("not found") || err.message?.includes("404");
-    res.status(is404 ? 404 : 500).json({
-      error: is404
-        ? `${platform} account '${username}' not found`
-        : "Failed to start verification"
-    });
-  }
-});
-
-// ── Step 2: Confirm Chess Account Verification ─────────────────
-app.post("/link-chess/confirm", requireAuth, async (req, res) => {
-  const { platform, code } = req.body;
-  
-  if (!platform || !code) {
-    return res.status(400).json({ error: "platform and code required" });
-  }
-
-  try {
-    // Look up pending verification
-    const verResult = await pool.query(
-      `SELECT * FROM chess_verifications 
-       WHERE user_id = $1 AND platform = $2 AND verification_code = $3`,
-      [req.userId, platform, code]
-    );
-
-    if (verResult.rows.length === 0) {
-      return res.status(400).json({ error: "Invalid or expired verification code" });
-    }
-
-    const verification = verResult.rows[0];
-
-    // Check if code has expired
-    if (new Date() > new Date(verification.code_expires_at)) {
-      await pool.query("DELETE FROM chess_verifications WHERE id = $1", [verification.id]);
-      return res.status(400).json({ error: "Verification code expired" });
-    }
-
-    // Check brute force attempts
-    if (verification.attempts >= 5) {
-      return res.status(429).json({ error: "Too many attempts. Try again later." });
-    }
-
-    // Link the account
-    if (platform === "lichess") {
+    // Save to database
+    if (isLichess) {
       await pool.query(
         "UPDATE users SET lichess_username = $1 WHERE id = $2",
-        [verification.username, req.userId]
+        [verifiedUsername, userId]
       );
     } else {
       await pool.query(
         "UPDATE users SET chess_username = $1 WHERE id = $2",
-        [verification.username, req.userId]
+        [verifiedUsername, userId]
       );
     }
 
-    // Delete verification record
-    await pool.query("DELETE FROM chess_verifications WHERE id = $1", [verification.id]);
+    console.log(`[chess/callback] ✅ Linked ${platform} "${verifiedUsername}" to userId ${userId}`);
 
     res.json({
       success: true,
-      message: `${platform} account linked successfully`,
       platform,
-      username: verification.username
+      username: verifiedUsername,
+      message: `${platform} account linked successfully`
     });
 
   } catch (err) {
-    console.error("Verification error:", err);
-    
-    // Increment attempts on error
-    if (req.body.code) {
-      await pool.query(
-        `UPDATE chess_verifications 
-         SET attempts = attempts + 1 
-         WHERE user_id = $1 AND platform = $2`,
-        [req.userId, req.body.platform]
-      );
-    }
-
-    res.status(500).json({ error: "Verification failed" });
+    console.error("[chess/callback]", err.message);
+    const is404 = err.response?.status === 404 || err.message?.includes("not found") || err.message?.includes("404");
+    res.status(is404 ? 404 : 500).json({
+      error: is404
+        ? `${platform} account "${username}" not found — check the spelling`
+        : "Failed to link account"
+    });
   }
 });
 
-// ── Unlink Chess account ──────────────────────────────────────
-app.delete("/link-chess", requireAuth, async (req, res) => {
+// DELETE /chess/unlink — remove chess account from profile
+app.delete("/chess/unlink", requireAuth, async (req, res) => {
   const { platform } = req.body;
-  
+
   if (!platform) {
     return res.status(400).json({ error: "platform required" });
   }
@@ -515,12 +536,32 @@ app.delete("/link-chess", requireAuth, async (req, res) => {
       await pool.query("UPDATE users SET chess_username = NULL WHERE id = $1", [req.userId]);
     }
 
-    // Clean up any pending verifications
+    // Clean up any leftover verification records
     await pool.query(
       "DELETE FROM chess_verifications WHERE user_id = $1 AND platform = $2",
       [req.userId, platform]
-    );
+    ).catch(() => {});
 
+    console.log(`[chess/unlink] Unlinked ${platform} from userId ${req.userId}`);
+    res.json({ success: true, message: `${platform} account unlinked` });
+  } catch (err) {
+    console.error("[chess/unlink]", err);
+    res.status(500).json({ error: "Failed to unlink account" });
+  }
+});
+
+// ── Keep old routes as aliases for backwards compatibility ───
+app.delete("/link-chess", requireAuth, async (req, res) => {
+  // Redirect to new route handler
+  const { platform } = req.body;
+  if (!platform) return res.status(400).json({ error: "platform required" });
+  try {
+    if (platform === "lichess") {
+      await pool.query("UPDATE users SET lichess_username = NULL WHERE id = $1", [req.userId]);
+    } else {
+      await pool.query("UPDATE users SET chess_username = NULL WHERE id = $1", [req.userId]);
+    }
+    await pool.query("DELETE FROM chess_verifications WHERE user_id = $1 AND platform = $2", [req.userId, platform]).catch(() => {});
     res.json({ success: true, message: `${platform} account unlinked` });
   } catch (err) {
     res.status(500).json({ error: "Failed to unlink account" });

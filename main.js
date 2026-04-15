@@ -33,12 +33,13 @@ function createWindow() {
   win.webContents.setWindowOpenHandler(({ url }) => {
     if (
       url.startsWith("https://steamcommunity.com") ||
-      url.startsWith("https://lobby-auth-server.onrender.com/steam")
+      url.startsWith("https://lobby-auth-server.onrender.com/steam") ||
+      url.startsWith("https://lobby-auth-server.onrender.com/chess")
     ) {
       return {
         action: "allow",
         overrideBrowserWindowOptions: {
-          width: 850, height: 650, autoHideMenuBar: true, title: "Sign in through Steam",
+          width: 850, height: 650, autoHideMenuBar: true, title: "Link Account",
           webPreferences: { contextIsolation: true, nodeIntegration: false }
         }
       };
@@ -48,13 +49,17 @@ function createWindow() {
   });
 
   ipcMain.handle("open-steam-window", (event, url) => {
+    const isChess = url.includes("/chess/auth");
     const steamWin = new BrowserWindow({
-      width: 850, height: 650, autoHideMenuBar: true, title: "Sign in through Steam",
+      width: isChess ? 600 : 850, height: isChess ? 500 : 650,
+      autoHideMenuBar: true,
+      title: isChess ? "Link Chess Account" : "Sign in through Steam",
       webPreferences: { contextIsolation: true, nodeIntegration: false }
     });
     steamWin.loadURL(url);
     steamWin.webContents.on("did-navigate", (e, navUrl) => {
-      if (navUrl.startsWith("https://lobby-auth-server.onrender.com/steam/callback")) {
+      if (navUrl.startsWith("https://lobby-auth-server.onrender.com/steam/callback") ||
+          navUrl.startsWith("https://lobby-auth-server.onrender.com/chess/callback")) {
         setTimeout(() => { try { if (steamWin && !steamWin.isDestroyed()) steamWin.close(); } catch(e) {} }, 2500);
       }
     });

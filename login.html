@@ -32,6 +32,7 @@
       background: var(--bg-0);
       font-family: var(--font);
       color: var(--text-1);
+      -webkit-app-region: no-drag;
     }
 
     /* Subtle background pattern */
@@ -52,6 +53,8 @@
       width: min(480px, 92vw);
       box-shadow: 0 24px 64px rgba(0,0,0,.5);
       position: relative;
+      overflow: hidden;
+      -webkit-app-region: no-drag;
     }
 
     .logo {
@@ -100,6 +103,7 @@
       font-family: var(--font);
       cursor: pointer;
       transition: background .15s, color .15s;
+      -webkit-app-region: no-drag;
     }
 
     .tab.active {
@@ -109,10 +113,10 @@
     }
 
     /* Form */
-    .form { display: flex; flex-direction: column; gap: 18px; }
+    .form { display: flex; flex-direction: column; gap: 18px; width: 100%; }
     .form.hidden { display: none; }
 
-    .field { display: flex; flex-direction: column; gap: 6px; }
+    .field { display: flex; flex-direction: column; gap: 6px; width: 100%; overflow: visible; }
 
     label {
       font-size: 12px;
@@ -123,7 +127,8 @@
     }
 
     input[type="text"],
-    input[type="password"] {
+    input[type="password"],
+    input[type="email"] {
       background: var(--bg-0);
       border: 1.5px solid rgba(255,255,255,.08);
       border-radius: var(--radius);
@@ -133,6 +138,12 @@
       padding: 11px 14px;
       outline: none;
       transition: border-color .15s;
+      width: 100%;
+      min-width: 0;
+      max-width: 100%;
+      box-sizing: border-box;
+      display: block;
+      -webkit-app-region: no-drag;
     }
 
     input:focus { border-color: var(--accent); }
@@ -185,6 +196,7 @@
       cursor: pointer;
       transition: background .15s, transform .1s;
       margin-top: 4px;
+      -webkit-app-region: no-drag;
     }
 
     .submit-btn:hover { background: var(--accent-h); }
@@ -228,10 +240,55 @@
       border-radius: 4px;
       margin: -12px 0 8px 0;
     }
+
+    /* ── Frameless window title bar ── */
+    .title-bar {
+      position: fixed;
+      top: 0; left: 0; right: 0;
+      height: 36px;
+      -webkit-app-region: drag;
+      z-index: 9999;
+    }
+
+    #winControls {
+      position: fixed;
+      top: 0; right: 0;
+      height: 36px;
+      display: flex;
+      align-items: center;
+      z-index: 99999;
+      -webkit-app-region: no-drag;
+    }
+    .win-btn {
+      width: 46px; height: 36px;
+      border: none; background: transparent;
+      color: var(--text-3); cursor: pointer;
+      display: flex; align-items: center; justify-content: center;
+      transition: background .15s, color .15s;
+    }
+    .win-btn:hover { background: rgba(255,255,255,.08); color: var(--text-1); }
+    .win-btn.close:hover { background: #c42b1c; color: #fff; }
   </style>
   <script src="nav.js"></script>
 </head>
 <body>
+
+<!-- Drag region for frameless window — only the top bar -->
+<div class="title-bar"></div>
+
+<!-- Window controls -->
+<div id="winControls">
+  <button class="win-btn" title="Minimise" onclick="window.electronAPI?.minimizeWindow()">
+    <svg width="10" height="1" viewBox="0 0 10 1"><rect width="10" height="1.5" fill="currentColor"/></svg>
+  </button>
+  <button class="win-btn" title="Maximise/Restore" onclick="window.electronAPI?.maximizeWindow()">
+    <svg width="10" height="10" viewBox="0 0 10 10" fill="none" stroke="currentColor" stroke-width="1.2"><rect x="0.6" y="0.6" width="8.8" height="8.8" rx="1"/></svg>
+  </button>
+  <button class="win-btn close" title="Close" onclick="window.electronAPI?.closeWindow()">
+    <svg width="10" height="10" viewBox="0 0 10 10" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"><line x1="0" y1="0" x2="10" y2="10"/><line x1="10" y1="0" x2="0" y2="10"/></svg>
+  </button>
+</div>
+
 <div class="card">
   <div class="logo">
     <svg width="56" height="56" viewBox="0 0 48 48" xmlns="http://www.w3.org/2000/svg" style="display:block;margin:0 auto;">
@@ -273,8 +330,8 @@
       <input type="text" id="regUsername" placeholder="Choose a username (2–32 chars)" autocomplete="off" />
     </div>
     <div class="field">
-      <label for="regEmail">Email <span style="font-weight:400;text-transform:none;letter-spacing:0;color:var(--text-3)">(recommended — enables chess verification &amp; login by email)</span></label>
-      <input type="email" id="regEmail" placeholder="you@email.com" autocomplete="email" />
+      <label for="regEmail">Email</label>
+      <input type="text" id="regEmail" placeholder="you@email.com" autocomplete="email" />
     </div>
     <div class="field">
       <label for="regPassword">Password</label>
@@ -406,9 +463,10 @@
     const pass2 = document.getElementById("regPassword2").value;
 
     if (!uname || !pass1) return showMsg("registerMsg", "Please fill in all fields.", "error");
+    if (!email) return showMsg("registerMsg", "Email address is required.", "error");
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) return showMsg("registerMsg", "Invalid email address.", "error");
     if (pass1 !== pass2)  return showMsg("registerMsg", "Passwords do not match.", "error");
     if (pass1.length < 6) return showMsg("registerMsg", "Password must be at least 6 characters.", "error");
-    if (email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) return showMsg("registerMsg", "Invalid email address.", "error");
 
     btn.disabled = true;
     btn.textContent = "Creating account…";

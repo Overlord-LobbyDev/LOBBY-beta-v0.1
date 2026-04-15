@@ -241,85 +241,71 @@ async function linkChess(platform) {
     return;
   }
 
-  // Check if we're in code-entry mode
-  if (chessVerificationState[platform] === 'awaiting-code') {
-    return submitChessCode(platform);
-  }
-
-  // Step 1: Start verification
+  // Step 1: Verify username exists on the platform's public API
   statusEl.style.color = 'var(--text-3)';
-  statusEl.textContent = 'Sending verification code…';
+  statusEl.textContent = `Checking ${platform === 'lichess' ? 'Lichess' : 'Chess.com'} profile…`;
 
   try {
-    const res = await fetch(`${AUTH_URL}/link-chess/start`, {
-      method: 'POST',
-      headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
-      body: JSON.stringify({ platform, username })
-    });
-    const data = await res.json();
-    if (!res.ok) throw new Error(data.error || 'Failed to start verification');
-
-    // Now show code-entry UI
-    chessVerificationState[platform] = 'awaiting-code';
-    statusEl.style.color = '#fee75c';
-    statusEl.innerHTML = `
-      <div style="margin-top:10px">
-        <p style="margin-bottom:8px">📧 Verification code sent to your ${platform} email!</p>
-        <div style="display:flex;gap:6px;margin-bottom:8px">
-          <input id="chess-code-${platform}" type="text" placeholder="Enter 6-digit code" 
-            maxlength="6" style="width:120px;padding:6px 8px;background:var(--bg-2);border:1px solid rgba(255,255,255,.1);border-radius:4px;color:var(--text-1);font-size:13px;font-family:var(--font);text-align:center;letter-spacing:4px" />
-          <button onclick="submitChessCode('${platform}')" style="padding:6px 12px;background:var(--accent);color:#fff;border:none;border-radius:4px;font-size:12px;font-weight:600;cursor:pointer;font-family:var(--font)">Confirm</button>
-        </div>
-        <p style="font-size:11px;color:var(--text-3)">Code expires in 10 minutes</p>
-      </div>
-    `;
+    const verifyUrl = platform === 'lichess'
+      ? `https://lichess.org/api/user/${encodeURIComponent(username)}`
+      : `https://api.chess.com/pub/player/${encodeURIComponent(username.toLowerCase())}`;
+    const verifyRes = await fetch(verifyUrl);
+    if (!verifyRes.ok) {
+      statusEl.style.color = 'var(--danger)';
+      statusEl.textContent = `❌ "${username}" not found on ${platform === 'lichess' ? 'Lichess' : 'Chess.com'}. Check the spelling.`;
+      return;
+    }
   } catch(e) {
     statusEl.style.color = 'var(--danger)';
-    statusEl.textContent = `❌ ${e.message}`;
-    chessVerificationState[platform] = null;
-  }
-}
-
-async function submitChessCode(platform) {
-  const statusEl = document.getElementById('chessLinkStatus');
-  const codeInput = document.getElementById(`chess-code-${platform}`);
-  const code = codeInput?.value?.trim();
-
-  if (!code || code.length !== 6) {
-    statusEl.style.color = 'var(--danger)';
-    statusEl.textContent = '❌ Please enter a valid 6-digit code';
+    statusEl.textContent = `❌ Could not reach ${platform === 'lichess' ? 'Lichess' : 'Chess.com'} — check your connection.`;
     return;
   }
 
+  // Step 2: Open confirmation window (mirrors Steam OAuth flow)
+  const linkUrl = `${AUTH_URL}/chess/auth?platform=${encodeURIComponent(platform)}&username=${encodeURIComponent(username)}&token=${encodeURIComponent(token)}`;
   statusEl.style.color = 'var(--text-3)';
-  statusEl.textContent = 'Verifying code…';
+  statusEl.textContent = `Opening ${platform === 'lichess' ? 'Lichess' : 'Chess.com'} verification…`;
 
-  try {
-    const res = await fetch(`${AUTH_URL}/link-chess/confirm`, {
-      method: 'POST',
-      headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
-      body: JSON.stringify({ platform, code })
-    });
-    const data = await res.json();
-    if (!res.ok) throw new Error(data.error || 'Invalid code');
-
-    statusEl.style.color = '#57f287';
-    statusEl.textContent = `✅ ${platform === 'lichess' ? 'Lichess' : 'Chess.com'} linked successfully!`;
-    chessVerificationState[platform] = null;
-    // Reload page to reflect update buttons
-    setTimeout(() => window.location.reload(), 1200);
-  } catch(e) {
-    statusEl.style.color = 'var(--danger)';
-    statusEl.textContent = `❌ ${e.message}`;
+  if (window.electronAPI?.openSteamWindow) {
+    window.electronAPI.openSteamWindow(linkUrl);
+  } else {
+    window.open(linkUrl, `Link ${platform}`, "width=600,height=500");
   }
+
+  // Step 3: Poll for completion (same pattern as Steam)
+  let attempts = 0;
+  const maxAttempts = 60;
+  statusEl.style.color = 'var(--text-3)';
+  statusEl.textContent = `Waiting for ${platform === 'lichess' ? 'Lichess' : 'Chess.com'} confirmation…`;
+
+  const poll = setInterval(async () => {
+    attempts++;
+    if (attempts > maxAttempts) {
+      clearInterval(poll);
+      statusEl.style.color = 'var(--danger)';
+      statusEl.textContent = 'Timed out — close the window and try again.';
+      return;
+    }
+    try {
+      const me = await api("/me");
+      const linked = platform === 'lichess' ? me.lichess_username : me.chess_username;
+      if (linked) {
+        clearInterval(poll);
+        statusEl.style.color = '#57f287';
+        statusEl.textContent = `✅ ${platform === 'lichess' ? 'Lichess' : 'Chess.com'} linked as ${linked}`;
+        setTimeout(() => window.location.reload(), 1500);
+      }
+    } catch(e) {}
+  }, 2000);
 }
 
 async function unlinkChess(platform) {
   const statusEl = document.getElementById('chessLinkStatus');
+  if (!confirm(`Unlink your ${platform === 'lichess' ? 'Lichess' : 'Chess.com'} account?`)) return;
   statusEl.style.color = 'var(--text-3)';
   statusEl.textContent = 'Unlinking…';
   try {
-    const res = await fetch(`${AUTH_URL}/link-chess`, {
+    const res = await fetch(`${AUTH_URL}/chess/unlink`, {
       method: 'DELETE',
       headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
       body: JSON.stringify({ platform })

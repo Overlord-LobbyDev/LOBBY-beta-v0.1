@@ -23,7 +23,7 @@ html { background: #1e1f22; }
   to   { opacity: 1; transform: translateY(0); }
 }
 
-/* Applied to body by default */
+/* Applied to body by default — always reset pointer-events on load */
 body {
   animation: pageFadeIn 0.2s ease forwards;
   animation-fill-mode: forwards;
