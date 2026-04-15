@@ -13915,6 +13915,8 @@ setTimeout(() => { updateMyStatusUI(); }, 100);
     } catch(e) { console.error("[chess section]", e); }
   }
 
+
+
   async function spLinkChess(platform) {
     const isLichess  = platform === "lichess";
     const inputId    = isLichess ? "spLichessInput"   : "spChesscomInput";
@@ -13928,10 +13930,10 @@ setTimeout(() => { updateMyStatusUI(); }, 100);
       if (statusEl) { statusEl.style.color = "var(--danger)"; statusEl.textContent = "Enter your username first."; }
       return;
     }
-    if (statusEl) { statusEl.style.color = "var(--text-3)"; statusEl.textContent = "Opening verification…"; }
+    if (statusEl) { statusEl.style.color = "var(--text-3)"; statusEl.textContent = isLichess ? "Opening Lichess…" : "Sending verification email…"; }
 
     try {
-      // Step 1: Get the popup URL from the backend
+      // Call backend to initiate linking
       const res = await fetch(`${AUTH_URL}/link-chess`, {
         method: "POST",
         headers: { Authorization: `Bearer ${token()}`, "Content-Type": "application/json" },
@@ -13940,34 +13942,69 @@ setTimeout(() => { updateMyStatusUI(); }, 100);
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || "Failed");
 
-      // Step 2: Open the popup window
-      if (window.electronAPI?.openSteamWindow) {
-        window.electronAPI.openSteamWindow(data.popupUrl);
-      } else {
-        // Fallback for web or testing
-        window.open(data.popupUrl, "LinkChessAccount", "width=600,height=500");
+      // For Lichess: open OAuth popup
+      if (isLichess) {
+        if (window.electronAPI?.openSteamWindow) {
+          window.electronAPI.openSteamWindow(data.popupUrl);
+        } else {
+          window.open(data.popupUrl, "LinkChessAccount", "width=850,height=650");
+        }
+
+        // Listen for success message from popup
+        const handleMessage = async (event) => {
+          if (event.data?.type === "chess-linked" && event.data?.platform === "lichess") {
+            window.removeEventListener("message", handleMessage);
+            if (statusEl) { statusEl.style.color = "#57f287"; statusEl.textContent = `✅ Linked as ${event.data.username}`; }
+            const unlinkBtn = document.getElementById(unlinkId);
+            const linkBtn   = document.getElementById(linkBtnId);
+            if (unlinkBtn) unlinkBtn.style.display = "inline-flex";
+            if (linkBtn)   linkBtn.textContent = "Update";
+            spMe = await api("/me");
+            setTimeout(() => { if (statusEl) statusEl.textContent = ""; }, 3000);
+          }
+        };
+        
+        window.addEventListener("message", handleMessage);
+        setTimeout(() => window.removeEventListener("message", handleMessage), 300000);
+        if (statusEl) { statusEl.style.color = "var(--text-3)"; statusEl.textContent = "Waiting for Lichess verification…"; }
+      } 
+      // For Chess.com: show email verification message
+      else {
+        if (statusEl) { 
+          statusEl.style.color = "#5865f2"; 
+          statusEl.textContent = `📧 Check your email to verify. Link will be active for 15 minutes.`;
+        }
+        
+        // Poll the backend every 5 seconds to check if verified
+        let verified = false;
+        const pollInterval = setInterval(async () => {
+          if (verified) {
+            clearInterval(pollInterval);
+            return;
+          }
+          
+          try {
+            const meRes = await api("/me");
+            if (meRes.chess_username === username) {
+              verified = true;
+              clearInterval(pollInterval);
+              if (statusEl) { statusEl.style.color = "#57f287"; statusEl.textContent = `✅ Linked as ${username}`; }
+              const unlinkBtn = document.getElementById(unlinkId);
+              const linkBtn   = document.getElementById(linkBtnId);
+              if (unlinkBtn) unlinkBtn.style.display = "inline-flex";
+              if (linkBtn)   linkBtn.textContent = "Update";
+              spMe = meRes;
+              setTimeout(() => { if (statusEl) statusEl.textContent = ""; }, 3000);
+            }
+          } catch (e) {
+            // Keep polling
+          }
+        }, 5000);
+        
+        // Stop polling after 15 minutes
+        setTimeout(() => clearInterval(pollInterval), 15 * 60 * 1000);
       }
 
-      // Step 3: Listen for success message from popup
-      const handleMessage = async (event) => {
-        if (event.data?.type === "chess-linked" && event.data?.platform === platform) {
-          window.removeEventListener("message", handleMessage);
-          if (statusEl) { statusEl.style.color = "#57f287"; statusEl.textContent = `✅ Linked as ${event.data.username}`; }
-          const unlinkBtn = document.getElementById(unlinkId);
-          const linkBtn   = document.getElementById(linkBtnId);
-          if (unlinkBtn) unlinkBtn.style.display = "inline-flex";
-          if (linkBtn)   linkBtn.textContent = "Update";
-          // Refresh spMe cache
-          spMe = await api("/me");
-          setTimeout(() => { if (statusEl) statusEl.textContent = ""; }, 3000);
-        }
-      };
-      
-      window.addEventListener("message", handleMessage);
-      // Timeout after 5 minutes if no response
-      setTimeout(() => window.removeEventListener("message", handleMessage), 300000);
-
-      if (statusEl) { statusEl.style.color = "var(--text-3)"; statusEl.textContent = "Waiting for verification…"; }
     } catch(e) {
       if (statusEl) { statusEl.style.color = "var(--danger)"; statusEl.textContent = `❌ ${e.message}`; }
     }

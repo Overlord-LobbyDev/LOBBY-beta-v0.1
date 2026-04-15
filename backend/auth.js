@@ -362,22 +362,229 @@ app.post("/link-chess", requireAuth, async (req, res) => {
   }
 
   try {
-    // Generate a short-lived JWT token for the popup window
-    const popupToken = jwt.sign({ id: userId }, SECRET, { expiresIn: "15m" });
+    // For Lichess: use OAuth popup
+    if (platform === "lichess") {
+      const popupToken = jwt.sign({ id: userId }, SECRET, { expiresIn: "15m" });
+      const popupUrl = `${process.env.AUTH_SERVER_URL || "https://lobby-auth-server.onrender.com"}/chess/auth?platform=${encodeURIComponent(platform)}&username=${encodeURIComponent(username)}&token=${popupToken}`;
+      return res.json({
+        success: true,
+        popupUrl,
+        message: "Opening Lichess OAuth window…"
+      });
+    }
 
-    // Return the popup URL + token so frontend can open it
-    const popupUrl = `${process.env.AUTH_SERVER_URL || "https://lobby-auth-server.onrender.com"}/chess/auth?platform=${encodeURIComponent(platform)}&username=${encodeURIComponent(username)}&token=${popupToken}`;
+    // For Chess.com: use email verification from Chess.com profile
+    // Verify Chess.com username exists and get their email
+    const axios = require("axios");
+    let chessProfile;
+    try {
+      const check = await axios.get(
+        `https://api.chess.com/pub/player/${encodeURIComponent(username.toLowerCase())}`,
+        { headers: { "User-Agent": "LOBBY-App/1.0" } }
+      );
+      if (check.status !== 200 || !check.data?.email) {
+        return res.status(400).json({ 
+          error: "Chess.com profile not found or email not public. Make sure your email is visible in your Chess.com settings."
+        });
+      }
+      chessProfile = check.data;
+    } catch (err) {
+      const is404 = err.response?.status === 404 || err.message?.includes("not found");
+      return res.status(is404 ? 404 : 500).json({
+        error: is404 ? `Chess.com account "${username}" not found` : "Could not reach Chess.com"
+      });
+    }
 
-    console.log(`[/link-chess] Initiated chess linking for userId ${userId}, platform ${platform}`);
+    const chessEmail = chessProfile.email;
+    if (!chessEmail) {
+      return res.status(400).json({
+        error: "Your Chess.com profile doesn't have a public email. Go to chess.com/settings and make sure your email is visible."
+      });
+    }
+
+    // Generate verification code and email
+    const crypto = require("crypto");
+    const verifyCode = crypto.randomBytes(24).toString("hex").toUpperCase();
+
+    // Store verification record
+    await pool.query(
+      "DELETE FROM chess_verifications WHERE user_id = $1 AND platform = 'chess.com'",
+      [userId]
+    );
+    await pool.query(
+      `INSERT INTO chess_verifications (user_id, platform, username, verification_code, code_expires_at, attempts)
+       VALUES ($1, 'chess.com', $2, $3, $4, 0)`,
+      [userId, username, verifyCode, new Date(Date.now() + 15 * 60 * 1000)]
+    );
+
+    // Send verification email to their Chess.com email
+    const verifyLink = `https://lobby-auth-server.onrender.com/chess/verify-email?code=${verifyCode}&userId=${userId}`;
+    const emailHtml = `
+      <html>
+      <body style="font-family:Arial,sans-serif;background:#1e1f22;color:#f2f3f5;padding:20px">
+        <div style="max-width:500px;margin:0 auto;background:#2b2d31;border-radius:12px;padding:30px">
+          <div style="text-align:center;margin-bottom:20px">
+            <div style="font-size:48px">♟️</div>
+            <h1 style="margin:10px 0 5px;font-size:22px">Verify Chess.com Account</h1>
+            <p style="color:#80848e;margin:0">Link your Chess.com account to LOBBY</p>
+          </div>
+          
+          <p style="color:#b5bac1;line-height:1.6">
+            Someone (hopefully you) requested to link the Chess.com account <strong style="color:#f2f3f5">${username}</strong> to a LOBBY profile.
+          </p>
+          
+          <div style="background:#313338;border-radius:8px;padding:20px;margin:20px 0;text-align:center">
+            <a href="${verifyLink}" style="display:inline-block;padding:12px 24px;background:#5865f2;color:#fff;text-decoration:none;border-radius:8px;font-weight:700">Verify & Link Account</a>
+          </div>
+          
+          <p style="color:#80848e;font-size:13px;margin:20px 0 0">
+            Or copy this link: <br>
+            <code style="background:#313338;padding:8px 12px;border-radius:4px;display:block;word-break:break-all;margin-top:8px">${verifyLink}</code>
+          </p>
+          
+          <p style="color:#80848e;font-size:12px;margin:20px 0 0;border-top:1px solid rgba(255,255,255,.1);padding-top:15px">
+            This link expires in 15 minutes. If you didn't request this, you can safely ignore this email.
+          </p>
+        </div>
+      </body>
+      </html>
+    `;
+
+    // Send email using nodemailer
+    const transporter = require("nodemailer").createTransport({
+      service: process.env.EMAIL_SERVICE || "gmail",
+      auth: {
+        user: process.env.EMAIL_USER,
+        pass: process.env.EMAIL_PASS
+      }
+    });
+
+    await transporter.sendMail({
+      from: process.env.EMAIL_FROM || process.env.EMAIL_USER,
+      to: chessEmail,
+      subject: `Verify your Chess.com account for LOBBY`,
+      html: emailHtml
+    });
+
+    console.log(`[/link-chess] Sent verification email to ${chessEmail} for Chess.com account "${username}"`);
 
     res.json({
       success: true,
-      popupUrl,
-      message: "Opening verification window…"
+      message: `Verification email sent to ${chessEmail} (the email on your Chess.com account). Please check your email to confirm.`
     });
+
   } catch (err) {
     console.error("[/link-chess]", err);
-    res.status(500).json({ error: "Failed to initiate linking" });
+    res.status(500).json({ error: "Failed to send verification email" });
+  }
+});
+
+// ── GET /chess/verify-email — User clicks verification link from email ────
+app.get("/chess/verify-email", async (req, res) => {
+  const { code, userId } = req.query;
+
+  if (!code || !userId) {
+    return res.send(`
+      <html><body style="background:#1e1f22;color:#fff;font-family:sans-serif;display:flex;align-items:center;justify-content:center;height:100vh;margin:0">
+        <div style="text-align:center"><div style="font-size:48px">❌</div><div style="margin-top:12px">Missing verification code or user ID</div></div>
+      </body></html>
+    `);
+  }
+
+  try {
+    // Get the verification record
+    const verRow = await pool.query(
+      "SELECT * FROM chess_verifications WHERE user_id = $1 AND platform = 'chess.com'",
+      [userId]
+    );
+
+    if (!verRow.rows.length) {
+      return res.send(`
+        <html><body style="background:#1e1f22;color:#fff;font-family:sans-serif;display:flex;align-items:center;justify-content:center;height:100vh;margin:0">
+          <div style="text-align:center"><div style="font-size:48px">❌</div><div style="margin-top:12px">No pending verification found</div></div>
+        </body></html>
+      `);
+    }
+
+    const verification = verRow.rows[0];
+    const chessUsername = verification.username;
+
+    // Check if expired
+    if (new Date() > new Date(verification.code_expires_at)) {
+      await pool.query("DELETE FROM chess_verifications WHERE id = $1", [verification.id]);
+      return res.send(`
+        <html><body style="background:#1e1f22;color:#fff;font-family:sans-serif;display:flex;align-items:center;justify-content:center;height:100vh;margin:0">
+          <div style="text-align:center"><div style="font-size:48px">⏰</div><div style="margin-top:12px">Verification link expired — please try linking again</div></div>
+        </body></html>
+      `);
+    }
+
+    // Verify the code matches
+    if (code !== verification.verification_code) {
+      return res.send(`
+        <html><body style="background:#1e1f22;color:#fff;font-family:sans-serif;display:flex;align-items:center;justify-content:center;height:100vh;margin:0">
+          <div style="text-align:center"><div style="font-size:48px">❌</div><div style="margin-top:12px">Invalid verification code</div></div>
+        </body></html>
+      `);
+    }
+
+    // Verify Chess.com account still exists and get canonical username
+    const axios = require("axios");
+    let verifiedUsername = chessUsername;
+    try {
+      const profileRes = await axios.get(
+        `https://api.chess.com/pub/player/${encodeURIComponent(chessUsername.toLowerCase())}`,
+        { headers: { "User-Agent": "LOBBY-App/1.0" } }
+      );
+      if (profileRes.data?.username) {
+        verifiedUsername = profileRes.data.username;
+      }
+    } catch (err) {
+      return res.send(`
+        <html><body style="background:#1e1f22;color:#fff;font-family:sans-serif;display:flex;align-items:center;justify-content:center;height:100vh;margin:0">
+          <div style="text-align:center"><div style="font-size:48px">❌</div><div style="margin-top:12px">Chess.com account not found — may have been deleted</div></div>
+        </body></html>
+      `);
+    }
+
+    // All verified! Link the account
+    await pool.query(
+      "UPDATE users SET chess_username = $1 WHERE id = $2",
+      [verifiedUsername, userId]
+    );
+
+    // Clean up verification record
+    await pool.query("DELETE FROM chess_verifications WHERE id = $1", [verification.id]);
+
+    console.log(`[chess/verify-email] ✅ Email-verified and linked "${verifiedUsername}" to userId ${userId}`);
+
+    res.send(`
+      <html>
+      <body style="background:#1e1f22;color:#f2f3f5;font-family:'Segoe UI',sans-serif;display:flex;align-items:center;justify-content:center;height:100vh;margin:0">
+        <div style="background:#2b2d31;border-radius:16px;padding:40px;max-width:420px;width:90%;text-align:center;box-shadow:0 24px 64px rgba(0,0,0,.5)">
+          <div style="font-size:48px;margin-bottom:16px">✅</div>
+          <div style="font-size:20px;font-weight:800;margin-bottom:8px">Account Linked!</div>
+          <div style="font-size:13px;color:#b5bac1;margin-bottom:16px">
+            Your Chess.com account <strong style="color:#f2f3f5">${verifiedUsername}</strong> is now linked to LOBBY.
+          </div>
+          <div style="font-size:12px;color:#80848e;margin-bottom:20px">
+            You can close this window or return to the app.
+          </div>
+          <button onclick="window.close()" style="padding:10px 20px;background:#5865f2;color:#fff;border:none;border-radius:8px;font-size:13px;cursor:pointer;font-family:inherit;font-weight:700">
+            Close
+          </button>
+        </div>
+      </body>
+      </html>
+    `);
+
+  } catch (err) {
+    console.error("[chess/verify-email]", err);
+    res.send(`
+      <html><body style="background:#1e1f22;color:#fff;font-family:sans-serif;display:flex;align-items:center;justify-content:center;height:100vh;margin:0">
+        <div style="text-align:center"><div style="font-size:48px">❌</div><div style="margin-top:12px">Verification failed: ${err.message}</div></div>
+      </body></html>
+    `);
   }
 });
 
