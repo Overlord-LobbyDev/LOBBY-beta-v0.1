@@ -2984,6 +2984,7 @@
 
   </style>
   <script src="nav.js"></script>
+  <link rel="stylesheet" href="./lottie-loader.css">
 </head>
 <body>
 
@@ -13954,33 +13955,7 @@ setTimeout(() => { updateMyStatusUI(); }, 100);
     }
   }
 
-  async function spCheckChessLink(platform, username) {
-    const statusId  = platform === "lichess" ? "spLichessStatus" : "spChesscomStatus";
-    const unlinkId  = platform === "lichess" ? "spLichessUnlinkBtn" : "spChesscomUnlinkBtn";
-    const linkBtnId = platform === "lichess" ? "spLichessLinkBtn" : "spChesscomLinkBtn";
-    const statusEl  = document.getElementById(statusId);
-    
-    if (statusEl) { statusEl.innerHTML = "🔄 Checking…"; statusEl.style.color = "var(--text-3)"; }
-    
-    try {
-      const meRes = await api("/me");
-      const linkedUsername = platform === "lichess" ? meRes.lichess_username : meRes.chess_username;
-      
-      if (linkedUsername === username) {
-        if (statusEl) { statusEl.innerHTML = `✅ Linked as ${linkedUsername}`; statusEl.style.color = "#57f287"; }
-        const unlinkBtn = document.getElementById(unlinkId);
-        const linkBtn   = document.getElementById(linkBtnId);
-        if (unlinkBtn) unlinkBtn.style.display = "inline-flex";
-        if (linkBtn)   linkBtn.textContent = "Update";
-        spMe = meRes;
-        setTimeout(() => { if (statusEl) statusEl.textContent = ""; }, 3000);
-      } else {
-        if (statusEl) { statusEl.style.color = "#5865f2"; statusEl.innerHTML = `📧 Not linked yet. <button onclick="spCheckChessLink('${platform}', '${username}')" style="margin-left:8px;padding:4px 12px;background:#5865f2;color:#fff;border:none;border-radius:4px;font-size:12px;cursor:pointer;font-weight:600">Refresh</button>`; }
-      }
-    } catch (e) {
-      if (statusEl) { statusEl.style.color = "var(--danger)"; statusEl.textContent = `❌ ${e.message}`; }
-    }
-  }
+
 
 
   async function spUnlinkChess(platform) {
@@ -13992,7 +13967,7 @@ setTimeout(() => { updateMyStatusUI(); }, 100);
     const statusEl  = document.getElementById(statusId);
 
     if (!confirm(`Unlink your ${isLichess ? "Lichess" : "Chess.com"} account?`)) return;
-    if (statusEl) { statusEl.style.color = "var(--text-3)"; statusEl.textContent = "Unlinking…"; }
+    if (statusEl) { statusEl.style.color = "var(--text-3)"; statusEl.innerHTML = '<div class="loader-with-text-32"><div class="lottie-loader-32"></div> Unlinking…</div>'; }
 
     try {
       const res = await fetch(`${AUTH_URL}/link-chess`, {

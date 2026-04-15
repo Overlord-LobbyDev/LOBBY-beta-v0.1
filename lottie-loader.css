@@ -1,0 +1,199 @@
+/* Lottie Mascot Loader Animations */
+
+/* 32px version - 12 cols x 10 rows = 120 frames */
+.lottie-loader-32 {
+  display: inline-block;
+  width: 32px;
+  height: 32px;
+  background-image: url('./lottie-loader-32.png');
+  background-size: 384px 320px;
+  background-position: 0 0;
+  background-repeat: no-repeat;
+  animation: lottie-spin-32 4s steps(120, end) infinite;
+}
+
+@keyframes lottie-spin-32 {
+  0%   { background-position: 0px 0px; }
+  8.33%   { background-position: -32px 0px; }
+  16.66%  { background-position: -64px 0px; }
+  25%     { background-position: -96px 0px; }
+  33.33%  { background-position: -128px 0px; }
+  41.66%  { background-position: -160px 0px; }
+  50%     { background-position: -192px 0px; }
+  58.33%  { background-position: -224px 0px; }
+  66.66%  { background-position: -256px 0px; }
+  75%     { background-position: -288px 0px; }
+  83.33%  { background-position: -320px 0px; }
+  91.66%  { background-position: -352px 0px; }
+  8.33%   { background-position: 0px -32px; }
+  16.66%  { background-position: -32px -32px; }
+  25%     { background-position: -64px -32px; }
+  33.33%  { background-position: -96px -32px; }
+  41.66%  { background-position: -128px -32px; }
+  50%     { background-position: -160px -32px; }
+  58.33%  { background-position: -192px -32px; }
+  66.66%  { background-position: -224px -32px; }
+  75%     { background-position: -256px -32px; }
+  83.33%  { background-position: -288px -32px; }
+  91.66%  { background-position: -320px -32px; }
+  100%    { background-position: -352px -32px; }
+}
+
+/* 48px version - 10 cols x 12 rows = 120 frames */
+.lottie-loader-48 {
+  display: inline-block;
+  width: 48px;
+  height: 48px;
+  background-image: url('./lottie-loader-48.png');
+  background-size: 480px 576px;
+  background-position: 0 0;
+  background-repeat: no-repeat;
+  animation: lottie-spin-48 4s steps(120, end) infinite;
+}
+
+@keyframes lottie-spin-48 {
+  0%      { background-position: 0px 0px; }
+  0.833%  { background-position: -48px 0px; }
+  1.666%  { background-position: -96px 0px; }
+  2.5%    { background-position: -144px 0px; }
+  3.333%  { background-position: -192px 0px; }
+  4.166%  { background-position: -240px 0px; }
+  5%      { background-position: -288px 0px; }
+  5.833%  { background-position: -336px 0px; }
+  6.666%  { background-position: -384px 0px; }
+  7.5%    { background-position: -432px 0px; }
+  8.333%  { background-position: 0px -48px; }
+  9.166%  { background-position: -48px -48px; }
+  10%     { background-position: -96px -48px; }
+  10.833% { background-position: -144px -48px; }
+  11.666% { background-position: -192px -48px; }
+  12.5%   { background-position: -240px -48px; }
+  13.333% { background-position: -288px -48px; }
+  14.166% { background-position: -336px -48px; }
+  15%     { background-position: -384px -48px; }
+  15.833% { background-position: -432px -48px; }
+  16.666% { background-position: 0px -96px; }
+  17.5%   { background-position: -48px -96px; }
+  18.333% { background-position: -96px -96px; }
+  19.166% { background-position: -144px -96px; }
+  20%     { background-position: -192px -96px; }
+  20.833% { background-position: -240px -96px; }
+  21.666% { background-position: -288px -96px; }
+  22.5%   { background-position: -336px -96px; }
+  23.333% { background-position: -384px -96px; }
+  24.166% { background-position: -432px -96px; }
+  25%     { background-position: 0px -144px; }
+  25.833% { background-position: -48px -144px; }
+  26.666% { background-position: -96px -144px; }
+  27.5%   { background-position: -144px -144px; }
+  28.333% { background-position: -192px -144px; }
+  29.166% { background-position: -240px -144px; }
+  30%     { background-position: -288px -144px; }
+  30.833% { background-position: -336px -144px; }
+  31.666% { background-position: -384px -144px; }
+  32.5%   { background-position: -432px -144px; }
+  33.333% { background-position: 0px -192px; }
+  34.166% { background-position: -48px -192px; }
+  35%     { background-position: -96px -192px; }
+  35.833% { background-position: -144px -192px; }
+  36.666% { background-position: -192px -192px; }
+  37.5%   { background-position: -240px -192px; }
+  38.333% { background-position: -288px -192px; }
+  39.166% { background-position: -336px -192px; }
+  40%     { background-position: -384px -192px; }
+  40.833% { background-position: -432px -192px; }
+  41.666% { background-position: 0px -240px; }
+  42.5%   { background-position: -48px -240px; }
+  43.333% { background-position: -96px -240px; }
+  44.166% { background-position: -144px -240px; }
+  45%     { background-position: -192px -240px; }
+  45.833% { background-position: -240px -240px; }
+  46.666% { background-position: -288px -240px; }
+  47.5%   { background-position: -336px -240px; }
+  48.333% { background-position: -384px -240px; }
+  49.166% { background-position: -432px -240px; }
+  50%     { background-position: 0px -288px; }
+  50.833% { background-position: -48px -288px; }
+  51.666% { background-position: -96px -288px; }
+  52.5%   { background-position: -144px -288px; }
+  53.333% { background-position: -192px -288px; }
+  54.166% { background-position: -240px -288px; }
+  55%     { background-position: -288px -288px; }
+  55.833% { background-position: -336px -288px; }
+  56.666% { background-position: -384px -288px; }
+  57.5%   { background-position: -432px -288px; }
+  58.333% { background-position: 0px -336px; }
+  59.166% { background-position: -48px -336px; }
+  60%     { background-position: -96px -336px; }
+  60.833% { background-position: -144px -336px; }
+  61.666% { background-position: -192px -336px; }
+  62.5%   { background-position: -240px -336px; }
+  63.333% { background-position: -288px -336px; }
+  64.166% { background-position: -336px -336px; }
+  65%     { background-position: -384px -336px; }
+  65.833% { background-position: -432px -336px; }
+  66.666% { background-position: 0px -384px; }
+  67.5%   { background-position: -48px -384px; }
+  68.333% { background-position: -96px -384px; }
+  69.166% { background-position: -144px -384px; }
+  70%     { background-position: -192px -384px; }
+  70.833% { background-position: -240px -384px; }
+  71.666% { background-position: -288px -384px; }
+  72.5%   { background-position: -336px -384px; }
+  73.333% { background-position: -384px -384px; }
+  74.166% { background-position: -432px -384px; }
+  75%     { background-position: 0px -432px; }
+  75.833% { background-position: -48px -432px; }
+  76.666% { background-position: -96px -432px; }
+  77.5%   { background-position: -144px -432px; }
+  78.333% { background-position: -192px -432px; }
+  79.166% { background-position: -240px -432px; }
+  80%     { background-position: -288px -432px; }
+  80.833% { background-position: -336px -432px; }
+  81.666% { background-position: -384px -432px; }
+  82.5%   { background-position: -432px -432px; }
+  83.333% { background-position: 0px -480px; }
+  84.166% { background-position: -48px -480px; }
+  85%     { background-position: -96px -480px; }
+  85.833% { background-position: -144px -480px; }
+  86.666% { background-position: -192px -480px; }
+  87.5%   { background-position: -240px -480px; }
+  88.333% { background-position: -288px -480px; }
+  89.166% { background-position: -336px -480px; }
+  90%     { background-position: -384px -480px; }
+  90.833% { background-position: -432px -480px; }
+  91.666% { background-position: 0px -528px; }
+  92.5%   { background-position: -48px -528px; }
+  93.333% { background-position: -96px -528px; }
+  94.166% { background-position: -144px -528px; }
+  95%     { background-position: -192px -528px; }
+  95.833% { background-position: -240px -528px; }
+  96.666% { background-position: -288px -528px; }
+  97.5%   { background-position: -336px -528px; }
+  98.333% { background-position: -384px -528px; }
+  99.166% { background-position: -432px -528px; }
+  100%    { background-position: -432px -528px; }
+}
+
+/* Utility: center the loader */
+.loader-center {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+}
+
+/* Inline loader text */
+.loader-with-text-32 {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+}
+
+.loader-with-text-48 {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 14px;
+}
