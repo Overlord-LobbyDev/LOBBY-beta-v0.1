@@ -360,6 +360,41 @@ async function initDb() {
         UNIQUE(user_id, platform)
       );
     `);
+    
+    // Migration: Add code_expires_at column if it doesn't exist (for existing databases)
+    try {
+      const checkCol = await pool.query(`
+        SELECT column_name FROM information_schema.columns 
+        WHERE table_name = 'chess_verifications' AND column_name = 'code_expires_at'
+      `);
+      if (!checkCol.rows.length) {
+        console.log("⚠️  Adding missing code_expires_at column to chess_verifications...");
+        await pool.query(`
+          ALTER TABLE chess_verifications 
+          ADD COLUMN code_expires_at TIMESTAMPTZ DEFAULT NOW() + INTERVAL '15 minutes'
+        `);
+      }
+    } catch (err) {
+      console.warn("⚠️  Could not check/add code_expires_at column:", err.message);
+    }
+    
+    // Migration: Add attempts column if it doesn't exist
+    try {
+      const checkCol = await pool.query(`
+        SELECT column_name FROM information_schema.columns 
+        WHERE table_name = 'chess_verifications' AND column_name = 'attempts'
+      `);
+      if (!checkCol.rows.length) {
+        console.log("⚠️  Adding missing attempts column to chess_verifications...");
+        await pool.query(`
+          ALTER TABLE chess_verifications 
+          ADD COLUMN attempts INTEGER DEFAULT 0
+        `);
+      }
+    } catch (err) {
+      console.warn("⚠️  Could not check/add attempts column:", err.message);
+    }
+    
     await pool.query(`CREATE INDEX IF NOT EXISTS idx_chess_verifications_user_id ON chess_verifications(user_id);`).catch(() => {});
 
     // Back-fill unique_id for any servers that don't have one yet
