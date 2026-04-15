@@ -13025,7 +13025,7 @@ setTimeout(() => { updateMyStatusUI(); }, 100);
         <!-- Lichess row -->
         <div class="sp-form-group">
           <label class="sp-label">Lichess Username</label>
-          <div id="spLichessRow" style="display:flex;gap:8px;align-items:center">
+          <div style="display:flex;gap:8px;align-items:center">
             <input class="sp-input" id="spLichessInput" placeholder="e.g. DrNykterstein" style="flex:1" />
             <button id="spLichessLinkBtn" onclick="spLinkChess('lichess')"
               style="flex-shrink:0;padding:9px 16px;background:var(--accent);color:#fff;border:none;border-radius:8px;font-size:13px;font-weight:700;cursor:pointer;font-family:var(--font);white-space:nowrap;transition:background .15s"
@@ -13928,69 +13928,49 @@ setTimeout(() => { updateMyStatusUI(); }, 100);
       if (statusEl) { statusEl.style.color = "var(--danger)"; statusEl.textContent = "Enter your username first."; }
       return;
     }
-
-    const tok = token();
-    if (!tok) { if (statusEl) { statusEl.style.color = "var(--danger)"; statusEl.textContent = "Not logged in."; } return; }
-
-    // ── Step 1: Verify the username exists on the platform's public API ──
-    if (statusEl) { statusEl.style.color = "var(--text-3)"; statusEl.textContent = `Checking ${isLichess ? "Lichess" : "Chess.com"} profile…`; }
+    if (statusEl) { statusEl.style.color = "var(--text-3)"; statusEl.textContent = "Opening verification…"; }
 
     try {
-      const verifyUrl = isLichess
-        ? `https://lichess.org/api/user/${encodeURIComponent(username)}`
-        : `https://api.chess.com/pub/player/${encodeURIComponent(username.toLowerCase())}`;
+      // Step 1: Get the popup URL from the backend
+      const res = await fetch(`${AUTH_URL}/link-chess`, {
+        method: "POST",
+        headers: { Authorization: `Bearer ${token()}`, "Content-Type": "application/json" },
+        body: JSON.stringify({ platform, username })
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "Failed");
 
-      const verifyRes = await fetch(verifyUrl);
-      if (!verifyRes.ok) {
-        if (statusEl) { statusEl.style.color = "var(--danger)"; statusEl.textContent = `❌ "${username}" not found on ${isLichess ? "Lichess" : "Chess.com"}. Check the spelling.`; }
-        return;
+      // Step 2: Open the popup window
+      if (window.electronAPI?.openSteamWindow) {
+        window.electronAPI.openSteamWindow(data.popupUrl);
+      } else {
+        // Fallback for web or testing
+        window.open(data.popupUrl, "LinkChessAccount", "width=600,height=500");
       }
-    } catch(e) {
-      if (statusEl) { statusEl.style.color = "var(--danger)"; statusEl.textContent = `❌ Could not reach ${isLichess ? "Lichess" : "Chess.com"} — check your connection.`; }
-      return;
-    }
 
-    // ── Step 2: Open confirmation window (mirrors Steam OAuth flow) ──
-    const linkUrl = `${AUTH_URL}/chess/auth?platform=${encodeURIComponent(platform)}&username=${encodeURIComponent(username)}&token=${encodeURIComponent(tok)}`;
-
-    if (statusEl) { statusEl.style.color = "var(--text-3)"; statusEl.textContent = `Opening ${isLichess ? "Lichess" : "Chess.com"} verification…`; }
-
-    if (window.electronAPI?.openSteamWindow) {
-      // Reuse the same Electron popup window mechanism as Steam
-      window.electronAPI.openSteamWindow(linkUrl);
-    } else {
-      window.open(linkUrl, `Link ${platform}`, "width=600,height=500");
-    }
-
-    // ── Step 3: Poll backend for completion (same pattern as Steam) ──
-    let attempts = 0;
-    const maxAttempts = 60;
-    if (statusEl) { statusEl.style.color = "var(--text-3)"; statusEl.textContent = `Waiting for ${isLichess ? "Lichess" : "Chess.com"} confirmation…`; }
-
-    const poll = setInterval(async () => {
-      attempts++;
-      if (attempts > maxAttempts) {
-        clearInterval(poll);
-        if (statusEl) { statusEl.style.color = "var(--danger)"; statusEl.textContent = "Timed out — close the window and try again."; }
-        return;
-      }
-      try {
-        const me = await api("/me");
-        const linked = isLichess ? me.lichess_username : me.chess_username;
-        if (linked) {
-          clearInterval(poll);
+      // Step 3: Listen for success message from popup
+      const handleMessage = async (event) => {
+        if (event.data?.type === "chess-linked" && event.data?.platform === platform) {
+          window.removeEventListener("message", handleMessage);
+          if (statusEl) { statusEl.style.color = "#57f287"; statusEl.textContent = `✅ Linked as ${event.data.username}`; }
           const unlinkBtn = document.getElementById(unlinkId);
           const linkBtn   = document.getElementById(linkBtnId);
-          const inputEl   = document.getElementById(inputId);
-          if (inputEl)   inputEl.value = linked;
           if (unlinkBtn) unlinkBtn.style.display = "inline-flex";
           if (linkBtn)   linkBtn.textContent = "Update";
-          if (statusEl) { statusEl.style.color = "#57f287"; statusEl.textContent = `✅ Linked as ${linked}`; }
-          spMe = me;
-          setTimeout(() => { if (statusEl) statusEl.textContent = ""; }, 4000);
+          // Refresh spMe cache
+          spMe = await api("/me");
+          setTimeout(() => { if (statusEl) statusEl.textContent = ""; }, 3000);
         }
-      } catch(e) {}
-    }, 2000);
+      };
+      
+      window.addEventListener("message", handleMessage);
+      // Timeout after 5 minutes if no response
+      setTimeout(() => window.removeEventListener("message", handleMessage), 300000);
+
+      if (statusEl) { statusEl.style.color = "var(--text-3)"; statusEl.textContent = "Waiting for verification…"; }
+    } catch(e) {
+      if (statusEl) { statusEl.style.color = "var(--danger)"; statusEl.textContent = `❌ ${e.message}`; }
+    }
   }
 
   async function spUnlinkChess(platform) {
@@ -14005,7 +13985,7 @@ setTimeout(() => { updateMyStatusUI(); }, 100);
     if (statusEl) { statusEl.style.color = "var(--text-3)"; statusEl.textContent = "Unlinking…"; }
 
     try {
-      const res = await fetch(`${AUTH_URL}/chess/unlink`, {
+      const res = await fetch(`${AUTH_URL}/link-chess`, {
         method: "DELETE",
         headers: { Authorization: `Bearer ${token()}`, "Content-Type": "application/json" },
         body: JSON.stringify({ platform })

@@ -348,6 +348,39 @@ app.delete("/link-riot", requireAuth, async (req, res) => {
   res.json({ success: true });
 });
 
+// ── POST /link-chess — Frontend initiates chess account linking ──────────
+app.post("/link-chess", requireAuth, async (req, res) => {
+  const { platform, username } = req.body;
+  const userId = req.userId;
+
+  if (!platform || !username) {
+    return res.status(400).json({ error: "Missing platform or username" });
+  }
+
+  if (!["chess.com", "lichess"].includes(platform)) {
+    return res.status(400).json({ error: "Invalid platform" });
+  }
+
+  try {
+    // Generate a short-lived JWT token for the popup window
+    const popupToken = jwt.sign({ id: userId }, SECRET, { expiresIn: "15m" });
+
+    // Return the popup URL + token so frontend can open it
+    const popupUrl = `${process.env.AUTH_SERVER_URL || "https://lobby-auth-server.onrender.com"}/chess/auth?platform=${encodeURIComponent(platform)}&username=${encodeURIComponent(username)}&token=${popupToken}`;
+
+    console.log(`[/link-chess] Initiated chess linking for userId ${userId}, platform ${platform}`);
+
+    res.json({
+      success: true,
+      popupUrl,
+      message: "Opening verification window…"
+    });
+  } catch (err) {
+    console.error("[/link-chess]", err);
+    res.status(500).json({ error: "Failed to initiate linking" });
+  }
+});
+
 // ── Step 1: Start Chess Account Verification ──────────────────
 // ── Chess Integration (with ownership verification) ─────────
 
@@ -355,79 +388,83 @@ app.delete("/link-riot", requireAuth, async (req, res) => {
 
 // GET /chess/auth — entry point for the popup window
 app.get("/chess/auth", async (req, res) => {
-  const { platform, username, token: queryToken } = req.query;
+  try {
+    const { platform, username, token: queryToken } = req.query;
 
-  // Authenticate from query token (same as Steam)
-  let userId = null;
-  if (queryToken) {
-    try {
-      const payload = jwt.verify(queryToken, SECRET);
-      userId = payload.id;
-    } catch { return res.status(401).send("Invalid token"); }
-  }
-  if (!userId) return res.status(401).send("Unauthorized");
-  if (!platform || !["chess.com", "lichess"].includes(platform)) {
-    return res.send(`<html><body style="background:#1e1f22;color:#fff;font-family:sans-serif;display:flex;align-items:center;justify-content:center;height:100vh;margin:0">
-      <div style="text-align:center"><div style="font-size:48px">❌</div><div style="margin-top:12px">Invalid platform</div></div>
-      <script>setTimeout(() => window.close(), 3000);</script>
-    </body></html>`);
-  }
+    // Authenticate from query token (same as Steam)
+    let userId = null;
+    if (queryToken) {
+      try {
+        const payload = jwt.verify(queryToken, SECRET);
+        userId = payload.id;
+      } catch { return res.status(401).send("Invalid token"); }
+    }
+    if (!userId) return res.status(401).send("Unauthorized");
+    if (!platform || !["chess.com", "lichess"].includes(platform)) {
+      return res.send(`<html><body style="background:#1e1f22;color:#fff;font-family:sans-serif;display:flex;align-items:center;justify-content:center;height:100vh;margin:0">
+        <div style="text-align:center"><div style="font-size:48px">❌</div><div style="margin-top:12px">Invalid platform</div></div>
+        <script>setTimeout(() => window.close(), 3000);</script>
+      </body></html>`);
+    }
 
-  if (platform === "lichess") {
-    // ── Lichess: redirect to Lichess OAuth login ──
-    // Generate PKCE code_verifier + code_challenge
+    if (platform === "lichess") {
+      // ── Lichess: redirect to Lichess OAuth login ──
+      // Generate PKCE code_verifier + code_challenge
+      const crypto = require("crypto");
+      const codeVerifier = crypto.randomBytes(32).toString("hex");
+      const codeChallenge = crypto.createHash("sha256").update(codeVerifier).digest("base64url");
+      const state = crypto.randomBytes(16).toString("hex");
+
+      // Store verifier + state in DB so the callback can retrieve them
+      await pool.query(
+        `INSERT INTO chess_verifications (user_id, platform, username, verification_code, code_expires_at)
+         VALUES ($1, 'lichess', $2, $3, $4)
+         ON CONFLICT (user_id, platform)
+         DO UPDATE SET username = $2, verification_code = $3, code_expires_at = $4, attempts = 0`,
+        [userId, username || "pending", JSON.stringify({ codeVerifier, state }), new Date(Date.now() + 10 * 60 * 1000)]
+      );
+
+      const redirectUri = `https://lobby-auth-server.onrender.com/chess/callback/lichess?userId=${userId}`;
+      const lichessAuthUrl = `https://lichess.org/oauth`
+        + `?response_type=code`
+        + `&client_id=lobby-app`
+        + `&redirect_uri=${encodeURIComponent(redirectUri)}`
+        + `&code_challenge_method=S256`
+        + `&code_challenge=${codeChallenge}`
+        + `&state=${state}`;
+
+      return res.redirect(lichessAuthUrl);
+    }
+
+    // ── Chess.com: bio verification flow ──
+    if (!username) {
+      return res.send(`<html><body style="background:#1e1f22;color:#fff;font-family:sans-serif;display:flex;align-items:center;justify-content:center;height:100vh;margin:0">
+        <div style="text-align:center"><div style="font-size:48px">❌</div><div style="margin-top:12px">Username required</div></div>
+        <script>setTimeout(() => window.close(), 3000);</script>
+      </body></html>`);
+    }
+
+    // Generate a unique verification code for bio check
     const crypto = require("crypto");
-    const codeVerifier = crypto.randomBytes(32).toString("hex");
-    const codeChallenge = crypto.createHash("sha256").update(codeVerifier).digest("base64url");
-    const state = crypto.randomBytes(16).toString("hex");
+    const verifyCode = "LOBBY-" + crypto.randomBytes(4).toString("hex").toUpperCase();
 
-    // Store verifier + state in DB so the callback can retrieve them
+    // Store pending verification
     await pool.query(
       `INSERT INTO chess_verifications (user_id, platform, username, verification_code, code_expires_at)
-       VALUES ($1, 'lichess', $2, $3, $4)
+       VALUES ($1, 'chess.com', $2, $3, $4)
        ON CONFLICT (user_id, platform)
        DO UPDATE SET username = $2, verification_code = $3, code_expires_at = $4, attempts = 0`,
-      [userId, username || "pending", JSON.stringify({ codeVerifier, state }), new Date(Date.now() + 10 * 60 * 1000)]
+      [userId, username, verifyCode, new Date(Date.now() + 15 * 60 * 1000)]
     );
 
-    const redirectUri = `https://lobby-auth-server.onrender.com/chess/callback/lichess?userId=${userId}`;
-    const lichessAuthUrl = `https://lichess.org/oauth`
-      + `?response_type=code`
-      + `&client_id=lobby-app`
-      + `&redirect_uri=${encodeURIComponent(redirectUri)}`
-      + `&code_challenge_method=S256`
-      + `&code_challenge=${codeChallenge}`
-      + `&state=${state}`;
+    // Set content-type explicitly
+    res.setHeader("Content-Type", "text/html; charset=utf-8");
 
-    return res.redirect(lichessAuthUrl);
-  }
-
-  // ── Chess.com: bio verification flow ──
-  if (!username) {
-    return res.send(`<html><body style="background:#1e1f22;color:#fff;font-family:sans-serif;display:flex;align-items:center;justify-content:center;height:100vh;margin:0">
-      <div style="text-align:center"><div style="font-size:48px">❌</div><div style="margin-top:12px">Username required</div></div>
-      <script>setTimeout(() => window.close(), 3000);</script>
-    </body></html>`);
-  }
-
-  // Generate a unique verification code for bio check
-  const crypto = require("crypto");
-  const verifyCode = "LOBBY-" + crypto.randomBytes(4).toString("hex").toUpperCase();
-
-  // Store pending verification
-  await pool.query(
-    `INSERT INTO chess_verifications (user_id, platform, username, verification_code, code_expires_at)
-     VALUES ($1, 'chess.com', $2, $3, $4)
-     ON CONFLICT (user_id, platform)
-     DO UPDATE SET username = $2, verification_code = $3, code_expires_at = $4, attempts = 0`,
-    [userId, username, verifyCode, new Date(Date.now() + 15 * 60 * 1000)]
-  );
-
-  // Show the bio-verification page
-  const escapedUsername = username.replace(/[<>&"']/g, c => ({'<':'&lt;','>':'&gt;','&':'&amp;','"':'&quot;',"'":'&#39;'}[c]));
-  res.send(`
+    // Show the bio-verification page
+    const escapedUsername = username.replace(/[<>&"']/g, c => ({'<':'&lt;','>':'&gt;','&':'&amp;','"':'&quot;',"'":'&#39;'}[c]));
+    const html = `<!DOCTYPE html>
     <html>
-    <head><title>Link Chess.com — LOBBY</title></head>
+    <head><meta charset="UTF-8"><title>Link Chess.com — LOBBY</title></head>
     <body style="background:#1e1f22;color:#f2f3f5;font-family:'Segoe UI',sans-serif;display:flex;align-items:center;justify-content:center;min-height:100vh;margin:0;padding:20px;box-sizing:border-box">
       <div id="card" style="background:#2b2d31;border-radius:16px;padding:36px;max-width:460px;width:100%;box-shadow:0 24px 64px rgba(0,0,0,.5)">
         <div style="text-align:center;margin-bottom:24px">
@@ -505,8 +542,21 @@ app.get("/chess/auth", async (req, res) => {
           }
         }
       </script>
-    </body></html>
-  `);
+    </body></html>`;
+
+    res.send(html);
+
+  } catch (err) {
+    console.error("[/chess/auth error]", err);
+    res.status(500).send(`<html><body style="background:#1e1f22;color:#fff;font-family:sans-serif;display:flex;align-items:center;justify-content:center;height:100vh;margin:0">
+      <div style="text-align:center">
+        <div style="font-size:48px">❌</div>
+        <div style="margin-top:12px">Server error: ${err.message}</div>
+        <div style="font-size:12px;color:#80848e;margin-top:8px">Close this window and try again</div>
+      </div>
+      <script>setTimeout(() => window.close(), 5000);</script>
+    </body></html>`);
+  }
 });
 
 // ── Lichess OAuth callback — Lichess redirects here after user logs in ──
