@@ -13915,8 +13915,6 @@ setTimeout(() => { updateMyStatusUI(); }, 100);
     } catch(e) { console.error("[chess section]", e); }
   }
 
-
-
   async function spLinkChess(platform) {
     const isLichess  = platform === "lichess";
     const inputId    = isLichess ? "spLichessInput"   : "spChesscomInput";
@@ -13930,10 +13928,8 @@ setTimeout(() => { updateMyStatusUI(); }, 100);
       if (statusEl) { statusEl.style.color = "var(--danger)"; statusEl.textContent = "Enter your username first."; }
       return;
     }
-    if (statusEl) { statusEl.style.color = "var(--text-3)"; statusEl.textContent = isLichess ? "Opening Lichess…" : "Sending verification email…"; }
 
     try {
-      // Call backend to initiate linking
       const res = await fetch(`${AUTH_URL}/link-chess`, {
         method: "POST",
         headers: { Authorization: `Bearer ${token()}`, "Content-Type": "application/json" },
@@ -13942,73 +13938,50 @@ setTimeout(() => { updateMyStatusUI(); }, 100);
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || "Failed");
 
-      // For Lichess: open OAuth popup
-      if (isLichess) {
-        if (window.electronAPI?.openSteamWindow) {
-          window.electronAPI.openSteamWindow(data.popupUrl);
-        } else {
-          window.open(data.popupUrl, "LinkChessAccount", "width=850,height=650");
-        }
-
-        // Listen for success message from popup
-        const handleMessage = async (event) => {
-          if (event.data?.type === "chess-linked" && event.data?.platform === "lichess") {
-            window.removeEventListener("message", handleMessage);
-            if (statusEl) { statusEl.style.color = "#57f287"; statusEl.textContent = `✅ Linked as ${event.data.username}`; }
-            const unlinkBtn = document.getElementById(unlinkId);
-            const linkBtn   = document.getElementById(linkBtnId);
-            if (unlinkBtn) unlinkBtn.style.display = "inline-flex";
-            if (linkBtn)   linkBtn.textContent = "Update";
-            spMe = await api("/me");
-            setTimeout(() => { if (statusEl) statusEl.textContent = ""; }, 3000);
-          }
-        };
-        
-        window.addEventListener("message", handleMessage);
-        setTimeout(() => window.removeEventListener("message", handleMessage), 300000);
-        if (statusEl) { statusEl.style.color = "var(--text-3)"; statusEl.textContent = "Waiting for Lichess verification…"; }
-      } 
-      // For Chess.com: show email verification message
-      else {
-        if (statusEl) { 
-          statusEl.style.color = "#5865f2"; 
-          statusEl.textContent = `📧 Check your email to verify. Link will be active for 15 minutes.`;
-        }
-        
-        // Poll the backend every 5 seconds to check if verified
-        let verified = false;
-        const pollInterval = setInterval(async () => {
-          if (verified) {
-            clearInterval(pollInterval);
-            return;
-          }
-          
-          try {
-            const meRes = await api("/me");
-            if (meRes.chess_username === username) {
-              verified = true;
-              clearInterval(pollInterval);
-              if (statusEl) { statusEl.style.color = "#57f287"; statusEl.textContent = `✅ Linked as ${username}`; }
-              const unlinkBtn = document.getElementById(unlinkId);
-              const linkBtn   = document.getElementById(linkBtnId);
-              if (unlinkBtn) unlinkBtn.style.display = "inline-flex";
-              if (linkBtn)   linkBtn.textContent = "Update";
-              spMe = meRes;
-              setTimeout(() => { if (statusEl) statusEl.textContent = ""; }, 3000);
-            }
-          } catch (e) {
-            // Keep polling
-          }
-        }, 5000);
-        
-        // Stop polling after 15 minutes
-        setTimeout(() => clearInterval(pollInterval), 15 * 60 * 1000);
+      if (platform === "chess.com") {
+        if (statusEl) { statusEl.style.color = "#5865f2"; statusEl.innerHTML = `📧 Check your email. <button onclick="spCheckChessLink('${platform}', '${username}')" style="margin-left:8px;padding:4px 12px;background:#5865f2;color:#fff;border:none;border-radius:4px;font-size:12px;cursor:pointer;font-weight:600">Refresh</button>`; }
+      } else {
+        if (statusEl) { statusEl.style.color = "#57f287"; statusEl.textContent = `✅ Linked as ${data.username}`; }
+        const unlinkBtn = document.getElementById(unlinkId);
+        const linkBtn   = document.getElementById(linkBtnId);
+        if (unlinkBtn) unlinkBtn.style.display = "inline-flex";
+        if (linkBtn)   linkBtn.textContent = "Update";
+        spMe = await api("/me");
+        setTimeout(() => { if (statusEl) statusEl.textContent = ""; }, 3000);
       }
-
     } catch(e) {
       if (statusEl) { statusEl.style.color = "var(--danger)"; statusEl.textContent = `❌ ${e.message}`; }
     }
   }
+
+  async function spCheckChessLink(platform, username) {
+    const statusId  = platform === "lichess" ? "spLichessStatus" : "spChesscomStatus";
+    const unlinkId  = platform === "lichess" ? "spLichessUnlinkBtn" : "spChesscomUnlinkBtn";
+    const linkBtnId = platform === "lichess" ? "spLichessLinkBtn" : "spChesscomLinkBtn";
+    const statusEl  = document.getElementById(statusId);
+    
+    if (statusEl) { statusEl.innerHTML = "🔄 Checking…"; statusEl.style.color = "var(--text-3)"; }
+    
+    try {
+      const meRes = await api("/me");
+      const linkedUsername = platform === "lichess" ? meRes.lichess_username : meRes.chess_username;
+      
+      if (linkedUsername === username) {
+        if (statusEl) { statusEl.innerHTML = `✅ Linked as ${linkedUsername}`; statusEl.style.color = "#57f287"; }
+        const unlinkBtn = document.getElementById(unlinkId);
+        const linkBtn   = document.getElementById(linkBtnId);
+        if (unlinkBtn) unlinkBtn.style.display = "inline-flex";
+        if (linkBtn)   linkBtn.textContent = "Update";
+        spMe = meRes;
+        setTimeout(() => { if (statusEl) statusEl.textContent = ""; }, 3000);
+      } else {
+        if (statusEl) { statusEl.style.color = "#5865f2"; statusEl.innerHTML = `📧 Not linked yet. <button onclick="spCheckChessLink('${platform}', '${username}')" style="margin-left:8px;padding:4px 12px;background:#5865f2;color:#fff;border:none;border-radius:4px;font-size:12px;cursor:pointer;font-weight:600">Refresh</button>`; }
+      }
+    } catch (e) {
+      if (statusEl) { statusEl.style.color = "var(--danger)"; statusEl.textContent = `❌ ${e.message}`; }
+    }
+  }
+
 
   async function spUnlinkChess(platform) {
     const isLichess = platform === "lichess";
@@ -14043,6 +14016,7 @@ setTimeout(() => { updateMyStatusUI(); }, 100);
   }
 
   window.spLinkChess   = spLinkChess;
+  window.spCheckChessLink = spCheckChessLink;
   window.spUnlinkChess = spUnlinkChess;
 
   const spMsgTimers = {};
