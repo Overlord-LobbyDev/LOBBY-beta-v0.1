@@ -394,6 +394,23 @@ async function initDb() {
     } catch (err) {
       console.warn("⚠️  Could not check/add attempts column:", err.message);
     }
+
+    // Migration: Add unique constraint on (user_id, platform) if it doesn't exist
+    try {
+      const checkConstraint = await pool.query(`
+        SELECT constraint_name FROM information_schema.table_constraints 
+        WHERE table_name = 'chess_verifications' AND constraint_name = 'chess_verifications_user_id_platform_key'
+      `);
+      if (!checkConstraint.rows.length) {
+        console.log("⚠️  Adding missing unique constraint to chess_verifications...");
+        await pool.query(`
+          ALTER TABLE chess_verifications 
+          ADD CONSTRAINT chess_verifications_user_id_platform_key UNIQUE(user_id, platform)
+        `);
+      }
+    } catch (err) {
+      console.warn("⚠️  Could not add unique constraint:", err.message);
+    }
     
     await pool.query(`CREATE INDEX IF NOT EXISTS idx_chess_verifications_user_id ON chess_verifications(user_id);`).catch(() => {});
 

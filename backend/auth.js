@@ -416,11 +416,14 @@ app.get("/chess/auth", async (req, res) => {
       const state = crypto.randomBytes(16).toString("hex");
 
       // Store verifier + state in DB so the callback can retrieve them
+      // Delete any existing record first to avoid conflicts
       await pool.query(
-        `INSERT INTO chess_verifications (user_id, platform, username, verification_code, code_expires_at)
-         VALUES ($1, 'lichess', $2, $3, $4)
-         ON CONFLICT (user_id, platform)
-         DO UPDATE SET username = $2, verification_code = $3, code_expires_at = $4, attempts = 0`,
+        "DELETE FROM chess_verifications WHERE user_id = $1 AND platform = 'lichess'",
+        [userId]
+      );
+      await pool.query(
+        `INSERT INTO chess_verifications (user_id, platform, username, verification_code, code_expires_at, attempts)
+         VALUES ($1, 'lichess', $2, $3, $4, 0)`,
         [userId, username || "pending", JSON.stringify({ codeVerifier, state }), new Date(Date.now() + 10 * 60 * 1000)]
       );
 
@@ -449,11 +452,14 @@ app.get("/chess/auth", async (req, res) => {
     const verifyCode = "LOBBY-" + crypto.randomBytes(4).toString("hex").toUpperCase();
 
     // Store pending verification
+    // Delete any existing record first to avoid conflicts
     await pool.query(
-      `INSERT INTO chess_verifications (user_id, platform, username, verification_code, code_expires_at)
-       VALUES ($1, 'chess.com', $2, $3, $4)
-       ON CONFLICT (user_id, platform)
-       DO UPDATE SET username = $2, verification_code = $3, code_expires_at = $4, attempts = 0`,
+      "DELETE FROM chess_verifications WHERE user_id = $1 AND platform = 'chess.com'",
+      [userId]
+    );
+    await pool.query(
+      `INSERT INTO chess_verifications (user_id, platform, username, verification_code, code_expires_at, attempts)
+       VALUES ($1, 'chess.com', $2, $3, $4, 0)`,
       [userId, username, verifyCode, new Date(Date.now() + 15 * 60 * 1000)]
     );
 
