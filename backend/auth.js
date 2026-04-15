@@ -447,31 +447,45 @@ app.post("/link-chess", requireAuth, async (req, res) => {
     `;
 
     // Send email using nodemailer
+    if (!process.env.EMAIL_USER || !process.env.EMAIL_PASSWORD) {
+      console.error("[/link-chess] Email config missing: EMAIL_USER or EMAIL_PASSWORD not set");
+      return res.status(500).json({ 
+        error: "Email service not configured on server. Contact support." 
+      });
+    }
+
     const transporter = require("nodemailer").createTransport({
       service: process.env.EMAIL_SERVICE || "gmail",
       auth: {
         user: process.env.EMAIL_USER,
-        pass: process.env.EMAIL_PASS
+        pass: process.env.EMAIL_PASSWORD
       }
     });
 
-    await transporter.sendMail({
-      from: process.env.EMAIL_FROM || process.env.EMAIL_USER,
-      to: userEmail,
-      subject: `Verify your Chess.com account for LOBBY`,
-      html: emailHtml
-    });
+    try {
+      await transporter.sendMail({
+        from: process.env.EMAIL_FROM || process.env.EMAIL_USER,
+        to: userEmail,
+        subject: `Verify your Chess.com account for LOBBY`,
+        html: emailHtml
+      });
 
-    console.log(`[/link-chess] Sent verification email to ${userEmail} for Chess.com account "${username}"`);
+      console.log(`[/link-chess] ✅ Sent verification email to ${userEmail} for Chess.com account "${username}"`);
 
-    res.json({
-      success: true,
-      message: `Verification email sent to ${userEmail}. Check your email to confirm linking your Chess.com account.`
-    });
+      res.json({
+        success: true,
+        message: `Verification email sent to ${userEmail}. Check your email to confirm linking your Chess.com account.`
+      });
+    } catch (emailErr) {
+      console.error("[/link-chess] Email send error:", emailErr.message);
+      res.status(500).json({ 
+        error: `Failed to send email: ${emailErr.message}` 
+      });
+    }
 
   } catch (err) {
-    console.error("[/link-chess]", err);
-    res.status(500).json({ error: "Failed to send verification email" });
+    console.error("[/link-chess] Error:", err.message);
+    res.status(500).json({ error: err.message || "Failed to process request" });
   }
 });
 
