@@ -439,7 +439,7 @@ app.get("/chess/auth", async (req, res) => {
       return res.redirect(lichessAuthUrl);
     }
 
-    // ── Chess.com: bio verification flow ──
+    // ── Chess.com: Personal access token verification flow ──
     if (!username) {
       return res.send(`<html><body style="background:#1e1f22;color:#fff;font-family:sans-serif;display:flex;align-items:center;justify-content:center;height:100vh;margin:0">
         <div style="text-align:center"><div style="font-size:48px">❌</div><div style="margin-top:12px">Username required</div></div>
@@ -447,12 +447,7 @@ app.get("/chess/auth", async (req, res) => {
       </body></html>`);
     }
 
-    // Generate a unique verification code for bio check
-    const crypto = require("crypto");
-    const verifyCode = "LOBBY-" + crypto.randomBytes(4).toString("hex").toUpperCase();
-
-    // Store pending verification
-    // Delete any existing record first to avoid conflicts
+    // Store pending verification session
     await pool.query(
       "DELETE FROM chess_verifications WHERE user_id = $1 AND platform = 'chess.com'",
       [userId]
@@ -460,41 +455,46 @@ app.get("/chess/auth", async (req, res) => {
     await pool.query(
       `INSERT INTO chess_verifications (user_id, platform, username, verification_code, code_expires_at, attempts)
        VALUES ($1, 'chess.com', $2, $3, $4, 0)`,
-      [userId, username, verifyCode, new Date(Date.now() + 15 * 60 * 1000)]
+      [userId, username, '', new Date(Date.now() + 10 * 60 * 1000)]
     );
 
     // Set content-type explicitly
     res.setHeader("Content-Type", "text/html; charset=utf-8");
 
-    // Show the bio-verification page
+    // Show the token verification page
     const escapedUsername = username.replace(/[<>&"']/g, c => ({'<':'&lt;','>':'&gt;','&':'&amp;','"':'&quot;',"'":'&#39;'}[c]));
     const html = `<!DOCTYPE html>
     <html>
     <head><meta charset="UTF-8"><title>Link Chess.com — LOBBY</title></head>
     <body style="background:#1e1f22;color:#f2f3f5;font-family:'Segoe UI',sans-serif;display:flex;align-items:center;justify-content:center;min-height:100vh;margin:0;padding:20px;box-sizing:border-box">
-      <div id="card" style="background:#2b2d31;border-radius:16px;padding:36px;max-width:460px;width:100%;box-shadow:0 24px 64px rgba(0,0,0,.5)">
+      <div id="card" style="background:#2b2d31;border-radius:16px;padding:36px;max-width:480px;width:100%;box-shadow:0 24px 64px rgba(0,0,0,.5)">
         <div style="text-align:center;margin-bottom:24px">
           <div style="font-size:42px;margin-bottom:12px">♟️</div>
           <div style="font-size:20px;font-weight:800">Verify Chess.com Account</div>
-          <div style="font-size:13px;color:#80848e;margin-top:6px">Prove you own <strong style="color:#f2f3f5">${escapedUsername}</strong></div>
+          <div style="font-size:13px;color:#80848e;margin-top:6px">Securely prove you own <strong style="color:#f2f3f5">${escapedUsername}</strong></div>
         </div>
 
         <div style="background:#1e1f22;border-radius:10px;padding:16px;margin-bottom:20px">
-          <div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.8px;color:#80848e;margin-bottom:10px">Step 1 — Add this code to your Chess.com bio</div>
-          <div style="display:flex;align-items:center;gap:10px;background:#313338;border-radius:8px;padding:12px 14px;border:1px solid rgba(255,255,255,.08)">
-            <code id="codeText" style="flex:1;font-size:16px;font-weight:700;letter-spacing:2px;color:#5865f2;font-family:'Courier New',monospace">${verifyCode}</code>
-            <button onclick="navigator.clipboard.writeText('${verifyCode}');this.textContent='✓ Copied';setTimeout(()=>this.textContent='Copy',1500)"
-              style="padding:6px 14px;background:#5865f2;color:#fff;border:none;border-radius:6px;font-size:12px;font-weight:700;cursor:pointer;font-family:inherit;white-space:nowrap">Copy</button>
-          </div>
-        </div>
-
-        <div style="background:#1e1f22;border-radius:10px;padding:16px;margin-bottom:20px">
-          <div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.8px;color:#80848e;margin-bottom:10px">Step 2 — Where to paste it</div>
+          <div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.8px;color:#80848e;margin-bottom:10px">Step 1 — Create a personal access token</div>
           <div style="font-size:13px;color:#b5bac1;line-height:1.6">
-            Go to <a href="https://www.chess.com/settings" target="_blank" style="color:#5865f2;text-decoration:none;font-weight:600">chess.com/settings ↗</a>
-            → scroll to <strong style="color:#f2f3f5">"Bio"</strong> or <strong style="color:#f2f3f5">"Location"</strong>
-            → paste the code → click <strong style="color:#f2f3f5">Save</strong>
+            1. Go to <a href="https://www.chess.com/settings/security" target="_blank" style="color:#5865f2;text-decoration:none;font-weight:600">chess.com/settings/security ↗</a><br>
+            2. Scroll to <strong style="color:#f2f3f5">"Personal Access Tokens"</strong><br>
+            3. Click <strong style="color:#f2f3f5">"Generate Token"</strong><br>
+            4. Give it any name (e.g., "LOBBY Verification")<br>
+            5. Select only <strong style="color:#f2f3f5">"Read-only"</strong> scope<br>
+            6. Copy the token (you'll only see it once)
           </div>
+        </div>
+
+        <div style="background:#1e1f22;border-radius:10px;padding:16px;margin-bottom:20px">
+          <div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.8px;color:#80848e;margin-bottom:10px">Step 2 — Paste your token here</div>
+          <input id="tokenInput" type="password" placeholder="Paste your Chess.com personal access token here" 
+            style="width:100%;padding:12px 14px;background:#313338;color:#f2f3f5;border:1px solid rgba(255,255,255,.1);border-radius:8px;font-size:13px;font-family:monospace;box-sizing:border-box;margin-bottom:8px"
+          />
+          <label style="display:flex;align-items:center;gap:8px;font-size:12px;color:#b5bac1;cursor:pointer">
+            <input id="showTokenCheckbox" type="checkbox" onchange="document.getElementById('tokenInput').type = this.checked ? 'text' : 'password'" style="cursor:pointer">
+            Show token
+          </label>
         </div>
 
         <div id="status" style="font-size:13px;min-height:20px;margin-bottom:14px;text-align:center"></div>
@@ -502,21 +502,29 @@ app.get("/chess/auth", async (req, res) => {
         <button id="verifyBtn" onclick="verify()"
           style="width:100%;padding:13px;background:#5865f2;color:#fff;border:none;border-radius:8px;font-size:15px;font-weight:700;cursor:pointer;font-family:inherit;transition:background .15s"
           onmouseover="this.style.background='#4752c4'" onmouseout="this.style.background='#5865f2'">
-          I've added it — Verify Now
+          Verify & Link
         </button>
         <button onclick="window.close()"
           style="width:100%;padding:10px;background:transparent;color:#80848e;border:1px solid rgba(255,255,255,.1);border-radius:8px;font-size:13px;cursor:pointer;font-family:inherit;margin-top:8px">
           Cancel
         </button>
-        <div style="font-size:11px;color:#80848e;text-align:center;margin-top:12px">You can remove the code from your bio after linking. Expires in 15 minutes.</div>
+        <div style="font-size:11px;color:#80848e;text-align:center;margin-top:12px">⚠️ <strong>Don't worry:</strong> We only use the token to verify you own the account, then you can delete it from your Chess.com settings immediately.</div>
       </div>
 
       <script>
         async function verify() {
           const btn = document.getElementById('verifyBtn');
           const status = document.getElementById('status');
+          const token = document.getElementById('tokenInput').value?.trim();
+
+          if (!token) {
+            status.style.color = '#ed4245';
+            status.textContent = 'Please paste your token first.';
+            return;
+          }
+
           btn.disabled = true;
-          btn.textContent = 'Checking your Chess.com profile…';
+          btn.textContent = 'Verifying token…';
           btn.style.opacity = '0.6';
           status.textContent = '';
 
@@ -524,7 +532,7 @@ app.get("/chess/auth", async (req, res) => {
             const res = await fetch(window.location.origin + '/chess/callback/chesscom', {
               method: 'POST',
               headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({ userId: ${userId} })
+              body: JSON.stringify({ userId: ${userId}, token: token })
             });
             const data = await res.json();
             if (!res.ok) throw new Error(data.error || 'Verification failed');
@@ -533,7 +541,7 @@ app.get("/chess/auth", async (req, res) => {
               <div style="text-align:center">
                 <div style="font-size:48px;margin-bottom:16px">✅</div>
                 <div style="font-size:18px;font-weight:700">Linked as \${data.username}</div>
-                <div style="font-size:13px;color:#80848e;margin-top:8px">You can remove the code from your bio now.</div>
+                <div style="font-size:13px;color:#80848e;margin-top:8px">You can now delete the token from your Chess.com settings.</div>
                 <div style="font-size:12px;color:#80848e;margin-top:4px">This window will close automatically.</div>
               </div>
             \`;
@@ -543,7 +551,7 @@ app.get("/chess/auth", async (req, res) => {
             status.style.color = '#ed4245';
             status.textContent = e.message;
             btn.disabled = false;
-            btn.textContent = 'Retry Verification';
+            btn.textContent = 'Retry';
             btn.style.opacity = '1';
           }
         }
@@ -654,10 +662,10 @@ app.get("/chess/callback/lichess", async (req, res) => {
   }
 });
 
-// ── Chess.com bio verification callback ──
+// ── Chess.com personal access token verification callback ──
 app.post("/chess/callback/chesscom", async (req, res) => {
-  const { userId } = req.body;
-  if (!userId) return res.status(400).json({ error: "Missing userId" });
+  const { userId, token } = req.body;
+  if (!userId || !token) return res.status(400).json({ error: "Missing userId or token" });
 
   try {
     // Get pending verification
@@ -668,66 +676,72 @@ app.post("/chess/callback/chesscom", async (req, res) => {
     if (!verRow.rows.length) return res.status(400).json({ error: "No pending verification — start again" });
 
     const verification = verRow.rows[0];
+    const chessUsername = verification.username;
 
     // Check expiry
     if (new Date() > new Date(verification.code_expires_at)) {
       await pool.query("DELETE FROM chess_verifications WHERE id = $1", [verification.id]);
-      return res.status(400).json({ error: "Verification code expired — close this window and try again" });
+      return res.status(400).json({ error: "Verification expired — close this window and try again" });
     }
 
     // Check brute force
-    if (verification.attempts >= 10) {
+    if (verification.attempts >= 5) {
       return res.status(429).json({ error: "Too many attempts — close this window and try again" });
     }
 
     // Increment attempts
     await pool.query("UPDATE chess_verifications SET attempts = attempts + 1 WHERE id = $1", [verification.id]);
 
-    const expectedCode = verification.verification_code;
-    const chessUsername = verification.username;
-
-    // Fetch the Chess.com player profile to check their bio/location for the code
+    // Verify the token by making an authenticated request to Chess.com API
     const axios = require("axios");
-    const profileRes = await axios.get(
-      `https://api.chess.com/pub/player/${encodeURIComponent(chessUsername.toLowerCase())}`,
-      { headers: { "User-Agent": "LOBBY-App/1.0" } }
-    );
+    try {
+      // Use the token as a Bearer token to access protected endpoints
+      const meRes = await axios.get("https://api.chess.com/pub/user", {
+        headers: {
+          "Authorization": `Bearer ${token}`,
+          "User-Agent": "LOBBY-App/1.0"
+        }
+      });
 
-    if (profileRes.status !== 200 || !profileRes.data) {
-      return res.status(404).json({ error: `Chess.com account "${chessUsername}" not found` });
-    }
+      const authenticatedUsername = meRes.data?.username;
+      if (!authenticatedUsername) {
+        return res.status(401).json({ error: "Token verification failed — invalid token or no user data" });
+      }
 
-    const profile = profileRes.data;
+      // Verify the token is for the correct account (case-insensitive)
+      if (authenticatedUsername.toLowerCase() !== chessUsername.toLowerCase()) {
+        return res.status(403).json({
+          error: `Token is for account "${authenticatedUsername}", but you're trying to link "${chessUsername}". Use the correct account's token.`
+        });
+      }
 
-    // Check bio and location for the verification code
-    const bio = (profile.bio || "").toUpperCase();
-    const location = (profile.location || "").toUpperCase();
-    const codeUpper = expectedCode.toUpperCase();
+      // Token verified! Save to database
+      await pool.query(
+        "UPDATE users SET chess_username = $1 WHERE id = $2",
+        [authenticatedUsername, userId]
+      );
 
-    if (!bio.includes(codeUpper) && !location.includes(codeUpper)) {
-      return res.status(400).json({
-        error: `Code not found in your Chess.com profile. Make sure you added "${expectedCode}" to your bio or location, saved it, and try again.`
+      // Clean up verification record
+      await pool.query("DELETE FROM chess_verifications WHERE id = $1", [verification.id]);
+
+      console.log(`[chess/chesscom] ✅ Token-verified and linked "${authenticatedUsername}" to userId ${userId}`);
+
+      res.json({
+        success: true,
+        platform: "chess.com",
+        username: authenticatedUsername,
+        message: "Chess.com account verified and linked"
+      });
+
+    } catch (tokenErr) {
+      // Token is invalid or expired
+      const isUnauth = tokenErr.response?.status === 401 || tokenErr.response?.status === 403;
+      return res.status(isUnauth ? 401 : 500).json({
+        error: isUnauth
+          ? "Invalid or expired token — generate a new one from chess.com/settings/security"
+          : "Could not verify token — try again"
       });
     }
-
-    // Verified! Save to database
-    const verifiedUsername = profile.username || chessUsername;
-    await pool.query(
-      "UPDATE users SET chess_username = $1 WHERE id = $2",
-      [verifiedUsername, userId]
-    );
-
-    // Clean up
-    await pool.query("DELETE FROM chess_verifications WHERE id = $1", [verification.id]);
-
-    console.log(`[chess/chesscom] ✅ Bio-verified and linked "${verifiedUsername}" to userId ${userId}`);
-
-    res.json({
-      success: true,
-      platform: "chess.com",
-      username: verifiedUsername,
-      message: "Chess.com account verified and linked"
-    });
 
   } catch (err) {
     console.error("[chess/chesscom callback]", err.message);
