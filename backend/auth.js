@@ -349,9 +349,11 @@ app.delete("/link-riot", requireAuth, async (req, res) => {
 });
 
 // ── Step 1: Start Chess Account Verification ──────────────────
-// ── Chess Integration (OAuth-window pattern, mirrors Steam) ─────
+// ── Chess Integration (with ownership verification) ─────────
 
-// GET /chess/auth — shows a confirmation page in a popup window
+// ── Lichess: OAuth2 PKCE flow (user logs into Lichess to prove ownership) ──
+
+// GET /chess/auth — entry point for the popup window
 app.get("/chess/auth", async (req, res) => {
   const { platform, username, token: queryToken } = req.query;
 
@@ -364,88 +366,141 @@ app.get("/chess/auth", async (req, res) => {
     } catch { return res.status(401).send("Invalid token"); }
   }
   if (!userId) return res.status(401).send("Unauthorized");
-
-  if (!platform || !username) {
-    return res.send(`<html><body style="background:#1e1f22;color:#fff;font-family:sans-serif;display:flex;align-items:center;justify-content:center;height:100vh;margin:0">
-      <div style="text-align:center"><div style="font-size:48px">❌</div><div style="margin-top:12px">Missing platform or username</div></div>
-      <script>setTimeout(() => window.close(), 3000);</script>
-    </body></html>`);
-  }
-
-  if (!["chess.com", "lichess"].includes(platform)) {
+  if (!platform || !["chess.com", "lichess"].includes(platform)) {
     return res.send(`<html><body style="background:#1e1f22;color:#fff;font-family:sans-serif;display:flex;align-items:center;justify-content:center;height:100vh;margin:0">
       <div style="text-align:center"><div style="font-size:48px">❌</div><div style="margin-top:12px">Invalid platform</div></div>
       <script>setTimeout(() => window.close(), 3000);</script>
     </body></html>`);
   }
 
-  const isLichess = platform === "lichess";
-  const platformName = isLichess ? "Lichess" : "Chess.com";
-  const profileUrl = isLichess
-    ? `https://lichess.org/@/${encodeURIComponent(username)}`
-    : `https://www.chess.com/member/${encodeURIComponent(username)}`;
+  if (platform === "lichess") {
+    // ── Lichess: redirect to Lichess OAuth login ──
+    // Generate PKCE code_verifier + code_challenge
+    const crypto = require("crypto");
+    const codeVerifier = crypto.randomBytes(32).toString("hex");
+    const codeChallenge = crypto.createHash("sha256").update(codeVerifier).digest("base64url");
+    const state = crypto.randomBytes(16).toString("hex");
 
-  // Show confirmation page
+    // Store verifier + state in DB so the callback can retrieve them
+    await pool.query(
+      `INSERT INTO chess_verifications (user_id, platform, username, verification_code, code_expires_at)
+       VALUES ($1, 'lichess', $2, $3, $4)
+       ON CONFLICT (user_id, platform)
+       DO UPDATE SET username = $2, verification_code = $3, code_expires_at = $4, attempts = 0`,
+      [userId, username || "pending", JSON.stringify({ codeVerifier, state }), new Date(Date.now() + 10 * 60 * 1000)]
+    );
+
+    const redirectUri = `https://lobby-auth-server.onrender.com/chess/callback/lichess?userId=${userId}`;
+    const lichessAuthUrl = `https://lichess.org/oauth`
+      + `?response_type=code`
+      + `&client_id=lobby-app`
+      + `&redirect_uri=${encodeURIComponent(redirectUri)}`
+      + `&code_challenge_method=S256`
+      + `&code_challenge=${codeChallenge}`
+      + `&state=${state}`;
+
+    return res.redirect(lichessAuthUrl);
+  }
+
+  // ── Chess.com: bio verification flow ──
+  if (!username) {
+    return res.send(`<html><body style="background:#1e1f22;color:#fff;font-family:sans-serif;display:flex;align-items:center;justify-content:center;height:100vh;margin:0">
+      <div style="text-align:center"><div style="font-size:48px">❌</div><div style="margin-top:12px">Username required</div></div>
+      <script>setTimeout(() => window.close(), 3000);</script>
+    </body></html>`);
+  }
+
+  // Generate a unique verification code for bio check
+  const crypto = require("crypto");
+  const verifyCode = "LOBBY-" + crypto.randomBytes(4).toString("hex").toUpperCase();
+
+  // Store pending verification
+  await pool.query(
+    `INSERT INTO chess_verifications (user_id, platform, username, verification_code, code_expires_at)
+     VALUES ($1, 'chess.com', $2, $3, $4)
+     ON CONFLICT (user_id, platform)
+     DO UPDATE SET username = $2, verification_code = $3, code_expires_at = $4, attempts = 0`,
+    [userId, username, verifyCode, new Date(Date.now() + 15 * 60 * 1000)]
+  );
+
+  // Show the bio-verification page
+  const escapedUsername = username.replace(/[<>&"']/g, c => ({'<':'&lt;','>':'&gt;','&':'&amp;','"':'&quot;',"'":'&#39;'}[c]));
   res.send(`
     <html>
-    <head><title>Link ${platformName} — LOBBY</title></head>
-    <body style="background:#1e1f22;color:#f2f3f5;font-family:'Segoe UI',sans-serif;display:flex;align-items:center;justify-content:center;height:100vh;margin:0">
-      <div style="background:#2b2d31;border-radius:16px;padding:40px;max-width:420px;width:90%;text-align:center;box-shadow:0 24px 64px rgba(0,0,0,.5)">
-        <div style="font-size:48px;margin-bottom:16px">${isLichess ? "🐴" : "♟️"}</div>
-        <div style="font-size:20px;font-weight:800;margin-bottom:8px">Link ${platformName}</div>
-        <div style="font-size:14px;color:#b5bac1;margin-bottom:24px">
-          You're about to link the ${platformName} account <strong style="color:#f2f3f5">${username}</strong> to your LOBBY profile.
+    <head><title>Link Chess.com — LOBBY</title></head>
+    <body style="background:#1e1f22;color:#f2f3f5;font-family:'Segoe UI',sans-serif;display:flex;align-items:center;justify-content:center;min-height:100vh;margin:0;padding:20px;box-sizing:border-box">
+      <div id="card" style="background:#2b2d31;border-radius:16px;padding:36px;max-width:460px;width:100%;box-shadow:0 24px 64px rgba(0,0,0,.5)">
+        <div style="text-align:center;margin-bottom:24px">
+          <div style="font-size:42px;margin-bottom:12px">♟️</div>
+          <div style="font-size:20px;font-weight:800">Verify Chess.com Account</div>
+          <div style="font-size:13px;color:#80848e;margin-top:6px">Prove you own <strong style="color:#f2f3f5">${escapedUsername}</strong></div>
         </div>
-        <div style="font-size:12px;color:#80848e;margin-bottom:24px">
-          <a href="${profileUrl}" target="_blank" style="color:#5865f2;text-decoration:none">View profile on ${platformName} ↗</a>
+
+        <div style="background:#1e1f22;border-radius:10px;padding:16px;margin-bottom:20px">
+          <div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.8px;color:#80848e;margin-bottom:10px">Step 1 — Add this code to your Chess.com bio</div>
+          <div style="display:flex;align-items:center;gap:10px;background:#313338;border-radius:8px;padding:12px 14px;border:1px solid rgba(255,255,255,.08)">
+            <code id="codeText" style="flex:1;font-size:16px;font-weight:700;letter-spacing:2px;color:#5865f2;font-family:'Courier New',monospace">${verifyCode}</code>
+            <button onclick="navigator.clipboard.writeText('${verifyCode}');this.textContent='✓ Copied';setTimeout(()=>this.textContent='Copy',1500)"
+              style="padding:6px 14px;background:#5865f2;color:#fff;border:none;border-radius:6px;font-size:12px;font-weight:700;cursor:pointer;font-family:inherit;white-space:nowrap">Copy</button>
+          </div>
         </div>
-        <div id="status" style="font-size:13px;color:#b5bac1;margin-bottom:16px;min-height:20px"></div>
-        <button id="confirmBtn" onclick="confirmLink()" style="width:100%;padding:13px;background:#5865f2;color:#fff;border:none;border-radius:8px;font-size:15px;font-weight:700;cursor:pointer;font-family:inherit;transition:background .15s"
+
+        <div style="background:#1e1f22;border-radius:10px;padding:16px;margin-bottom:20px">
+          <div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.8px;color:#80848e;margin-bottom:10px">Step 2 — Where to paste it</div>
+          <div style="font-size:13px;color:#b5bac1;line-height:1.6">
+            Go to <a href="https://www.chess.com/settings" target="_blank" style="color:#5865f2;text-decoration:none;font-weight:600">chess.com/settings ↗</a>
+            → scroll to <strong style="color:#f2f3f5">"Bio"</strong> or <strong style="color:#f2f3f5">"Location"</strong>
+            → paste the code → click <strong style="color:#f2f3f5">Save</strong>
+          </div>
+        </div>
+
+        <div id="status" style="font-size:13px;min-height:20px;margin-bottom:14px;text-align:center"></div>
+
+        <button id="verifyBtn" onclick="verify()"
+          style="width:100%;padding:13px;background:#5865f2;color:#fff;border:none;border-radius:8px;font-size:15px;font-weight:700;cursor:pointer;font-family:inherit;transition:background .15s"
           onmouseover="this.style.background='#4752c4'" onmouseout="this.style.background='#5865f2'">
-          Confirm Link
+          I've added it — Verify Now
         </button>
-        <button onclick="window.close()" style="width:100%;padding:10px;background:transparent;color:#80848e;border:1px solid rgba(255,255,255,.1);border-radius:8px;font-size:13px;cursor:pointer;font-family:inherit;margin-top:8px;transition:background .15s"
-          onmouseover="this.style.background='rgba(255,255,255,.05)'" onmouseout="this.style.background='transparent'">
+        <button onclick="window.close()"
+          style="width:100%;padding:10px;background:transparent;color:#80848e;border:1px solid rgba(255,255,255,.1);border-radius:8px;font-size:13px;cursor:pointer;font-family:inherit;margin-top:8px">
           Cancel
         </button>
+        <div style="font-size:11px;color:#80848e;text-align:center;margin-top:12px">You can remove the code from your bio after linking. Expires in 15 minutes.</div>
       </div>
+
       <script>
-        async function confirmLink() {
-          const btn = document.getElementById('confirmBtn');
+        async function verify() {
+          const btn = document.getElementById('verifyBtn');
           const status = document.getElementById('status');
           btn.disabled = true;
-          btn.textContent = 'Linking…';
+          btn.textContent = 'Checking your Chess.com profile…';
           btn.style.opacity = '0.6';
-          status.textContent = 'Verifying account on ${platformName}…';
-          status.style.color = '#b5bac1';
+          status.textContent = '';
 
           try {
-            const res = await fetch(window.location.origin + '/chess/callback', {
+            const res = await fetch(window.location.origin + '/chess/callback/chesscom', {
               method: 'POST',
               headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({
-                platform: '${platform}',
-                username: ${JSON.stringify(username)},
-                userId: ${userId}
-              })
+              body: JSON.stringify({ userId: ${userId} })
             });
             const data = await res.json();
-            if (!res.ok) throw new Error(data.error || 'Failed to link');
+            if (!res.ok) throw new Error(data.error || 'Verification failed');
 
-            status.style.color = '#57f287';
-            status.textContent = '';
-            document.querySelector('div[style*="max-width"]').innerHTML = \`
-              <div style="font-size:48px;margin-bottom:16px">✅</div>
-              <div style="font-size:18px;font-weight:700">Linked as \${data.username}</div>
-              <div style="font-size:13px;color:#80848e;margin-top:8px">You can close this window and return to LOBBY</div>
+            document.getElementById('card').innerHTML = \`
+              <div style="text-align:center">
+                <div style="font-size:48px;margin-bottom:16px">✅</div>
+                <div style="font-size:18px;font-weight:700">Linked as \${data.username}</div>
+                <div style="font-size:13px;color:#80848e;margin-top:8px">You can remove the code from your bio now.</div>
+                <div style="font-size:12px;color:#80848e;margin-top:4px">This window will close automatically.</div>
+              </div>
             \`;
-            try { window.opener?.postMessage({ type: 'chess-linked', platform: '${platform}', username: data.username }, '*'); } catch(e) {}
+            try { window.opener?.postMessage({ type:'chess-linked', platform:'chess.com', username:data.username }, '*'); } catch(e) {}
             setTimeout(() => { try { window.close(); } catch(e) {} }, 2500);
           } catch(e) {
             status.style.color = '#ed4245';
             status.textContent = e.message;
             btn.disabled = false;
-            btn.textContent = 'Retry';
+            btn.textContent = 'Retry Verification';
             btn.style.opacity = '1';
           }
         }
@@ -454,70 +509,173 @@ app.get("/chess/auth", async (req, res) => {
   `);
 });
 
-// POST /chess/callback — server-side verification and linking
-app.post("/chess/callback", async (req, res) => {
-  const { platform, username, userId } = req.body;
+// ── Lichess OAuth callback — Lichess redirects here after user logs in ──
+app.get("/chess/callback/lichess", async (req, res) => {
+  const { code, state, userId } = req.query;
 
-  if (!platform || !username || !userId) {
-    return res.status(400).json({ error: "Missing platform, username, or userId" });
-  }
-
-  if (!["chess.com", "lichess"].includes(platform)) {
-    return res.status(400).json({ error: "Invalid platform" });
+  if (!code || !userId) {
+    return res.send(`<html><body style="background:#1e1f22;color:#fff;font-family:sans-serif;display:flex;align-items:center;justify-content:center;height:100vh;margin:0">
+      <div style="text-align:center"><div style="font-size:48px">❌</div><div style="margin-top:12px">Missing authorization code</div></div>
+      <script>setTimeout(() => window.close(), 3000);</script>
+    </body></html>`);
   }
 
   try {
+    // Retrieve stored PKCE verifier
+    const verRow = await pool.query(
+      "SELECT * FROM chess_verifications WHERE user_id = $1 AND platform = 'lichess'",
+      [userId]
+    );
+    if (!verRow.rows.length) throw new Error("No pending verification found");
+
+    const stored = JSON.parse(verRow.rows[0].verification_code);
+    if (stored.state !== state) throw new Error("State mismatch — possible CSRF");
+
+    // Exchange authorization code for access token
     const axios = require("axios");
-    const isLichess = platform === "lichess";
+    const redirectUri = `https://lobby-auth-server.onrender.com/chess/callback/lichess?userId=${userId}`;
 
-    // Verify account exists on the chess platform
-    let verifiedUsername = username;
-    if (isLichess) {
-      const check = await axios.get(
-        `https://lichess.org/api/user/${encodeURIComponent(username.toLowerCase())}`,
-        { headers: { Accept: "application/json" } }
-      );
-      if (!check.data?.id) throw new Error("Account not found on Lichess");
-      verifiedUsername = check.data.username; // Use canonical casing from Lichess
-    } else {
-      const check = await axios.get(
-        `https://api.chess.com/pub/player/${encodeURIComponent(username.toLowerCase())}`,
-        { headers: { "User-Agent": "LOBBY-App/1.0" } }
-      );
-      if (check.status !== 200) throw new Error("Account not found on Chess.com");
-      verifiedUsername = check.data?.username || username; // Use canonical casing from Chess.com
+    const tokenRes = await axios.post("https://lichess.org/api/token", new URLSearchParams({
+      grant_type: "authorization_code",
+      code: code,
+      redirect_uri: redirectUri,
+      client_id: "lobby-app",
+      code_verifier: stored.codeVerifier,
+    }).toString(), {
+      headers: { "Content-Type": "application/x-www-form-urlencoded" }
+    });
+
+    const accessToken = tokenRes.data?.access_token;
+    if (!accessToken) throw new Error("No access token received from Lichess");
+
+    // Fetch the authenticated user's profile — this gives us their VERIFIED username
+    const profileRes = await axios.get("https://lichess.org/api/account", {
+      headers: { Authorization: `Bearer ${accessToken}` }
+    });
+
+    const lichessUsername = profileRes.data?.username;
+    if (!lichessUsername) throw new Error("Could not read Lichess username");
+
+    // Revoke the token immediately — we only needed it to confirm identity
+    await axios.delete("https://lichess.org/api/token", {
+      headers: { Authorization: `Bearer ${accessToken}` }
+    }).catch(() => {}); // Non-critical if revocation fails
+
+    // Save verified username to database
+    await pool.query(
+      "UPDATE users SET lichess_username = $1 WHERE id = $2",
+      [lichessUsername, userId]
+    );
+
+    // Clean up verification record
+    await pool.query("DELETE FROM chess_verifications WHERE user_id = $1 AND platform = 'lichess'", [userId]);
+
+    console.log(`[chess/lichess] ✅ OAuth-verified and linked "${lichessUsername}" to userId ${userId}`);
+
+    res.send(`
+      <html><body style="background:#1e1f22;color:#fff;font-family:sans-serif;display:flex;align-items:center;justify-content:center;height:100vh;margin:0">
+        <div style="text-align:center">
+          <div style="font-size:48px;margin-bottom:16px">✅</div>
+          <div style="font-size:18px;font-weight:700">Linked as ${lichessUsername}</div>
+          <div style="font-size:13px;color:#80848e;margin-top:8px">You can close this window and return to LOBBY</div>
+        </div>
+        <script>
+          try { window.opener?.postMessage({type:'chess-linked',platform:'lichess',username:${JSON.stringify(lichessUsername)}},'*'); } catch(e){}
+          setTimeout(() => { try { window.close(); } catch(e){} }, 2500);
+        </script>
+      </body></html>
+    `);
+  } catch (err) {
+    console.error("[chess/lichess callback]", err.message);
+    res.send(`<html><body style="background:#1e1f22;color:#fff;font-family:sans-serif;display:flex;align-items:center;justify-content:center;height:100vh;margin:0">
+      <div style="text-align:center">
+        <div style="font-size:48px">❌</div>
+        <div style="font-size:16px;margin-top:12px">${err.message || "Lichess verification failed"}</div>
+        <div style="font-size:12px;color:#80848e;margin-top:8px">Close this window and try again</div>
+      </div>
+      <script>setTimeout(() => window.close(), 5000);</script>
+    </body></html>`);
+  }
+});
+
+// ── Chess.com bio verification callback ──
+app.post("/chess/callback/chesscom", async (req, res) => {
+  const { userId } = req.body;
+  if (!userId) return res.status(400).json({ error: "Missing userId" });
+
+  try {
+    // Get pending verification
+    const verRow = await pool.query(
+      "SELECT * FROM chess_verifications WHERE user_id = $1 AND platform = 'chess.com'",
+      [userId]
+    );
+    if (!verRow.rows.length) return res.status(400).json({ error: "No pending verification — start again" });
+
+    const verification = verRow.rows[0];
+
+    // Check expiry
+    if (new Date() > new Date(verification.code_expires_at)) {
+      await pool.query("DELETE FROM chess_verifications WHERE id = $1", [verification.id]);
+      return res.status(400).json({ error: "Verification code expired — close this window and try again" });
     }
 
-    // Save to database
-    if (isLichess) {
-      await pool.query(
-        "UPDATE users SET lichess_username = $1 WHERE id = $2",
-        [verifiedUsername, userId]
-      );
-    } else {
-      await pool.query(
-        "UPDATE users SET chess_username = $1 WHERE id = $2",
-        [verifiedUsername, userId]
-      );
+    // Check brute force
+    if (verification.attempts >= 10) {
+      return res.status(429).json({ error: "Too many attempts — close this window and try again" });
     }
 
-    console.log(`[chess/callback] ✅ Linked ${platform} "${verifiedUsername}" to userId ${userId}`);
+    // Increment attempts
+    await pool.query("UPDATE chess_verifications SET attempts = attempts + 1 WHERE id = $1", [verification.id]);
+
+    const expectedCode = verification.verification_code;
+    const chessUsername = verification.username;
+
+    // Fetch the Chess.com player profile to check their bio/location for the code
+    const axios = require("axios");
+    const profileRes = await axios.get(
+      `https://api.chess.com/pub/player/${encodeURIComponent(chessUsername.toLowerCase())}`,
+      { headers: { "User-Agent": "LOBBY-App/1.0" } }
+    );
+
+    if (profileRes.status !== 200 || !profileRes.data) {
+      return res.status(404).json({ error: `Chess.com account "${chessUsername}" not found` });
+    }
+
+    const profile = profileRes.data;
+
+    // Check bio and location for the verification code
+    const bio = (profile.bio || "").toUpperCase();
+    const location = (profile.location || "").toUpperCase();
+    const codeUpper = expectedCode.toUpperCase();
+
+    if (!bio.includes(codeUpper) && !location.includes(codeUpper)) {
+      return res.status(400).json({
+        error: `Code not found in your Chess.com profile. Make sure you added "${expectedCode}" to your bio or location, saved it, and try again.`
+      });
+    }
+
+    // Verified! Save to database
+    const verifiedUsername = profile.username || chessUsername;
+    await pool.query(
+      "UPDATE users SET chess_username = $1 WHERE id = $2",
+      [verifiedUsername, userId]
+    );
+
+    // Clean up
+    await pool.query("DELETE FROM chess_verifications WHERE id = $1", [verification.id]);
+
+    console.log(`[chess/chesscom] ✅ Bio-verified and linked "${verifiedUsername}" to userId ${userId}`);
 
     res.json({
       success: true,
-      platform,
+      platform: "chess.com",
       username: verifiedUsername,
-      message: `${platform} account linked successfully`
+      message: "Chess.com account verified and linked"
     });
 
   } catch (err) {
-    console.error("[chess/callback]", err.message);
-    const is404 = err.response?.status === 404 || err.message?.includes("not found") || err.message?.includes("404");
-    res.status(is404 ? 404 : 500).json({
-      error: is404
-        ? `${platform} account "${username}" not found — check the spelling`
-        : "Failed to link account"
-    });
+    console.error("[chess/chesscom callback]", err.message);
+    res.status(500).json({ error: "Verification failed — try again" });
   }
 });
 
@@ -550,9 +708,8 @@ app.delete("/chess/unlink", requireAuth, async (req, res) => {
   }
 });
 
-// ── Keep old routes as aliases for backwards compatibility ───
+// ── Keep old DELETE route as alias for backwards compatibility ──
 app.delete("/link-chess", requireAuth, async (req, res) => {
-  // Redirect to new route handler
   const { platform } = req.body;
   if (!platform) return res.status(400).json({ error: "platform required" });
   try {

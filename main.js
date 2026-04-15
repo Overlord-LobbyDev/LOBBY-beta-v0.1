@@ -34,7 +34,9 @@ function createWindow() {
     if (
       url.startsWith("https://steamcommunity.com") ||
       url.startsWith("https://lobby-auth-server.onrender.com/steam") ||
-      url.startsWith("https://lobby-auth-server.onrender.com/chess")
+      url.startsWith("https://lobby-auth-server.onrender.com/chess") ||
+      url.startsWith("https://lichess.org/oauth") ||
+      url.startsWith("https://lichess.org/login")
     ) {
       return {
         action: "allow",
@@ -59,8 +61,9 @@ function createWindow() {
     steamWin.loadURL(url);
     steamWin.webContents.on("did-navigate", (e, navUrl) => {
       if (navUrl.startsWith("https://lobby-auth-server.onrender.com/steam/callback") ||
-          navUrl.startsWith("https://lobby-auth-server.onrender.com/chess/callback")) {
-        setTimeout(() => { try { if (steamWin && !steamWin.isDestroyed()) steamWin.close(); } catch(e) {} }, 2500);
+          navUrl.startsWith("https://lobby-auth-server.onrender.com/chess/callback/lichess") ||
+          navUrl.includes("chess-linked")) {
+        setTimeout(() => { try { if (steamWin && !steamWin.isDestroyed()) steamWin.close(); } catch(e) {} }, 3000);
       }
     });
     steamWin.on("closed", () => {});
