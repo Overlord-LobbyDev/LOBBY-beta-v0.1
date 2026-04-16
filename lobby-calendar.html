@@ -1,0 +1,687 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>Lobby Calendar</title>
+  <link rel="stylesheet" href="transitions.css" />
+  <script src="nav.js"></script>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    :root {
+      --bg-0:#1e1f22; --bg-1:#2b2d31; --bg-2:#313338; --bg-3:#383a40;
+      --accent:#5865f2; --accent-h:#4752c4; --danger:#ed4245;
+      --green:#23a55a; --text-1:#f2f3f5; --text-2:#b5bac1; --text-3:#80848e;
+      --radius:8px; --font:"gg sans","Noto Sans",Whitney,Helvetica Neue,Helvetica,Arial,sans-serif;
+    }
+    body { background:var(--bg-0); color:var(--text-1); font-family:var(--font); padding:20px; }
+
+    .calendar-container { max-width:1200px; margin:0 auto; }
+
+    .calendar-header {
+      display:flex; align-items:center; justify-content:space-between;
+      margin-bottom:24px; padding:20px; background:var(--bg-1); border-radius:12px;
+    }
+
+    .calendar-title {
+      display:flex; align-items:center; gap:12px;
+      font-size:24px; font-weight:700;
+    }
+
+    .calendar-icon { font-size:28px; }
+
+    .calendar-nav {
+      display:flex; align-items:center; gap:16px;
+    }
+
+    .month-nav {
+      display:flex; align-items:center; gap:12px;
+    }
+
+    .month-btn {
+      padding:8px 12px; background:var(--bg-3); border:none;
+      border-radius:6px; color:var(--text-2); cursor:pointer;
+      font-size:18px; transition:all .15s; font-family:var(--font);
+    }
+
+    .month-btn:hover { background:var(--bg-2); color:var(--text-1); }
+
+    .current-month {
+      font-size:18px; font-weight:700; min-width:180px; text-align:center;
+    }
+
+    .btn-create {
+      padding:10px 20px; background:var(--accent); border:none;
+      border-radius:8px; color:#fff; font-size:14px; font-weight:600;
+      cursor:pointer; transition:background .15s; font-family:var(--font);
+      display:flex; align-items:center; gap:8px;
+    }
+
+    .btn-create:hover { background:var(--accent-h); }
+
+    .calendar-grid {
+      display:grid; grid-template-columns:repeat(7, 1fr);
+      gap:1px; background:rgba(255,255,255,.06);
+      border-radius:8px; overflow:hidden;
+    }
+
+    .cal-day-header {
+      background:var(--bg-1); padding:12px; text-align:center;
+      font-size:12px; font-weight:700; text-transform:uppercase;
+      letter-spacing:.8px; color:var(--text-3);
+    }
+
+    .cal-day {
+      background:var(--bg-1); padding:8px; min-height:120px;
+      position:relative; cursor:pointer; transition:background .15s;
+    }
+
+    .cal-day:hover { background:var(--bg-2); }
+
+    .cal-day.other-month { opacity:.4; }
+
+    .cal-day.today { background:rgba(88,101,242,.12); }
+    .cal-day.today .day-number { color:var(--accent); font-weight:700; }
+
+    .day-number {
+      font-size:14px; font-weight:600; margin-bottom:6px;
+      color:var(--text-2);
+    }
+
+    .day-events { display:flex; flex-direction:column; gap:3px; }
+
+    .event-dot {
+      padding:3px 6px; border-radius:4px; font-size:10px;
+      font-weight:600; white-space:nowrap; overflow:hidden;
+      text-overflow:ellipsis; display:flex; align-items:center; gap:4px;
+      transition:transform .1s;
+    }
+
+    .event-dot:hover { transform:translateX(2px); }
+
+    .event-dot.tournament { background:rgba(88,101,242,.2); color:#7c8ff5; border-left:3px solid var(--accent); }
+    .event-dot.public { background:rgba(35,165,90,.15); color:#57f287; border-left:3px solid var(--green); }
+    .event-dot.online { background:rgba(240,178,50,.15); color:#f0b232; border-left:3px solid #f0b232; }
+    .event-dot.private { background:rgba(255,255,255,.05); color:var(--text-3); border-left:3px solid var(--text-3); }
+
+    .event-icon { font-size:9px; }
+
+    /* ── Modal ── */
+    .modal {
+      display:none; position:fixed; inset:0; background:rgba(0,0,0,.7);
+      align-items:center; justify-content:center; z-index:100;
+    }
+
+    .modal.open { display:flex; }
+
+    .modal-content {
+      background:var(--bg-1); border-radius:12px; width:min(500px, 92vw);
+      max-height:90vh; overflow-y:auto; box-shadow:0 24px 64px rgba(0,0,0,.6);
+    }
+
+    .modal-header {
+      padding:20px; border-bottom:1px solid rgba(255,255,255,.06);
+      display:flex; align-items:center; justify-content:space-between;
+    }
+
+    .modal-title { font-size:20px; font-weight:700; }
+
+    .modal-close {
+      background:none; border:none; color:var(--text-3); font-size:20px;
+      cursor:pointer; width:32px; height:32px; border-radius:50%;
+      display:flex; align-items:center; justify-content:center;
+      transition:background .15s, color .15s;
+    }
+
+    .modal-close:hover { background:rgba(255,255,255,.08); color:var(--text-1); }
+
+    .modal-body { padding:20px; }
+
+    .form-group { margin-bottom:16px; }
+
+    .form-label {
+      display:block; font-size:12px; font-weight:700;
+      text-transform:uppercase; letter-spacing:.8px; color:var(--text-3);
+      margin-bottom:8px;
+    }
+
+    .form-input, .form-select, .form-textarea {
+      width:100%; padding:10px 12px; background:var(--bg-3);
+      border:1.5px solid rgba(255,255,255,.1); border-radius:8px;
+      color:var(--text-1); font-size:14px; font-family:var(--font);
+      transition:border-color .15s;
+    }
+
+    .form-input:focus, .form-select:focus, .form-textarea:focus {
+      outline:none; border-color:var(--accent);
+    }
+
+    .form-textarea { resize:vertical; min-height:80px; }
+
+    .event-type-grid {
+      display:grid; grid-template-columns:repeat(2, 1fr); gap:8px;
+    }
+
+    .event-type-card {
+      padding:12px; border-radius:8px; border:2px solid rgba(255,255,255,.08);
+      background:var(--bg-3); cursor:pointer; transition:all .15s;
+      display:flex; flex-direction:column; gap:4px;
+    }
+
+    .event-type-card:hover { border-color:rgba(255,255,255,.2); }
+
+    .event-type-card.selected { border-color:var(--accent); background:rgba(88,101,242,.08); }
+
+    .event-type-name { font-size:13px; font-weight:700; }
+
+    .event-type-desc { font-size:11px; color:var(--text-3); }
+
+    .action-buttons {
+      display:flex; gap:10px; margin-top:20px;
+    }
+
+    .btn {
+      flex:1; padding:12px; border:none; border-radius:8px;
+      font-size:14px; font-weight:600; cursor:pointer;
+      transition:all .15s; font-family:var(--font);
+    }
+
+    .btn-primary { background:var(--accent); color:#fff; }
+    .btn-primary:hover { background:var(--accent-h); }
+
+    .btn-secondary { background:var(--bg-3); color:var(--text-2); }
+    .btn-secondary:hover { background:var(--bg-2); color:var(--text-1); }
+
+    .btn-danger { background:rgba(237,66,69,.15); color:var(--danger); border:1px solid rgba(237,66,69,.3); }
+    .btn-danger:hover { background:rgba(237,66,69,.25); }
+
+    /* Event details modal */
+    .event-detail-header {
+      padding:16px 20px; border-bottom:1px solid rgba(255,255,255,.06);
+    }
+
+    .event-detail-type {
+      display:inline-block; padding:4px 10px; border-radius:6px;
+      font-size:11px; font-weight:700; text-transform:uppercase;
+      letter-spacing:.6px; margin-bottom:8px;
+    }
+
+    .event-detail-type.tournament { background:rgba(88,101,242,.2); color:var(--accent); }
+    .event-detail-type.public { background:rgba(35,165,90,.15); color:var(--green); }
+    .event-detail-type.online { background:rgba(240,178,50,.15); color:#f0b232; }
+    .event-detail-type.private { background:rgba(255,255,255,.05); color:var(--text-3); }
+
+    .event-detail-title { font-size:22px; font-weight:700; margin-bottom:4px; }
+
+    .event-detail-time {
+      font-size:13px; color:var(--text-3);
+      display:flex; align-items:center; gap:6px;
+    }
+
+    .event-detail-body { padding:20px; }
+
+    .event-detail-section { margin-bottom:16px; }
+
+    .event-detail-label {
+      font-size:11px; font-weight:700; text-transform:uppercase;
+      letter-spacing:.8px; color:var(--text-3); margin-bottom:6px;
+    }
+
+    .event-detail-value { font-size:14px; color:var(--text-2); line-height:1.6; }
+
+    .event-detail-location {
+      display:flex; align-items:center; gap:8px;
+      padding:10px 12px; background:var(--bg-2); border-radius:6px;
+    }
+
+    .checkbox-row {
+      display:flex; align-items:center; gap:10px; margin-top:10px;
+    }
+
+    .checkbox-row input[type="checkbox"] {
+      width:18px; height:18px; cursor:pointer;
+    }
+
+    .checkbox-row label {
+      font-size:13px; color:var(--text-2); cursor:pointer;
+      margin:0; text-transform:none; letter-spacing:0; font-weight:400;
+    }
+  </style>
+</head>
+<body>
+
+<div class="calendar-container">
+  <!-- Header -->
+  <div class="calendar-header">
+    <div class="calendar-title">
+      <span class="calendar-icon">📅</span>
+      <span id="lobbyName">Lobby Calendar</span>
+    </div>
+    <div class="calendar-nav">
+      <div class="month-nav">
+        <button class="month-btn" onclick="changeMonth(-1)">‹</button>
+        <div class="current-month" id="currentMonth">January 2025</div>
+        <button class="month-btn" onclick="changeMonth(1)">›</button>
+      </div>
+      <button class="btn-create" onclick="openCreateModal()" id="btnCreate">
+        <span>➕</span>
+        <span>Create Event</span>
+      </button>
+    </div>
+  </div>
+
+  <!-- Calendar Grid -->
+  <div class="calendar-grid">
+    <div class="cal-day-header">Sun</div>
+    <div class="cal-day-header">Mon</div>
+    <div class="cal-day-header">Tue</div>
+    <div class="cal-day-header">Wed</div>
+    <div class="cal-day-header">Thu</div>
+    <div class="cal-day-header">Fri</div>
+    <div class="cal-day-header">Sat</div>
+    <!-- Days populated by JS -->
+    <div id="calendarDays"></div>
+  </div>
+</div>
+
+<!-- Create/Edit Event Modal -->
+<div class="modal" id="eventModal">
+  <div class="modal-content">
+    <div class="modal-header">
+      <h2 class="modal-title" id="modalTitle">Create Event</h2>
+      <button class="modal-close" onclick="closeModal()">✕</button>
+    </div>
+    <div class="modal-body">
+      <form id="eventForm" onsubmit="saveEvent(event)">
+
+        <div class="form-group">
+          <label class="form-label">Event Type</label>
+          <div class="event-type-grid">
+            <div class="event-type-card selected" onclick="selectEventType('public', this)">
+              <div class="event-type-name">🌍 Public</div>
+              <div class="event-type-desc">Everyone can see</div>
+            </div>
+            <div class="event-type-card" onclick="selectEventType('online', this)">
+              <div class="event-type-name">💻 Online</div>
+              <div class="event-type-desc">Virtual event</div>
+            </div>
+          </div>
+          <div class="checkbox-row">
+            <input type="checkbox" id="privateCheck" onchange="togglePrivate()" />
+            <label for="privateCheck">Make this event private (only visible to you)</label>
+          </div>
+          <input type="hidden" id="eventType" value="public" />
+        </div>
+
+        <div class="form-group">
+          <label class="form-label" for="eventTitle">Event Title</label>
+          <input type="text" id="eventTitle" class="form-input" placeholder="e.g., Weekly Game Night" required />
+        </div>
+
+        <div class="form-group">
+          <label class="form-label" for="eventDesc">Description</label>
+          <textarea id="eventDesc" class="form-textarea" placeholder="Optional details about the event"></textarea>
+        </div>
+
+        <div class="form-group">
+          <label class="form-label" for="eventDate">Date & Time</label>
+          <input type="datetime-local" id="eventDate" class="form-input" required />
+        </div>
+
+        <div class="form-group" id="locationGroup">
+          <label class="form-label" for="eventLocation">Location</label>
+          <input type="text" id="eventLocation" class="form-input" placeholder="e.g., Discord Voice Channel, https://meet.google.com/..." />
+        </div>
+
+        <div class="action-buttons">
+          <button type="button" class="btn btn-secondary" onclick="closeModal()">Cancel</button>
+          <button type="submit" class="btn btn-primary">Create Event</button>
+        </div>
+
+      </form>
+    </div>
+  </div>
+</div>
+
+<!-- Event Details Modal -->
+<div class="modal" id="eventDetailModal">
+  <div class="modal-content">
+    <div class="modal-header">
+      <h2 class="modal-title">Event Details</h2>
+      <button class="modal-close" onclick="closeDetailModal()">✕</button>
+    </div>
+    <div class="event-detail-header">
+      <div class="event-detail-type" id="detailType">Public</div>
+      <div class="event-detail-title" id="detailTitle">Event Title</div>
+      <div class="event-detail-time" id="detailTime">
+        <span>🕐</span>
+        <span>January 15, 2025 at 7:00 PM</span>
+      </div>
+    </div>
+    <div class="event-detail-body">
+      <div class="event-detail-section" id="detailDescSection" style="display:none">
+        <div class="event-detail-label">Description</div>
+        <div class="event-detail-value" id="detailDesc"></div>
+      </div>
+      <div class="event-detail-section" id="detailLocationSection" style="display:none">
+        <div class="event-detail-label">Location</div>
+        <div class="event-detail-location">
+          <span>📍</span>
+          <span id="detailLocation"></span>
+        </div>
+      </div>
+      <div class="action-buttons" id="detailActions">
+        <button type="button" class="btn btn-secondary" onclick="closeDetailModal()">Close</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+const AUTH_URL = "https://lobby-auth-server.onrender.com";
+const token = localStorage.getItem("vh_token") || sessionStorage.getItem("vh_token");
+if (!token) smoothNavigate("login.html", "down");
+
+const params = new URLSearchParams(window.location.search);
+const lobbyId = params.get("lobbyId");
+if (!lobbyId) smoothNavigate("index.html", "down");
+
+let currentDate = new Date();
+let events = []; // { id, type, title, desc, date, location, isPrivate, createdBy }
+let currentUser = null;
+let isAdmin = false;
+
+async function boot() {
+  try {
+    const meRes = await fetch(`${AUTH_URL}/me`, {
+      headers: { Authorization: `Bearer ${token}` }
+    });
+    currentUser = await meRes.json();
+
+    // Check if user is lobby admin (host)
+    // TODO: implement proper lobby permission check
+    isAdmin = true; // For now, assume all users can create events
+
+    if (!isAdmin) {
+      document.getElementById('btnCreate').style.display = 'none';
+    }
+
+    document.getElementById('lobbyName').textContent = `${params.get("lobbyName") || "Lobby"} Calendar`;
+
+    await loadEvents();
+    renderCalendar();
+  } catch (err) {
+    console.error('Boot error:', err);
+  }
+}
+
+async function loadEvents() {
+  try {
+    // Load all events from backend (includes tournaments + custom events)
+    const eventsRes = await fetch(`${AUTH_URL}/api/events/lobby/${lobbyId}`, {
+      headers: { Authorization: `Bearer ${token}` }
+    });
+    const eventsData = await eventsRes.json();
+    
+    events = (eventsData.events || []).map(e => ({
+      ...e,
+      date: new Date(e.event_date)
+    }));
+
+  } catch (err) {
+    console.error('Load events error:', err);
+    events = [];
+  }
+}
+
+function renderCalendar() {
+  const year = currentDate.getFullYear();
+  const month = currentDate.getMonth();
+
+  document.getElementById('currentMonth').textContent = 
+    currentDate.toLocaleDateString('en-US', { month: 'long', year: 'numeric' });
+
+  const firstDay = new Date(year, month, 1).getDay();
+  const daysInMonth = new Date(year, month + 1, 0).getDate();
+  const daysInPrevMonth = new Date(year, month, 0).getDate();
+
+  const daysContainer = document.getElementById('calendarDays');
+  daysContainer.innerHTML = '';
+
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+
+  // Previous month days
+  for (let i = firstDay - 1; i >= 0; i--) {
+    const day = daysInPrevMonth - i;
+    const dayEl = createDayElement(day, year, month - 1, true);
+    daysContainer.appendChild(dayEl);
+  }
+
+  // Current month days
+  for (let day = 1; day <= daysInMonth; day++) {
+    const dayEl = createDayElement(day, year, month, false);
+    const dayDate = new Date(year, month, day);
+    
+    if (dayDate.getTime() === today.getTime()) {
+      dayEl.classList.add('today');
+    }
+
+    daysContainer.appendChild(dayEl);
+  }
+
+  // Next month days
+  const totalCells = daysContainer.children.length;
+  const remainingCells = 42 - totalCells; // 6 rows of 7
+  for (let day = 1; day <= remainingCells; day++) {
+    const dayEl = createDayElement(day, year, month + 1, true);
+    daysContainer.appendChild(dayEl);
+  }
+}
+
+function createDayElement(day, year, month, isOtherMonth) {
+  const dayEl = document.createElement('div');
+  dayEl.className = 'cal-day';
+  if (isOtherMonth) dayEl.classList.add('other-month');
+
+  const dayNumber = document.createElement('div');
+  dayNumber.className = 'day-number';
+  dayNumber.textContent = day;
+
+  const eventsContainer = document.createElement('div');
+  eventsContainer.className = 'day-events';
+
+  // Find events for this day
+  const dayDate = new Date(year, month, day);
+  dayDate.setHours(0, 0, 0, 0);
+
+  const dayEvents = events.filter(e => {
+    const eventDate = new Date(e.date);
+    eventDate.setHours(0, 0, 0, 0);
+    return eventDate.getTime() === dayDate.getTime() && 
+           (!e.is_private || e.created_by === currentUser?.id);
+  });
+
+  dayEvents.forEach(event => {
+    const eventDot = document.createElement('div');
+    eventDot.className = `event-dot ${event.type}`;
+    eventDot.innerHTML = `
+      <span class="event-icon">${getEventIcon(event.type)}</span>
+      <span>${event.title}</span>
+    `;
+    eventDot.onclick = (e) => {
+      e.stopPropagation();
+      showEventDetails(event);
+    };
+    eventsContainer.appendChild(eventDot);
+  });
+
+  dayEl.appendChild(dayNumber);
+  dayEl.appendChild(eventsContainer);
+
+  dayEl.onclick = () => {
+    if (!isOtherMonth && isAdmin) {
+      openCreateModal(new Date(year, month, day));
+    }
+  };
+
+  return dayEl;
+}
+
+function getEventIcon(type) {
+  switch(type) {
+    case 'tournament': return '🏆';
+    case 'public': return '🌍';
+    case 'online': return '💻';
+    case 'private': return '🔒';
+    default: return '📌';
+  }
+}
+
+function changeMonth(delta) {
+  currentDate.setMonth(currentDate.getMonth() + delta);
+  renderCalendar();
+}
+
+function openCreateModal(presetDate) {
+  document.getElementById('modalTitle').textContent = 'Create Event';
+  document.getElementById('eventForm').reset();
+  
+  if (presetDate) {
+    const dateStr = presetDate.toISOString().slice(0, 16);
+    document.getElementById('eventDate').value = dateStr;
+  }
+
+  selectEventType('public', document.querySelector('.event-type-card'));
+  document.getElementById('privateCheck').checked = false;
+  
+  document.getElementById('eventModal').classList.add('open');
+}
+
+function closeModal() {
+  document.getElementById('eventModal').classList.remove('open');
+}
+
+function selectEventType(type, el) {
+  document.querySelectorAll('.event-type-card').forEach(c => c.classList.remove('selected'));
+  el.classList.add('selected');
+  document.getElementById('eventType').value = type;
+}
+
+function togglePrivate() {
+  const isPrivate = document.getElementById('privateCheck').checked;
+  // Just visual feedback — actual privacy handled in saveEvent
+}
+
+async function saveEvent(e) {
+  e.preventDefault();
+
+  const type = document.getElementById('eventType').value;
+  const isPrivate = document.getElementById('privateCheck').checked;
+  const title = document.getElementById('eventTitle').value;
+  const description = document.getElementById('eventDesc').value;
+  const eventDate = new Date(document.getElementById('eventDate').value);
+  const location = document.getElementById('eventLocation').value;
+
+  try {
+    const response = await fetch(`${AUTH_URL}/api/events/create`, {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${token}`,
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({
+        lobbyId,
+        eventType: isPrivate ? 'private' : type,
+        title,
+        description,
+        eventDate: eventDate.toISOString(),
+        location,
+        isPrivate
+      })
+    });
+
+    if (!response.ok) {
+      throw new Error('Failed to create event');
+    }
+
+    closeModal();
+    await loadEvents();
+    renderCalendar();
+  } catch (err) {
+    console.error('Save event error:', err);
+    alert('Failed to create event. Please try again.');
+  }
+}
+
+function showEventDetails(event) {
+  document.getElementById('detailType').className = `event-detail-type ${event.type}`;
+  document.getElementById('detailType').textContent = event.type.toUpperCase();
+  document.getElementById('detailTitle').textContent = event.title;
+  
+  const timeStr = event.date.toLocaleDateString('en-US', { 
+    month: 'long', day: 'numeric', year: 'numeric', hour: 'numeric', minute: '2-digit' 
+  });
+  document.getElementById('detailTime').innerHTML = `<span>🕐</span><span>${timeStr}</span>`;
+
+  if (event.description) {
+    document.getElementById('detailDescSection').style.display = 'block';
+    document.getElementById('detailDesc').textContent = event.description;
+  } else {
+    document.getElementById('detailDescSection').style.display = 'none';
+  }
+
+  if (event.location) {
+    document.getElementById('detailLocationSection').style.display = 'block';
+    document.getElementById('detailLocation').textContent = event.location;
+  } else {
+    document.getElementById('detailLocationSection').style.display = 'none';
+  }
+
+  // Show delete button if user created it (not for tournaments)
+  const actionsEl = document.getElementById('detailActions');
+  if (event.created_by === currentUser.id && !event.tournament_id) {
+    actionsEl.innerHTML = `
+      <button type="button" class="btn btn-danger" onclick="deleteEvent('${event.id}')">Delete</button>
+      <button type="button" class="btn btn-secondary" onclick="closeDetailModal()">Close</button>
+    `;
+  } else {
+    actionsEl.innerHTML = `
+      <button type="button" class="btn btn-secondary" onclick="closeDetailModal()">Close</button>
+    `;
+  }
+
+  document.getElementById('eventDetailModal').classList.add('open');
+}
+
+function closeDetailModal() {
+  document.getElementById('eventDetailModal').classList.remove('open');
+}
+
+async function deleteEvent(eventId) {
+  if (!confirm('Delete this event?')) return;
+
+  try {
+    const response = await fetch(`${AUTH_URL}/api/events/${eventId}`, {
+      method: 'DELETE',
+      headers: {
+        'Authorization': `Bearer ${token}`
+      }
+    });
+
+    if (!response.ok) {
+      throw new Error('Failed to delete event');
+    }
+
+    closeDetailModal();
+    await loadEvents();
+    renderCalendar();
+  } catch (err) {
+    console.error('Delete event error:', err);
+    alert('Failed to delete event. Please try again.');
+  }
+}
+
+boot();
+</script>
+</body>
+</html>

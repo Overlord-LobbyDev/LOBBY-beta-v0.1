@@ -138,6 +138,17 @@ async function handleTournamentSubmit(e) {
         return;
     }
 
+    // Read result mode — "automatic" maps to the specific API type
+    // Sources: radio buttons (tournaments.html) OR hidden #tournamentResultMode (index.html dropdown)
+    const rawMode   = (document.querySelector('input[name="resultMode"]:checked')?.value)
+                        || document.getElementById('tournamentResultMode')?.value
+                        || window._pendingResultMode
+                        || 'manual';
+    const apiType   = document.getElementById('autoApiType')?.value  || 'riot-api';
+    const apiGame   = document.getElementById('autoGameValue')?.value || 'lol';
+    const resultMode = rawMode === 'automatic' ? apiType : rawMode;
+    const resolvedApiGame = rawMode === 'automatic' ? apiGame : null;
+
     const tournamentData = {
         lobbyId: currentLobbyId,
         name: document.getElementById('tournamentName').value,
@@ -149,17 +160,8 @@ async function handleTournamentSubmit(e) {
         hasLosersBracket:     document.getElementById('tournamentLosers')?.checked || false,
         hasPointsTally:       document.getElementById('tournamentPoints')?.checked !== false,
         hostJoinsAsPlayer:    document.getElementById('tournamentHostJoins')?.checked !== false,
-        // Result mode — reads from radio buttons (tournaments.html new UI) or legacy select
-        resultMode:           (document.querySelector('input[name="resultMode"]:checked')?.value)
-                                || document.getElementById('tournamentResultMode')?.value
-                                || window._pendingResultMode
-                                || 'manual',
-        // API game (riot: lol/valorant/tft, chess: chess.com/lichess)
-        apiGame:              document.getElementById('riotGameSelect')?.value
-                                || document.getElementById('chessPlatformSelect')?.value
-                                || window._pendingApiGame
-                                || null,
-        // Dispute timeout for self-report mode (minutes)
+        resultMode,
+        apiGame:              resolvedApiGame,
         disputeTimeout:       parseInt(document.getElementById('disputeTimeoutInput')?.value)
                                 || window._pendingDisputeTimeout
                                 || 30,
@@ -851,11 +853,13 @@ function showBracketPanel(tournament) {
                     tournament.resultMode==='self-report' ? '#57f287'
                     : tournament.resultMode==='riot-api'  ? '#e57373'
                     : tournament.resultMode==='chess-api' ? 'var(--yellow)'
+                    : tournament.resultMode==='automatic' ? 'var(--accent)'
                     : 'var(--text-2)'
                   }">${
                     tournament.resultMode==='self-report' ? '🤝 Self-report'
                     : tournament.resultMode==='riot-api'  ? `⚔️ Riot API${tournament.apiGame ? ' · ' + tournament.apiGame.toUpperCase() : ''}`
                     : tournament.resultMode==='chess-api' ? `♟️ ${tournament.apiGame === 'lichess' ? 'Lichess' : 'Chess.com'}`
+                    : tournament.resultMode==='automatic' ? `⚡ Auto${tournament.apiGame ? ' · ' + tournament.apiGame : ''}`
                     : '🖊️ Manual'
                   }</div></div>
                 </div>

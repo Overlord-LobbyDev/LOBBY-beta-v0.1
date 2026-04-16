@@ -596,6 +596,89 @@
 
     .api-game-section.visible { display: block; }
 
+    /* ──────────── AUTO WARNING BANNER ──────────── */
+    .auto-warning-banner {
+      padding: 12px 14px;
+      background: rgba(240,178,50,0.1);
+      border: 1px solid rgba(240,178,50,0.3);
+      border-radius: 8px;
+      font-size: 12px;
+      color: var(--yellow);
+      line-height: 1.5;
+    }
+
+    /* ──────────── AUTO GAME GRID ──────────── */
+    .auto-game-grid {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 8px;
+      margin-top: 8px;
+    }
+
+    .auto-game-card {
+      position: relative;
+      border-radius: 8px;
+      border: 2px solid rgba(255,255,255,0.08);
+      background: var(--bg-3);
+      cursor: pointer;
+      overflow: hidden;
+      transition: border-color 0.15s, transform 0.1s;
+      user-select: none;
+    }
+
+    .auto-game-card:hover {
+      border-color: rgba(255,255,255,0.25);
+      transform: translateY(-2px);
+    }
+
+    .auto-game-card.selected {
+      border-color: var(--accent);
+    }
+
+    .auto-game-thumb {
+      width: 100%;
+      height: 56px;
+      object-fit: cover;
+      display: block;
+      background: var(--bg-3);
+    }
+
+    .auto-game-info {
+      padding: 6px 8px;
+    }
+
+    .auto-game-name {
+      font-size: 11px;
+      font-weight: 700;
+      color: var(--text-1);
+      line-height: 1.3;
+    }
+
+    .auto-game-api {
+      font-size: 10px;
+      color: var(--text-3);
+      margin-top: 2px;
+    }
+
+    .auto-game-check {
+      display: none;
+      position: absolute;
+      top: 4px;
+      right: 4px;
+      width: 18px;
+      height: 18px;
+      background: var(--accent);
+      border-radius: 50%;
+      font-size: 10px;
+      color: #fff;
+      align-items: center;
+      justify-content: center;
+      font-weight: 700;
+    }
+
+    .auto-game-card.selected .auto-game-check { display: flex; }
+
+    /* ──────────── LEGACY game-select-grid (kept for compat) ──────────── */
     .game-select-grid {
       display: grid;
       grid-template-columns: repeat(3, 1fr);
@@ -829,8 +912,8 @@
                 <input type="radio" name="resultMode" value="manual" checked onchange="onResultModeChange(this.value)" />
                 <div class="result-mode-card">
                   <span class="result-mode-card-icon">🖊️</span>
-                  <span class="result-mode-card-name">Manual</span>
-                  <span class="result-mode-card-desc">Host updates scores and advances players.</span>
+                  <span class="result-mode-card-name">Host Manages</span>
+                  <span class="result-mode-card-desc">You decide the score and advance players after each match. Works for any game.</span>
                   <span class="result-mode-card-tag tag-manual">All games</span>
                 </div>
               </label>
@@ -846,25 +929,14 @@
                 </div>
               </label>
 
-              <!-- Riot API -->
+              <!-- Automatic -->
               <label class="result-mode-option">
-                <input type="radio" name="resultMode" value="riot-api" onchange="onResultModeChange(this.value)" />
+                <input type="radio" name="resultMode" value="automatic" onchange="onResultModeChange(this.value)" />
                 <div class="result-mode-card">
-                  <span class="result-mode-card-icon">⚔️</span>
-                  <span class="result-mode-card-name">Riot API</span>
-                  <span class="result-mode-card-desc">Auto-pulls results from Riot servers. No input needed.</span>
-                  <span class="result-mode-card-tag tag-api">LoL · VALORANT · TFT</span>
-                </div>
-              </label>
-
-              <!-- Chess.com / Lichess -->
-              <label class="result-mode-option">
-                <input type="radio" name="resultMode" value="chess-api" onchange="onResultModeChange(this.value)" />
-                <div class="result-mode-card">
-                  <span class="result-mode-card-icon">♟️</span>
-                  <span class="result-mode-card-name">Chess API</span>
-                  <span class="result-mode-card-desc">Auto-pulls results from Chess.com or Lichess.</span>
-                  <span class="result-mode-card-tag tag-open">Chess.com · Lichess</span>
+                  <span class="result-mode-card-icon">⚡</span>
+                  <span class="result-mode-card-name">Automatic</span>
+                  <span class="result-mode-card-desc">Bracket updates automatically when the match ends in-game. Supported games only.</span>
+                  <span class="result-mode-card-tag tag-api">API games only</span>
                 </div>
               </label>
 
@@ -880,49 +952,80 @@
             </div>
           </div>
 
-          <!-- ── Riot API: Game + linked account ── -->
-          <div id="riotApiOptions" class="api-game-section">
-            <div class="form-section-title">Select Game</div>
-            <div class="game-select-grid">
-              <div class="game-option selected" data-riot-game="lol" onclick="selectRiotGame(this, 'lol')">
-                <span class="game-option-icon">⚔️</span>
-                League of Legends
-              </div>
-              <div class="game-option" data-riot-game="valorant" onclick="selectRiotGame(this, 'valorant')">
-                <span class="game-option-icon">🔫</span>
-                VALORANT
-              </div>
-              <div class="game-option" data-riot-game="tft" onclick="selectRiotGame(this, 'tft')">
-                <span class="game-option-icon">🎲</span>
-                TFT
-              </div>
-            </div>
-            <input type="hidden" id="riotGameSelect" value="lol" />
+          <!-- ── Automatic: Game Picker ── -->
+          <div id="automaticOptions" class="api-game-section">
 
-            <!-- Riot account link status — populated by JS -->
-            <div class="riot-link-banner" id="riotLinkBanner">
-              ⚠️ Players need a linked Riot account in their profile for auto-pull to work.
-              <button type="button" class="riot-link-btn" onclick="openProfileSettings('riot')">Link Account</button>
+            <!-- Warning banner -->
+            <div class="auto-warning-banner">
+              ⚠️ <strong>Players cannot join if they haven't linked their account for the selected game.</strong>
+              Make sure participants have connected the relevant game account in their LOBBY profile before registering.
             </div>
-          </div>
 
-          <!-- ── Chess API: Platform ── -->
-          <div id="chessApiOptions" class="api-game-section">
-            <div class="form-section-title">Chess Platform</div>
-            <div class="game-select-grid" style="grid-template-columns: 1fr 1fr;">
-              <div class="game-option selected" data-chess-platform="chess.com" onclick="selectChessPlatform(this, 'chess.com')">
-                <span class="game-option-icon">♟️</span>
-                Chess.com
+            <div class="form-section-title" style="margin-top:14px;">Select Game</div>
+            <div class="auto-game-grid" id="autoGameGrid">
+
+              <!-- League of Legends -->
+              <div class="auto-game-card selected" data-api="riot-api" data-game="lol" onclick="selectAutoGame(this)">
+                <img class="auto-game-thumb" src="https://cdn.cloudflare.steamstatic.com/steam/apps/2562690/header.jpg" onerror="this.style.display='none'" alt="" />
+                <div class="auto-game-info">
+                  <div class="auto-game-name">League of Legends</div>
+                  <div class="auto-game-api">Riot Games API</div>
+                </div>
+                <div class="auto-game-check">✓</div>
               </div>
-              <div class="game-option" data-chess-platform="lichess" onclick="selectChessPlatform(this, 'lichess')">
-                <span class="game-option-icon">🐴</span>
-                Lichess
+
+              <!-- VALORANT -->
+              <div class="auto-game-card" data-api="riot-api" data-game="valorant" onclick="selectAutoGame(this)">
+                <img class="auto-game-thumb" src="https://cdn.cloudflare.steamstatic.com/steam/apps/2733780/header.jpg" onerror="this.style.display='none'" alt="" />
+                <div class="auto-game-info">
+                  <div class="auto-game-name">VALORANT</div>
+                  <div class="auto-game-api">Riot Games API</div>
+                </div>
+                <div class="auto-game-check">✓</div>
               </div>
+
+              <!-- TFT -->
+              <div class="auto-game-card" data-api="riot-api" data-game="tft" onclick="selectAutoGame(this)">
+                <img class="auto-game-thumb" src="https://cdn.cloudflare.steamstatic.com/steam/apps/2849580/header.jpg" onerror="this.style.display='none'" alt="" />
+                <div class="auto-game-info">
+                  <div class="auto-game-name">Teamfight Tactics</div>
+                  <div class="auto-game-api">Riot Games API</div>
+                </div>
+                <div class="auto-game-check">✓</div>
+              </div>
+
+              <!-- Chess.com -->
+              <div class="auto-game-card" data-api="chess-api" data-game="chess.com" onclick="selectAutoGame(this)">
+                <img class="auto-game-thumb" src="https://images.chesscomfiles.com/uploads/v1/images_users/tiny_mce/SamCopeland/phpmeXx6V.png" onerror="this.style.display='none'" alt="" />
+                <div class="auto-game-info">
+                  <div class="auto-game-name">Chess.com</div>
+                  <div class="auto-game-api">Chess.com Public API</div>
+                </div>
+                <div class="auto-game-check">✓</div>
+              </div>
+
+              <!-- Lichess -->
+              <div class="auto-game-card" data-api="chess-api" data-game="lichess" onclick="selectAutoGame(this)">
+                <img class="auto-game-thumb" src="https://lichess1.org/assets/logo/lichess-favicon-512.png" onerror="this.style.display='none'" alt="" />
+                <div class="auto-game-info">
+                  <div class="auto-game-name">Lichess</div>
+                  <div class="auto-game-api">Lichess Open API</div>
+                </div>
+                <div class="auto-game-check">✓</div>
+              </div>
+
             </div>
-            <input type="hidden" id="chessPlatformSelect" value="chess.com" />
-            <p style="margin-top:10px;font-size:11px;color:var(--text-3);">
-              Players must have a matching Chess.com or Lichess username set in their LOBBY profile. Results are pulled automatically after each match ends.
-            </p>
+
+            <!-- Hidden fields written by selectAutoGame() -->
+            <input type="hidden" id="autoApiType" value="riot-api" />
+            <input type="hidden" id="autoGameValue" value="lol" />
+
+            <!-- Per-game account link status -->
+            <div class="riot-link-banner" id="autoLinkBanner">
+              ⚠️ <span id="autoLinkBannerText">Players need a linked account for this game.</span>
+              <button type="button" class="riot-link-btn" onclick="openProfileSettings('game')">Link Account</button>
+            </div>
+
           </div>
 
           <div class="form-divider"></div>
@@ -940,19 +1043,34 @@
   <script>
     // ── Result mode UI controller ────────────────────────────────
     function onResultModeChange(value) {
-      document.getElementById('selfReportOptions').style.display = value === 'self-report' ? 'block' : 'none';
-      document.getElementById('riotApiOptions').classList.toggle('visible', value === 'riot-api');
-      document.getElementById('chessApiOptions').classList.toggle('visible', value === 'chess-api');
+      document.getElementById('selfReportOptions').style.display  = value === 'self-report' ? 'block' : 'none';
+      document.getElementById('automaticOptions').classList.toggle('visible', value === 'automatic');
 
-      // Show riot account link banner if riot mode is selected
-      if (value === 'riot-api') {
-        checkRiotLinkStatus();
-      }
+      // Deprecated panels kept for compat — always hidden now
+      const rp = document.getElementById('riotApiOptions');
+      const cp = document.getElementById('chessApiOptions');
+      if (rp) rp.classList.remove('visible');
+      if (cp) cp.classList.remove('visible');
+
+      if (value === 'automatic') checkAutoLinkStatus();
     }
 
-    // Check if the current user has a Riot account linked
-    async function checkRiotLinkStatus() {
-      const banner = document.getElementById('riotLinkBanner');
+    // Select a game card in the automatic picker
+    function selectAutoGame(el) {
+      document.querySelectorAll('.auto-game-card').forEach(c => c.classList.remove('selected'));
+      el.classList.add('selected');
+      document.getElementById('autoApiType').value  = el.dataset.api;
+      document.getElementById('autoGameValue').value = el.dataset.game;
+      checkAutoLinkStatus();
+    }
+
+    // Check if current user has linked the required account
+    async function checkAutoLinkStatus() {
+      const banner   = document.getElementById('autoLinkBanner');
+      const bannerTx = document.getElementById('autoLinkBannerText');
+      const apiType  = document.getElementById('autoApiType')?.value;
+      const game     = document.getElementById('autoGameValue')?.value;
+      if (!banner) return;
       try {
         const token = localStorage.getItem('vh_token');
         if (!token) { banner.classList.add('visible'); return; }
@@ -961,52 +1079,74 @@
         });
         if (!res.ok) throw new Error();
         const me = await res.json();
-        // Show banner if no riot_puuid linked
-        banner.classList.toggle('visible', !me.riot_puuid);
+
+        let linked = false;
+        let label  = 'this game';
+        if (apiType === 'riot-api') {
+          linked = !!me.riot_puuid;
+          label  = 'Riot Games (LoL / VALORANT / TFT)';
+        } else if (game === 'chess.com') {
+          linked = !!me.chess_username;
+          label  = 'Chess.com';
+        } else if (game === 'lichess') {
+          linked = !!me.lichess_username;
+          label  = 'Lichess';
+        }
+
+        if (!linked) {
+          bannerTx.textContent = `You haven't linked your ${label} account. Players also need to link theirs before joining.`;
+          banner.classList.add('visible');
+        } else {
+          banner.classList.remove('visible');
+        }
       } catch {
         banner.classList.add('visible');
       }
     }
 
+    // Legacy helpers kept so any external callers don't break
     function selectRiotGame(el, value) {
       document.querySelectorAll('[data-riot-game]').forEach(e => e.classList.remove('selected'));
       el.classList.add('selected');
-      document.getElementById('riotGameSelect').value = value;
+      const h = document.getElementById('riotGameSelect');
+      if (h) h.value = value;
     }
 
     function selectChessPlatform(el, value) {
       document.querySelectorAll('[data-chess-platform]').forEach(e => e.classList.remove('selected'));
       el.classList.add('selected');
-      document.getElementById('chessPlatformSelect').value = value;
+      const h = document.getElementById('chessPlatformSelect');
+      if (h) h.value = value;
     }
 
-    // Patch submitCreateTournament to include new fields
-    // (Override the one in tournaments.js if needed — runs after it loads)
+    // Enrich window before submit so tournaments.js can read the values
     document.addEventListener('DOMContentLoaded', () => {
       const form = document.querySelector('#createModal form');
       if (!form) return;
+      form.addEventListener('submit', () => {
+        const mode    = document.querySelector('input[name="resultMode"]:checked')?.value || 'manual';
+        const apiType = document.getElementById('autoApiType')?.value  || 'riot-api';
+        const game    = document.getElementById('autoGameValue')?.value || 'lol';
 
-      form.addEventListener('submit', (e) => {
-        // tournaments.js handles the actual submit via onsubmit=
-        // We just enrich the data object there by reading these fields
-        // The data reading happens in submitCreateTournament() in tournaments.js
-        // which already reads #tournamentResultMode — we just renamed the IDs here
-        // so we patch window before submit fires:
-        const mode = document.querySelector('input[name="resultMode"]:checked')?.value || 'manual';
-        window._pendingResultMode = mode;
+        // Map "automatic" back to the specific API type tournaments.js expects
+        const resolvedMode = mode === 'automatic' ? apiType : mode;
+        const resolvedGame = mode === 'automatic' ? game : null;
+
+        window._pendingResultMode     = resolvedMode;
+        window._pendingApiGame        = resolvedGame;
         window._pendingDisputeTimeout = parseInt(document.getElementById('disputeTimeoutInput')?.value) || 30;
-        window._pendingRiotGame = document.getElementById('riotGameSelect')?.value || 'lol';
-        window._pendingChessPlatform = document.getElementById('chessPlatformSelect')?.value || 'chess.com';
-        window._pendingApiGame = mode === 'riot-api' ? window._pendingRiotGame : (mode === 'chess-api' ? window._pendingChessPlatform : null);
-      }, true); // capture phase — fires before onsubmit
+
+        // Also patch hidden fields for tournaments.js fallback reads
+        const rm = document.getElementById('tournamentResultMode');
+        if (rm) rm.value = resolvedMode;
+      }, true);
     });
 
-    // Helper for opening profile settings (wire to your existing profile nav)
     function openProfileSettings(section) {
-      if (typeof window.navigateTo === 'function') {
-        window.navigateTo('userprofile.html', { section });
-      } else if (window.api?.navigate) {
-        window.api.navigate('userprofile.html');
+      if (window.electronAPI?.navigate) {
+        window.electronAPI.navigate('userprofile.html');
+      } else if (typeof smoothNavigate === 'function') {
+        smoothNavigate('userprofile.html', 'up');
       }
     }
   </script>

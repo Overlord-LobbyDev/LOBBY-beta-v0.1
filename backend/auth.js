@@ -2860,6 +2860,346 @@ app.post("/home/section-order", requireAuth, async (req, res) => {
   }
 });
 
+// ════════════════════════════════════════════════════════════════════════════════
+// LOBBY CALENDAR EVENTS API
+// ════════════════════════════════════════════════════════════════════════════════
+
+// ── GET /api/events/lobby/:lobbyId — Get all events for a lobby ────────────────
+app.get('/api/events/lobby/:lobbyId', requireAuth, async (req, res) => {
+  const { lobbyId } = req.params;
+  const userId = req.user.id;
+
+  try {
+    // Get custom events (filter private events — only show if user created them)
+    const eventsResult = await pool.query(
+      `SELECT 
+        id, lobby_id, created_by, event_type, title, description,
+        event_date, location, is_private, created_at
+       FROM lobby_events
+       WHERE lobby_id = $1 
+       AND (is_private = FALSE OR created_by = $2)
+       ORDER BY event_date ASC`,
+      [lobbyId, userId]
+    );
+
+    // Get scheduled tournaments for this lobby
+    const tournamentsResult = await pool.query(
+      `SELECT id, name, description, scheduled_start, host_id
+       FROM tournaments
+       WHERE lobby_id = $1 AND scheduled_start IS NOT NULL
+       ORDER BY scheduled_start ASC`,
+      [lobbyId]
+    );
+
+    // Convert tournaments to event format
+    const tournamentEvents = tournamentsResult.rows.map(t => ({
+      id: `tournament_${t.id}`,
+      type: 'tournament',
+      title: t.name,
+      description: t.description,
+      event_date: t.scheduled_start,
+      location: null,
+      is_private: false,
+      created_by: t.host_id,
+      tournament_id: t.id
+    }));
+
+    // Combine and return
+    const allEvents = [
+      ...eventsResult.rows.map(e => ({
+        id: e.id,
+        type: e.event_type,
+        title: e.title,
+        description: e.description,
+        event_date: e.event_date,
+        location: e.location,
+        is_private: e.is_private,
+        created_by: e.created_by
+      })),
+      ...tournamentEvents
+    ];
+
+    res.json({ events: allEvents });
+
+  } catch (err) {
+    console.error('[GET /api/events/lobby]', err);
+    res.status(500).json({ error: 'Failed to load events' });
+  }
+});
+
+// ── POST /api/events/create — Create a new lobby event ─────────────────────────
+app.post('/api/events/create', requireAuth, async (req, res) => {
+  const userId = req.user.id;
+  const {
+    lobbyId,
+    eventType,    // 'public', 'online', 'private'
+    title,
+    description,
+    eventDate,
+    location,
+    isPrivate
+  } = req.body;
+
+  if (!lobbyId || !eventType || !title || !eventDate) {
+    return res.status(400).json({ error: 'Missing required fields' });
+  }
+
+  try {
+    const result = await pool.query(
+      `INSERT INTO lobby_events 
+       (lobby_id, created_by, event_type, title, description, event_date, location, is_private)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+       RETURNING *`,
+      [lobbyId, userId, eventType, title, description || null, eventDate, location || null, isPrivate || false]
+    );
+
+    console.log(`[events] ✅ Created event "${title}" in lobby ${lobbyId}`);
+
+    res.json({
+      success: true,
+      event: result.rows[0]
+    });
+
+  } catch (err) {
+    console.error('[POST /api/events/create]', err);
+    res.status(500).json({ error: 'Failed to create event' });
+  }
+});
+
+// ── DELETE /api/events/:id — Delete an event (creator only) ────────────────────
+app.delete('/api/events/:id', requireAuth, async (req, res) => {
+  const userId = req.user.id;
+  const { id } = req.params;
+
+  try {
+    // Check if event exists and user is the creator
+    const eventResult = await pool.query(
+      `SELECT * FROM lobby_events WHERE id = $1`,
+      [id]
+    );
+
+    if (eventResult.rows.length === 0) {
+      return res.status(404).json({ error: 'Event not found' });
+    }
+
+    const event = eventResult.rows[0];
+
+    if (event.created_by !== userId) {
+      return res.status(403).json({ error: 'Only the event creator can delete this event' });
+    }
+
+    await pool.query(`DELETE FROM lobby_events WHERE id = $1`, [id]);
+
+    console.log(`[events] ✅ Deleted event ${id}`);
+
+    res.json({ success: true });
+
+  } catch (err) {
+    console.error('[DELETE /api/events]', err);
+    res.status(500).json({ error: 'Failed to delete event' });
+  }
+});
+
+// ── PUT /api/events/:id — Update an event (creator only) ───────────────────────
+app.put('/api/events/:id', requireAuth, async (req, res) => {
+  const userId = req.user.id;
+  const { id } = req.params;
+  const {
+    eventType,
+    title,
+    description,
+    eventDate,
+    location,
+    isPrivate
+  } = req.body;
+
+  try {
+    // Check if event exists and user is the creator
+    const eventResult = await pool.query(
+      `SELECT * FROM lobby_events WHERE id = $1`,
+      [id]
+    );
+
+    if (eventResult.rows.length === 0) {
+      return res.status(404).json({ error: 'Event not found' });
+    }
+
+    const event = eventResult.rows[0];
+
+    if (event.created_by !== userId) {
+      return res.status(403).json({ error: 'Only the event creator can edit this event' });
+    }
+
+    const result = await pool.query(
+      `UPDATE lobby_events
+       SET event_type = $1, title = $2, description = $3, 
+           event_date = $4, location = $5, is_private = $6
+       WHERE id = $7
+       RETURNING *`,
+      [
+        eventType || event.event_type,
+        title || event.title,
+        description !== undefined ? description : event.description,
+        eventDate || event.event_date,
+        location !== undefined ? location : event.location,
+        isPrivate !== undefined ? isPrivate : event.is_private,
+        id
+      ]
+    );
+
+    console.log(`[events] ✅ Updated event ${id}`);
+
+    res.json({
+      success: true,
+      event: result.rows[0]
+    });
+
+  } catch (err) {
+    console.error('[PUT /api/events]', err);
+    res.status(500).json({ error: 'Failed to update event' });
+  }
+});
+
+// ════════════════════════════════════════════════════════════════════════════════
+// LOBBY CALENDAR EVENTS API
+// ════════════════════════════════════════════════════════════════════════════════
+
+// GET /api/events/lobby/:lobbyId — Get all events for a lobby
+app.get('/api/events/lobby/:lobbyId', requireAuth, async (req, res) => {
+  const { lobbyId } = req.params;
+  const userId = req.user.id;
+
+  try {
+    // Get custom events (filter private events — only show if user created them)
+    const eventsResult = await pool.query(
+      `SELECT 
+        id, lobby_id, created_by, event_type, title, description,
+        event_date, location, is_private, created_at
+       FROM lobby_events
+       WHERE lobby_id = $1 
+       AND (is_private = FALSE OR created_by = $2)
+       ORDER BY event_date ASC`,
+      [lobbyId, userId]
+    );
+
+    // Get scheduled tournaments for this lobby
+    const tournamentsResult = await pool.query(
+      `SELECT id, name, description, scheduled_start, host_id
+       FROM tournaments
+       WHERE lobby_id = $1 AND scheduled_start IS NOT NULL
+       ORDER BY scheduled_start ASC`,
+      [lobbyId]
+    );
+
+    // Convert tournaments to event format
+    const tournamentEvents = tournamentsResult.rows.map(t => ({
+      id: `tournament_${t.id}`,
+      type: 'tournament',
+      title: t.name,
+      description: t.description,
+      event_date: t.scheduled_start,
+      location: null,
+      is_private: false,
+      created_by: t.host_id,
+      tournament_id: t.id
+    }));
+
+    // Combine and return
+    const allEvents = [
+      ...eventsResult.rows.map(e => ({
+        id: e.id,
+        type: e.event_type,
+        title: e.title,
+        description: e.description,
+        event_date: e.event_date,
+        location: e.location,
+        is_private: e.is_private,
+        created_by: e.created_by
+      })),
+      ...tournamentEvents
+    ];
+
+    res.json({ events: allEvents });
+
+  } catch (err) {
+    console.error('[GET /api/events/lobby]', err);
+    res.status(500).json({ error: 'Failed to load events' });
+  }
+});
+
+// POST /api/events/create — Create a new lobby event
+app.post('/api/events/create', requireAuth, async (req, res) => {
+  const userId = req.user.id;
+  const {
+    lobbyId,
+    eventType,    // 'public', 'online', 'private'
+    title,
+    description,
+    eventDate,
+    location,
+    isPrivate
+  } = req.body;
+
+  if (!lobbyId || !eventType || !title || !eventDate) {
+    return res.status(400).json({ error: 'Missing required fields' });
+  }
+
+  try {
+    const result = await pool.query(
+      `INSERT INTO lobby_events 
+       (lobby_id, created_by, event_type, title, description, event_date, location, is_private)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+       RETURNING *`,
+      [lobbyId, userId, eventType, title, description || null, eventDate, location || null, isPrivate || false]
+    );
+
+    console.log(`[events] ✅ Created event "${title}" in lobby ${lobbyId}`);
+
+    res.json({
+      success: true,
+      event: result.rows[0]
+    });
+
+  } catch (err) {
+    console.error('[POST /api/events/create]', err);
+    res.status(500).json({ error: 'Failed to create event' });
+  }
+});
+
+// DELETE /api/events/:id — Delete an event (creator only)
+app.delete('/api/events/:id', requireAuth, async (req, res) => {
+  const userId = req.user.id;
+  const { id } = req.params;
+
+  try {
+    // Check if event exists and user is the creator
+    const eventResult = await pool.query(
+      `SELECT * FROM lobby_events WHERE id = $1`,
+      [id]
+    );
+
+    if (eventResult.rows.length === 0) {
+      return res.status(404).json({ error: 'Event not found' });
+    }
+
+    const event = eventResult.rows[0];
+
+    if (event.created_by !== userId) {
+      return res.status(403).json({ error: 'Only the event creator can delete this event' });
+    }
+
+    await pool.query(`DELETE FROM lobby_events WHERE id = $1`, [id]);
+
+    console.log(`[events] ✅ Deleted event ${id}`);
+
+    res.json({ success: true });
+
+  } catch (err) {
+    console.error('[DELETE /api/events]', err);
+    res.status(500).json({ error: 'Failed to delete event' });
+  }
+});
+
 // Express error-catching middleware (must be last, before listen)
 app.use((err, req, res, next) => {
   console.error(`[EXPRESS ERROR] ${req.method} ${req.url}:`, err);

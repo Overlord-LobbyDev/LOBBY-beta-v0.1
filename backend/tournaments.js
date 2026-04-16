@@ -736,10 +736,12 @@ router.post('/:tournamentId/api-poll', verifyAuth, async (req, res) => {
     const { matchId } = req.body;
     const axios = require('axios');
 
-    const tourResult = await pool.query('SELECT result_mode, api_game, host_id FROM tournaments WHERE id = $1', [tournamentId]);
+    const tourResult = await pool.query('SELECT result_mode, api_game, host_id, created_at FROM tournaments WHERE id = $1', [tournamentId]);
     if (!tourResult.rows.length) return res.status(404).json({ error: 'Not found' });
     const t = tourResult.rows[0];
     if (!['riot-api','chess-api'].includes(t.result_mode)) return res.status(400).json({ error: 'Not in API mode' });
+
+    const tournamentCreatedAt = t.created_at; // CRITICAL: Only consider games after this timestamp
 
     const matchResult = await pool.query(
       'SELECT id, player1_id, player2_id, status FROM tournament_matches WHERE id = $1 AND tournament_id = $2',
@@ -778,11 +780,20 @@ router.post('/:tournamentId/api-poll', verifyAuth, async (req, res) => {
       const matchIds = Array.isArray(mlResp.data) ? mlResp.data : (mlResp.data?.history?.map(h => h.matchId) || []);
 
       let foundWinnerPuuid = null;
+      const tournamentTimestampMs = new Date(tournamentCreatedAt).getTime();
+
       for (const riotMatchId of matchIds.slice(0, 10)) {
         const detailUrl = game === 'valorant'
           ? `https://${REGIONAL}.api.riotgames.com/val/match/v1/matches/${riotMatchId}`
           : `https://${REGIONAL}.api.riotgames.com/lol/match/v5/matches/${riotMatchId}`;
         const detail = (await axios.get(detailUrl, { headers: { 'X-Riot-Token': RIOT_API_KEY } })).data;
+
+        // ── TIMESTAMP FILTER: Skip games before tournament was created ──
+        const gameTimestampMs = detail.info?.gameCreation || detail.matchInfo?.gameStartMillis || 0;
+        if (gameTimestampMs < tournamentTimestampMs) {
+          continue; // Game was played before tournament — skip it
+        }
+
         const participants = detail.info?.participants || detail.players?.all_players || [];
         const puuids = participants.map(p => p.puuid);
         if (puuids.includes(puuid1) && puuids.includes(puuid2)) {
@@ -817,13 +828,24 @@ router.post('/:tournamentId/api-poll', verifyAuth, async (req, res) => {
       let winnerChessUser = null;
 
       if (platform === 'lichess') {
+        const tournamentTimestampMs = new Date(tournamentCreatedAt).getTime();
+
         const resp = await axios.get(
-          `https://lichess.org/api/games/user/${cu1.toLowerCase()}?opponent=${cu2.toLowerCase()}&max=1`,
+          `https://lichess.org/api/games/user/${cu1.toLowerCase()}?opponent=${cu2.toLowerCase()}&max=10`,
           { headers: { 'Accept': 'application/x-ndjson' } }
         );
         const lines = (resp.data || '').trim().split('\n').filter(Boolean);
-        if (lines.length) {
-          const game = JSON.parse(lines[0]);
+
+        // Filter games by timestamp
+        for (const line of lines) {
+          const game = JSON.parse(line);
+
+          // ── TIMESTAMP FILTER: Skip games before tournament was created ──
+          const gameTimestampMs = game.createdAt || 0; // Lichess uses 'createdAt' in milliseconds
+          if (gameTimestampMs < tournamentTimestampMs) {
+            continue; // Game was played before tournament — skip it
+          }
+
           const winner = game.winner;
           if (winner) {
             const whiteUser = game.players?.white?.user?.name?.toLowerCase();
@@ -832,18 +854,30 @@ router.post('/:tournamentId/api-poll', verifyAuth, async (req, res) => {
               : (whiteUser === cu1.toLowerCase() ? cu2 : cu1);
             // Build Lichess game URL for live embed
             gameUrl = `https://lichess.org/${game.id}`;
+            break; // Found a valid game
           }
         }
       } else {
+        const tournamentTimestampUnix = Math.floor(new Date(tournamentCreatedAt).getTime() / 1000);
+
         const today = new Date();
         const url = `https://api.chess.com/pub/player/${cu1.toLowerCase()}/games/${today.getFullYear()}/${String(today.getMonth()+1).padStart(2,'0')}`;
         const resp = await axios.get(url, { headers: { 'User-Agent': 'LOBBY-App/1.0' } });
         const games = resp.data.games || [];
         const u1l = cu1.toLowerCase(), u2l = cu2.toLowerCase();
+
+        // Filter for games between these two players AFTER tournament creation
         const relevant = games.filter(g => {
           const w = g.white?.username?.toLowerCase(), b = g.black?.username?.toLowerCase();
-          return (w === u1l && b === u2l) || (w === u2l && b === u1l);
+          const playersMatch = (w === u1l && b === u2l) || (w === u2l && b === u1l);
+
+          // ── TIMESTAMP FILTER: Skip games before tournament was created ──
+          const gameTimestampUnix = g.end_time || 0; // Chess.com uses 'end_time' in Unix seconds
+          const afterTournament = gameTimestampUnix >= tournamentTimestampUnix;
+
+          return playersMatch && afterTournament;
         });
+
         if (relevant.length) {
           const latest = relevant[relevant.length - 1];
           if (latest.white?.result === 'win') winnerChessUser = latest.white.username;
