@@ -253,6 +253,9 @@
   <!-- Header -->
   <div class="calendar-header">
     <div class="calendar-title">
+      <button onclick="smoothNavigate('index.html', 'down')" style="background:var(--bg-3);border:none;color:var(--text-2);width:36px;height:36px;border-radius:8px;cursor:pointer;display:flex;align-items:center;justify-content:center;font-size:16px;transition:all .15s;font-family:var(--font);margin-right:4px" onmouseover="this.style.background='var(--bg-2)';this.style.color='var(--text-1)'" onmouseout="this.style.background='var(--bg-3)';this.style.color='var(--text-2)'" title="Back to Lobby">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 18 9 12 15 6"></polyline></svg>
+      </button>
       <span class="calendar-icon">📅</span>
       <span id="lobbyName">Lobby Calendar</span>
     </div>
@@ -381,8 +384,26 @@ const AUTH_URL = "https://lobby-auth-server.onrender.com";
 const token = localStorage.getItem("vh_token") || sessionStorage.getItem("vh_token");
 if (!token) smoothNavigate("login.html", "down");
 
-const params = new URLSearchParams(window.location.search);
-const lobbyId = params.get("lobbyId");
+// Get lobby info from sessionStorage (set by openLobbyCalendar in index.html)
+// Falls back to URL params for backward compatibility
+let lobbyId, lobbyName;
+try {
+  const pending = sessionStorage.getItem('pendingCalendarLobby');
+  if (pending) {
+    const parsed = JSON.parse(pending);
+    lobbyId = parsed.lobbyId;
+    lobbyName = parsed.lobbyName;
+    // Don't clear — keep in case of refresh
+  }
+} catch(e) {}
+
+// Fallback to URL params (in case of direct link)
+if (!lobbyId) {
+  const params = new URLSearchParams(window.location.search);
+  lobbyId = params.get("lobbyId");
+  lobbyName = params.get("lobbyName");
+}
+
 if (!lobbyId) smoothNavigate("index.html", "down");
 
 let currentDate = new Date();
@@ -405,7 +426,7 @@ async function boot() {
       document.getElementById('btnCreate').style.display = 'none';
     }
 
-    document.getElementById('lobbyName').textContent = `${params.get("lobbyName") || "Lobby"} Calendar`;
+    document.getElementById('lobbyName').textContent = `${lobbyName || "Lobby"} Calendar`;
 
     await loadEvents();
     renderCalendar();

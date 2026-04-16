@@ -3046,6 +3046,9 @@
   <div class="channel-sidebar-header" id="channelSidebarHeader">
     <div class="channel-sidebar-header-top">
       <span id="sidebarTitle">Direct Messages</span>
+      <button class="sidebar-settings-btn" id="sidebarCalendarBtn" title="Lobby Calendar" style="display:none" onclick="if(selectedServer)openLobbyCalendar(selectedServer.id, selectedServer.name)">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
+      </button>
       <button class="sidebar-settings-btn" id="sidebarSettingsBtn" title="Lobby Settings" style="display:none" onclick="if(selectedServer)openServerSettings(selectedServer.id)">
         <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
       </button>
@@ -3236,6 +3239,154 @@
         <h3 style="font-size:17px;font-weight:700;color:var(--text-1);margin:0">Direct Messages</h3>
         <p style="font-size:13px;color:var(--text-3);margin:0;text-align:center;max-width:260px;line-height:1.5">Select a conversation from the left, or start a new one by searching for a friend.</p>
       </div>
+    </div>
+  </div>
+</div>
+
+<!-- ── Lobby Calendar Panel (in-app view, same layout as chatPanel) ── -->
+<div id="calendarPanel" class="hidden" style="flex:1;display:flex;flex-direction:column;background:var(--bg-2);overflow:hidden;min-width:0">
+  <!-- Header -->
+  <div style="padding:16px 24px;background:var(--bg-1);border-bottom:1px solid rgba(255,255,255,.06);display:flex;align-items:center;justify-content:space-between;gap:16px;flex-wrap:wrap">
+    <div style="display:flex;align-items:center;gap:12px;min-width:0">
+      <div style="width:40px;height:40px;border-radius:10px;background:linear-gradient(135deg,rgba(88,101,242,.2),rgba(88,101,242,.08));display:flex;align-items:center;justify-content:center;flex-shrink:0">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="var(--accent)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
+      </div>
+      <div style="min-width:0">
+        <div style="font-size:18px;font-weight:800;color:var(--text-1);letter-spacing:-.3px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" id="calendarLobbyTitle">Lobby Calendar</div>
+        <div style="font-size:11px;color:var(--text-3);margin-top:1px" id="calendarMonthSubtitle">January 2025</div>
+      </div>
+    </div>
+    <div style="display:flex;align-items:center;gap:10px">
+      <div style="display:flex;align-items:center;gap:4px;background:var(--bg-3);border-radius:8px;padding:3px">
+        <button onclick="calendarChangeMonth(-1)" style="background:none;border:none;color:var(--text-2);width:30px;height:30px;border-radius:6px;cursor:pointer;font-size:14px;font-family:var(--font);transition:background .15s" onmouseover="this.style.background='rgba(255,255,255,.08)'" onmouseout="this.style.background='none'">‹</button>
+        <button onclick="calendarGoToday()" style="background:none;border:none;color:var(--text-2);padding:0 10px;height:30px;border-radius:6px;cursor:pointer;font-size:11px;font-weight:600;font-family:var(--font);text-transform:uppercase;letter-spacing:.6px;transition:background .15s" onmouseover="this.style.background='rgba(255,255,255,.08)'" onmouseout="this.style.background='none'">Today</button>
+        <button onclick="calendarChangeMonth(1)" style="background:none;border:none;color:var(--text-2);width:30px;height:30px;border-radius:6px;cursor:pointer;font-size:14px;font-family:var(--font);transition:background .15s" onmouseover="this.style.background='rgba(255,255,255,.08)'" onmouseout="this.style.background='none'">›</button>
+      </div>
+      <button onclick="openCreateEventModal()" style="padding:8px 14px;background:var(--accent);border:none;border-radius:8px;color:#fff;font-size:12px;font-weight:700;cursor:pointer;font-family:var(--font);display:flex;align-items:center;gap:6px;transition:background .15s" onmouseover="this.style.background='var(--accent-h)'" onmouseout="this.style.background='var(--accent)'">
+        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+        New Event
+      </button>
+    </div>
+  </div>
+
+  <!-- Body: calendar + sidebar -->
+  <div style="flex:1;display:flex;overflow:hidden;min-height:0">
+    <!-- Calendar grid -->
+    <div style="flex:1;display:flex;flex-direction:column;overflow:hidden;padding:16px;min-width:0">
+      <div style="display:grid;grid-template-columns:repeat(7,1fr);gap:1px;margin-bottom:6px">
+        <div style="text-align:center;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.8px;color:var(--text-3);padding:8px 4px">Sun</div>
+        <div style="text-align:center;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.8px;color:var(--text-3);padding:8px 4px">Mon</div>
+        <div style="text-align:center;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.8px;color:var(--text-3);padding:8px 4px">Tue</div>
+        <div style="text-align:center;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.8px;color:var(--text-3);padding:8px 4px">Wed</div>
+        <div style="text-align:center;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.8px;color:var(--text-3);padding:8px 4px">Thu</div>
+        <div style="text-align:center;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.8px;color:var(--text-3);padding:8px 4px">Fri</div>
+        <div style="text-align:center;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.8px;color:var(--text-3);padding:8px 4px">Sat</div>
+      </div>
+      <div id="calendarDaysGrid" style="flex:1;display:grid;grid-template-columns:repeat(7,1fr);grid-template-rows:repeat(6,minmax(0,1fr));gap:4px;min-height:0"></div>
+    </div>
+
+    <!-- Right: upcoming events list -->
+    <div style="width:300px;flex-shrink:0;background:var(--bg-1);border-left:1px solid rgba(255,255,255,.06);display:flex;flex-direction:column;overflow:hidden">
+      <div style="padding:14px 18px;border-bottom:1px solid rgba(255,255,255,.06);font-size:10px;font-weight:800;text-transform:uppercase;letter-spacing:.8px;color:var(--text-3)">Upcoming</div>
+      <div id="calendarUpcomingList" style="flex:1;overflow-y:auto;padding:10px"></div>
+    </div>
+  </div>
+</div>
+
+<!-- ── Create/Edit Event Modal ── -->
+<div id="createEventModal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.7);align-items:center;justify-content:center;z-index:10000">
+  <div style="background:var(--bg-1);border-radius:14px;width:min(500px,92vw);max-height:92vh;overflow-y:auto;box-shadow:0 24px 64px rgba(0,0,0,.6);border:1px solid rgba(255,255,255,.08)">
+    <div style="padding:20px 22px;border-bottom:1px solid rgba(255,255,255,.06);display:flex;align-items:center;justify-content:space-between">
+      <div style="display:flex;align-items:center;gap:10px">
+        <div style="width:32px;height:32px;border-radius:8px;background:rgba(88,101,242,.15);display:flex;align-items:center;justify-content:center">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--accent)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
+        </div>
+        <h3 style="font-size:17px;font-weight:800;margin:0" id="createEventModalTitle">Create Event</h3>
+      </div>
+      <button onclick="closeCreateEventModal()" style="background:none;border:none;color:var(--text-3);font-size:18px;cursor:pointer;width:30px;height:30px;border-radius:50%;display:flex;align-items:center;justify-content:center;transition:all .15s" onmouseover="this.style.background='rgba(255,255,255,.08)';this.style.color='var(--text-1)'" onmouseout="this.style.background='none';this.style.color='var(--text-3)'">✕</button>
+    </div>
+    <div style="padding:22px">
+      <form onsubmit="submitNewEvent(event)">
+
+        <div style="margin-bottom:16px">
+          <label style="display:block;font-size:10px;font-weight:800;text-transform:uppercase;letter-spacing:.8px;color:var(--text-3);margin-bottom:8px">Event Type</label>
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">
+            <div id="etypePublic" class="etype-card selected" onclick="selectEType('public')" style="padding:12px;border-radius:8px;border:2px solid var(--accent);background:rgba(35,165,90,.08);cursor:pointer;transition:all .15s">
+              <div style="display:flex;align-items:center;gap:8px;margin-bottom:3px">
+                <span style="font-size:16px">🌍</span>
+                <span style="font-size:13px;font-weight:700">Public</span>
+              </div>
+              <div style="font-size:10.5px;color:var(--text-3);padding-left:24px">In-person or hybrid</div>
+            </div>
+            <div id="etypeOnline" class="etype-card" onclick="selectEType('online')" style="padding:12px;border-radius:8px;border:2px solid rgba(255,255,255,.08);background:var(--bg-3);cursor:pointer;transition:all .15s">
+              <div style="display:flex;align-items:center;gap:8px;margin-bottom:3px">
+                <span style="font-size:16px">💻</span>
+                <span style="font-size:13px;font-weight:700">Online</span>
+              </div>
+              <div style="font-size:10.5px;color:var(--text-3);padding-left:24px">Virtual event</div>
+            </div>
+          </div>
+          <div style="display:flex;align-items:center;gap:8px;margin-top:10px;padding:8px 10px;background:var(--bg-3);border-radius:6px;cursor:pointer" onclick="document.getElementById('eventPrivateCheck').click()">
+            <input type="checkbox" id="eventPrivateCheck" style="width:16px;height:16px;cursor:pointer" />
+            <label for="eventPrivateCheck" style="font-size:12px;color:var(--text-2);cursor:pointer;user-select:none">🔒 Make this event private (only visible to you)</label>
+          </div>
+          <input type="hidden" id="eventTypeValue" value="public" />
+        </div>
+
+        <div style="margin-bottom:14px">
+          <label style="display:block;font-size:10px;font-weight:800;text-transform:uppercase;letter-spacing:.8px;color:var(--text-3);margin-bottom:6px">Event Title</label>
+          <input type="text" id="eventTitleInput" required placeholder="e.g. Weekly Game Night" style="width:100%;padding:10px 12px;background:var(--bg-3);border:1.5px solid rgba(255,255,255,.1);border-radius:8px;color:var(--text-1);font-size:13px;font-family:var(--font);outline:none;transition:border-color .15s" onfocus="this.style.borderColor='var(--accent)'" onblur="this.style.borderColor='rgba(255,255,255,.1)'" />
+        </div>
+
+        <div style="margin-bottom:14px">
+          <label style="display:block;font-size:10px;font-weight:800;text-transform:uppercase;letter-spacing:.8px;color:var(--text-3);margin-bottom:6px">Description</label>
+          <textarea id="eventDescInput" placeholder="Optional details…" style="width:100%;padding:10px 12px;background:var(--bg-3);border:1.5px solid rgba(255,255,255,.1);border-radius:8px;color:var(--text-1);font-size:13px;font-family:var(--font);outline:none;min-height:70px;resize:vertical;transition:border-color .15s" onfocus="this.style.borderColor='var(--accent)'" onblur="this.style.borderColor='rgba(255,255,255,.1)'"></textarea>
+        </div>
+
+        <div style="margin-bottom:14px">
+          <label style="display:block;font-size:10px;font-weight:800;text-transform:uppercase;letter-spacing:.8px;color:var(--text-3);margin-bottom:6px">Date &amp; Time</label>
+          <input type="datetime-local" id="eventDateInput" required style="width:100%;padding:10px 12px;background:var(--bg-3);border:1.5px solid rgba(255,255,255,.1);border-radius:8px;color:var(--text-1);font-size:13px;font-family:var(--font);outline:none;color-scheme:dark" />
+        </div>
+
+        <div style="margin-bottom:18px">
+          <label style="display:block;font-size:10px;font-weight:800;text-transform:uppercase;letter-spacing:.8px;color:var(--text-3);margin-bottom:6px">Location <span style="color:var(--text-3);font-weight:400;text-transform:none;letter-spacing:0">(optional)</span></label>
+          <input type="text" id="eventLocationInput" placeholder="Address, voice channel, or meeting link" style="width:100%;padding:10px 12px;background:var(--bg-3);border:1.5px solid rgba(255,255,255,.1);border-radius:8px;color:var(--text-1);font-size:13px;font-family:var(--font);outline:none;transition:border-color .15s" onfocus="this.style.borderColor='var(--accent)'" onblur="this.style.borderColor='rgba(255,255,255,.1)'" />
+        </div>
+
+        <div style="display:flex;gap:10px">
+          <button type="button" onclick="closeCreateEventModal()" style="flex:1;padding:11px;background:var(--bg-3);border:none;border-radius:8px;color:var(--text-2);font-size:13px;font-weight:700;cursor:pointer;font-family:var(--font);transition:all .15s" onmouseover="this.style.background='var(--bg-2)';this.style.color='var(--text-1)'" onmouseout="this.style.background='var(--bg-3)';this.style.color='var(--text-2)'">Cancel</button>
+          <button type="submit" style="flex:1;padding:11px;background:var(--accent);border:none;border-radius:8px;color:#fff;font-size:13px;font-weight:700;cursor:pointer;font-family:var(--font);transition:background .15s" onmouseover="this.style.background='var(--accent-h)'" onmouseout="this.style.background='var(--accent)'">Create Event</button>
+        </div>
+
+      </form>
+    </div>
+  </div>
+</div>
+
+<!-- ── Event Details Modal ── -->
+<div id="eventDetailsModal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.7);align-items:center;justify-content:center;z-index:10000">
+  <div style="background:var(--bg-1);border-radius:14px;width:min(460px,92vw);box-shadow:0 24px 64px rgba(0,0,0,.6);border:1px solid rgba(255,255,255,.08);overflow:hidden">
+    <div id="eventDetailsBanner" style="height:6px;background:var(--accent)"></div>
+    <div style="padding:20px 22px 14px">
+      <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:10px;margin-bottom:6px">
+        <div>
+          <div id="eventDetailsTypeChip" style="display:inline-flex;align-items:center;gap:5px;padding:3px 8px;background:rgba(88,101,242,.15);border-radius:5px;font-size:10px;font-weight:800;color:var(--accent);text-transform:uppercase;letter-spacing:.8px;margin-bottom:8px">PUBLIC</div>
+          <h3 id="eventDetailsTitle" style="font-size:19px;font-weight:800;margin:0;line-height:1.3">Event Title</h3>
+        </div>
+        <button onclick="closeEventDetails()" style="background:none;border:none;color:var(--text-3);font-size:18px;cursor:pointer;width:28px;height:28px;border-radius:50%;display:flex;align-items:center;justify-content:center;flex-shrink:0;transition:all .15s" onmouseover="this.style.background='rgba(255,255,255,.08)';this.style.color='var(--text-1)'" onmouseout="this.style.background='none';this.style.color='var(--text-3)'">✕</button>
+      </div>
+      <div id="eventDetailsTime" style="font-size:12.5px;color:var(--text-2);display:flex;align-items:center;gap:6px;margin-top:4px"><span>🕐</span><span></span></div>
+    </div>
+    <div style="padding:4px 22px 22px">
+      <div id="eventDetailsDescSection" style="display:none;margin-bottom:14px">
+        <div style="font-size:10px;font-weight:800;text-transform:uppercase;letter-spacing:.8px;color:var(--text-3);margin-bottom:5px">Description</div>
+        <div id="eventDetailsDesc" style="font-size:13px;color:var(--text-2);line-height:1.6"></div>
+      </div>
+      <div id="eventDetailsLocationSection" style="display:none;margin-bottom:16px">
+        <div style="font-size:10px;font-weight:800;text-transform:uppercase;letter-spacing:.8px;color:var(--text-3);margin-bottom:5px">Location</div>
+        <div style="padding:10px 12px;background:var(--bg-2);border-radius:6px;font-size:13px;color:var(--text-2);display:flex;align-items:center;gap:8px"><span>📍</span><span id="eventDetailsLocation"></span></div>
+      </div>
+      <div id="eventDetailsActions" style="display:flex;gap:8px"></div>
     </div>
   </div>
 </div>
@@ -4937,6 +5088,29 @@ function renderChannelList(channels, members, server) {
       <div id="tournamentsList" class="tournaments-list" style="padding:0 10px;box-sizing:border-box;width:100%;overflow-y:auto;overflow-x:hidden;max-height:420px;"></div>
     </div>
   </div>`;
+
+  // ── EVENTS CALENDAR SECTION ────────────────────────────────
+  html += `<div class="channel-section" style="margin-top:12px;">
+    <div class="channel-section-label" onclick="window._toggleEvents()" style="cursor:pointer;user-select:none;display:flex;align-items:center;justify-content:space-between;">
+      <span style="display:flex;align-items:center;gap:6px">
+        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
+        Events
+        <span id="eventsCountBadge" style="display:none;font-size:8px;font-weight:800;padding:1px 5px;border-radius:3px;background:rgba(88,101,242,.2);color:var(--accent);text-transform:uppercase;letter-spacing:.3px"></span>
+      </span>
+      <svg id="eventsChevron" width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" style="transition:transform .2s;flex-shrink:0"><polyline points="6 9 12 15 18 9"></polyline></svg>
+    </div>
+    <div id="eventsDropdown" style="overflow:hidden;max-height:400px;transition:max-height .25s ease,opacity .2s;opacity:1">
+      <div id="eventsList" style="padding:6px 10px;box-sizing:border-box;width:100%;overflow-y:auto;overflow-x:hidden;max-height:300px;">
+        <div style="padding:12px;text-align:center;color:var(--text-3);font-size:11px">Loading events…</div>
+      </div>
+      <div style="padding:0 10px 10px">
+        <button onclick="openLobbyCalendar(${server.id}, ${JSON.stringify(server.name).replace(/"/g,'&quot;')})" style="width:100%;padding:8px 10px;background:linear-gradient(135deg,rgba(88,101,242,.15),rgba(88,101,242,.08));border:1px solid rgba(88,101,242,.25);border-radius:6px;color:var(--accent);font-size:11px;font-weight:700;cursor:pointer;font-family:var(--font);display:flex;align-items:center;justify-content:center;gap:6px;transition:all .15s" onmouseover="this.style.background='linear-gradient(135deg,rgba(88,101,242,.25),rgba(88,101,242,.15))'" onmouseout="this.style.background='linear-gradient(135deg,rgba(88,101,242,.15),rgba(88,101,242,.08))'">
+          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
+          Open Full Calendar
+        </button>
+      </div>
+    </div>
+  </div>`;
   html += `<div style="margin-top:auto;padding-top:12px">
     <div class="server-actions">
       ${canManage ? `<div class="server-action-item" onclick="openServerSettings(${server.id})">
@@ -4960,6 +5134,7 @@ function renderChannelList(channels, members, server) {
 
   content.innerHTML = html;
   if (typeof initTournaments === 'function') initTournaments(server.id, me?.id);
+  if (typeof loadLobbyEvents === 'function') loadLobbyEvents(server.id);
   renderMembers(members);
   document.getElementById("membersSidebar").style.display = "flex";
   document.getElementById("membersSidebar").classList.add("open");
@@ -6744,6 +6919,8 @@ async function showVcPanel(name) {
   document.getElementById("homePanel").classList.add("hidden");
   document.getElementById("chatPanel").classList.add("hidden");
   document.getElementById("profilePage").classList.add("hidden");
+  const _calPanel1 = document.getElementById("calendarPanel");
+  if (_calPanel1) _calPanel1.classList.add("hidden");
   document.getElementById("vcPanel").classList.remove("hidden");
   document.getElementById("vcPanelName").textContent = name;
   hideVcPip();
@@ -9750,14 +9927,17 @@ function setSidebarMode(mode) {
   // mode: 'server' | 'dm' | 'friends' | 'groups'
   const inviteBtn   = document.getElementById("sidebarInviteBtn");
   const settingsBtn = document.getElementById("sidebarSettingsBtn");
+  const calendarBtn = document.getElementById("sidebarCalendarBtn");
   const addFriendBtn = document.getElementById("sidebarAddFriendBtn");
   if (mode === "server") {
     if (inviteBtn)    { inviteBtn.classList.remove("hidden"); }
     if (settingsBtn)  { settingsBtn.style.display = "flex"; }
+    if (calendarBtn)  { calendarBtn.style.display = "flex"; }
     if (addFriendBtn) { addFriendBtn.style.display = "none"; }
   } else {
     if (inviteBtn)    { inviteBtn.classList.add("hidden"); }
     if (settingsBtn)  { settingsBtn.style.display = "none"; }
+    if (calendarBtn)  { calendarBtn.style.display = "none"; }
     if (addFriendBtn) { addFriendBtn.style.display = ""; }
   }
 }
@@ -9771,6 +9951,8 @@ function showHomePanel() {
   document.getElementById("homePanel").classList.remove("hidden");
   document.getElementById("chatPanel").classList.add("hidden");
   document.getElementById("profilePage").classList.add("hidden");
+  const calPanel = document.getElementById("calendarPanel");
+  if (calPanel) calPanel.classList.add("hidden");
   clearAllNavIcons();
   document.getElementById("homeNavIcon").classList.add("active");
   // Open sidebar: always on subsequent navigations, or on startup if pref allows
@@ -9940,6 +10122,8 @@ function showChatPanel() {
   document.getElementById("homePanel").classList.add("hidden");
   document.getElementById("chatPanel").classList.remove("hidden");
   document.getElementById("profilePage").classList.add("hidden");
+  const calPanel = document.getElementById("calendarPanel");
+  if (calPanel) calPanel.classList.add("hidden");
   clearAllNavIcons();
   document.getElementById("dmServerIcon").classList.add("active");
   currentPanel = "chat";
@@ -10686,6 +10870,8 @@ async function showFullProfilePage(userId) {
   document.getElementById("homePanel").classList.add("hidden");
   document.getElementById("chatPanel").classList.add("hidden");
   document.getElementById("profilePage").classList.remove("hidden");
+  const _calPanel2 = document.getElementById("calendarPanel");
+  if (_calPanel2) _calPanel2.classList.add("hidden");
 
   // Hide the lobby members bar — same behaviour as home
   document.getElementById("membersSidebar").style.display = "none";
@@ -12204,6 +12390,418 @@ window._updateTournamentBadge = function(tournaments) {
   badge.style.color     = isLive ? '#57f287' : 'var(--yellow, #faa61a)';
   badge.style.background = isLive ? 'rgba(35,165,90,.15)' : 'rgba(250,166,26,.1)';
   badge.style.border    = `1px solid ${isLive ? 'rgba(35,165,90,.3)' : 'rgba(250,166,26,.25)'}`;
+};
+
+// ════════════════════════════════════════════════════════════════
+// LOBBY CALENDAR — In-app panel (not a separate page)
+// ════════════════════════════════════════════════════════════════
+
+window._eventsOpen = true;
+window._toggleEvents = function() {
+  const dropdown = document.getElementById('eventsDropdown');
+  const chevron  = document.getElementById('eventsChevron');
+  if (!dropdown) return;
+  window._eventsOpen = !window._eventsOpen;
+  dropdown.style.maxHeight  = window._eventsOpen ? '400px' : '0';
+  dropdown.style.opacity    = window._eventsOpen ? '1' : '0';
+  if (chevron) chevron.style.transform = window._eventsOpen ? '' : 'rotate(-90deg)';
+};
+
+// Calendar state (in-app panel)
+window._calendarState = {
+  lobbyId: null,
+  lobbyName: '',
+  currentDate: new Date(),
+  events: [],
+  editingEventDate: null
+};
+
+// Load events for the sidebar preview
+window.loadLobbyEvents = async function(lobbyId) {
+  const listEl = document.getElementById('eventsList');
+  const badge  = document.getElementById('eventsCountBadge');
+  if (!listEl) return;
+
+  try {
+    const token = localStorage.getItem('vh_token') || sessionStorage.getItem('vh_token');
+    const res = await fetch(`https://lobby-auth-server.onrender.com/api/events/lobby/${lobbyId}`, {
+      headers: { Authorization: `Bearer ${token}` }
+    });
+    if (!res.ok) throw new Error('Failed');
+    const data = await res.json();
+
+    // Cache in state
+    window._calendarState.events = data.events || [];
+
+    const now = Date.now();
+    const upcoming = (data.events || [])
+      .filter(e => new Date(e.event_date).getTime() >= now - 3600000)
+      .sort((a, b) => new Date(a.event_date) - new Date(b.event_date))
+      .slice(0, 5);
+
+    if (badge) {
+      if (upcoming.length > 0) { badge.textContent = upcoming.length; badge.style.display = 'inline-block'; }
+      else { badge.style.display = 'none'; }
+    }
+
+    if (upcoming.length === 0) {
+      listEl.innerHTML = `<div style="padding:12px;text-align:center;color:var(--text-3);font-size:11px;line-height:1.5">
+        No upcoming events<br>
+        <span style="font-size:10px;opacity:.7">Click 'Open Full Calendar' to create one</span>
+      </div>`;
+      return;
+    }
+
+    listEl.innerHTML = upcoming.map(e => {
+      const date = new Date(e.event_date);
+      const isToday = date.toDateString() === new Date().toDateString();
+      const isTomorrow = date.toDateString() === new Date(Date.now() + 86400000).toDateString();
+
+      let dateLabel;
+      if (isToday) dateLabel = `Today · ${date.toLocaleTimeString('en-GB', { hour:'2-digit', minute:'2-digit' })}`;
+      else if (isTomorrow) dateLabel = `Tomorrow · ${date.toLocaleTimeString('en-GB', { hour:'2-digit', minute:'2-digit' })}`;
+      else dateLabel = date.toLocaleDateString('en-GB', { day:'numeric', month:'short', hour:'2-digit', minute:'2-digit' });
+
+      const colors = _eventTypeColors(e.type);
+      const titleEsc = (e.title || 'Untitled').replace(/</g, '&lt;');
+
+      return `<div style="padding:8px 10px;margin-bottom:5px;background:${colors.bg};border-left:2.5px solid ${colors.border};border-radius:5px;transition:background .15s" onmouseover="this.style.background='${colors.bgHover}'" onmouseout="this.style.background='${colors.bg}'">
+        <div style="display:flex;align-items:center;gap:6px;margin-bottom:2px">
+          <span style="font-size:11px">${colors.icon}</span>
+          <span style="font-size:11.5px;font-weight:700;color:var(--text-1);flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${titleEsc}</span>
+        </div>
+        <div style="font-size:10px;color:${colors.color};font-weight:600;padding-left:18px">${dateLabel}</div>
+      </div>`;
+    }).join('');
+
+  } catch(e) {
+    console.error('[loadLobbyEvents]', e);
+    listEl.innerHTML = `<div style="padding:12px;text-align:center;color:var(--text-3);font-size:11px">Unable to load events</div>`;
+  }
+};
+
+function _eventTypeColors(type) {
+  const map = {
+    tournament: { bg:'rgba(88,101,242,.12)',  bgHover:'rgba(88,101,242,.22)',  border:'rgba(88,101,242,.4)',  icon:'🏆', color:'#7c8ff5' },
+    public:     { bg:'rgba(35,165,90,.10)',    bgHover:'rgba(35,165,90,.20)',   border:'rgba(35,165,90,.4)',    icon:'🌍', color:'#57f287' },
+    online:     { bg:'rgba(240,178,50,.10)',   bgHover:'rgba(240,178,50,.20)',  border:'rgba(240,178,50,.4)',   icon:'💻', color:'#f0b232' },
+    private:    { bg:'rgba(255,255,255,.04)',  bgHover:'rgba(255,255,255,.08)', border:'rgba(255,255,255,.2)',  icon:'🔒', color:'var(--text-3)' }
+  };
+  return map[type] || map.public;
+}
+
+// ── Open in-app calendar panel ──────────────────────────────────
+window.openLobbyCalendar = async function(lobbyId, lobbyName) {
+  window._calendarState.lobbyId = lobbyId;
+  window._calendarState.lobbyName = lobbyName || 'Lobby';
+  window._calendarState.currentDate = new Date();
+
+  // Hide other panels, show calendar
+  const panels = ['homePanel', 'chatPanel', 'profilePage', 'vcPanel'];
+  panels.forEach(id => { const el = document.getElementById(id); if (el) el.classList.add('hidden'); });
+  const cal = document.getElementById('calendarPanel');
+  if (cal) cal.classList.remove('hidden');
+
+  // Update title
+  const titleEl = document.getElementById('calendarLobbyTitle');
+  if (titleEl) titleEl.textContent = `${lobbyName} · Calendar`;
+
+  // Set current panel context
+  if (typeof currentPanel !== 'undefined') currentPanel = 'calendar';
+
+  // Load events and render
+  await _calendarFetchEvents();
+  _calendarRender();
+};
+
+async function _calendarFetchEvents() {
+  try {
+    const token = localStorage.getItem('vh_token') || sessionStorage.getItem('vh_token');
+    const res = await fetch(`https://lobby-auth-server.onrender.com/api/events/lobby/${window._calendarState.lobbyId}`, {
+      headers: { Authorization: `Bearer ${token}` }
+    });
+    const data = await res.json();
+    window._calendarState.events = data.events || [];
+  } catch(e) {
+    console.error('[calendar fetch]', e);
+    window._calendarState.events = [];
+  }
+}
+
+function _calendarRender() {
+  const state = window._calendarState;
+  const date = state.currentDate;
+  const year = date.getFullYear();
+  const month = date.getMonth();
+
+  // Subtitle
+  const subEl = document.getElementById('calendarMonthSubtitle');
+  if (subEl) subEl.textContent = date.toLocaleDateString('en-GB', { month: 'long', year: 'numeric' });
+
+  const firstDay = new Date(year, month, 1).getDay();
+  const daysInMonth = new Date(year, month + 1, 0).getDate();
+  const daysInPrevMonth = new Date(year, month, 0).getDate();
+
+  const grid = document.getElementById('calendarDaysGrid');
+  if (!grid) return;
+  grid.innerHTML = '';
+
+  const today = new Date(); today.setHours(0,0,0,0);
+  const me_id = typeof me !== 'undefined' && me ? me.id : null;
+
+  // Previous month days
+  for (let i = firstDay - 1; i >= 0; i--) {
+    const day = daysInPrevMonth - i;
+    grid.appendChild(_calendarMakeDay(day, year, month - 1, true, today, me_id));
+  }
+  // Current month days
+  for (let day = 1; day <= daysInMonth; day++) {
+    grid.appendChild(_calendarMakeDay(day, year, month, false, today, me_id));
+  }
+  // Next month filler
+  const cellsUsed = firstDay + daysInMonth;
+  const remaining = (cellsUsed <= 35) ? (35 - cellsUsed) : (42 - cellsUsed);
+  for (let day = 1; day <= remaining; day++) {
+    grid.appendChild(_calendarMakeDay(day, year, month + 1, true, today, me_id));
+  }
+  // Adjust grid rows
+  const totalCells = grid.children.length;
+  grid.style.gridTemplateRows = `repeat(${Math.ceil(totalCells/7)},minmax(0,1fr))`;
+
+  _calendarRenderUpcoming();
+}
+
+function _calendarMakeDay(day, year, month, isOtherMonth, today, me_id) {
+  const dayDate = new Date(year, month, day); dayDate.setHours(0,0,0,0);
+  const isToday = dayDate.getTime() === today.getTime();
+
+  const dayEvents = window._calendarState.events.filter(e => {
+    const ed = new Date(e.event_date); ed.setHours(0,0,0,0);
+    return ed.getTime() === dayDate.getTime() && (!e.is_private || e.created_by === me_id);
+  }).sort((a,b) => new Date(a.event_date) - new Date(b.event_date));
+
+  const el = document.createElement('div');
+  el.style.cssText = `background:${isToday ? 'rgba(88,101,242,.08)' : 'var(--bg-1)'};border:1px solid ${isToday ? 'rgba(88,101,242,.3)' : 'rgba(255,255,255,.04)'};border-radius:8px;padding:6px;display:flex;flex-direction:column;gap:3px;overflow:hidden;cursor:pointer;transition:background .15s;min-height:0;${isOtherMonth ? 'opacity:.4' : ''}`;
+  el.onmouseover = () => { if (!isToday) el.style.background = 'var(--bg-2)'; };
+  el.onmouseout = () => { if (!isToday) el.style.background = 'var(--bg-1)'; };
+
+  if (!isOtherMonth) {
+    el.onclick = (ev) => {
+      if (ev.target !== el && ev.target.dataset?.evId) return;
+      _openCreateEventModalForDate(dayDate);
+    };
+  }
+
+  const num = document.createElement('div');
+  num.style.cssText = `font-size:11px;font-weight:700;color:${isToday ? 'var(--accent)' : 'var(--text-2)'};flex-shrink:0`;
+  num.textContent = day;
+  el.appendChild(num);
+
+  // Show up to 3 events, then "+N more"
+  const maxVisible = 3;
+  dayEvents.slice(0, maxVisible).forEach(e => {
+    const c = _eventTypeColors(e.type);
+    const chip = document.createElement('div');
+    chip.dataset.evId = e.id;
+    chip.style.cssText = `padding:2px 5px;border-radius:3px;font-size:9.5px;font-weight:600;background:${c.bg};color:${c.color};border-left:2px solid ${c.border};white-space:nowrap;overflow:hidden;text-overflow:ellipsis;cursor:pointer`;
+    chip.textContent = `${c.icon} ${e.title}`;
+    chip.onclick = (ev) => { ev.stopPropagation(); _showEventDetails(e); };
+    el.appendChild(chip);
+  });
+
+  if (dayEvents.length > maxVisible) {
+    const more = document.createElement('div');
+    more.style.cssText = 'font-size:9px;color:var(--text-3);font-weight:700;padding:1px 5px;cursor:pointer';
+    more.textContent = `+${dayEvents.length - maxVisible} more`;
+    more.onclick = (ev) => { ev.stopPropagation(); _showEventDetails(dayEvents[0], dayEvents); };
+    el.appendChild(more);
+  }
+
+  return el;
+}
+
+function _calendarRenderUpcoming() {
+  const list = document.getElementById('calendarUpcomingList');
+  if (!list) return;
+  const me_id = typeof me !== 'undefined' && me ? me.id : null;
+  const now = Date.now();
+  const upcoming = window._calendarState.events
+    .filter(e => new Date(e.event_date).getTime() >= now - 3600000)
+    .filter(e => !e.is_private || e.created_by === me_id)
+    .sort((a,b) => new Date(a.event_date) - new Date(b.event_date))
+    .slice(0, 15);
+
+  if (upcoming.length === 0) {
+    list.innerHTML = `<div style="padding:20px;text-align:center;color:var(--text-3);font-size:11.5px;line-height:1.6">No upcoming events.<br><span style="opacity:.7">Click a day on the calendar to create one.</span></div>`;
+    return;
+  }
+
+  list.innerHTML = upcoming.map(e => {
+    const c = _eventTypeColors(e.type);
+    const date = new Date(e.event_date);
+    const dateLabel = date.toLocaleDateString('en-GB', { weekday:'short', day:'numeric', month:'short' });
+    const timeLabel = date.toLocaleTimeString('en-GB', { hour:'2-digit', minute:'2-digit' });
+    const titleEsc = (e.title || 'Untitled').replace(/</g, '&lt;');
+
+    return `<div onclick='_showEventDetails(${JSON.stringify(e).replace(/"/g,'&quot;')})' style="padding:10px 12px;margin-bottom:6px;background:${c.bg};border-left:3px solid ${c.border};border-radius:6px;cursor:pointer;transition:background .15s" onmouseover="this.style.background='${c.bgHover}'" onmouseout="this.style.background='${c.bg}'">
+      <div style="display:flex;align-items:center;gap:6px;margin-bottom:3px">
+        <span style="font-size:12px">${c.icon}</span>
+        <span style="font-size:12px;font-weight:700;color:var(--text-1);flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${titleEsc}</span>
+      </div>
+      <div style="font-size:10.5px;color:${c.color};font-weight:600">${dateLabel} · ${timeLabel}</div>
+    </div>`;
+  }).join('');
+}
+
+window.calendarChangeMonth = function(delta) {
+  window._calendarState.currentDate.setMonth(window._calendarState.currentDate.getMonth() + delta);
+  _calendarRender();
+};
+
+window.calendarGoToday = function() {
+  window._calendarState.currentDate = new Date();
+  _calendarRender();
+};
+
+// ── Create Event Modal ──────────────────────────────────────────
+function _openCreateEventModalForDate(date) {
+  window.openCreateEventModal();
+  if (date) {
+    const d = new Date(date);
+    d.setHours(19, 0, 0, 0); // Default to 7pm
+    document.getElementById('eventDateInput').value = _toLocalDateTimeInput(d);
+  }
+}
+
+window.openCreateEventModal = function() {
+  document.getElementById('eventTitleInput').value = '';
+  document.getElementById('eventDescInput').value = '';
+  document.getElementById('eventDateInput').value = _toLocalDateTimeInput(new Date());
+  document.getElementById('eventLocationInput').value = '';
+  document.getElementById('eventPrivateCheck').checked = false;
+  selectEType('public');
+  document.getElementById('createEventModal').style.display = 'flex';
+};
+
+window.closeCreateEventModal = function() {
+  document.getElementById('createEventModal').style.display = 'none';
+};
+
+window.selectEType = function(type) {
+  document.getElementById('eventTypeValue').value = type;
+  const pub = document.getElementById('etypePublic');
+  const onl = document.getElementById('etypeOnline');
+  if (type === 'public') {
+    pub.style.border = '2px solid var(--accent)';
+    pub.style.background = 'rgba(35,165,90,.08)';
+    onl.style.border = '2px solid rgba(255,255,255,.08)';
+    onl.style.background = 'var(--bg-3)';
+  } else {
+    onl.style.border = '2px solid var(--accent)';
+    onl.style.background = 'rgba(240,178,50,.08)';
+    pub.style.border = '2px solid rgba(255,255,255,.08)';
+    pub.style.background = 'var(--bg-3)';
+  }
+};
+
+function _toLocalDateTimeInput(d) {
+  const pad = n => String(n).padStart(2,'0');
+  return `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
+}
+
+window.submitNewEvent = async function(e) {
+  e.preventDefault();
+  const token = localStorage.getItem('vh_token') || sessionStorage.getItem('vh_token');
+  const isPrivate = document.getElementById('eventPrivateCheck').checked;
+  const type = document.getElementById('eventTypeValue').value;
+
+  const body = {
+    lobbyId: window._calendarState.lobbyId,
+    eventType: isPrivate ? 'private' : type,
+    title: document.getElementById('eventTitleInput').value.trim(),
+    description: document.getElementById('eventDescInput').value.trim(),
+    eventDate: new Date(document.getElementById('eventDateInput').value).toISOString(),
+    location: document.getElementById('eventLocationInput').value.trim(),
+    isPrivate
+  };
+
+  try {
+    const res = await fetch('https://lobby-auth-server.onrender.com/api/events/create', {
+      method: 'POST',
+      headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' },
+      body: JSON.stringify(body)
+    });
+    if (!res.ok) throw new Error('Failed to create event');
+    closeCreateEventModal();
+    await _calendarFetchEvents();
+    _calendarRender();
+    await loadLobbyEvents(window._calendarState.lobbyId);
+  } catch(err) {
+    alert('Failed to create event: ' + err.message);
+  }
+};
+
+// ── Event Details Modal ─────────────────────────────────────────
+window._showEventDetails = function(event) {
+  if (typeof event === 'string') { try { event = JSON.parse(event); } catch(e) { return; } }
+
+  const c = _eventTypeColors(event.type);
+  document.getElementById('eventDetailsBanner').style.background = c.border;
+  document.getElementById('eventDetailsTypeChip').textContent = `${c.icon} ${event.type.toUpperCase()}`;
+  document.getElementById('eventDetailsTypeChip').style.color = c.color;
+  document.getElementById('eventDetailsTypeChip').style.background = c.bg;
+  document.getElementById('eventDetailsTitle').textContent = event.title || 'Untitled';
+
+  const date = new Date(event.event_date);
+  const fmt = date.toLocaleDateString('en-GB', { weekday:'long', day:'numeric', month:'long', year:'numeric', hour:'2-digit', minute:'2-digit' });
+  document.getElementById('eventDetailsTime').querySelector('span:last-child').textContent = fmt;
+
+  const descSec = document.getElementById('eventDetailsDescSection');
+  if (event.description) {
+    descSec.style.display = 'block';
+    document.getElementById('eventDetailsDesc').textContent = event.description;
+  } else descSec.style.display = 'none';
+
+  const locSec = document.getElementById('eventDetailsLocationSection');
+  if (event.location) {
+    locSec.style.display = 'block';
+    document.getElementById('eventDetailsLocation').textContent = event.location;
+  } else locSec.style.display = 'none';
+
+  // Actions
+  const actions = document.getElementById('eventDetailsActions');
+  const me_id = typeof me !== 'undefined' && me ? me.id : null;
+  const isCreator = event.created_by === me_id;
+  const isTournament = event.type === 'tournament' || String(event.id).startsWith('tournament_');
+
+  let html = '';
+  if (isCreator && !isTournament) {
+    html += `<button onclick="_deleteEvent('${event.id}')" style="flex:1;padding:10px;background:rgba(237,66,69,.15);border:1px solid rgba(237,66,69,.3);border-radius:8px;color:var(--danger);font-size:12.5px;font-weight:700;cursor:pointer;font-family:var(--font);transition:background .15s" onmouseover="this.style.background='rgba(237,66,69,.25)'" onmouseout="this.style.background='rgba(237,66,69,.15)'">Delete Event</button>`;
+  }
+  html += `<button onclick="closeEventDetails()" style="flex:1;padding:10px;background:var(--bg-3);border:none;border-radius:8px;color:var(--text-2);font-size:12.5px;font-weight:700;cursor:pointer;font-family:var(--font);transition:all .15s" onmouseover="this.style.background='var(--bg-2)';this.style.color='var(--text-1)'" onmouseout="this.style.background='var(--bg-3)';this.style.color='var(--text-2)'">Close</button>`;
+  actions.innerHTML = html;
+
+  document.getElementById('eventDetailsModal').style.display = 'flex';
+};
+
+window.closeEventDetails = function() {
+  document.getElementById('eventDetailsModal').style.display = 'none';
+};
+
+window._deleteEvent = async function(eventId) {
+  if (!confirm('Delete this event?')) return;
+  const token = localStorage.getItem('vh_token') || sessionStorage.getItem('vh_token');
+  try {
+    const res = await fetch(`https://lobby-auth-server.onrender.com/api/events/${eventId}`, {
+      method: 'DELETE',
+      headers: { 'Authorization': `Bearer ${token}` }
+    });
+    if (!res.ok) throw new Error('Failed');
+    closeEventDetails();
+    await _calendarFetchEvents();
+    _calendarRender();
+    await loadLobbyEvents(window._calendarState.lobbyId);
+  } catch(e) { alert('Failed to delete event'); }
 };
 
 window._startupComplete = false;
