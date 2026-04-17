@@ -6235,6 +6235,9 @@ let selectedGroupOwnerId = null;
 const groupCallPeers = {};
 let groupLocalStream = null;
 let groupCallActive  = false;
+const _groupCandidateQueue = {};
+let groupScreenStream = null;
+let groupCamStream = null;
 
 async function createGroup() {
   const name = document.getElementById("groupName").value.trim();
@@ -6500,9 +6503,9 @@ function createGroupPeerConnection(peerId) {
   let makingOffer = false;
   pc.onnegotiationneeded = async () => {
     try {
+      if (pc.signalingState !== "stable") return;
       makingOffer = true;
       const offer = await pc.createOffer();
-      if (pc.signalingState !== "stable") return;
       await pc.setLocalDescription(offer);
       wsSend({ type: "group-offer", offer: pc.localDescription, to: peerId });
     } catch(e) { console.error("group renegotiation error", e); }
@@ -6512,9 +6515,8 @@ function createGroupPeerConnection(peerId) {
 }
 
 async function createGroupOffer(peerId) {
-  const pc = createGroupPeerConnection(peerId);
-  const offer = await pc.createOffer(); await pc.setLocalDescription(offer);
-  wsSend({ type:"group-offer", offer:pc.localDescription, to:peerId });
+  createGroupPeerConnection(peerId);
+  // onnegotiationneeded will fire automatically from addTrack() and handle the offer flow
 }
 
 async function handleGroupOffer(msg) {
@@ -6536,8 +6538,14 @@ async function handleGroupOffer(msg) {
   if (!pc) {
     pc = createGroupPeerConnection(msg.from);
   }
+  // Handle glare: if we're already mid-offer, roll back
+  if (pc.signalingState !== "stable") {
+    await pc.setLocalDescription({ type: "rollback" });
+  }
   await pc.setRemoteDescription(msg.offer);
-  const answer = await pc.createAnswer(); await pc.setLocalDescription(answer);
+  await drainGroupCandidates(msg.from);
+  const answer = await pc.createAnswer();
+  await pc.setLocalDescription(answer);
   wsSend({ type:"group-answer", answer:pc.localDescription, to:msg.from, groupId:selectedGroupId });
 }
 
@@ -6566,6 +6574,7 @@ async function toggleGroupCam() {
       const camStream = await navigator.mediaDevices.getUserMedia({ video: true });
       const camTrack = camStream.getVideoTracks()[0];
       groupLocalStream.addTrack(camTrack);
+      groupCamStream = camStream;  // ✅ Track the cam stream
       // Replace null video track on all peers
       function findGroupVideoSender(pc) {
         return pc.getSenders().find(s => s.track?.kind === "video")
@@ -6593,6 +6602,7 @@ async function toggleGroupScreen() {
     });
     if (!screenStream) return;
     const screenTrack = screenStream.getVideoTracks()[0];
+    groupScreenStream = screenStream;  // ✅ Track the screen stream
     // Find video sender — may have null track if audio-only joined
     function findGroupVideoSender(pc) {
       return pc.getSenders().find(s => s.track?.kind === "video")
@@ -6608,6 +6618,7 @@ async function toggleGroupScreen() {
     if (myVid) myVid.srcObject = screenStream;
     document.getElementById("gcScreenBtn").classList.add("active");
     screenTrack.onended = () => {
+      groupScreenStream = null;  // ✅ Clear when screen share ends
       const camTrack = groupLocalStream?.getVideoTracks()[0] || null;
       Object.values(groupCallPeers).forEach(pc => { const s = findGroupVideoSender(pc); if (s) s.replaceTrack(camTrack); });
       if (myVid) myVid.srcObject = camTrack ? groupLocalStream : null;
@@ -6905,6 +6916,14 @@ async function drainVcCandidates(peerId) {
   _vcCandidateQueue[peerId] = [];
   for (const c of queue) {
     await vcPeers[peerId]?.addIceCandidate(new RTCIceCandidate(c)).catch(() => {});
+  }
+}
+
+async function drainGroupCandidates(peerId) {
+  const queue = _groupCandidateQueue[peerId] || [];
+  _groupCandidateQueue[peerId] = [];
+  for (const c of queue) {
+    await groupCallPeers[peerId]?.addIceCandidate(new RTCIceCandidate(c)).catch(() => {});
   }
 }
 let vcVideoStreams = {};      // peerId → MediaStream (remote video)

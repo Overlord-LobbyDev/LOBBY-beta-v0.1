@@ -2,20 +2,31 @@
   "name": "lobby",
   "version": "1.4.0",
   "description": "LOBBY — Your Gaming Social Hub",
+  "author": "Connor Robinson <Connortasklethelp@outlook.com>",
   "main": "main.js",
   "scripts": {
     "start": "electron .",
     "dev": "electron .",
     "build": "electron-builder",
-    "build:win": "electron-builder --win"
+    "build:win": "electron-builder --win",
+    "build:mac": "electron-builder --mac",
+    "build:linux": "electron-builder --linux",
+    "build:all": "electron-builder -mwl"
   },
   "build": {
     "appId": "com.lobby.app",
     "productName": "LOBBY",
     "icon": "icon.ico",
+    "files": [
+      "**/*",
+      "!**/*.map"
+    ],
     "win": {
       "icon": "icon.ico",
-      "target": "nsis",
+      "target": [
+        "nsis",
+        "portable"
+      ],
       "requestedExecutionLevel": "asInvoker"
     },
     "nsis": {
@@ -27,6 +38,36 @@
       "deleteAppDataOnUninstall": false,
       "perMachine": false,
       "uninstallDisplayName": "LOBBY"
+    },
+    "mac": {
+      "icon": "icon.icns",
+      "target": [
+        "dmg",
+        "zip"
+      ],
+      "category": "public.app-category.games"
+    },
+    "dmg": {
+      "contents": [
+        {
+          "x": 130,
+          "y": 220
+        },
+        {
+          "x": 410,
+          "y": 220,
+          "type": "link",
+          "path": "/Applications"
+        }
+      ]
+    },
+    "linux": {
+      "icon": "icon.png",
+      "target": [
+        "AppImage",
+        "deb"
+      ],
+      "category": "Game"
     }
   },
   "dependencies": {
