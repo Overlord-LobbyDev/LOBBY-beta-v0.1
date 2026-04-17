@@ -1799,12 +1799,23 @@ async function joinGroupCall(groupId) {
   // Tell others we joined
   wsSend({ type:"group-call-join", groupId });
 
-  // Handle incoming WebRTC from WS
+  // Handle incoming WebRTC from WS — remove first to prevent stacking on rejoin
+  ws.removeEventListener("message", handleGroupCallWS);
   ws.addEventListener("message", handleGroupCallWS);
 }
 
 async function handleGroupCallWS({ data }) {
   const msg = JSON.parse(data);
+
+  // Bug 3 fix: when we join, server sends existing members — create offers to each
+  if (msg.type === "group-call-peers" && msg.groupId === selectedGroupId) {
+    for (const peer of (msg.peers || [])) {
+      if (peer.peerId && !groupCallPeers[peer.peerId]) {
+        await createGroupOffer(peer.peerId);
+      }
+    }
+    return;
+  }
 
   if (msg.type === "group-call-join" && msg.groupId === selectedGroupId) {
     // New peer joined — create offer to them
@@ -2396,12 +2407,17 @@ document.getElementById("coScreenBtn")?.addEventListener("click", () => document
 document.getElementById("coLeaveBtn")?.addEventListener("click", () => { document.getElementById("callVideoOverlay")?.classList.remove("open"); endCall(); });
 
 // ── Hook call signalling into WS ──────────────────────────────
+// Bug 1 fix: guard so we only ever attach the call signalling listener once
+let callSignallingReady = false;
+
 function setupCallSignalling() {
+  if (callSignallingReady) return;
   if (!ws || ws.readyState !== WebSocket.OPEN) {
     setTimeout(setupCallSignalling, 500);
     return;
   }
 
+  callSignallingReady = true;
   log("Call signalling ready");
 
   ws.addEventListener("message", async ({ data }) => {
@@ -2418,6 +2434,17 @@ function setupCallSignalling() {
     if (msg.type === "call-accept") {
       closeOutgoingCallModal();
       showFloatingCallBar(callTargetName, null, "Connecting…");
+      // Bug 2 fix: callStream must exist before we add tracks to the peer connection
+      if (!callStream) {
+        try {
+          callStream = await navigator.mediaDevices.getUserMedia({ audio: true, video: true });
+        } catch (e) {
+          showToast("Could not access camera/mic: " + e.message, "error");
+          wsSend({ type: "call-end", to: msg.from });
+          forceEndCall();
+          return;
+        }
+      }
       const pc    = createCallPeerConnection(msg.from);
       const offer = await pc.createOffer();
       await pc.setLocalDescription(offer);
@@ -2497,6 +2524,7 @@ if (pendingDM) {
   setTimeout(() => openDM(userId, username, ""), 1500);
 }
 </script>
+<script src="screenpicker.js"></script>
 <script src="settingspanel.js"></script>
 </body>
 </html>

@@ -4,6 +4,7 @@
 
 const { app, BrowserWindow, ipcMain, desktopCapturer, session, shell, screen, Menu, globalShortcut } = require("electron");
 const path = require("path");
+const fs   = require("fs");   // moved here — was required at line 227 but used at line 79 (crash)
 
 // Remove the native menu bar entirely
 Menu.setApplicationMenu(null);
@@ -224,7 +225,6 @@ ipcMain.handle("vc-pip-action", (event, action) => {
 // ── Auto-Updater IPC ──────────────────────────────────────────
 const https = require("https");
 const http = require("http");
-const fs = require("fs");
 const os = require("os");
 const { execFile } = require("child_process");
 

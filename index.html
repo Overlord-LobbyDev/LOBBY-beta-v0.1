@@ -4148,26 +4148,7 @@
 </div>
 <div id="notifBackdrop" onclick="closeNotifPanel()"></div>
 
-<!-- ── Screen Share Picker ─────────────────────────────────── -->
-<div id="sourcePickerOverlay">
-  <div id="sourcePickerModal">
-    <div class="sp-header">
-      <div class="sp-title">
-        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="3" width="20" height="14" rx="2"/><line x1="8" y1="21" x2="16" y2="21"/><line x1="12" y1="17" x2="12" y2="21"/></svg>
-        Share Your Screen
-      </div>
-      <button class="sp-close" id="sourcePickerClose">
-        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
-      </button>
-    </div>
-    <p class="sp-subtitle">Choose a window or screen to share</p>
-    <div class="sp-grid" id="sourcePickerGrid"></div>
-    <div class="sp-footer">
-      <button class="sp-btn-cancel" id="sourcePickerCancel">Cancel</button>
-      <button class="sp-btn-share" id="sourcePickerConfirm" disabled>Share</button>
-    </div>
-  </div>
-</div>
+<!-- sourcePickerOverlay injected at runtime by screenpicker.js -->
 
 <div id="floatingCallBar" style="display:none">
   <div class="floating-call-info">
@@ -7697,50 +7678,7 @@ function setupVoiceChannelSystem() {
 // ── End Voice Channel System ──────────────────────────────────
 
 // ── Screen Share Source Picker ────────────────────────────────
-function openSourcePicker(sources) {
-  return new Promise(resolve => {
-    const overlay  = document.getElementById("sourcePickerOverlay");
-    const grid     = document.getElementById("sourcePickerGrid");
-    const confirm  = document.getElementById("sourcePickerConfirm");
-    const cancel   = document.getElementById("sourcePickerCancel");
-    const closeBtn = document.getElementById("sourcePickerClose");
-    let selectedId = null;
-
-    grid.innerHTML = sources.map(s => {
-      // thumbnails arrive as dataURL strings from main.js — use directly
-      const thumb = typeof s.thumbnail === "string"
-        ? `<img class="sp-source-thumb" src="${s.thumbnail}" />`
-        : `<div class="sp-source-thumb-placeholder">🖥</div>`;
-      return `<div class="sp-source" data-id="${s.id}" onclick="spSelect(this,'${s.id}')">
-        ${thumb}
-        <div class="sp-source-name">${s.name}</div>
-      </div>`;
-    }).join("");
-
-    window.spSelect = (el, id) => {
-      document.querySelectorAll(".sp-source").forEach(e => e.classList.remove("selected"));
-      el.classList.add("selected");
-      selectedId = id;
-      confirm.disabled = false;
-    };
-
-    const close = (val) => {
-      overlay.classList.remove("open");
-      setTimeout(() => { overlay.classList.remove("visible"); }, 350);
-      resolve(val || null);
-    };
-
-    confirm.disabled = true;
-    confirm.onclick  = () => close(selectedId);
-    cancel.onclick   = () => close(null);
-    closeBtn.onclick = () => close(null);
-    overlay.onclick  = (e) => { if (e.target === overlay) close(null); };
-
-    // Use classes only — no inline style so CSS transitions work
-    overlay.classList.add("visible");
-    requestAnimationFrame(() => overlay.classList.add("open"));
-  });
-}
+// openSourcePicker() is provided by screenpicker.js
 
 // ── End Screen Share Picker ───────────────────────────────────
 
@@ -12861,6 +12799,7 @@ setTimeout(function() {
 document.body.classList.add("feed-open");
 // Lobby list visibility is managed by showHomePanel on initial load
 </script>
+<script src="screenpicker.js"></script>
 <script src="client.js"></script>
 <script>
 // Restore saved theme immediately before render to avoid flash
