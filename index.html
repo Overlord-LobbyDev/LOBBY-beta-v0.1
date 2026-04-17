@@ -7012,7 +7012,7 @@ function renderVcPip() {
 
   body.innerHTML = allMembers.slice(0,4).map(m => {
     // Check if this member has an active video element (webcam/screen)
-    const peerId = m.isSelf ? null : `vc${m.userId}`;
+    const peerId = m.isSelf ? null : `u${m.userId}`;
     const audioEl = peerId ? document.getElementById(`vcaudio-${peerId}`) : null;
     // For self, check vcStream video tracks
     const hasVideo = m.isSelf
@@ -7034,7 +7034,7 @@ function renderVcPip() {
   allMembers.slice(0,4).forEach(m => {
     const tile = document.getElementById(`pip-tile-${m.userId}`);
     if (!tile) return;
-    const peerId = m.isSelf ? null : `vc${m.userId}`;
+    const peerId = m.isSelf ? null : `u${m.userId}`;
 
     // Remote: use vcVideoStreams for video (stored by ontrack handler)
     if (!m.isSelf && peerId) {
@@ -7178,7 +7178,7 @@ function renderVcGrid() {
         tiles.push({ type:"screen", member:m, stream:vcScreenStream });
       }
     } else {
-      const peerId = `vc${m.userId}`;
+      const peerId = `u${m.userId}`;
       // Use vcVideoStreams for remote video (stored by ontrack handler)
       const remoteVideoStream = vcVideoStreams[peerId];
       const hasRemoteVideo = remoteVideoStream?.getVideoTracks().some(t => t.readyState === "live");
@@ -7365,8 +7365,11 @@ function createVcPeerConnection(peerId) {
   return pc;
 }
 
+let vcSignallingReady = false;
 function setupVcSignalling() {
+  if (vcSignallingReady) return;
   if (!ws || ws.readyState !== WebSocket.OPEN) { setTimeout(setupVcSignalling, 500); return; }
+  vcSignallingReady = true;
   ws.addEventListener("message", async ({ data }) => {
     let msg;
     try { msg = JSON.parse(data); } catch { return; }
@@ -7382,7 +7385,7 @@ function setupVcSignalling() {
       if (cid === vcChannelId) {
         renderVcGrid();
         // Initiate WebRTC to the new member
-        const peerId = `vc${msg.userId}`;
+        const peerId = `u${msg.userId}`;
         if (msg.userId !== me.id && !vcPeers[peerId]) {
           const pc = createVcPeerConnection(peerId);
           const offer = await pc.createOffer();
@@ -7401,7 +7404,7 @@ function setupVcSignalling() {
       if (vcChannelMembers[cid]) {
         vcChannelMembers[cid] = vcChannelMembers[cid].filter(m => m.userId !== msg.userId);
       }
-      const peerId = `vc${msg.userId}`;
+      const peerId = `u${msg.userId}`;
       vcPeers[peerId]?.close(); delete vcPeers[peerId]; delete vcVideoStreams[peerId];
       document.getElementById(`vcaudio-${peerId}`)?.remove();
       if (cid === vcChannelId) renderVcGrid();
