@@ -4900,7 +4900,6 @@ function connectWS() {
     if (typeof window.registerTournamentSocketHandlers === 'function') window.registerTournamentSocketHandlers();
   };
   ws.onclose = () => setTimeout(connectWS, 3000);
-  if (typeof initRTC === "function") initRTC();
   ws.onmessage = async ({ data }) => {
     const msg = JSON.parse(data);
     // Route tournament-specific messages to the tournament handler
@@ -6866,10 +6865,7 @@ async function handleGroupCallWS({ data }) {
 function peerUserIdFromPeerId(peerId) { return peerId.startsWith("u") ? parseInt(peerId.slice(1)) : null; }
 
 function createGroupPeerConnection(peerId) {
-  const pc = new RTCPeerConnection({ iceServers:[
-    { urls:"stun:stun.l.google.com:19302" },
-    { urls:"stun:stun1.l.google.com:19302" }
-  ]});
+  const pc = new RTCPeerConnection({ iceServers: CALL_ICE_SERVERS });
   groupCallPeers[peerId] = pc;
   _groupCandidateQueue[peerId] = [];
   // Add audio tracks
@@ -7159,6 +7155,30 @@ document.getElementById("cancelCallBtn").addEventListener("click", () => {
 });
 
 let callStream=null, callPeers={}, callActive=false, callTargetId=null, callTargetName=null;
+let callScreenStream = null; // active screen-share stream for direct calls, tracked for cleanup
+// Queue for ICE candidates that arrive before setRemoteDescription completes.
+// Without this, candidates are silently dropped and the peer connection stays stuck
+// in 'checking' forever — calls never connect. Draining is performed after
+// setRemoteDescription in the call-offer/call-answer handlers.
+const _callCandidateQueue = {}; // peerId → [candidate, ...]
+async function drainCallCandidates(peerId) {
+  const queue = _callCandidateQueue[peerId] || [];
+  _callCandidateQueue[peerId] = [];
+  for (const c of queue) {
+    try { await callPeers[peerId]?.addIceCandidate(new RTCIceCandidate(c)); }
+    catch(e) { console.warn("[call] drain candidate error:", e); }
+  }
+}
+// ICE server config shared across call types. TURN is essential for users behind
+// symmetric NAT — STUN alone fails for ~15-20% of real-world peer pairs.
+// Uses the free OpenRelay TURN project (metered.ca) — credentials are public.
+const CALL_ICE_SERVERS = [
+  { urls: "stun:stun.l.google.com:19302" },
+  { urls: "stun:stun1.l.google.com:19302" },
+  { urls: "turn:openrelay.metered.ca:80",            username: "openrelayproject", credential: "openrelayproject" },
+  { urls: "turn:openrelay.metered.ca:443",           username: "openrelayproject", credential: "openrelayproject" },
+  { urls: "turn:openrelay.metered.ca:443?transport=tcp", username: "openrelayproject", credential: "openrelayproject" }
+];
 
 async function startDirectCall(userId, username) {
   if (callActive) { showToast("Already in a call","error"); return; }
@@ -7233,9 +7253,22 @@ function showIncomingCallModal(fromUsername, fromAvatarUrl, fromPeerId) {
 function peerUserIdFromCallPeerId(peerId) { return peerId.startsWith("u") ? parseInt(peerId.slice(1)) : null; }
 
 function createCallPeerConnection(peerId) {
-  const pc = new RTCPeerConnection({ iceServers:[{ urls:"stun:stun.l.google.com:19302" }] });
+  const pc = new RTCPeerConnection({ iceServers: CALL_ICE_SERVERS });
   callPeers[peerId] = pc;
-  callStream?.getTracks().forEach(t => pc.addTrack(t, callStream));
+  // Add whatever local tracks we have (audio always, video if user granted it).
+  let hasLocalVideo = false;
+  callStream?.getTracks().forEach(t => {
+    pc.addTrack(t, callStream);
+    if (t.kind === "video") hasLocalVideo = true;
+  });
+  // Always ensure there's a video sender/transceiver. If the user started audio-only
+  // (e.g. no webcam or declined video perm), webcam/screen share still need a
+  // video sender to replaceTrack() onto. sendrecv means we can also receive remote
+  // video if the other side turns on their cam.
+  if (!hasLocalVideo) {
+    try { pc.addTransceiver("video", { direction: "sendrecv" }); }
+    catch(e) { console.warn("[call] addTransceiver(video) failed:", e); }
+  }
   pc.onicecandidate = ({ candidate }) => { if (candidate) wsSend({ type:"call-candidate", candidate, to:peerId }); };
   pc.ontrack = e => {
     // Show remote stream in the video overlay
@@ -7245,7 +7278,13 @@ function createCallPeerConnection(peerId) {
     // Open the video overlay
     document.getElementById("callVideoOverlay")?.classList.add("open");
   };
-  pc.onconnectionstatechange = () => { if (["disconnected","failed","closed"].includes(pc.connectionState)) endCall(); };
+  pc.oniceconnectionstatechange = () => {
+    console.log(`[call][${peerId}] iceConnectionState:`, pc.iceConnectionState);
+  };
+  pc.onconnectionstatechange = () => {
+    console.log(`[call][${peerId}] connectionState:`, pc.connectionState);
+    if (["disconnected","failed","closed"].includes(pc.connectionState)) endCall();
+  };
   return pc;
 }
 
@@ -7256,6 +7295,11 @@ async function forceEndCall() {
   callActive=false;
   Object.values(callPeers).forEach(pc=>pc.close()); Object.keys(callPeers).forEach(k=>delete callPeers[k]);
   callStream?.getTracks().forEach(t=>t.stop()); callStream=null;
+  // Stop any active screen share stream — tracks added via replaceTrack aren't stopped
+  // when the PC closes; the capture device keeps the indicator on until stop() is called.
+  callScreenStream?.getTracks().forEach(t=>t.stop()); callScreenStream=null;
+  // Clear any pending ICE candidates (avoid cross-call leakage if the user redials)
+  Object.keys(_callCandidateQueue).forEach(k => delete _callCandidateQueue[k]);
   document.querySelectorAll("[id^='callvid-']").forEach(el=>el.remove());
   // Close video overlay and clean up video elements
   document.getElementById("callVideoOverlay")?.classList.remove("open");
@@ -7277,21 +7321,99 @@ document.getElementById("fcMuteBtn").addEventListener("click", () => {
   tracks.forEach(t=>t.enabled=enabled);
   const btn=document.getElementById("fcMuteBtn"); btn.textContent=enabled?"🎙":"🔇"; btn.classList.toggle("active",!enabled);
 });
-document.getElementById("fcCamBtn").addEventListener("click", () => {
-  if (!callStream) return;
-  const tracks=callStream.getVideoTracks(); const enabled=!tracks[0]?.enabled;
-  tracks.forEach(t=>t.enabled=enabled); document.getElementById("fcCamBtn").classList.toggle("active",!enabled);
+
+// Helper: get the video sender on a PC, preferring an existing live video track but
+// falling back to a transceiver's sender (which may have a null track from sendrecv).
+function _callVideoSender(pc) {
+  const withTrack = pc.getSenders().find(s => s.track?.kind === "video");
+  if (withTrack) return withTrack;
+  const transceiver = pc.getTransceivers().find(t => t.receiver?.track?.kind === "video" || t.sender?.track === null);
+  return transceiver?.sender || null;
+}
+
+document.getElementById("fcCamBtn").addEventListener("click", async () => {
+  if (!callActive) return;
+  const btn = document.getElementById("fcCamBtn");
+  const existingTrack = callStream?.getVideoTracks()?.[0];
+
+  // If we already have a video track, toggle its enabled state
+  if (existingTrack && existingTrack.readyState === "live") {
+    const enabled = !existingTrack.enabled;
+    existingTrack.enabled = enabled;
+    btn.classList.toggle("active", enabled);
+    return;
+  }
+
+  // Otherwise acquire a webcam track and push it to all peers via replaceTrack.
+  // This lets users turn the camera on mid-call even if they started audio-only.
+  try {
+    const camStream = await navigator.mediaDevices.getUserMedia({ video: true });
+    const camTrack = camStream.getVideoTracks()[0];
+    if (!camTrack) throw new Error("No video track");
+    // Attach to our local callStream so mute logic / endCall cleanup finds it
+    if (callStream) { callStream.addTrack(camTrack); } else { callStream = camStream; }
+    // Push to all peer connections
+    Object.values(callPeers).forEach(pc => {
+      const sender = _callVideoSender(pc);
+      if (sender) sender.replaceTrack(camTrack);
+      else pc.addTrack(camTrack, callStream);
+    });
+    // Update local preview
+    const localVid = document.getElementById("callLocalVideo");
+    if (localVid) localVid.srcObject = callStream;
+    btn.classList.add("active");
+  } catch(e) {
+    console.error("[call] enable camera failed:", e);
+    showToast("Could not access camera: " + e.message, "error");
+  }
 });
 document.getElementById("fcScreenBtn").addEventListener("click", async () => {
-  if (!callActive||!window.electronAPI) return;
+  if (!callActive) return;
   try {
-    const sources=await window.electronAPI.getSources(); const chosenId=await openSourcePicker(sources); if (!chosenId) return;
-    const screenStream=await navigator.mediaDevices.getUserMedia({ audio:false, video:{ mandatory:{ chromeMediaSource:"desktop", chromeMediaSourceId:chosenId } } });
-    const screenTrack=screenStream.getVideoTracks()[0];
-    Object.values(callPeers).forEach(pc=>{ const s=pc.getSenders().find(s=>s.track?.kind==="video"); s?.replaceTrack(screenTrack); });
+    let screenStream;
+    // Prefer Electron desktopCapturer for better source selection; fall back to
+    // getDisplayMedia so this also works in a browser context.
+    if (window.electronAPI?.getSources) {
+      const sources = await window.electronAPI.getSources();
+      const chosenId = await openSourcePicker(sources);
+      if (!chosenId) return;
+      screenStream = await navigator.mediaDevices.getUserMedia({
+        audio:false,
+        video:{ mandatory:{ chromeMediaSource:"desktop", chromeMediaSourceId:chosenId } }
+      });
+    } else if (navigator.mediaDevices.getDisplayMedia) {
+      screenStream = await navigator.mediaDevices.getDisplayMedia({ video:true, audio:false });
+    } else {
+      showToast("Screen sharing isn't supported in this environment", "error");
+      return;
+    }
+    const screenTrack = screenStream.getVideoTracks()[0];
+    if (!screenTrack) throw new Error("No screen video track");
+    callScreenStream = screenStream; // track for cleanup in forceEndCall
+    // Push screen track to all peers. If no video sender exists yet (audio-only start),
+    // addTrack instead of replaceTrack so renegotiation fires via onnegotiationneeded
+    // or our explicit logic.
+    Object.values(callPeers).forEach(pc => {
+      const sender = _callVideoSender(pc);
+      if (sender) sender.replaceTrack(screenTrack);
+      else pc.addTrack(screenTrack, screenStream);
+    });
     document.getElementById("fcScreenBtn").classList.add("active");
-    screenTrack.onended=()=>{ const camTrack=callStream?.getVideoTracks()[0]; if (camTrack) Object.values(callPeers).forEach(pc=>{ const s=pc.getSenders().find(s=>s.track?.kind==="video"); s?.replaceTrack(camTrack); }); document.getElementById("fcScreenBtn").classList.remove("active"); };
-  } catch(e) { console.error("Screen share error:",e); }
+    // Show local preview of the screen share too
+    const localVid = document.getElementById("callLocalVideo");
+    if (localVid) localVid.srcObject = screenStream;
+    screenTrack.onended = () => {
+      callScreenStream = null;
+      // Restore camera track if we had one, otherwise set null
+      const camTrack = callStream?.getVideoTracks().find(t => t.readyState === "live" && t !== screenTrack);
+      Object.values(callPeers).forEach(pc => {
+        const sender = _callVideoSender(pc);
+        if (sender) sender.replaceTrack(camTrack || null);
+      });
+      document.getElementById("fcScreenBtn").classList.remove("active");
+      if (localVid) localVid.srcObject = callStream;
+    };
+  } catch(e) { console.error("[call] screen share error:", e); showToast("Screen share failed: " + e.message, "error"); }
 });
 document.getElementById("fcLeaveBtn").addEventListener("click", endCall);
 
@@ -7738,7 +7860,7 @@ function findVideoSender(pc) {
 }
 
 function createVcPeerConnection(peerId) {
-  const pc = new RTCPeerConnection({ iceServers:[{ urls:"stun:stun.l.google.com:19302" }] });
+  const pc = new RTCPeerConnection({ iceServers: CALL_ICE_SERVERS });
   vcPeers[peerId] = pc;
   _vcCandidateQueue[peerId] = [];
   // Add audio tracks from vcStream
@@ -8024,23 +8146,34 @@ document.addEventListener("DOMContentLoaded", () => {
   }
 
   async function startScreenShare(quality) {
-    if (!window.electronAPI?.getSources) { showToast("Screen share requires the desktop app", "error"); return; }
     const q = VC_QUALITY[quality] || VC_QUALITY.high;
     try {
-      const sources = await window.electronAPI.getSources();
-      const chosenId = await openSourcePicker(sources); if (!chosenId) return;
-      const screenStream = await navigator.mediaDevices.getUserMedia({
-        audio: false,
-        video: {
-          mandatory: {
-            chromeMediaSource: "desktop",
-            chromeMediaSourceId: chosenId,
-            maxWidth:     q.width,
-            maxHeight:    q.height,
-            maxFrameRate: q.frameRate,
+      let screenStream;
+      // Prefer Electron's desktopCapturer (better UX: source picker). Fall back to
+      // getDisplayMedia so this works in plain browsers and web builds too.
+      if (window.electronAPI?.getSources) {
+        const sources = await window.electronAPI.getSources();
+        const chosenId = await openSourcePicker(sources); if (!chosenId) return;
+        screenStream = await navigator.mediaDevices.getUserMedia({
+          audio: false,
+          video: {
+            mandatory: {
+              chromeMediaSource: "desktop",
+              chromeMediaSourceId: chosenId,
+              maxWidth:     q.width,
+              maxHeight:    q.height,
+              maxFrameRate: q.frameRate,
+            }
           }
-        }
-      });
+        });
+      } else if (navigator.mediaDevices.getDisplayMedia) {
+        screenStream = await navigator.mediaDevices.getDisplayMedia({
+          audio: false,
+          video: { width:{ ideal:q.width }, height:{ ideal:q.height }, frameRate:{ ideal:q.frameRate } }
+        });
+      } else {
+        showToast("Screen sharing isn't supported in this environment", "error"); return;
+      }
       const screenTrack = screenStream.getVideoTracks()[0];
       // Apply bitrate constraint
       vcScreenStream = screenStream;
@@ -8662,17 +8795,78 @@ function ssCopyUid() {
 
 // ── End Lobby Settings ───────────────────────────────────────
 
+let _callSignallingReady = false;
 function setupCallSignalling() {
+  if (_callSignallingReady) return;
   if (!ws||ws.readyState!==WebSocket.OPEN) { setTimeout(setupCallSignalling,500); return; }
+  _callSignallingReady = true;
   ws.addEventListener("message", async ({ data }) => {
-    const msg = JSON.parse(data);
-    if (msg.type==="call-invite") { if (me&&msg.from===`u${me.id}`) return; await handleIncomingCall(msg); return; }
-    if (msg.type==="call-accept") { LobbySound.stop("callOutgoing"); closeOutgoingCallModal(); showFloatingCallBar(callTargetName,null,"Connecting…"); const pc=createCallPeerConnection(msg.from); const offer=await pc.createOffer(); await pc.setLocalDescription(offer); wsSend({ type:"call-offer", offer:pc.localDescription, to:msg.from }); return; }
-    if (msg.type==="call-decline") { closeOutgoingCallModal(); showToast(`${callTargetName} declined the call`,"error"); forceEndCall(); return; }
-    if (msg.type==="call-offer") { const pc=createCallPeerConnection(msg.from); await pc.setRemoteDescription(msg.offer); const answer=await pc.createAnswer(); await pc.setLocalDescription(answer); wsSend({ type:"call-answer", answer:pc.localDescription, to:msg.from }); return; }
-    if (msg.type==="call-answer") { await callPeers[msg.from]?.setRemoteDescription(msg.answer); return; }
-    if (msg.type==="call-candidate") { await callPeers[msg.from]?.addIceCandidate(new RTCIceCandidate(msg.candidate)).catch(()=>{}); return; }
-    if (msg.type==="call-end") { showToast(`${callTargetName||"User"} ended the call`,""); endCall(); return; }
+    let msg; try { msg = JSON.parse(data); } catch { return; }
+    if (msg.type==="call-invite") {
+      if (me&&msg.from===`u${me.id}`) return;
+      await handleIncomingCall(msg);
+      return;
+    }
+    if (msg.type==="call-accept") {
+      LobbySound.stop("callOutgoing");
+      closeOutgoingCallModal();
+      showFloatingCallBar(callTargetName,null,"Connecting…");
+      const pc=createCallPeerConnection(msg.from);
+      try {
+        const offer=await pc.createOffer();
+        await pc.setLocalDescription(offer);
+        wsSend({ type:"call-offer", offer:pc.localDescription, to:msg.from });
+      } catch(e) { console.error("[call-accept] offer error:", e); }
+      return;
+    }
+    if (msg.type==="call-decline") {
+      closeOutgoingCallModal();
+      showToast(`${callTargetName} declined the call`,"error");
+      forceEndCall();
+      return;
+    }
+    if (msg.type==="call-offer") {
+      // Reuse existing PC if present (supports renegotiation for cam/screen share)
+      let pc = callPeers[msg.from];
+      if (!pc) pc = createCallPeerConnection(msg.from);
+      try {
+        // Handle glare (both sides offered simultaneously)
+        if (pc.signalingState !== "stable") {
+          await pc.setLocalDescription({ type: "rollback" }).catch(()=>{});
+        }
+        await pc.setRemoteDescription(msg.offer);
+        await drainCallCandidates(msg.from);
+        const answer=await pc.createAnswer();
+        await pc.setLocalDescription(answer);
+        wsSend({ type:"call-answer", answer:pc.localDescription, to:msg.from });
+      } catch(e) { console.error("[call-offer] error:", e); }
+      return;
+    }
+    if (msg.type==="call-answer") {
+      try {
+        await callPeers[msg.from]?.setRemoteDescription(msg.answer);
+        await drainCallCandidates(msg.from);
+      } catch(e) { console.error("[call-answer] error:", e); }
+      return;
+    }
+    if (msg.type==="call-candidate") {
+      // Queue candidates that arrive before remote description is set, then drain
+      // after setRemoteDescription. Without this, candidates are silently dropped
+      // and the PC stays in 'checking' state forever — calls never connect.
+      const pc = callPeers[msg.from];
+      if (pc && pc.remoteDescription && pc.remoteDescription.type) {
+        try { await pc.addIceCandidate(new RTCIceCandidate(msg.candidate)); }
+        catch(e) { console.warn("[call-candidate] addIceCandidate error:", e); }
+      } else {
+        (_callCandidateQueue[msg.from] = _callCandidateQueue[msg.from] || []).push(msg.candidate);
+      }
+      return;
+    }
+    if (msg.type==="call-end") {
+      showToast(`${callTargetName||"User"} ended the call`,"");
+      endCall();
+      return;
+    }
   });
 }
 
@@ -13432,7 +13626,6 @@ document.body.classList.add("feed-open");
 // Lobby list visibility is managed by showHomePanel on initial load
 </script>
 <script src="screenpicker.js"></script>
-<script src="client.js"></script>
 <script>
 // Restore saved theme immediately before render to avoid flash
 (function() {
