@@ -1,6 +1,6 @@
 {
   "name": "lobby-backend",
-  "version": "1.4.1",
+  "version": "1.4.2",
   "description": "LOBBY Backend — Auth & WebSocket Server",
   "main": "server.js",
   "scripts": {

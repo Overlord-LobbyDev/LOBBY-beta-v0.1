@@ -244,7 +244,10 @@
       transform:translateY(-1px); border-color:var(--accent);
     }
     .sidebar-invite-btn.hidden { display:none; }
-    .channel-section { padding:16px 0 4px; overflow:hidden; min-width:0; }
+    .channel-section { padding:16px 0 4px; overflow:hidden; min-width:0; flex-shrink:0; }
+    /* Ensure collapsed dropdowns never intercept clicks on other lobby content */
+    #tournamentsDropdown[style*="max-height: 0"],
+    #eventsDropdown[style*="max-height: 0"] { pointer-events:none; }
     .channel-section-label {
       display:flex; align-items:center; justify-content:space-between;
       padding:0 12px 6px;
@@ -301,14 +304,39 @@
     .server-actions-trigger .trigger-chevron { transition:transform .2s; flex-shrink:0; }
     .server-actions-trigger.open .trigger-chevron { transform:rotate(180deg); }
     .server-actions {
-      position:absolute; bottom:calc(100% + 4px); left:8px; right:8px;
+      /* Anchored directly to the top of the trigger so the menu visually "grows"
+         out of the Lobby Menu button. No gap — the border-radius blends the two.
+         bottom:calc(100% - 8px) compensates for the wrap's 8px top padding so the
+         menu's bottom edge aligns flush with the trigger's top edge (not the wrap). */
+      position:absolute; bottom:calc(100% - 8px); left:8px; right:8px;
       background:var(--bg-1); border:1px solid rgba(255,255,255,.09);
-      border-radius:12px; overflow:hidden;
+      border-bottom:none;
+      border-radius:12px 12px 0 0; overflow:hidden;
       box-shadow:0 -8px 32px rgba(0,0,0,.4);
-      display:none; flex-direction:column;
+      display:flex; flex-direction:column;
       z-index:300;
+      /* Smooth slide-down-from-the-button animation */
+      transform-origin:bottom center;
+      transform:scaleY(0) translateY(4px);
+      opacity:0;
+      max-height:0;
+      pointer-events:none;
+      transition:transform .22s cubic-bezier(0.16,1,0.3,1),
+                 opacity  .18s ease-out,
+                 max-height .22s cubic-bezier(0.16,1,0.3,1);
     }
-    .server-actions.open { display:flex; }
+    .server-actions.open {
+      transform:scaleY(1) translateY(0);
+      opacity:1;
+      max-height:400px;
+      pointer-events:auto;
+    }
+    /* While the menu is open, merge the trigger's top corners into the menu so
+       they look like a single connected surface. */
+    .server-actions-trigger.open {
+      border-top-left-radius:0; border-top-right-radius:0;
+      border-top-color:transparent;
+    }
     .server-action-item {
       display:flex; align-items:center; gap:10px;
       padding:9px 13px; cursor:pointer; font-size:13px; font-weight:500;
@@ -338,22 +366,23 @@
     .transfer-avatar img { width:100%; height:100%; object-fit:cover; }
 
     .dm-item {
-      display:flex; align-items:center; gap:10px;
-      padding:6px 10px; border-radius:8px; margin:1px 6px;
-      cursor:pointer; font-size:13px; color:var(--text-2); transition:background .1s, color .1s;
+      display:flex; align-items:center; gap:11px;
+      padding:7px 10px; border-radius:8px; margin:1px 6px;
+      cursor:pointer; font-size:14px; color:var(--text-2);
+      transition:background .12s, color .12s;
     }
     .dm-item:hover { background:rgba(255,255,255,.05); color:var(--text-1); }
     .dm-item.active { background:rgba(255,255,255,.07); color:var(--text-1); }
     .dm-avatar {
-      width:32px; height:32px; border-radius:9px;
+      width:34px; height:34px; border-radius:50%;
       background:var(--accent); display:flex; align-items:center; justify-content:center;
-      font-weight:700; font-size:13px; flex-shrink:0; overflow:hidden; position:relative;
+      font-weight:700; font-size:14px; flex-shrink:0; overflow:hidden; position:relative;
     }
     .dm-avatar img { width:100%; height:100%; object-fit:cover; }
     .online-dot {
-      position:absolute; bottom:0; right:0;
-      width:10px; height:10px; border-radius:50%;
-      background:var(--green); border:2px solid var(--bg-1);
+      position:absolute; bottom:-1px; right:-1px;
+      width:11px; height:11px; border-radius:50%;
+      background:var(--green); border:2.5px solid var(--bg-1);
     }
 
     .user-panel {
@@ -483,16 +512,30 @@
 
     /* DM conversation start */
     .dm-convo-start {
-      padding:24px 20px 8px; display:flex; flex-direction:column; gap:8px;
+      padding:30px 20px 14px; display:flex; flex-direction:column; gap:10px;
+      align-items:flex-start;
     }
     .dm-convo-start-avatar {
-      width:64px; height:64px; border-radius:50%;
-      background:var(--accent); display:flex; align-items:center; justify-content:center;
-      font-weight:700; font-size:26px; overflow:hidden;
+      width:80px; height:80px; border-radius:50%;
+      background:linear-gradient(135deg, var(--accent), var(--accent-h, #4752c4));
+      display:flex; align-items:center; justify-content:center;
+      font-weight:800; font-size:32px; overflow:hidden;
+      box-shadow:0 4px 16px rgba(88,101,242,.3);
+      border:2px solid rgba(255,255,255,.1);
     }
     .dm-convo-start-avatar img { width:100%; height:100%; object-fit:cover; }
-    .dm-convo-start h3 { font-size:22px; font-weight:800; color:var(--text-1); margin:4px 0 0; }
-    .dm-convo-start p { font-size:14px; color:var(--text-3); margin:0; }
+    .dm-convo-start h3 {
+      font-size:28px; font-weight:800; color:var(--text-1);
+      margin:6px 0 0; letter-spacing:-.4px;
+    }
+    .dm-convo-start p {
+      font-size:14px; color:var(--text-3); margin:0; line-height:1.5;
+      max-width:520px;
+    }
+    .dm-convo-start-divider {
+      margin:18px 20px 6px; height:1px;
+      background:linear-gradient(to right, transparent, rgba(255,255,255,.07), transparent);
+    }
 
     .chat-input-wrap { padding:0 16px 14px; flex-shrink:0; }
     .chat-input-box {
@@ -553,13 +596,17 @@
     .members-sidebar::-webkit-scrollbar-track { background:transparent; }
     body.sidebar-open .members-sidebar { left:324px; }
     body.feed-open .members-sidebar { right:min(375px,26vw); }
+    /* When the lobby info rail is visible (feed closed + a lobby selected), leave room for it */
+    body.feed-closed.lobby-selected .members-sidebar { right:280px; }
     /* Push chat panel content up when members bar is open — JS overrides to match actual bar height */
     .members-visible #chatPanel { padding-bottom:138px; }
     .members-visible #profilePage { padding-bottom:138px; }
-    /* Toggle button transition */
+    /* Toggle button transition — smooth only when NOT actively dragging */
     #membersToggleBtn {
-      transition:background .15s, color .15s, bottom .35s cubic-bezier(0.16,1,0.3,1) !important;
+      transition:background .15s, color .15s, border-color .15s, bottom .35s cubic-bezier(0.16,1,0.3,1);
     }
+    /* During a resize drag, pin the button to the bar in realtime without transition lag */
+    body.resizing-row #membersToggleBtn { transition:background .15s, color .15s, border-color .15s !important; }
     .members-visible #chatPanel .call-controls { bottom:102px; }
     .members-section-label {
       font-size:10px; font-weight:700; text-transform:uppercase;
@@ -749,7 +796,8 @@
     .search-result-avatar { width:32px; height:32px; border-radius:50%; background:var(--accent); display:flex; align-items:center; justify-content:center; font-size:13px; font-weight:700; overflow:hidden; }
     .search-result-avatar img { width:100%; height:100%; object-fit:cover; }
 
-    .friend-req-item { display:flex; align-items:center; gap:10px; padding:8px 10px; border-radius:6px; margin:2px 6px; }
+    .friend-req-item { display:flex; align-items:center; gap:11px; padding:8px 10px; border-radius:8px; margin:2px 6px; background:rgba(255,255,255,.02); }
+    .friend-req-item:hover { background:rgba(255,255,255,.04); }
     .friend-req-actions { margin-left:auto; display:flex; gap:6px; }
     .small-btn { padding:4px 10px; border-radius:6px; border:none; font-size:12px; font-weight:600; font-family:var(--font); cursor:pointer; }
     .small-btn-green { background:rgba(35,165,90,.2); color:#57f287; }
@@ -1662,6 +1710,9 @@
       box-shadow:none;
       pointer-events:none;
     }
+    /* Hide button is position:fixed so it sits at a pinned screen position; when the
+       feed is collapsed, the button is no longer appropriate so we hide it. */
+    body.feed-closed #feedToggleBtn { display:none !important; }
 
     /* ── Lobby Info Rail (shown when feed is closed AND a lobby is selected) ── */
     #lobbyInfoRail {
@@ -3648,16 +3699,19 @@
 
 <!-- Members sidebar -->
 <!-- Members bar toggle — fixed bottom centre, only shows in lobbies -->
-<button id="membersToggleBtn" onclick="toggleMembersBar()" title="Toggle members"
+<button id="membersToggleBtn" onclick="toggleMembersBar()" title="Toggle members bar"
   style="display:none;position:fixed;bottom:0;left:50%;transform:translateX(-50%);
          z-index:401;background:var(--bg-2);border:1px solid rgba(255,255,255,.12);
          border-bottom:none;color:var(--text-2);cursor:pointer;
-         width:48px;height:20px;border-radius:8px 8px 0 0;
-         align-items:center;justify-content:center;
-         transition:background .15s,color .15s;"
+         padding:3px 14px;height:22px;border-radius:8px 8px 0 0;
+         align-items:center;justify-content:center;gap:6px;
+         font-family:var(--font);font-size:10.5px;font-weight:700;
+         letter-spacing:1.2px;text-transform:uppercase;line-height:1;white-space:nowrap;
+         transition:background .15s,color .15s,border-color .15s;"
   onmouseover="this.style.background='var(--accent)';this.style.color='#fff';this.style.borderColor='var(--accent)'"
   onmouseout="this.style.background='var(--bg-2)';this.style.color='var(--text-2)';this.style.borderColor='rgba(255,255,255,.12)'">
-  <svg id="membersToggleIcon" width="12" height="12" viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+  <span id="membersToggleLabel">LOBBY Members</span>
+  <svg id="membersToggleIcon" width="10" height="10" viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" style="flex-shrink:0">
     <polyline points="2,8 6,4 10,8"/>
   </svg>
 </button>
@@ -4403,13 +4457,14 @@
 <button id="adminBtn" style="display:none">🛡️ Admin Panel</button>
 
 
-<!-- Welcome title — fixed above the feed, top right -->
+<!-- Welcome title — fixed above the feed, top right. Kept intentionally compact so it
+     reads as a secondary page label rather than competing with the LOBBY wordmark. -->
 <div id="lobbySubtitleText" style="
   position:fixed; top:0; right:138px; z-index:9996;
   height:72px; display:flex; align-items:center;
   padding:0 20px; pointer-events:none;
   font-family:'Bebas Neue',sans-serif;
-  font-size:32px; letter-spacing:4px;
+  font-size:20px; letter-spacing:2.5px;
   color:transparent;
   background:linear-gradient(135deg, var(--text-1) 0%, var(--accent) 100%);
   -webkit-background-clip:text; background-clip:text;
@@ -4417,16 +4472,32 @@
   white-space:nowrap; line-height:1;
 ">HOME 🏠</div>
 
-<!-- Feed reopen button — fixed top-right, visible on every page when feed is hidden -->
+<!-- Feed reopen button — fixed top-right, visible on every page when feed is hidden.
+     Position is calibrated to land on the EXACT same pixel as the "✕ Hide" button
+     inside the feed header (top:72 header + 12/6 padding centers the button at ~80px),
+     so toggling requires zero mouse movement. -->
 <button id="feedReopenBtn"
   title="Show feed"
-  style="display:none;position:fixed;top:84px;right:18px;z-index:9997;
+  style="display:none;position:fixed;top:80px;right:8px;z-index:9997;
          background:var(--bg-3);border:1px solid rgba(255,255,255,.08);
          color:var(--text-2);font-size:12px;font-weight:600;font-family:var(--font);
-         padding:4px 10px;border-radius:8px;cursor:pointer;
+         padding:4px 12px;border-radius:8px;cursor:pointer;white-space:nowrap;
          transition:color .15s,background .15s,border-color .15s"
   onmouseover="this.style.background='rgba(88,101,242,.15)';this.style.color='var(--accent)';this.style.borderColor='rgba(88,101,242,.3)'"
-  onmouseout="this.style.color='var(--text-2)';this.style.background='var(--bg-3)';this.style.borderColor='rgba(255,255,255,.08)'">◀ Feed</button>
+  onmouseout="this.style.color='var(--text-2)';this.style.background='var(--bg-3)';this.style.borderColor='rgba(255,255,255,.08)'">✕ Feed</button>
+
+<!-- Feed HIDE button — lives at root (NOT inside #socialFeed) because #socialFeed has
+     `transform:translateX(0)` which creates a new containing block and breaks
+     position:fixed for descendants. Kept as a sibling of #feedReopenBtn so both buttons
+     resolve to the EXACT same viewport pixel. Visibility is flipped by toggleFeed(). -->
+<button id="feedToggleBtn" title="Hide feed"
+  style="display:none;position:fixed;top:80px;right:8px;z-index:9998;
+         background:var(--bg-3);border:1px solid rgba(255,255,255,.08);
+         color:var(--text-2);font-size:12px;font-weight:600;font-family:var(--font);
+         padding:4px 12px;border-radius:8px;cursor:pointer;white-space:nowrap;
+         transition:color .15s,background .15s,border-color .15s"
+  onmouseover="this.style.background='rgba(237,66,69,.15)';this.style.color='var(--danger)';this.style.borderColor='rgba(237,66,69,.3)'"
+  onmouseout="this.style.color='var(--text-2)';this.style.background='var(--bg-3)';this.style.borderColor='rgba(255,255,255,.08)'">✕ Hide</button>
 
 <!-- ── Persistent Social Feed Sidebar (global, always mounted) ── -->
 <div id="socialFeed">
@@ -4437,14 +4508,8 @@
       <button class="feed-tab" id="feedTabPublic" onclick="switchFeedTab('public')">🌐 Public</button>
       <button class="feed-tab" id="feedTabCommunities" onclick="switchFeedTab('communities')">🏘 Lobbies</button>
     </div>
-    <button id="feedToggleBtn" title="Hide feed"
-      style="margin-left:auto;flex-shrink:0;background:var(--bg-3);border:1px solid rgba(255,255,255,.08);
-             border-left:1px solid rgba(255,255,255,.12);
-             color:var(--text-2);font-size:12px;font-weight:600;font-family:var(--font);
-             padding:4px 12px;border-radius:8px;cursor:pointer;white-space:nowrap;
-             transition:color .15s,background .15s,border-color .15s"
-      onmouseover="this.style.background='rgba(237,66,69,.15)';this.style.color='var(--danger)';this.style.borderColor='rgba(237,66,69,.3)'"
-      onmouseout="this.style.color='var(--text-2)';this.style.background='var(--bg-3)';this.style.borderColor='rgba(255,255,255,.08)'">✕ Hide</button>
+    <!-- Hide button lives at root level (see #feedToggleBtn near #feedReopenBtn) to
+         escape #socialFeed's transform containing block. -->
   </div>
   <div id="feedPosts">
     <div style="text-align:center;padding:40px;color:var(--text-3)">Loading feed…</div>
@@ -5285,8 +5350,8 @@ function renderChannelList(channels, members, server) {
       </span>
       <svg id="tournamentsChevron" width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" style="transition:transform .2s;flex-shrink:0"><polyline points="6 9 12 15 18 9"></polyline></svg>
     </div>
-    <div id="tournamentsDropdown" style="overflow:hidden;max-height:600px;transition:max-height .25s ease,opacity .2s;opacity:1">
-      <div id="tournamentsList" class="tournaments-list" style="padding:0 10px;box-sizing:border-box;width:100%;overflow-y:auto;overflow-x:hidden;max-height:420px;"></div>
+    <div id="tournamentsDropdown" style="overflow:hidden;max-height:420px;transition:max-height .25s ease,opacity .2s;opacity:1">
+      <div id="tournamentsList" class="tournaments-list" style="padding:0 10px 6px;box-sizing:border-box;width:100%;max-height:400px;overflow-y:auto;overflow-x:hidden;overscroll-behavior:contain;"></div>
     </div>
   </div>`;
 
@@ -5464,14 +5529,25 @@ function hideMembersBar() {
 }
 
 // Compute the default members-bar height so its top edge lines up with the sidebar's
-// "breaker" (top border of .server-actions-wrap). Measures the real rendered heights.
+// "breaker" (top border of .server-actions-wrap). Uses getBoundingClientRect so the
+// result is pixel-accurate regardless of how the sidebar's flex layout distributes
+// space (offsetHeight sums can drift by a px or two depending on sub-pixel rounding).
 function _getDefaultMembersHeight() {
   const wrap = document.querySelector('.server-actions-wrap');
+  if (wrap && wrap.isConnected) {
+    const r = wrap.getBoundingClientRect();
+    // Height the members bar needs so its top sits exactly at the wrap's top edge
+    const h = Math.round(window.innerHeight - r.top);
+    if (h > 40) return h;
+  }
+  // Fallback when wrap isn't rendered yet — measure user-panel alone (DM view)
   const userPanel = document.querySelector('.user-panel');
-  let h = 0;
-  if (wrap) h += wrap.offsetHeight;
-  if (userPanel) h += userPanel.offsetHeight;
-  return h > 40 ? h : 138; // fallback matches CSS
+  if (userPanel && userPanel.isConnected) {
+    const r = userPanel.getBoundingClientRect();
+    const h = Math.round(window.innerHeight - r.top);
+    if (h > 40) return h;
+  }
+  return 138; // last-resort fallback matches CSS
 }
 window._getDefaultMembersHeight = _getDefaultMembersHeight;
 
@@ -5969,6 +6045,8 @@ async function showDMPanel() {
   selectedServer = null;
   // Hide the lobby info rail when leaving a lobby
   document.body.classList.remove("lobby-selected");
+  // Remove the lobby action menu ("Lobby Menu" button + dropdown) — it's lobby-only.
+  document.querySelector('.channel-sidebar .server-actions-wrap')?.remove();
   clearAllNavIcons();
   const mtBtn = document.getElementById("membersToggleBtn");
   if (mtBtn) { mtBtn.style.display = "none"; }
@@ -5979,7 +6057,7 @@ async function showDMPanel() {
   document.getElementById("membersSidebar").classList.remove("open");
   document.body.classList.remove("members-visible");
   document.body.classList.remove("members-bar-open");
-  document.getElementById("chatMain").innerHTML = `<div class="empty-state" style="gap:16px"><div style="width:72px;height:72px;border-radius:20px;background:rgba(88,101,242,0.12);border:1px solid rgba(88,101,242,0.2);display:flex;align-items:center;justify-content:center;font-size:32px">💬</div><div style="display:flex;flex-direction:column;align-items:center;gap:6px"><h3 style="font-size:17px;font-weight:700;color:var(--text-1);margin:0">Direct Messages</h3><p style="font-size:13px;color:var(--text-3);margin:0;text-align:center;max-width:260px;line-height:1.5">Select a conversation from the left, or start a new one by searching for a friend.</p></div></div>`;
+  document.getElementById("chatMain").innerHTML = `<div class="empty-state" style="gap:18px"><div style="width:96px;height:96px;border-radius:50%;background:linear-gradient(135deg,rgba(88,101,242,.18),rgba(88,101,242,.06));border:1px solid rgba(88,101,242,.22);display:flex;align-items:center;justify-content:center;font-size:42px;box-shadow:0 8px 32px rgba(88,101,242,.12)">💬</div><div style="display:flex;flex-direction:column;align-items:center;gap:8px;max-width:340px"><h3 style="font-size:22px;font-weight:800;color:var(--text-1);margin:0;letter-spacing:-.3px">Your messages</h3><p style="font-size:13.5px;color:var(--text-3);margin:0;text-align:center;line-height:1.55">Pick a friend from the left to start chatting, or use the <strong style="color:var(--text-2);font-weight:600">+</strong> button up top to add a new one.</p></div></div>`;
   const friends = await api("/friends");
   const accepted = (friends || []).filter(f => f.status === "accepted");
   const pending  = (friends || []).filter(f => f.status === "pending" && !f.is_sender);
@@ -6034,7 +6112,11 @@ async function showDMPanel() {
   }
   if (!accepted.length) {
     html += `<div class="channel-section"><div class="channel-section-label">Friends</div>`;
-    html += `<div style="padding:12px;font-size:13px;color:var(--text-3)">No friends yet. Add one above!</div>`;
+    html += `<div style="padding:18px 14px;text-align:center;color:var(--text-3);font-size:12.5px;line-height:1.55">
+      <div style="font-size:26px;margin-bottom:6px;opacity:.7">👋</div>
+      <div style="color:var(--text-2);font-weight:600;margin-bottom:2px">No friends yet</div>
+      <div style="opacity:.8">Use the <strong style="color:var(--accent)">+</strong> icon above to add some.</div>
+    </div>`;
     html += "</div>";
   }
   document.getElementById("channelSidebarContent").innerHTML = html;
@@ -6126,15 +6208,18 @@ async function openDM(userId, username, avatarUrl) {
   const avatarEl = avatarUrl
     ? `<img src="${avatarUrl}" style="width:34px;height:34px;border-radius:50%;object-fit:cover"/>`
     : initial;
-  renderChatArea({ icon: avatarEl, name: username, placeholder: `Message ${username}` });
+  renderChatArea({ icon: avatarEl, name: username, placeholder: `Message @${username}`, isDm: true, dmUserId: userId, dmUsername: username });
   const messages = await api(`/dm/${userId}`);
   const container = document.getElementById("msgContainer");
   // Conversation start banner
   const avatarBigHtml = avatarUrl ? `<img src="${avatarUrl}"/>` : initial;
   const startBanner = document.createElement("div");
   startBanner.className = "dm-convo-start";
-  startBanner.innerHTML = `<div class="dm-convo-start-avatar">${avatarBigHtml}</div><h3>${username}</h3><p>This is the beginning of your direct message history with <strong>${username}</strong>.</p>`;
+  startBanner.innerHTML = `<div class="dm-convo-start-avatar">${avatarBigHtml}</div><h3>${username}</h3><p>This is the beginning of your direct message history with <strong>@${username}</strong>. Say hi!</p>`;
   container.appendChild(startBanner);
+  const divider = document.createElement("div");
+  divider.className = "dm-convo-start-divider";
+  container.appendChild(divider);
   (messages || []).forEach(m => appendMessage(m, "dm"));
   container.scrollTop = container.scrollHeight;
 }
@@ -6163,12 +6248,21 @@ async function openChannel(id, name, type) {
   container.scrollTop = container.scrollHeight;
 }
 
-function renderChatArea({ icon, name, placeholder, readonly = false }) {
+function renderChatArea({ icon, name, placeholder, readonly = false, isDm = false, dmUserId = null, dmUsername = "" }) {
   // icon is either an img tag string (DM) or a text emoji (#, 📢)
   const isImgIcon = icon && icon.startsWith('<img');
   const headerIcon = isImgIcon
     ? `<div class="chat-header-icon">${icon}</div>`
     : `<div class="chat-header-icon" style="background:var(--bg-3);color:var(--text-2);font-size:16px;border-radius:8px">${icon}</div>`;
+
+  // DM-specific call/video buttons
+  const dmActionBtns = isDm ? `
+    <button class="chat-header-btn" title="Start voice call" onclick="if(typeof startDirectCall==='function') startDirectCall(${dmUserId}, '${(dmUsername||'').replace(/'/g, "\\'")}', false)">
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92z"/></svg>
+    </button>
+    <button class="chat-header-btn" title="Start video call" onclick="if(typeof startDirectCall==='function') startDirectCall(${dmUserId}, '${(dmUsername||'').replace(/'/g, "\\'")}', true)">
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="23 7 16 12 23 17 23 7"/><rect x="1" y="5" width="15" height="14" rx="2" ry="2"/></svg>
+    </button>` : '';
 
   document.getElementById("chatMain").innerHTML = `
     <div class="chat-header">
@@ -6177,6 +6271,7 @@ function renderChatArea({ icon, name, placeholder, readonly = false }) {
         <div class="chat-header-name">${name}</div>
       </div>
       <div class="chat-header-actions">
+        ${dmActionBtns}
         <button class="chat-header-btn" title="Search messages" onclick="">
           <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/></svg>
         </button>
@@ -6396,6 +6491,8 @@ function showToast(msg, type="success") {
 async function showGroupsPanel() {
   selectedServer = null;
   document.body.classList.remove("lobby-selected");
+  // Lobby Menu is lobby-only — remove when viewing Groups.
+  document.querySelector('.channel-sidebar .server-actions-wrap')?.remove();
   clearAllNavIcons();
   document.getElementById("groupsNavIcon").classList.add("active");
   document.getElementById("sidebarTitle").textContent = "Groups"; setSidebarMode("groups");
@@ -6418,6 +6515,11 @@ async function showGroupsPanel() {
     document.body.classList.remove("feed-closed");
     if(typeof applySocialResizeStyles==="function")applySocialResizeStyles();
   }
+  // Sync feed hide/show buttons (hide button only makes sense when feed is open)
+  const _reopenBtn = document.getElementById("feedReopenBtn");
+  const _toggleBtn = document.getElementById("feedToggleBtn");
+  if (_reopenBtn) _reopenBtn.style.display = "none";
+  if (_toggleBtn) _toggleBtn.style.display = "block";
   
   document.getElementById("chatMain").innerHTML = `<div class="empty-state"><div class="empty-icon">👥</div><h3>Your Groups</h3><p>Select a group to chat or start a call</p></div>`;
   const groups = await api("/groups");
@@ -10236,6 +10338,8 @@ function showHomePanel() {
   maybeShowVcPip();
   // Hide the lobby info rail when returning to home
   document.body.classList.remove("lobby-selected");
+  // Lobby Menu (server-actions-wrap) is lobby-only — remove on Home.
+  document.querySelector('.channel-sidebar .server-actions-wrap')?.remove();
   document.getElementById("homePanel").classList.remove("hidden");
   document.getElementById("chatPanel").classList.add("hidden");
   document.getElementById("profilePage").classList.add("hidden");
@@ -10263,6 +10367,7 @@ function showHomePanel() {
   const socialFeed = document.getElementById("socialFeed");
   const membersSidebar = document.getElementById("membersSidebar");
   const reopenBtn  = document.getElementById("feedReopenBtn");
+  const toggleBtn  = document.getElementById("feedToggleBtn");
   if (socialFeed) {
     if (!window._startupComplete) {
       // Startup: check preference for right sidebar
@@ -10273,6 +10378,7 @@ function showHomePanel() {
         document.body.classList.add("feed-open");
         document.body.classList.remove("feed-closed");
         if (reopenBtn) reopenBtn.style.display = "none";
+        if (toggleBtn) toggleBtn.style.display = "block";
         feedVisible = true;
         if(typeof applySocialResizeStyles==="function")applySocialResizeStyles();
       } else {
@@ -10281,6 +10387,7 @@ function showHomePanel() {
         document.body.classList.remove("feed-open");
         document.body.classList.add("feed-closed");
         if (reopenBtn) reopenBtn.style.display = "block";
+        if (toggleBtn) toggleBtn.style.display = "none";
         feedVisible = false;
       }
     } else if (feedVisible) {
@@ -10289,6 +10396,7 @@ function showHomePanel() {
       document.body.classList.add("feed-open");
       document.body.classList.remove("feed-closed");
       if (reopenBtn) reopenBtn.style.display = "none";
+      if (toggleBtn) toggleBtn.style.display = "block";
       if(typeof applySocialResizeStyles==="function")applySocialResizeStyles();
     } else {
       socialFeed.style.display = "";
@@ -10296,6 +10404,7 @@ function showHomePanel() {
       document.body.classList.remove("feed-open");
       document.body.classList.add("feed-closed");
       if (reopenBtn) reopenBtn.style.display = "block";
+      if (toggleBtn) toggleBtn.style.display = "none";
     }
   }
   if (membersSidebar) {
@@ -10554,12 +10663,14 @@ function feedThawGifs() {
 function toggleFeed() {
   const feed      = document.getElementById("socialFeed");
   const reopenBtn = document.getElementById("feedReopenBtn");
+  const toggleBtn = document.getElementById("feedToggleBtn");
   feedVisible     = !feedVisible;
 
   feed.classList.toggle("collapsed", !feedVisible);
   document.body.classList.toggle("feed-open",   feedVisible);
   document.body.classList.toggle("feed-closed", !feedVisible);
   if (reopenBtn) reopenBtn.style.display = feedVisible ? "none" : "block";
+  if (toggleBtn) toggleBtn.style.display = feedVisible ? "block" : "none";
 
   if (feedVisible) {
     feed.style.pointerEvents = "";
@@ -12765,8 +12876,9 @@ window._toggleTournaments = function() {
   const chevron  = document.getElementById('tournamentsChevron');
   if (!dropdown) return;
   window._tournamentsOpen = !window._tournamentsOpen;
-  dropdown.style.maxHeight  = window._tournamentsOpen ? '600px' : '0';
+  dropdown.style.maxHeight  = window._tournamentsOpen ? '420px' : '0';
   dropdown.style.opacity    = window._tournamentsOpen ? '1' : '0';
+  dropdown.style.pointerEvents = window._tournamentsOpen ? 'auto' : 'none';
   if (chevron) chevron.style.transform = window._tournamentsOpen ? '' : 'rotate(-90deg)';
 };
 
@@ -12796,6 +12908,7 @@ window._toggleEvents = function() {
   window._eventsOpen = !window._eventsOpen;
   dropdown.style.maxHeight  = window._eventsOpen ? '400px' : '0';
   dropdown.style.opacity    = window._eventsOpen ? '1' : '0';
+  dropdown.style.pointerEvents = window._eventsOpen ? 'auto' : 'none';
   if (chevron) chevron.style.transform = window._eventsOpen ? '' : 'rotate(-90deg)';
 };
 
@@ -15614,7 +15727,9 @@ setTimeout(() => { updateMyStatusUI(); }, 100);
   window.applyChannelResizeStyles = function() {
     var w = window._resizeState.channelW;
     if (!w) return;
-    var panelLeft = (80 + w) + 'px';
+    // Channel sidebar lives at left:72px (the 72px nav rail) — its right edge sits
+    // at 72+w. Panels must start exactly there or a black gap appears.
+    var panelLeft = (72 + w) + 'px';
     ['homePanel','chatPanel','profilePage','vcPanel'].forEach(function(id) {
       var el = document.getElementById(id);
       if (el) el.style.left = panelLeft;
@@ -15672,6 +15787,8 @@ setTimeout(() => { updateMyStatusUI(); }, 100);
     if (pp) pp.style.paddingBottom = h + 'px';
     var cc = document.querySelector('.members-visible #chatPanel .call-controls');
     if (cc) cc.style.bottom = (h - 36) + 'px';
+    var tb = document.getElementById('membersToggleBtn');
+    if (tb && mb && mb.classList.contains('open')) tb.style.bottom = h + 'px';
   };
 
   function initResizeHandles() {
@@ -15682,7 +15799,9 @@ setTimeout(() => { updateMyStatusUI(); }, 100);
     function updateChannelWidth(w) {
       window._resizeState.channelW = w;
       channelSidebar.style.width = w + 'px';
-      const panelLeft = (80 + w) + 'px';
+      // Channel sidebar starts at left:72px (server rail width); its right edge is 72+w.
+      // Panels must align flush against that — using 80 leaves an 8px black gap.
+      const panelLeft = (72 + w) + 'px';
       if (document.body.classList.contains('sidebar-open') || channelSidebar.classList.contains('open')) {
         ['homePanel','chatPanel','profilePage','vcPanel'].forEach(id => {
           const el = document.getElementById(id);
@@ -15719,6 +15838,9 @@ setTimeout(() => { updateMyStatusUI(); }, 100);
       if (profilePage) profilePage.style.paddingBottom = pb;
       const callControls = document.querySelector('.members-visible #chatPanel .call-controls');
       if (callControls) callControls.style.bottom = (h - 36) + 'px';
+      // Pin the toggle button to the top edge of the members bar so it flows with drag
+      const toggleBtn = document.getElementById('membersToggleBtn');
+      if (toggleBtn && membersSidebar.classList.contains('open')) toggleBtn.style.bottom = h + 'px';
     }
 
     function setupDrag(handle, axis, onMove) {
@@ -15743,7 +15865,8 @@ setTimeout(() => { updateMyStatusUI(); }, 100);
     const chHandle = document.getElementById('channelResizeHandle');
     if (chHandle && channelSidebar) {
       setupDrag(chHandle, 'x', function(e) {
-        const newW = Math.min(450, Math.max(180, e.clientX - 80));
+        // Sidebar starts at left:72px — drag width is cursor X minus that offset.
+        const newW = Math.min(450, Math.max(180, e.clientX - 72));
         updateChannelWidth(newW);
       });
     }
