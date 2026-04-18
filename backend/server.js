@@ -534,7 +534,18 @@ wss.on("connection", (ws, req) => {
   ws.on("close", () => {
     const client = clients.get(user.peerId);
 
-    if (client?.vcChannelId) {
+    // If this ws has already been replaced by a newer connection for the same
+    // user (reconnect path — see the clients.has()/close()/clients.set() dance
+    // at the top of this handler), do nothing. Otherwise we would delete the
+    // map entry belonging to the live new socket, and all `to:` messages
+    // (call-invite, call-offer, friend-request, DM delivery, etc.) addressed
+    // to this user would be silently dropped until they reconnect again.
+    if (!client || client.ws !== ws) {
+      console.log(`[~] ${user.username} old socket closed after replacement — skipping cleanup`);
+      return;
+    }
+
+    if (client.vcChannelId) {
       const channelId = client.vcChannelId;
       for (const [id, c] of clients) {
         if (id !== user.peerId && c.ws.readyState === 1) {
@@ -543,7 +554,7 @@ wss.on("connection", (ws, req) => {
       }
     }
 
-    if (client?.groupCallId) {
+    if (client.groupCallId) {
       const groupId = client.groupCallId;
       const groupChannelId = `group-${groupId}`;
       for (const [id, c] of clients) {
