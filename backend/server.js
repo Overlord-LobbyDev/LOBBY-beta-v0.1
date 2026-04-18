@@ -153,8 +153,17 @@ wss.on("connection", (ws, req) => {
     // ── WebRTC signalling (1-1, group, and voice channel) ─
     if (msg.to) {
       const target = clients.get(msg.to);
+      if (msg.type && msg.type.startsWith("call-")) {
+        console.log(`[fwd] ${msg.type} ${user.peerId} → ${msg.to} | target=${target ? "found" : "NOT_FOUND"} | readyState=${target?.ws.readyState} | clientIds=[${[...clients.keys()].join(",")}]`);
+      }
       if (target?.ws.readyState === 1) {
         target.ws.send(JSON.stringify({ ...msg, from: user.peerId, fromUsername: user.username }));
+      } else if (msg.type && msg.type.startsWith("call-")) {
+        // Tell the caller their target is gone so they can stop ringing,
+        // instead of silently eating the message.
+        try {
+          ws.send(JSON.stringify({ type: "call-undeliverable", to: msg.to, reason: target ? "socket-not-open" : "not-found" }));
+        } catch {}
       }
       return;
     }
