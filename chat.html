@@ -960,8 +960,16 @@ async function boot() {
 
 // ── WebSocket ─────────────────────────────────────────────────
 function connectWS() {
+  // Reset call-signalling guard so the listener re-attaches to this new socket.
+  // Without this, after any WS reconnect the call-invite listener stays bound to
+  // the dead socket and incoming calls are silently dropped.
+  callSignallingReady = false;
   ws = new WebSocket(`wss://lobby-websocket-server.onrender.com?token=${encodeURIComponent(token)}`);
-  ws.onopen = () => console.log("[ws] connected");
+  ws.onopen = () => {
+    console.log("[ws] connected");
+    // Re-attach the call-signalling message listener to the fresh socket.
+    setupCallSignalling();
+  };
   ws.onclose = () => setTimeout(connectWS, 3000); // auto-reconnect
   ws.onmessage = async ({ data }) => {
     const msg = JSON.parse(data);
