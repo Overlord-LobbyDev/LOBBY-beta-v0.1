@@ -7726,7 +7726,22 @@ function setupVcSignalling() {
     // ── Full member list on join ──
     if (msg.type === "vc-members") {
       vcChannelMembers[msg.channelId] = msg.members || [];
-      if (msg.channelId === vcChannelId) renderVcGrid();
+      if (msg.channelId === vcChannelId) {
+        renderVcGrid();
+        // Bug fix: initiate WebRTC to every member already in the channel when we join
+        for (const member of (msg.members || [])) {
+          if (member.userId === me?.id) continue;
+          const peerId = `u${member.userId}`;
+          if (!vcPeers[peerId]) {
+            const pc = createVcPeerConnection(peerId);
+            pc.createOffer().then(offer => {
+              return pc.setLocalDescription(offer).then(() => {
+                wsSend({ type: "vc-offer", offer: pc.localDescription, to: peerId, channelId: msg.channelId });
+              });
+            }).catch(e => console.error("[vc-members] offer error:", e));
+          }
+        }
+      }
       refreshChannelListVc();
       return;
     }
