@@ -4887,6 +4887,13 @@ async function loadPendingServerInvites() {
 // ── WebSocket ─────────────────────────────────────────────────
 function connectWS() {
   const _t = localStorage.getItem("vh_token") || sessionStorage.getItem("vh_token");
+  // Reset signalling-ready guards so call-signalling and VC-signalling listeners
+  // re-attach to the NEW WebSocket. Without this, on reconnect the listeners stay
+  // bound to the old (closed) socket and the user silently misses call invites,
+  // vc-members, vc-joined, etc. — manifests as "callee never rings" and
+  // "I'm alone in the voice channel even though they joined".
+  _callSignallingReady = false;
+  vcSignallingReady = false;
   ws = new WebSocket(`wss://lobby-websocket-server.onrender.com?token=${encodeURIComponent(_t)}`);
   ws.onopen = () => {
     console.log("[ws] connected");
