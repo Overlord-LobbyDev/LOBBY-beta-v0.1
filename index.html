@@ -575,7 +575,7 @@
 
     .members-sidebar {
       position:fixed; bottom:0; left:72px; right:0;
-      height:138px; /* JS overrides via applyMembersResizeStyles — matches default sidebar bottom section (server-actions-wrap + user-panel) */
+      height:94px; /* JS overrides via applyMembersResizeStyles — matches default user-panel height so top aligns with profile */
       background:var(--bg-1);
       border-top:1px solid rgba(255,255,255,.07);
       /* Wrap into multiple rows when members overflow; vertical scroll reveals more */
@@ -599,8 +599,8 @@
     /* When the lobby info rail is visible (feed closed + a lobby selected), leave room for it */
     body.feed-closed.lobby-selected .members-sidebar { right:280px; }
     /* Push chat panel content up when members bar is open — JS overrides to match actual bar height */
-    .members-visible #chatPanel { padding-bottom:138px; }
-    .members-visible #profilePage { padding-bottom:138px; }
+    .members-visible #chatPanel { padding-bottom:94px; }
+    .members-visible #profilePage { padding-bottom:94px; }
     /* Toggle button transition — smooth only when NOT actively dragging */
     #membersToggleBtn {
       transition:background .15s, color .15s, border-color .15s, bottom .35s cubic-bezier(0.16,1,0.3,1);
@@ -1854,13 +1854,20 @@
     body.feed-closed #calendarPanel { right:0; }
 
     .feed-tab {
-      flex:1; text-align:center;
+      flex:1;
+      /* Flex centering keeps the emoji+label pair visually centered in the tab.
+         Plain text-align:center leaves the emoji's optical whitespace uncompensated,
+         which made the label drift slightly left. gap gives clean, consistent spacing
+         between the icon and the label. */
+      display:flex; align-items:center; justify-content:center; gap:5px;
       background:none; border:none; border-bottom:2px solid transparent;
       border-right:1px solid rgba(255,255,255,.08);
       color:var(--text-3); font-size:13px; font-weight:600; font-family:var(--font);
-      padding:12px 6px; cursor:pointer;
+      padding:11px 4px; cursor:pointer; white-space:nowrap;
+      line-height:1;
       transition:color .15s, border-color .15s, background .15s;
     }
+    .feed-tab > span.tab-emoji { font-size:14px; line-height:1; display:inline-flex; align-items:center; }
     .feed-tab:last-of-type { border-right:none; }
     .feed-tab:hover { color:var(--text-1); background:rgba(255,255,255,.04); }
     .feed-tab.active { color:var(--text-1); border-bottom-color:var(--accent); background:rgba(0,0,0,.2); }
@@ -4478,7 +4485,7 @@
      so toggling requires zero mouse movement. -->
 <button id="feedReopenBtn"
   title="Show feed"
-  style="display:none;position:fixed;top:80px;right:8px;z-index:9997;
+  style="display:none;position:fixed;top:77px;right:8px;z-index:9997;
          background:var(--bg-3);border:1px solid rgba(255,255,255,.08);
          color:var(--text-2);font-size:12px;font-weight:600;font-family:var(--font);
          padding:4px 12px;border-radius:8px;cursor:pointer;white-space:nowrap;
@@ -4491,7 +4498,7 @@
      position:fixed for descendants. Kept as a sibling of #feedReopenBtn so both buttons
      resolve to the EXACT same viewport pixel. Visibility is flipped by toggleFeed(). -->
 <button id="feedToggleBtn" title="Hide feed"
-  style="display:none;position:fixed;top:80px;right:8px;z-index:9998;
+  style="display:none;position:fixed;top:77px;right:8px;z-index:9998;
          background:var(--bg-3);border:1px solid rgba(255,255,255,.08);
          color:var(--text-2);font-size:12px;font-weight:600;font-family:var(--font);
          padding:4px 12px;border-radius:8px;cursor:pointer;white-space:nowrap;
@@ -4502,11 +4509,15 @@
 <!-- ── Persistent Social Feed Sidebar (global, always mounted) ── -->
 <div id="socialFeed">
   <div class="resize-handle resize-handle-left" id="feedResizeHandle"></div>
-  <div id="feedHeader" style="display:flex;align-items:center;position:sticky;top:0;z-index:10;background:var(--bg-1);border-bottom:1px solid rgba(255,255,255,.1);padding:0 8px 0 0;gap:6px">
+  <!-- padding-right:92px reserves space for the fixed #feedToggleBtn ("✕ Hide") that
+       sits at top:80,right:8 — without this, the Hide button overlaps the last tab
+       (Lobbies). The button itself lives at root (see #feedToggleBtn above) so we can't
+       make it part of the header flex layout. -->
+  <div id="feedHeader" style="display:flex;align-items:center;position:sticky;top:0;z-index:10;background:var(--bg-1);border-bottom:1px solid rgba(255,255,255,.1);padding:0 92px 0 0;gap:6px">
     <div style="display:flex;flex:1;min-width:0">
-      <button class="feed-tab active" id="feedTabFriends" onclick="switchFeedTab('friends')">👥 Friends</button>
-      <button class="feed-tab" id="feedTabPublic" onclick="switchFeedTab('public')">🌐 Public</button>
-      <button class="feed-tab" id="feedTabCommunities" onclick="switchFeedTab('communities')">🏘 Lobbies</button>
+      <button class="feed-tab active" id="feedTabFriends" onclick="switchFeedTab('friends')"><span class="tab-emoji">👥</span><span>Friends</span></button>
+      <button class="feed-tab" id="feedTabPublic" onclick="switchFeedTab('public')"><span class="tab-emoji">🌐</span><span>Public</span></button>
+      <button class="feed-tab" id="feedTabCommunities" onclick="switchFeedTab('communities')"><span class="tab-emoji">🏘</span><span>Lobbies</span></button>
     </div>
     <!-- Hide button lives at root level (see #feedToggleBtn near #feedReopenBtn) to
          escape #socialFeed's transform containing block. -->
@@ -5300,7 +5311,7 @@ async function selectServer(server) {
     applyMembersResizeStyles();
   }
   const mtBtn = document.getElementById("membersToggleBtn");
-  const initialH = (window._resizeState && window._resizeState.membersH) || 138;
+  const initialH = (window._resizeState && window._resizeState.membersH) || 94;
   if (mtBtn) { mtBtn.style.display = "flex"; mtBtn.style.bottom = initialH + "px"; mtBtn.querySelector("polyline").setAttribute("points","2,4 6,8 10,4"); }
 
   // Update the lobby info rail (visible when feed is closed)
@@ -5528,26 +5539,29 @@ function hideMembersBar() {
   }
 }
 
-// Compute the default members-bar height so its top edge lines up with the sidebar's
-// "breaker" (top border of .server-actions-wrap). Uses getBoundingClientRect so the
-// result is pixel-accurate regardless of how the sidebar's flex layout distributes
-// space (offsetHeight sums can drift by a px or two depending on sub-pixel rounding).
+// Compute the default members-bar height so its top edge lines up with the TOP of
+// the user-panel (Overlord avatar area) in the left sidebar. Uses getBoundingClientRect
+// so the result is pixel-accurate regardless of how the sidebar's flex layout
+// distributes space (offsetHeight sums can drift by a px or two depending on sub-pixel
+// rounding).
 function _getDefaultMembersHeight() {
-  const wrap = document.querySelector('.server-actions-wrap');
-  if (wrap && wrap.isConnected) {
-    const r = wrap.getBoundingClientRect();
-    // Height the members bar needs so its top sits exactly at the wrap's top edge
-    const h = Math.round(window.innerHeight - r.top);
-    if (h > 40) return h;
-  }
-  // Fallback when wrap isn't rendered yet — measure user-panel alone (DM view)
+  // Primary: align with the user-panel's top edge — this is the "profile at the bottom"
+  // that the user wants the members bar to start in line with.
   const userPanel = document.querySelector('.user-panel');
   if (userPanel && userPanel.isConnected) {
     const r = userPanel.getBoundingClientRect();
     const h = Math.round(window.innerHeight - r.top);
     if (h > 40) return h;
   }
-  return 138; // last-resort fallback matches CSS
+  // Fallback: if user-panel isn't rendered yet, fall back to the server-actions-wrap
+  // top so the bar at least anchors to a recognizable sidebar boundary.
+  const wrap = document.querySelector('.server-actions-wrap');
+  if (wrap && wrap.isConnected) {
+    const r = wrap.getBoundingClientRect();
+    const h = Math.round(window.innerHeight - r.top);
+    if (h > 40) return h;
+  }
+  return 94; // last-resort fallback ≈ typical user-panel height
 }
 window._getDefaultMembersHeight = _getDefaultMembersHeight;
 
@@ -6702,7 +6716,7 @@ function openGroup(groupId, groupName) {
     document.body.classList.add("members-bar-open", "members-visible");
   }
   const mtBtn = document.getElementById("membersToggleBtn");
-  const _grpInitialH = (window._resizeState && window._resizeState.membersH) || (typeof _getDefaultMembersHeight === 'function' ? _getDefaultMembersHeight() : 138);
+  const _grpInitialH = (window._resizeState && window._resizeState.membersH) || (typeof _getDefaultMembersHeight === 'function' ? _getDefaultMembersHeight() : 94);
   if (mtBtn) { mtBtn.style.display = "flex"; mtBtn.style.bottom = _grpInitialH + "px"; mtBtn.querySelector("polyline").setAttribute("points","2,4 6,8 10,4"); }
   if (!window._resizeState) window._resizeState = {};
   if (!window._resizeState.membersH) window._resizeState.membersH = _grpInitialH;
@@ -10336,6 +10350,11 @@ function setPageTitle(title) {
 }
 function showHomePanel() {
   maybeShowVcPip();
+  // Clear selected server — the lobby info rail (#lobbyInfoRail) keys off
+  // `selectedServer` via updateLobbyInfoRail(); if we don't null it here, any later
+  // call (e.g. toggleFeed → updateLobbyInfoRail) will re-add `lobby-selected` and
+  // the rail will pop back up on the home screen.
+  selectedServer = null;
   // Hide the lobby info rail when returning to home
   document.body.classList.remove("lobby-selected");
   // Lobby Menu (server-actions-wrap) is lobby-only — remove on Home.
