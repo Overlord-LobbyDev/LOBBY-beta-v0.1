@@ -8811,6 +8811,18 @@ function setupCallSignalling() {
   console.log("[call] signalling ready; listening on ws, me.id=", me?.id);
   ws.addEventListener("message", async ({ data }) => {
     let msg; try { msg = JSON.parse(data); } catch { return; }
+    // DIAG: log every call-* message or "undeliverable" the client receives
+    if (msg.type && (msg.type.startsWith("call-") || msg.type === "call-undeliverable")) {
+      console.log("[call][rx]", msg.type, "from=", msg.from, "to=", msg.to, "fromUsername=", msg.fromUsername, "reason=", msg.reason);
+    }
+    if (msg.type === "call-undeliverable") {
+      console.warn("[call] server says undeliverable to", msg.to, "reason:", msg.reason);
+      showToast && showToast(`Call could not be delivered: ${msg.reason}`, "error");
+      try { LobbySound.stop("callOutgoing"); } catch {}
+      closeOutgoingCallModal && closeOutgoingCallModal();
+      forceEndCall && forceEndCall();
+      return;
+    }
     if (msg.type==="call-invite") {
       console.log("[call] received call-invite from", msg.from, "(", msg.fromUsername, "); my peerId is u" + me?.id);
       if (me&&msg.from===`u${me.id}`) return;
