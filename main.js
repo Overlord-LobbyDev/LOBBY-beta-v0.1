@@ -6,8 +6,53 @@ const { app, BrowserWindow, ipcMain, desktopCapturer, session, shell, screen, Me
 const path = require("path");
 const fs   = require("fs");   // moved here — was required at line 227 but used at line 79 (crash)
 
-// Remove the native menu bar entirely
-Menu.setApplicationMenu(null);
+// On macOS, keep a minimal menu so that system-level keyboard shortcuts
+// (Cmd+C, Cmd+V, Cmd+X, Cmd+A, Cmd+Z, Cmd+Shift+Z) continue to work.
+// On Windows/Linux we remove the menu bar entirely (it's frameless).
+if (process.platform === "darwin") {
+  const macMenu = Menu.buildFromTemplate([
+    {
+      label: app.name,
+      submenu: [
+        { role: "about" },
+        { type: "separator" },
+        { role: "services" },
+        { type: "separator" },
+        { role: "hide" },
+        { role: "hideOthers" },
+        { role: "unhide" },
+        { type: "separator" },
+        { role: "quit" },
+      ],
+    },
+    {
+      label: "Edit",
+      submenu: [
+        { role: "undo" },
+        { role: "redo" },
+        { type: "separator" },
+        { role: "cut" },
+        { role: "copy" },
+        { role: "paste" },
+        { role: "pasteAndMatchStyle" },
+        { role: "delete" },
+        { role: "selectAll" },
+      ],
+    },
+    {
+      label: "Window",
+      submenu: [
+        { role: "minimize" },
+        { role: "zoom" },
+        { type: "separator" },
+        { role: "front" },
+      ],
+    },
+  ]);
+  Menu.setApplicationMenu(macMenu);
+} else {
+  Menu.setApplicationMenu(null);
+}
 
 function createWindow() {
   const win = new BrowserWindow({
@@ -84,6 +129,7 @@ ipcMain.handle("navigate", (event, page, direction = "fade") => {
   const win = BrowserWindow.fromWebContents(event.sender);
   if (win) win.loadFile(page, { query: { transition: direction } });
 });
+
 
 let callWindow = null;
 let outgoingCallWindow = null;

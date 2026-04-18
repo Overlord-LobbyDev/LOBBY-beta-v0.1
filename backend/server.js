@@ -476,8 +476,10 @@ wss.on("connection", (ws, req) => {
         client.vcAvatarUrl = msg.avatarUrl || null;
       }
 
+      // Include all members of the channel (including the joiner themselves) so
+      // the joining client can render the full roster without losing self.
       const currentMembers = [...clients.values()]
-        .filter(c => c.vcChannelId === msg.channelId && c.peerId !== user.peerId)
+        .filter(c => c.vcChannelId === msg.channelId)
         .map(c => ({ userId: c.userId, username: c.vcUsername || c.username, avatarUrl: c.vcAvatarUrl || null, muted: false }));
       ws.send(JSON.stringify({ type: "vc-members", channelId: msg.channelId, members: currentMembers }));
 

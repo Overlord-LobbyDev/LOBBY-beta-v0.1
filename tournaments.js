@@ -46,27 +46,8 @@ function initTournaments(lobbyId, userId) {
     }
 }
 
-// Add tournament setup button to lobby menu
-function addTournamentButton() {
-    const lobbyMenu = document.querySelector('.server-actions');
-    if (!lobbyMenu) return;
-
-    // Remove any existing tournament button to avoid duplicates
-    const existing = lobbyMenu.querySelector('.tournament-setup-btn');
-    if (existing) existing.remove();
-
-    const tournamentItem = document.createElement('div');
-    tournamentItem.className = 'server-action-item tournament-setup-btn';
-    tournamentItem.innerHTML = `
-        <span class="sa-icon"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-            <polyline points="22 12 18 12 15 21 9 3 6 12 2 12"></polyline>
-        </svg></span>
-        Tournament Setup
-    `;
-    tournamentItem.onclick = openTournamentModal;
-    
-    lobbyMenu.appendChild(tournamentItem);
-}
+// Tournament Setup button is now part of the static Lobby Menu in index.html — no dynamic injection needed
+function addTournamentButton() { /* no-op */ }
 
 // Open tournament creation modal
 function openTournamentModal() {

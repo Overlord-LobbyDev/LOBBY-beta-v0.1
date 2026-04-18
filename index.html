@@ -196,10 +196,12 @@
     .channel-sidebar.open ~ #homePanel,
     .channel-sidebar.open ~ #chatPanel,
     .channel-sidebar.open ~ #profilePage,
+    .channel-sidebar.open ~ #calendarPanel,
     .channel-sidebar.open ~ #vcPanel,
     body.sidebar-open #homePanel,
     body.sidebar-open #chatPanel,
     body.sidebar-open #profilePage,
+    body.sidebar-open #calendarPanel,
     body.sidebar-open #vcPanel { left:324px; }
 
     #sidebarBackdrop { display:none; }
@@ -281,22 +283,41 @@
     .channel-item:hover .ch-delete { display:block; }
 
     /* Lobby action section */
-    .server-actions {
-      margin:8px; border-radius:12px; overflow:hidden;
-      border:1px solid rgba(255,255,255,.06);
-      background:rgba(0,0,0,.12);
+    /* ── Lobby action menu — pinned to bottom of sidebar ── */
+    .server-actions-wrap {
+      flex-shrink:0; padding:8px; position:relative;
+      background:var(--bg-1);
+      border-top:1px solid rgba(255,255,255,.06);
     }
+    .server-actions-trigger {
+      width:100%; display:flex; align-items:center; justify-content:space-between;
+      padding:8px 12px; border-radius:10px; cursor:pointer;
+      background:rgba(255,255,255,.04); border:1px solid rgba(255,255,255,.07);
+      color:var(--text-2); font-size:12px; font-weight:600; font-family:var(--font);
+      transition:background .15s, border-color .15s;
+      -webkit-app-region:no-drag;
+    }
+    .server-actions-trigger:hover { background:rgba(255,255,255,.08); border-color:rgba(255,255,255,.12); color:var(--text-1); }
+    .server-actions-trigger .trigger-chevron { transition:transform .2s; flex-shrink:0; }
+    .server-actions-trigger.open .trigger-chevron { transform:rotate(180deg); }
+    .server-actions {
+      position:absolute; bottom:calc(100% + 4px); left:8px; right:8px;
+      background:var(--bg-1); border:1px solid rgba(255,255,255,.09);
+      border-radius:12px; overflow:hidden;
+      box-shadow:0 -8px 32px rgba(0,0,0,.4);
+      display:none; flex-direction:column;
+      z-index:300;
+    }
+    .server-actions.open { display:flex; }
     .server-action-item {
       display:flex; align-items:center; gap:10px;
       padding:9px 13px; cursor:pointer; font-size:13px; font-weight:500;
-      color:var(--text-3); transition:background .12s, color .12s;
+      color:var(--text-2); transition:background .12s, color .12s;
       border-bottom:1px solid rgba(255,255,255,.04);
     }
     .server-action-item:last-child { border-bottom:none; }
     .server-action-item:hover { background:rgba(88,101,242,.1); color:var(--text-1); }
     .server-action-item:hover .sa-icon { color:var(--accent); }
-    .server-action-item.danger { color:var(--danger); }
-    .server-action-item.danger:hover { background:rgba(237,66,69,.1); color:var(--danger); }
     .sa-icon { display:flex; align-items:center; color:var(--text-3); flex-shrink:0; }
 
     /* Transfer ownership modal */
@@ -511,31 +532,35 @@
 
     .members-sidebar {
       position:fixed; bottom:0; left:72px; right:0;
-      height:100px;
+      height:138px; /* JS overrides via applyMembersResizeStyles — matches default sidebar bottom section (server-actions-wrap + user-panel) */
       background:var(--bg-1);
       border-top:1px solid rgba(255,255,255,.07);
-      display:flex; flex-direction:row; align-items:center;
-      padding:0 16px; gap:0;
+      /* Wrap into multiple rows when members overflow; vertical scroll reveals more */
+      display:flex; flex-direction:row; flex-wrap:wrap;
+      align-items:center; align-content:flex-start;
+      padding:10px 16px; gap:6px 4px;
       z-index:400;
-      overflow-x:auto; overflow-y:hidden;
-      scrollbar-width:none;
+      overflow-x:hidden; overflow-y:auto;
+      scrollbar-width:thin; scrollbar-color:var(--bg-3) transparent;
       transform:translateY(100%);
       transition:transform .35s cubic-bezier(0.16,1,0.3,1),
                  left .25s cubic-bezier(0.16,1,0.3,1),
                  right .3s cubic-bezier(0.16,1,0.3,1);
     }
     .members-sidebar.open { transform:translateY(0); }
-    .members-sidebar::-webkit-scrollbar { display:none; }
+    .members-sidebar::-webkit-scrollbar { width:6px; }
+    .members-sidebar::-webkit-scrollbar-thumb { background:var(--bg-3); border-radius:3px; }
+    .members-sidebar::-webkit-scrollbar-track { background:transparent; }
     body.sidebar-open .members-sidebar { left:324px; }
-    body.feed-open .members-sidebar { right:min(620px,40vw); }
-    /* Push chat panel content up when members bar is open */
-    .members-visible #chatPanel { padding-bottom:100px; }
-    .members-visible #profilePage { padding-bottom:100px; }
+    body.feed-open .members-sidebar { right:min(375px,26vw); }
+    /* Push chat panel content up when members bar is open — JS overrides to match actual bar height */
+    .members-visible #chatPanel { padding-bottom:138px; }
+    .members-visible #profilePage { padding-bottom:138px; }
     /* Toggle button transition */
     #membersToggleBtn {
       transition:background .15s, color .15s, bottom .35s cubic-bezier(0.16,1,0.3,1) !important;
     }
-    .members-visible #chatPanel .call-controls { bottom:64px; }
+    .members-visible #chatPanel .call-controls { bottom:102px; }
     .members-section-label {
       font-size:10px; font-weight:700; text-transform:uppercase;
       letter-spacing:.8px; color:var(--text-3);
@@ -1312,7 +1337,7 @@
     }
     #vcPanel.hidden { display:none !important; }
     body.sidebar-open #vcPanel { left:324px; }
-    body.feed-open #vcPanel { right:min(620px,40vw); }
+    body.feed-open #vcPanel { right:min(375px,26vw); }
 
     .vc-panel-header {
       height:48px; padding:0 16px; display:flex; align-items:center; gap:10px;
@@ -1466,11 +1491,13 @@
     /* When server list collapses, panels shift flush to the left edge */
     #serverList.collapsed ~ #homePanel,
     #serverList.collapsed ~ #chatPanel,
-    #serverList.collapsed ~ #profilePage { left:0 !important; }
+    #serverList.collapsed ~ #profilePage,
+    #serverList.collapsed ~ #calendarPanel { left:0 !important; }
 
     #homePanel,
     #chatPanel,
-    #profilePage {
+    #profilePage,
+    #calendarPanel {
       position:fixed;
       top:72px; left:72px; bottom:0; right:0;
       display:flex; flex-direction:column;
@@ -1481,33 +1508,34 @@
     }
     #homePanel.hidden,
     #chatPanel.hidden,
-    #profilePage.hidden { display:none !important; }
+    #profilePage.hidden,
+    #calendarPanel.hidden { display:none !important; }
     #chatPanel { flex-direction:row; background:var(--bg-2); }
+    #calendarPanel { flex-direction:column; background:var(--bg-2); }
 
     /* Shrink panels away from the fixed feed sidebar */
     body.feed-open  #homePanel,
     body.feed-open  #chatPanel,
-    body.feed-open  #profilePage { right:min(620px, 40vw); }
+    body.feed-open  #profilePage,
+    body.feed-open  #calendarPanel { right:min(375px, 26vw); }
     body.feed-closed #homePanel,
     body.feed-closed #chatPanel,
-    body.feed-closed #profilePage { right:0; }
+    body.feed-closed #profilePage,
+    body.feed-closed #calendarPanel { right:0; }
     .home-header {
       position:fixed; top:0; left:0; right:0; height:72px; z-index:500;
-      padding:0 20px 0 84px;
-      display:flex; align-items:center; gap:16px;
-      justify-content:space-between;
-      font-weight:700; font-size:15px; flex-shrink:0;
+      font-weight:700; font-size:15px;
       background:var(--bg-0); color:var(--text-1); letter-spacing:-.1px;
       border-bottom:1px solid rgba(255,255,255,.07);
-      transition:right .3s cubic-bezier(0.16,1,0.3,1),
-                 left .25s cubic-bezier(0.16,1,0.3,1);
       -webkit-app-region: drag;
+      pointer-events: none;
     }
     .home-header input,
     .home-header button,
     .home-header a,
+    .home-header > *,
     #lobbyLogoFixed,
-    #globalSearchWrap { -webkit-app-region: no-drag; }
+    #globalSearchWrap { -webkit-app-region: no-drag; pointer-events: auto; }
 
     /* ── Frameless window controls — always top-right ── */
     #winControls {
@@ -1528,8 +1556,7 @@
     }
     .win-btn:hover { background: rgba(255,255,255,.08); color: var(--text-1); }
     .win-btn.close:hover { background: #c42b1c; color: #fff; }
-    body.feed-open  .home-header { right:min(620px,40vw); }
-    body.sidebar-open .home-header { left:324px; }
+    /* home-header always spans full width — search stays centred regardless of feed/sidebar */
     /* home content scrolls inside the offset panel */
 
     /* ── Bebas Neue titles ─────────────────────────────────── */
@@ -1553,7 +1580,14 @@
 
     /* Search bar inside header */
     #globalSearchWrap {
-      flex:1; max-width:480px; position:relative; margin:0 auto;
+      position:fixed;
+      top:0; left:50%; transform:translateX(-50%);
+      height:72px;
+      width:min(480px, 40vw);
+      display:flex; flex-direction:column; align-items:center; justify-content:center;
+      z-index:501;
+      pointer-events:auto;
+      -webkit-app-region:no-drag;
     }
     #globalSearchInput {
       width:100%; background:var(--bg-3); border:1.5px solid rgba(255,255,255,.08);
@@ -1613,7 +1647,7 @@
     .gsearch-empty { padding:20px 14px; font-size:13px; color:var(--text-3); text-align:center; }
     #socialFeed {
       position:fixed; top:72px; right:0; bottom:0;
-      width:min(620px, 40vw);
+      width:min(375px, 26vw);
       display:flex !important; flex-direction:column;
       background:var(--bg-0);
       box-shadow:-8px 0 32px rgba(0,0,0,.35);
@@ -1628,18 +1662,145 @@
       box-shadow:none;
       pointer-events:none;
     }
+
+    /* ── Lobby Info Rail (shown when feed is closed AND a lobby is selected) ── */
+    #lobbyInfoRail {
+      position:fixed; top:72px; right:0; bottom:0;
+      width:280px;
+      display:flex; flex-direction:column;
+      background:linear-gradient(180deg, var(--bg-1) 0%, var(--bg-0) 100%);
+      border-left:1px solid rgba(255,255,255,.07);
+      box-shadow:-4px 0 24px rgba(0,0,0,.28);
+      z-index:95;
+      transform:translateX(100%);
+      transition:transform .28s cubic-bezier(0.16,1,0.3,1),
+                 box-shadow .28s ease;
+      overflow:hidden;
+      pointer-events:none;
+    }
+    body.feed-closed.lobby-selected #lobbyInfoRail {
+      transform:translateX(0);
+      pointer-events:auto;
+    }
+    /* When the rail is visible, shrink chat panel to accommodate it */
+    body.feed-closed.lobby-selected #chatPanel { right:280px !important; }
+
+    .lir-header {
+      padding:20px 18px 16px;
+      display:flex; flex-direction:column; align-items:center; gap:10px;
+      border-bottom:1px solid rgba(255,255,255,.06);
+      background:
+        radial-gradient(circle at 50% 0%, rgba(88,101,242,.18), transparent 60%),
+        linear-gradient(180deg, rgba(255,255,255,.02), transparent);
+    }
+    .lir-icon {
+      width:64px; height:64px; border-radius:18px;
+      background:linear-gradient(135deg, var(--accent), #7c3aed);
+      display:flex; align-items:center; justify-content:center;
+      font-size:26px; font-weight:800; color:#fff;
+      box-shadow:0 8px 24px rgba(88,101,242,.35);
+      overflow:hidden;
+    }
+    .lir-icon img { width:100%; height:100%; object-fit:cover; }
+    .lir-name {
+      font-size:16px; font-weight:700; color:var(--text-1);
+      text-align:center; line-height:1.2;
+      overflow:hidden; text-overflow:ellipsis;
+      display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical;
+      max-width:100%;
+    }
+    .lir-meta {
+      font-size:11px; color:var(--text-3); font-weight:600;
+      letter-spacing:.3px; text-transform:uppercase;
+    }
+    .lir-actions {
+      display:flex; gap:6px; justify-content:center; margin-top:4px;
+      flex-wrap:wrap;
+    }
+    .lir-action-btn {
+      background:var(--bg-3); border:1px solid rgba(255,255,255,.08);
+      color:var(--text-2); font-size:11px; font-weight:600;
+      padding:6px 10px; border-radius:8px; cursor:pointer;
+      font-family:var(--font);
+      transition:background .15s, color .15s, border-color .15s;
+      display:inline-flex; align-items:center; gap:5px;
+    }
+    .lir-action-btn:hover {
+      background:rgba(88,101,242,.15); color:var(--accent);
+      border-color:rgba(88,101,242,.3);
+    }
+
+    .lir-section {
+      padding:14px 16px 10px;
+      border-bottom:1px solid rgba(255,255,255,.05);
+    }
+    .lir-section-title {
+      font-size:10.5px; font-weight:700; letter-spacing:.6px;
+      text-transform:uppercase; color:var(--text-3);
+      margin-bottom:10px; display:flex; align-items:center; gap:6px;
+    }
+    .lir-section-title .count-badge {
+      background:var(--bg-3); color:var(--text-2);
+      padding:1px 7px; border-radius:99px; font-size:10px;
+      margin-left:auto; font-weight:700;
+    }
+
+    .lir-scroll {
+      flex:1; min-height:0; overflow-y:auto;
+    }
+    .lir-scroll::-webkit-scrollbar { width:6px; }
+    .lir-scroll::-webkit-scrollbar-track { background:transparent; }
+    .lir-scroll::-webkit-scrollbar-thumb { background:rgba(255,255,255,.08); border-radius:3px; }
+    .lir-scroll::-webkit-scrollbar-thumb:hover { background:rgba(255,255,255,.15); }
+
+    .lir-event {
+      padding:9px 10px; margin-bottom:6px;
+      background:rgba(255,255,255,.03);
+      border-left:3px solid var(--accent);
+      border-radius:6px; cursor:pointer;
+      transition:background .15s, transform .12s;
+    }
+    .lir-event:hover { background:rgba(255,255,255,.06); transform:translateX(2px); }
+    .lir-event-title {
+      font-size:12px; font-weight:700; color:var(--text-1);
+      overflow:hidden; text-overflow:ellipsis; white-space:nowrap;
+      margin-bottom:2px;
+    }
+    .lir-event-time {
+      font-size:10.5px; color:var(--text-3); font-weight:600;
+    }
+    .lir-empty {
+      padding:16px 10px; text-align:center;
+      color:var(--text-3); font-size:11.5px; line-height:1.5;
+    }
+    .lir-decor {
+      padding:20px 16px; text-align:center;
+      border-top:1px solid rgba(255,255,255,.05);
+      background:linear-gradient(180deg, transparent, rgba(88,101,242,.04));
+    }
+    .lir-decor-glyph {
+      font-size:28px; opacity:.35; margin-bottom:6px;
+      filter:drop-shadow(0 2px 8px rgba(88,101,242,.2));
+    }
+    .lir-decor-text {
+      font-size:10.5px; color:var(--text-3); line-height:1.5;
+      font-style:italic;
+    }
+
     /* Panels slide smoothly when feed opens/closes */
-    #homePanel, #chatPanel, #profilePage {
+    #homePanel, #chatPanel, #profilePage, #calendarPanel {
       transition: right .28s cubic-bezier(0.16,1,0.3,1),
                   left  .28s cubic-bezier(0.16,1,0.3,1);
     }
     /* Shrink panels away from the fixed feed sidebar */
     body.feed-open  #homePanel,
     body.feed-open  #chatPanel,
-    body.feed-open  #profilePage { right:min(620px, 40vw); }
+    body.feed-open  #profilePage,
+    body.feed-open  #calendarPanel { right:min(375px, 26vw); }
     body.feed-closed #homePanel,
     body.feed-closed #chatPanel,
-    body.feed-closed #profilePage { right:0; }
+    body.feed-closed #profilePage,
+    body.feed-closed #calendarPanel { right:0; }
 
     .feed-tab {
       flex:1; text-align:center;
@@ -3062,7 +3223,7 @@
       Invite People
     </button>
   </div>
-  <div id="channelSidebarContent" style="flex:1;overflow-y:auto;overflow-x:hidden;display:flex;flex-direction:column;min-width:0;"></div>
+  <div id="channelSidebarContent" style="flex:1;overflow-y:auto;overflow-x:hidden;display:flex;flex-direction:column;min-width:0;min-height:0;"></div>
   <div class="user-panel" id="chatUserPanel">
     <div class="user-panel-banner" id="chatPanelBanner"></div>
     <div class="user-panel-row1">
@@ -3143,33 +3304,28 @@
   ">BETA</div>
 </div>
 
-<div class="home-header">
-    <!-- Centre: Search -->
-    <div id="globalSearchWrap" style="display:flex;flex-direction:column;align-items:center;gap:3px;">
-      <div id="userLobbySubtitle" style="
-        font-family:'Bebas Neue',sans-serif;
-        font-size:18px;
-        letter-spacing:3px;
-        color:var(--text-1);
-        pointer-events:none;
-        white-space:nowrap;
-        line-height:1;
-      ">Welcome to LOBBY</div>
-      <div style="position:relative;width:100%;">
-        <svg class="gsearch-icon" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
-        <input id="globalSearchInput" placeholder="Search users and lobbies…" autocomplete="off"
-          oninput="onGlobalSearch(this.value)"
-          onfocus="if(this.value.trim())document.getElementById('globalSearchResults').classList.add('open')" />
-        <span id="gsearchKbd">⌘K</span>
-        <div id="globalSearchResults"></div>
-      </div>
-    </div>
+<div class="home-header"></div>
 
-    <!-- Right: feed status -->
-    <div style="display:flex;justify-content:flex-end;align-items:center;margin-right:148px;">
-      <span id="feedStatus" style="font-size:11px;color:var(--text-3);font-weight:400"></span>
-    </div>
+<!-- Search bar — always perfectly centred, independent of sidebar/feed -->
+<div id="globalSearchWrap">
+  <div id="userLobbySubtitle" style="
+    font-family:'Bebas Neue',sans-serif;
+    font-size:18px;
+    letter-spacing:3px;
+    color:var(--text-1);
+    pointer-events:none;
+    white-space:nowrap;
+    line-height:1;
+  ">Welcome to LOBBY</div>
+  <div style="position:relative;width:100%;">
+    <svg class="gsearch-icon" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+    <input id="globalSearchInput" placeholder="Search users and lobbies…" autocomplete="off"
+      oninput="onGlobalSearch(this.value)"
+      onfocus="if(this.value.trim())document.getElementById('globalSearchResults').classList.add('open')" />
+    <span id="gsearchKbd">⌘K</span>
+    <div id="globalSearchResults"></div>
   </div>
+</div>
 
 <!-- ── Home Panel ── -->
 <div id="homePanel">
@@ -3244,52 +3400,64 @@
 </div>
 
 <!-- ── Lobby Calendar Panel (in-app view, same layout as chatPanel) ── -->
-<div id="calendarPanel" class="hidden" style="flex:1;display:flex;flex-direction:column;background:var(--bg-2);overflow:hidden;min-width:0">
-  <!-- Header -->
-  <div style="padding:16px 24px;background:var(--bg-1);border-bottom:1px solid rgba(255,255,255,.06);display:flex;align-items:center;justify-content:space-between;gap:16px;flex-wrap:wrap">
-    <div style="display:flex;align-items:center;gap:12px;min-width:0">
-      <div style="width:40px;height:40px;border-radius:10px;background:linear-gradient(135deg,rgba(88,101,242,.2),rgba(88,101,242,.08));display:flex;align-items:center;justify-content:center;flex-shrink:0">
-        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="var(--accent)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
+<div id="calendarPanel" class="hidden">
+
+  <!-- ── Calendar Header ── -->
+  <div style="padding:0 148px 0 20px;height:52px;background:var(--bg-1);border-bottom:1px solid rgba(255,255,255,.06);display:flex;align-items:center;justify-content:space-between;gap:12px;flex-shrink:0;box-sizing:border-box">
+    <!-- Left: back + title -->
+    <div style="display:flex;align-items:center;gap:10px;min-width:0">
+      <button onclick="closeLobbyCalendar()" title="Back to chat" style="background:none;border:none;color:var(--text-3);width:30px;height:30px;border-radius:8px;cursor:pointer;display:flex;align-items:center;justify-content:center;flex-shrink:0;transition:all .15s;font-size:16px" onmouseover="this.style.background='rgba(255,255,255,.08)';this.style.color='var(--text-1)'" onmouseout="this.style.background='none';this.style.color='var(--text-3)'">←</button>
+      <div style="width:30px;height:30px;border-radius:8px;background:linear-gradient(135deg,rgba(88,101,242,.25),rgba(88,101,242,.1));display:flex;align-items:center;justify-content:center;flex-shrink:0">
+        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="var(--accent)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
       </div>
       <div style="min-width:0">
-        <div style="font-size:18px;font-weight:800;color:var(--text-1);letter-spacing:-.3px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" id="calendarLobbyTitle">Lobby Calendar</div>
-        <div style="font-size:11px;color:var(--text-3);margin-top:1px" id="calendarMonthSubtitle">January 2025</div>
+        <div style="font-size:15px;font-weight:800;color:var(--text-1);overflow:hidden;text-overflow:ellipsis;white-space:nowrap" id="calendarLobbyTitle">Lobby Calendar</div>
+        <div style="font-size:10px;color:var(--text-3);margin-top:1px" id="calendarMonthSubtitle"></div>
       </div>
     </div>
-    <div style="display:flex;align-items:center;gap:10px">
-      <div style="display:flex;align-items:center;gap:4px;background:var(--bg-3);border-radius:8px;padding:3px">
-        <button onclick="calendarChangeMonth(-1)" style="background:none;border:none;color:var(--text-2);width:30px;height:30px;border-radius:6px;cursor:pointer;font-size:14px;font-family:var(--font);transition:background .15s" onmouseover="this.style.background='rgba(255,255,255,.08)'" onmouseout="this.style.background='none'">‹</button>
-        <button onclick="calendarGoToday()" style="background:none;border:none;color:var(--text-2);padding:0 10px;height:30px;border-radius:6px;cursor:pointer;font-size:11px;font-weight:600;font-family:var(--font);text-transform:uppercase;letter-spacing:.6px;transition:background .15s" onmouseover="this.style.background='rgba(255,255,255,.08)'" onmouseout="this.style.background='none'">Today</button>
-        <button onclick="calendarChangeMonth(1)" style="background:none;border:none;color:var(--text-2);width:30px;height:30px;border-radius:6px;cursor:pointer;font-size:14px;font-family:var(--font);transition:background .15s" onmouseover="this.style.background='rgba(255,255,255,.08)'" onmouseout="this.style.background='none'">›</button>
+    <!-- Right: month nav + new event -->
+    <div style="display:flex;align-items:center;gap:8px;flex-shrink:0">
+      <div style="display:flex;align-items:center;gap:2px;background:var(--bg-3);border-radius:8px;padding:3px">
+        <button onclick="calendarChangeMonth(-1)" title="Previous month" style="background:none;border:none;color:var(--text-2);width:26px;height:26px;border-radius:6px;cursor:pointer;font-size:14px;font-family:var(--font);transition:background .15s;display:flex;align-items:center;justify-content:center" onmouseover="this.style.background='rgba(255,255,255,.1)'" onmouseout="this.style.background='none'">‹</button>
+        <button onclick="calendarGoToday()" title="Go to today" style="background:none;border:none;color:var(--text-2);padding:0 8px;height:26px;border-radius:6px;cursor:pointer;font-size:11px;font-weight:700;font-family:var(--font);text-transform:uppercase;letter-spacing:.6px;transition:background .15s" onmouseover="this.style.background='rgba(255,255,255,.1)'" onmouseout="this.style.background='none'">Today</button>
+        <button onclick="calendarChangeMonth(1)" title="Next month" style="background:none;border:none;color:var(--text-2);width:26px;height:26px;border-radius:6px;cursor:pointer;font-size:14px;font-family:var(--font);transition:background .15s;display:flex;align-items:center;justify-content:center" onmouseover="this.style.background='rgba(255,255,255,.1)'" onmouseout="this.style.background='none'">›</button>
       </div>
-      <button onclick="openCreateEventModal()" style="padding:8px 14px;background:var(--accent);border:none;border-radius:8px;color:#fff;font-size:12px;font-weight:700;cursor:pointer;font-family:var(--font);display:flex;align-items:center;gap:6px;transition:background .15s" onmouseover="this.style.background='var(--accent-h)'" onmouseout="this.style.background='var(--accent)'">
-        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+      <button onclick="_openCreateEventModalForDate(new Date())" style="padding:6px 12px;background:var(--accent);border:none;border-radius:8px;color:#fff;font-size:12px;font-weight:700;cursor:pointer;font-family:var(--font);display:flex;align-items:center;gap:5px;transition:background .15s;flex-shrink:0" onmouseover="this.style.background='var(--accent-h)'" onmouseout="this.style.background='var(--accent)'">
+        <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
         New Event
       </button>
     </div>
   </div>
 
-  <!-- Body: calendar + sidebar -->
-  <div style="flex:1;display:flex;overflow:hidden;min-height:0">
-    <!-- Calendar grid -->
-    <div style="flex:1;display:flex;flex-direction:column;overflow:hidden;padding:16px;min-width:0">
-      <div style="display:grid;grid-template-columns:repeat(7,1fr);gap:1px;margin-bottom:6px">
-        <div style="text-align:center;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.8px;color:var(--text-3);padding:8px 4px">Sun</div>
-        <div style="text-align:center;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.8px;color:var(--text-3);padding:8px 4px">Mon</div>
-        <div style="text-align:center;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.8px;color:var(--text-3);padding:8px 4px">Tue</div>
-        <div style="text-align:center;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.8px;color:var(--text-3);padding:8px 4px">Wed</div>
-        <div style="text-align:center;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.8px;color:var(--text-3);padding:8px 4px">Thu</div>
-        <div style="text-align:center;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.8px;color:var(--text-3);padding:8px 4px">Fri</div>
-        <div style="text-align:center;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.8px;color:var(--text-3);padding:8px 4px">Sat</div>
+  <!-- ── Body: grid + upcoming sidebar ── -->
+  <div style="flex:1;display:flex;overflow:hidden;min-height:0;">
+
+    <!-- Calendar grid area — position:relative wrapper so the inner scroller can fill it absolutely -->
+    <div style="flex:1;position:relative;min-width:0;min-height:0">
+      <div style="position:absolute;inset:0;display:flex;flex-direction:column;padding:10px;gap:4px;overflow:hidden">
+
+        <!-- Day-of-week headers -->
+        <div style="display:grid;grid-template-columns:repeat(7,1fr);gap:4px;flex-shrink:0">
+          <div style="text-align:center;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.8px;color:var(--text-3);padding:5px 2px">Sun</div>
+          <div style="text-align:center;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.8px;color:var(--text-3);padding:5px 2px">Mon</div>
+          <div style="text-align:center;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.8px;color:var(--text-3);padding:5px 2px">Tue</div>
+          <div style="text-align:center;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.8px;color:var(--text-3);padding:5px 2px">Wed</div>
+          <div style="text-align:center;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.8px;color:var(--text-3);padding:5px 2px">Thu</div>
+          <div style="text-align:center;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.8px;color:var(--text-3);padding:5px 2px">Fri</div>
+          <div style="text-align:center;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.8px;color:var(--text-3);padding:5px 2px">Sat</div>
+        </div>
+
+        <!-- Day cells grid -->
+        <div id="calendarDaysGrid" style="flex:1;min-height:0;display:grid;grid-template-columns:repeat(7,1fr);grid-auto-rows:minmax(90px,auto);align-content:start;gap:4px;overflow-y:auto"></div>
       </div>
-      <div id="calendarDaysGrid" style="flex:1;display:grid;grid-template-columns:repeat(7,1fr);grid-template-rows:repeat(6,minmax(0,1fr));gap:4px;min-height:0"></div>
     </div>
 
-    <!-- Right: upcoming events list -->
-    <div style="width:300px;flex-shrink:0;background:var(--bg-1);border-left:1px solid rgba(255,255,255,.06);display:flex;flex-direction:column;overflow:hidden">
-      <div style="padding:14px 18px;border-bottom:1px solid rgba(255,255,255,.06);font-size:10px;font-weight:800;text-transform:uppercase;letter-spacing:.8px;color:var(--text-3)">Upcoming</div>
-      <div id="calendarUpcomingList" style="flex:1;overflow-y:auto;padding:10px"></div>
+    <!-- Right: upcoming events sidebar -->
+    <div style="width:220px;flex-shrink:0;background:var(--bg-1);border-left:1px solid rgba(255,255,255,.06);display:flex;flex-direction:column;overflow:hidden">
+      <div style="padding:12px 14px;border-bottom:1px solid rgba(255,255,255,.06);font-size:10px;font-weight:800;text-transform:uppercase;letter-spacing:.8px;color:var(--text-3);flex-shrink:0">Upcoming</div>
+      <div id="calendarUpcomingList" style="flex:1;overflow-y:auto;padding:8px"></div>
     </div>
+
   </div>
 </div>
 
@@ -4308,6 +4476,41 @@
   </div>
 </div>
 
+<!-- ── Lobby Info Rail (auto-shown when feed is hidden in a lobby) ── -->
+<div id="lobbyInfoRail">
+  <div class="lir-header">
+    <div class="lir-icon" id="lirIcon">L</div>
+    <div class="lir-name" id="lirName">Lobby</div>
+    <div class="lir-meta" id="lirMeta">Community</div>
+    <div class="lir-actions">
+      <button class="lir-action-btn" id="lirCalendarBtn" title="Open calendar">
+        <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.3" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
+        Calendar
+      </button>
+      <button class="lir-action-btn" id="lirInviteBtn" title="Invite friend">
+        <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.3" stroke-linecap="round" stroke-linejoin="round"><path d="M16 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="8.5" cy="7" r="4"/><line x1="20" y1="8" x2="20" y2="14"/><line x1="23" y1="11" x2="17" y2="11"/></svg>
+        Invite
+      </button>
+    </div>
+  </div>
+  <div class="lir-scroll">
+    <div class="lir-section">
+      <div class="lir-section-title">
+        <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.3" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+        Upcoming
+        <span class="count-badge" id="lirEventCount">0</span>
+      </div>
+      <div id="lirEventsList">
+        <div class="lir-empty">No upcoming events.</div>
+      </div>
+    </div>
+    <div class="lir-decor">
+      <div class="lir-decor-glyph">◈</div>
+      <div class="lir-decor-text">Your home for play.<br>Bring the feed back anytime.</div>
+    </div>
+  </div>
+</div>
+
 <!-- ── Profile Panel ── -->
 <div id="profileBackdrop"></div>
 <div id="profilePanel">
@@ -5018,8 +5221,25 @@ async function selectServer(server) {
   const channels = await api(`/servers/${server.id}/channels`);
   renderChannelList(channels, members, server);
   // Show members toggle button and open members bar by default (arrow points down = "collapse")
+  // Seed default height from measured sidebar bottom section so the bar's top aligns with the "breaker"
+  if (!window._resizeState) window._resizeState = {};
+  if (!window._resizeState.membersH && typeof _getDefaultMembersHeight === 'function') {
+    // Defer one frame so the sidebar's server-actions-wrap and user-panel have rendered before we measure
+    requestAnimationFrame(() => {
+      window._resizeState.membersH = _getDefaultMembersHeight();
+      if (typeof applyMembersResizeStyles === "function") applyMembersResizeStyles();
+      const btn = document.getElementById("membersToggleBtn");
+      if (btn) btn.style.bottom = window._resizeState.membersH + "px";
+    });
+  } else if (typeof applyMembersResizeStyles === "function") {
+    applyMembersResizeStyles();
+  }
   const mtBtn = document.getElementById("membersToggleBtn");
-  if (mtBtn) { mtBtn.style.display = "flex"; mtBtn.style.bottom = "100px"; mtBtn.querySelector("polyline").setAttribute("points","2,4 6,8 10,4"); }
+  const initialH = (window._resizeState && window._resizeState.membersH) || 138;
+  if (mtBtn) { mtBtn.style.display = "flex"; mtBtn.style.bottom = initialH + "px"; mtBtn.querySelector("polyline").setAttribute("points","2,4 6,8 10,4"); }
+
+  // Update the lobby info rail (visible when feed is closed)
+  if (typeof updateLobbyInfoRail === "function") updateLobbyInfoRail();
 }
 
 function renderChannelList(channels, members, server) {
@@ -5092,28 +5312,48 @@ function renderChannelList(channels, members, server) {
       </div>
     </div>
   </div>`;
-  html += `<div style="margin-top:auto;padding-top:12px">
-    <div class="server-actions">
-      ${canManage ? `<div class="server-action-item" onclick="openServerSettings(${server.id})">
-        <span class="sa-icon"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg></span>
-        Lobby Settings
-      </div>` : ""}
-      <div class="server-action-item" onclick="withLoading(this, () => inviteFriendToServer(${server.id}))">
+  content.innerHTML = html;
+
+  // Inject the Lobby Menu wrap directly into .channel-sidebar (outside the scrollable content)
+  // so it stays pinned at the bottom regardless of scroll position
+  const sidebar = document.querySelector('.channel-sidebar');
+  const existingWrap = sidebar?.querySelector('.server-actions-wrap');
+  if (existingWrap) existingWrap.remove();
+
+  const wrap = document.createElement('div');
+  wrap.className = 'server-actions-wrap';
+  wrap.innerHTML = `
+    <div class="server-actions" id="lobbyActionMenu">
+      <div class="server-action-item" onclick="withLoading(this, () => inviteFriendToServer(${server.id}));closeLobbyActionMenu()">
         <span class="sa-icon"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><line x1="19" y1="8" x2="19" y2="14"/><line x1="22" y1="11" x2="16" y2="11"/></svg></span>
         Invite Friends
       </div>
-      ${!isAloneOwner ? `<div class="server-action-item" onclick="withLoading(this, () => leaveServer(${server.id}))">
-        <span class="sa-icon"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg></span>
+      <div class="server-action-item" onclick="openTournamentModal();closeLobbyActionMenu()">
+        <span class="sa-icon"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg></span>
+        Tournament Setup
+      </div>
+      ${canManage ? `<div class="server-action-item" onclick="openServerSettings(${server.id});closeLobbyActionMenu()">
+        <span class="sa-icon"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg></span>
+        Lobby Settings
+      </div>` : ""}
+      ${!isAloneOwner ? `<div class="server-action-item" style="color:var(--danger)" onclick="confirmLeaveLobby(${server.id});closeLobbyActionMenu()" onmouseover="this.style.background='rgba(237,66,69,.1)'" onmouseout="this.style.background=''">
+        <span class="sa-icon" style="color:var(--danger)"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg></span>
         Leave Lobby
       </div>` : ""}
-      ${isOwner ? `<div class="server-action-item danger" onclick="withLoading(this, () => deleteServer(${server.id}))">
-        <span class="sa-icon" style="color:var(--danger)"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/><path d="M10 11v6M14 11v6"/><path d="M9 6V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2"/></svg></span>
-        Delete Lobby
-      </div>` : ""}
     </div>
-  </div>`;
-
-  content.innerHTML = html;
+    <button class="server-actions-trigger" id="lobbyActionTrigger" onclick="toggleLobbyActionMenu()">
+      <span style="display:flex;align-items:center;gap:8px">
+        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="1"/><circle cx="12" cy="5" r="1"/><circle cx="12" cy="19" r="1"/></svg>
+        Lobby Menu
+      </span>
+      <svg class="trigger-chevron" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="18 15 12 9 6 15"/></svg>
+    </button>`;
+  const userPanel = sidebar?.querySelector('.user-panel');
+  if (userPanel) {
+    sidebar.insertBefore(wrap, userPanel);
+  } else {
+    sidebar?.appendChild(wrap);
+  }
   if (typeof initTournaments === 'function') initTournaments(server.id, me?.id);
   if (typeof loadLobbyEvents === 'function') loadLobbyEvents(server.id);
   renderMembers(members);
@@ -5196,7 +5436,19 @@ function renderMembers(members) {
     offline.forEach(m => { html += memberItem(m, false); });
   }
 
+  // Preserve the resize handle across re-renders (innerHTML wipes it otherwise, breaking resize).
+  const existingHandle = sidebar.querySelector('#membersResizeHandle');
   sidebar.innerHTML = html;
+  if (existingHandle) {
+    sidebar.insertBefore(existingHandle, sidebar.firstChild);
+  } else {
+    const h = document.createElement('div');
+    h.className = 'resize-handle resize-handle-top';
+    h.id = 'membersResizeHandle';
+    sidebar.insertBefore(h, sidebar.firstChild);
+    // Re-wire drag for the fresh handle (the original listener from initResizeHandles was on the now-discarded node)
+    if (typeof window._rewireMembersResize === 'function') window._rewireMembersResize();
+  }
 }
 
 function hideMembersBar() {
@@ -5210,6 +5462,18 @@ function hideMembersBar() {
     btn.querySelector("polyline").setAttribute("points", "2,8 6,4 10,8");
   }
 }
+
+// Compute the default members-bar height so its top edge lines up with the sidebar's
+// "breaker" (top border of .server-actions-wrap). Measures the real rendered heights.
+function _getDefaultMembersHeight() {
+  const wrap = document.querySelector('.server-actions-wrap');
+  const userPanel = document.querySelector('.user-panel');
+  let h = 0;
+  if (wrap) h += wrap.offsetHeight;
+  if (userPanel) h += userPanel.offsetHeight;
+  return h > 40 ? h : 138; // fallback matches CSS
+}
+window._getDefaultMembersHeight = _getDefaultMembersHeight;
 
 function toggleMembersBar() {
   const sidebar = document.getElementById("membersSidebar");
@@ -5226,9 +5490,12 @@ function toggleMembersBar() {
   } else {
     sidebar.classList.add("open");
     document.body.classList.add("members-visible");
+    // If no user-set height, seed _resizeState with the measured default so the bar top aligns with the sidebar breaker
+    if (!window._resizeState) window._resizeState = {};
+    if (!window._resizeState.membersH) window._resizeState.membersH = _getDefaultMembersHeight();
     if(typeof applyMembersResizeStyles==="function")applyMembersResizeStyles();
     if (btn) {
-      var h = (window._resizeState && window._resizeState.membersH) || 100;
+      var h = (window._resizeState && window._resizeState.membersH) || _getDefaultMembersHeight();
       btn.style.bottom = h + "px";
       btn.querySelector("polyline").setAttribute("points", "2,4 6,8 10,4");
     }
@@ -5419,6 +5686,35 @@ async function createServer() {
   await loadCommunities();
   showToast(`Lobby "${name}" created!`, "success");
 }
+
+// ── Leave Lobby confirmation ──────────────────────────────────
+function confirmLeaveLobby(serverId) {
+  const name = (typeof selectedServer !== 'undefined' && selectedServer?.name) ? selectedServer.name : 'this lobby';
+  if (confirm(`Leave ${name}?\n\nYou can rejoin if it's public, or if you receive a new invite.`)) {
+    withLoading(document.body, () => leaveServer(serverId));
+  }
+}
+
+// ── Lobby action menu (upward dropdown) ──────────────────────
+function toggleLobbyActionMenu() {
+  const menu = document.getElementById('lobbyActionMenu');
+  const trigger = document.getElementById('lobbyActionTrigger');
+  if (!menu || !trigger) return;
+  const isOpen = menu.classList.toggle('open');
+  trigger.classList.toggle('open', isOpen);
+}
+function closeLobbyActionMenu() {
+  const menu = document.getElementById('lobbyActionMenu');
+  const trigger = document.getElementById('lobbyActionTrigger');
+  if (menu) menu.classList.remove('open');
+  if (trigger) trigger.classList.remove('open');
+}
+// Close menu when clicking outside the wrap
+document.addEventListener('click', (e) => {
+  if (!e.target.closest('.server-actions-wrap') && !e.target.closest('#lobbyActionMenu')) {
+    closeLobbyActionMenu();
+  }
+});
 
 // ── Edit Lobby ────────────────────────────────────────────────
 
@@ -5671,6 +5967,8 @@ window._doInviteToServer = async function(serverId, userId, username) {
 // ── DM Panel ──────────────────────────────────────────────────
 async function showDMPanel() {
   selectedServer = null;
+  // Hide the lobby info rail when leaving a lobby
+  document.body.classList.remove("lobby-selected");
   clearAllNavIcons();
   const mtBtn = document.getElementById("membersToggleBtn");
   if (mtBtn) { mtBtn.style.display = "none"; }
@@ -5844,6 +6142,14 @@ async function openDM(userId, username, avatarUrl) {
 // ── Open Channel ──────────────────────────────────────────────
 async function openChannel(id, name, type) {
   if (type === "voice") { joinVoiceChannel(id, name); return; }
+  // If calendar is open, close it and restore chat panel
+  const calPanel = document.getElementById('calendarPanel');
+  if (calPanel && !calPanel.classList.contains('hidden')) {
+    calPanel.classList.add('hidden'); calPanel.style.display = '';
+    const chatPanel = document.getElementById('chatPanel');
+    if (chatPanel) chatPanel.classList.remove('hidden');
+    if (typeof currentPanel !== 'undefined') currentPanel = 'chat';
+  }
   if (currentView?.type === "channel") wsSend({ type:"unsubscribe-channel", channelId: currentView.id });
   currentView = { type:"channel", id, name };
   document.querySelectorAll(".channel-item").forEach(el => el.classList.remove("active"));
@@ -6089,6 +6395,7 @@ function showToast(msg, type="success") {
 // ── Groups ────────────────────────────────────────────────────
 async function showGroupsPanel() {
   selectedServer = null;
+  document.body.classList.remove("lobby-selected");
   clearAllNavIcons();
   document.getElementById("groupsNavIcon").classList.add("active");
   document.getElementById("sidebarTitle").textContent = "Groups"; setSidebarMode("groups");
@@ -6293,7 +6600,11 @@ function openGroup(groupId, groupName) {
     document.body.classList.add("members-bar-open", "members-visible");
   }
   const mtBtn = document.getElementById("membersToggleBtn");
-  if (mtBtn) { mtBtn.style.display = "flex"; mtBtn.style.bottom = "100px"; mtBtn.querySelector("polyline").setAttribute("points","2,4 6,8 10,4"); }
+  const _grpInitialH = (window._resizeState && window._resizeState.membersH) || (typeof _getDefaultMembersHeight === 'function' ? _getDefaultMembersHeight() : 138);
+  if (mtBtn) { mtBtn.style.display = "flex"; mtBtn.style.bottom = _grpInitialH + "px"; mtBtn.querySelector("polyline").setAttribute("points","2,4 6,8 10,4"); }
+  if (!window._resizeState) window._resizeState = {};
+  if (!window._resizeState.membersH) window._resizeState.membersH = _grpInitialH;
+  if (typeof applyMembersResizeStyles === "function") applyMembersResizeStyles();
 
   console.log("[openGroup] UI shell rendered, now loading data...");
   _loadGroupData(groupId);
@@ -9908,6 +10219,8 @@ function setPageTitle(title) {
 }
 function showHomePanel() {
   maybeShowVcPip();
+  // Hide the lobby info rail when returning to home
+  document.body.classList.remove("lobby-selected");
   document.getElementById("homePanel").classList.remove("hidden");
   document.getElementById("chatPanel").classList.add("hidden");
   document.getElementById("profilePage").classList.add("hidden");
@@ -10240,8 +10553,112 @@ function toggleFeed() {
   } else {
     feedFreezeGifs();
     if(typeof clearFeedResizeStyles==="function") clearFeedResizeStyles();
+    // Refresh the lobby info rail if a lobby is currently selected
+    if (typeof updateLobbyInfoRail === "function") updateLobbyInfoRail();
   }
 }
+
+// ── Lobby Info Rail (shown when feed is closed AND a lobby is selected) ──
+function updateLobbyInfoRail() {
+  const rail = document.getElementById("lobbyInfoRail");
+  if (!rail) return;
+  // Toggle body class based on whether a lobby is currently selected
+  if (typeof selectedServer !== "undefined" && selectedServer) {
+    document.body.classList.add("lobby-selected");
+  } else {
+    document.body.classList.remove("lobby-selected");
+    return;
+  }
+
+  // Populate header
+  const iconEl = document.getElementById("lirIcon");
+  const nameEl = document.getElementById("lirName");
+  const metaEl = document.getElementById("lirMeta");
+  if (iconEl) {
+    if (selectedServer.icon_url || selectedServer.iconUrl) {
+      iconEl.innerHTML = `<img src="${selectedServer.icon_url || selectedServer.iconUrl}" alt="">`;
+    } else {
+      iconEl.innerHTML = "";
+      iconEl.textContent = (selectedServer.name || "L").charAt(0).toUpperCase();
+    }
+  }
+  if (nameEl) nameEl.textContent = selectedServer.name || "Lobby";
+  if (metaEl) {
+    const count = (typeof cachedServerMembers !== "undefined" && Array.isArray(cachedServerMembers))
+      ? cachedServerMembers.length : 0;
+    metaEl.textContent = count > 0 ? `${count} member${count === 1 ? "" : "s"}` : "Community";
+  }
+
+  // Populate upcoming events list
+  const listEl = document.getElementById("lirEventsList");
+  const countEl = document.getElementById("lirEventCount");
+  if (listEl) {
+    // Only show events if calendar state is for the current lobby
+    const events = (window._calendarState
+                    && window._calendarState.lobbyId === selectedServer.id
+                    && Array.isArray(window._calendarState.events))
+                   ? window._calendarState.events : [];
+    const now = Date.now();
+    const me_id = (typeof me !== "undefined" && me) ? me.id : null;
+    const upcoming = events
+      .filter(e => new Date(e.event_date).getTime() >= now - 3600000)
+      .filter(e => !e.is_private || e.created_by === me_id)
+      .sort((a, b) => new Date(a.event_date) - new Date(b.event_date))
+      .slice(0, 8);
+
+    if (countEl) countEl.textContent = String(upcoming.length);
+
+    if (upcoming.length === 0) {
+      listEl.innerHTML = `<div class="lir-empty">No upcoming events.<br><span style="opacity:.7">Open the calendar to add one.</span></div>`;
+    } else {
+      listEl.innerHTML = upcoming.map(e => {
+        const d = new Date(e.event_date);
+        const dateLabel = d.toLocaleDateString("en-GB", { weekday: "short", day: "numeric", month: "short" });
+        const timeLabel = d.toLocaleTimeString("en-GB", { hour: "2-digit", minute: "2-digit" });
+        const titleEsc = (e.title || "Untitled").replace(/</g, "&lt;").replace(/"/g, "&quot;");
+        const typeColor = (typeof _eventTypeColors === "function") ? _eventTypeColors(e.type) : null;
+        const accent = typeColor ? typeColor.border : "var(--accent)";
+        const icon = typeColor ? typeColor.icon : "●";
+        const onClick = (typeof _showEventDetails === "function")
+          ? `_showEventDetails(${JSON.stringify(e).replace(/"/g, "&quot;")})`
+          : "";
+        return `<div class="lir-event" style="border-left-color:${accent}" onclick='${onClick}'>
+          <div class="lir-event-title">${icon} ${titleEsc}</div>
+          <div class="lir-event-time">${dateLabel} · ${timeLabel}</div>
+        </div>`;
+      }).join("");
+    }
+  }
+
+  // Fetch fresh events if we haven't yet for this lobby (non-blocking)
+  if (typeof _calendarFetchEvents === "function"
+      && window._calendarState
+      && window._calendarState.lobbyId !== selectedServer.id) {
+    window._calendarState.lobbyId = selectedServer.id;
+    window._calendarState.lobbyName = selectedServer.name;
+    window._calendarState.events = [];
+    _calendarFetchEvents().then(() => updateLobbyInfoRail()).catch(() => {});
+  }
+}
+window.updateLobbyInfoRail = updateLobbyInfoRail;
+
+// Wire up rail action buttons
+(function wireLobbyInfoRailActions() {
+  const cal = document.getElementById("lirCalendarBtn");
+  const inv = document.getElementById("lirInviteBtn");
+  if (cal) cal.addEventListener("click", (e) => {
+    e.stopPropagation();
+    if (typeof selectedServer !== "undefined" && selectedServer && typeof openLobbyCalendar === "function") {
+      openLobbyCalendar(selectedServer.id, selectedServer.name);
+    }
+  });
+  if (inv) inv.addEventListener("click", (e) => {
+    e.stopPropagation();
+    if (typeof selectedServer !== "undefined" && selectedServer && typeof inviteFriendToServer === "function") {
+      inviteFriendToServer(selectedServer.id);
+    }
+  });
+})();
 
 document.getElementById("feedToggleBtn").addEventListener("click", e => { e.stopPropagation(); toggleFeed(); });
 document.getElementById("feedReopenBtn").addEventListener("click",  e => { e.stopPropagation(); toggleFeed(); });
@@ -12382,11 +12799,18 @@ window.loadLobbyEvents = async function(lobbyId) {
   const badge  = document.getElementById('eventsCountBadge');
   if (!listEl) return;
 
+  // Show loading state
+  listEl.innerHTML = `<div style="padding:12px;text-align:center;color:var(--text-3);font-size:11px">Loading events…</div>`;
+
   try {
     const token = localStorage.getItem('vh_token') || sessionStorage.getItem('vh_token');
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), 8000);
     const res = await fetch(`https://lobby-auth-server.onrender.com/api/events/lobby/${lobbyId}`, {
-      headers: { Authorization: `Bearer ${token}` }
+      headers: { Authorization: `Bearer ${token}` },
+      signal: controller.signal
     });
+    clearTimeout(timeout);
     if (!res.ok) throw new Error('Failed');
     const data = await res.json();
 
@@ -12436,7 +12860,11 @@ window.loadLobbyEvents = async function(lobbyId) {
 
   } catch(e) {
     console.error('[loadLobbyEvents]', e);
-    listEl.innerHTML = `<div style="padding:12px;text-align:center;color:var(--text-3);font-size:11px">Unable to load events</div>`;
+    const isTimeout = e.name === 'AbortError';
+    listEl.innerHTML = `<div style="padding:12px;text-align:center;color:var(--text-3);font-size:11px;line-height:1.5">
+      ${isTimeout ? 'Taking too long to load.' : 'No upcoming events'}<br>
+      <span style="font-size:10px;opacity:.7">Click 'Open Full Calendar' to create one</span>
+    </div>`;
   }
 };
 
@@ -12450,28 +12878,53 @@ function _eventTypeColors(type) {
   return map[type] || map.public;
 }
 
-// ── Open in-app calendar panel ──────────────────────────────────
+// ── Open in-app calendar panel (embedded, scoped to the active lobby) ──
 window.openLobbyCalendar = async function(lobbyId, lobbyName) {
-  window._calendarState.lobbyId = lobbyId;
+  // Guard: only show calendar for the lobby it belongs to
+  window._calendarState.lobbyId   = lobbyId;
   window._calendarState.lobbyName = lobbyName || 'Lobby';
   window._calendarState.currentDate = new Date();
+  // Clear stale events from any previously-opened lobby so the grid renders cleanly
+  window._calendarState.events = [];
 
-  // Hide other panels, show calendar
-  const panels = ['homePanel', 'chatPanel', 'profilePage', 'vcPanel'];
-  panels.forEach(id => { const el = document.getElementById(id); if (el) el.classList.add('hidden'); });
+  // Hide all other content panels
+  ['homePanel','chatPanel','profilePage','vcPanel'].forEach(id => {
+    const el = document.getElementById(id);
+    if (el) el.classList.add('hidden');
+  });
+
+  // Show calendar panel
   const cal = document.getElementById('calendarPanel');
-  if (cal) cal.classList.remove('hidden');
+  if (cal) { cal.classList.remove('hidden'); cal.style.display = 'flex'; }
 
-  // Update title
+  // Update header
   const titleEl = document.getElementById('calendarLobbyTitle');
-  if (titleEl) titleEl.textContent = `${lobbyName} · Calendar`;
+  if (titleEl) titleEl.textContent = `${lobbyName || 'Lobby'} · Calendar`;
 
-  // Set current panel context
   if (typeof currentPanel !== 'undefined') currentPanel = 'calendar';
+  if (typeof clearAllNavIcons === 'function') clearAllNavIcons();
 
-  // Load events and render
+  // Wait 2 animation frames so the flex layout resolves before we measure/render.
+  // Without this, on the very first open the grid flex container can still report
+  // zero height (panel just became visible), and the cells collapse into nothing.
+  await new Promise(r => requestAnimationFrame(() => requestAnimationFrame(r)));
+
+  // Render immediately so days appear before the network fetch returns
+  _calendarRender();
+
+  // Fetch events, then re-render so event chips show up on the days
   await _calendarFetchEvents();
   _calendarRender();
+};
+
+// ── Close calendar, return to chat ──
+window.closeLobbyCalendar = function() {
+  const cal = document.getElementById('calendarPanel');
+  if (cal) { cal.classList.add('hidden'); cal.style.display = ''; }
+  // Restore chat panel for the currently selected server
+  const chat = document.getElementById('chatPanel');
+  if (chat) chat.classList.remove('hidden');
+  if (typeof currentPanel !== 'undefined') currentPanel = 'chat';
 };
 
 async function _calendarFetchEvents() {
@@ -12524,10 +12977,6 @@ function _calendarRender() {
   for (let day = 1; day <= remaining; day++) {
     grid.appendChild(_calendarMakeDay(day, year, month + 1, true, today, me_id));
   }
-  // Adjust grid rows
-  const totalCells = grid.children.length;
-  grid.style.gridTemplateRows = `repeat(${Math.ceil(totalCells/7)},minmax(0,1fr))`;
-
   _calendarRenderUpcoming();
 }
 
@@ -12541,7 +12990,7 @@ function _calendarMakeDay(day, year, month, isOtherMonth, today, me_id) {
   }).sort((a,b) => new Date(a.event_date) - new Date(b.event_date));
 
   const el = document.createElement('div');
-  el.style.cssText = `background:${isToday ? 'rgba(88,101,242,.08)' : 'var(--bg-1)'};border:1px solid ${isToday ? 'rgba(88,101,242,.3)' : 'rgba(255,255,255,.04)'};border-radius:8px;padding:6px;display:flex;flex-direction:column;gap:3px;overflow:hidden;cursor:pointer;transition:background .15s;min-height:0;${isOtherMonth ? 'opacity:.4' : ''}`;
+  el.style.cssText = `background:${isToday ? 'rgba(88,101,242,.08)' : 'var(--bg-1)'};border:1px solid ${isToday ? 'rgba(88,101,242,.35)' : 'rgba(255,255,255,.05)'};border-radius:8px;padding:6px 5px 5px 5px;display:flex;flex-direction:column;gap:3px;overflow:hidden;cursor:pointer;transition:background .15s;min-height:90px;${isOtherMonth ? 'opacity:.35' : ''}`;
   el.onmouseover = () => { if (!isToday) el.style.background = 'var(--bg-2)'; };
   el.onmouseout = () => { if (!isToday) el.style.background = 'var(--bg-1)'; };
 
@@ -12552,10 +13001,28 @@ function _calendarMakeDay(day, year, month, isOtherMonth, today, me_id) {
     };
   }
 
+  // Date header: day-of-week label + date number
+  const dayNames = ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
+  const dayName = dayNames[dayDate.getDay()];
+
+  const numWrap = document.createElement('div');
+  numWrap.style.cssText = `display:flex;align-items:center;gap:5px;flex-shrink:0;margin-bottom:3px`;
+
+  const dayLabel = document.createElement('span');
+  dayLabel.style.cssText = `font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;color:${isOtherMonth ? 'var(--text-3)' : isToday ? 'var(--accent)' : 'var(--text-3)'};opacity:${isOtherMonth ? '.5' : '1'}`;
+  dayLabel.textContent = dayName;
+
   const num = document.createElement('div');
-  num.style.cssText = `font-size:11px;font-weight:700;color:${isToday ? 'var(--accent)' : 'var(--text-2)'};flex-shrink:0`;
+  if (isToday) {
+    num.style.cssText = `font-size:12px;font-weight:800;color:#fff;background:var(--accent);width:22px;height:22px;border-radius:50%;display:flex;align-items:center;justify-content:center;flex-shrink:0`;
+  } else {
+    num.style.cssText = `font-size:12px;font-weight:700;color:${isOtherMonth ? 'var(--text-3)' : 'var(--text-1)'};flex-shrink:0`;
+  }
   num.textContent = day;
-  el.appendChild(num);
+
+  numWrap.appendChild(dayLabel);
+  numWrap.appendChild(num);
+  el.appendChild(numWrap);
 
   // Show up to 3 events, then "+N more"
   const maxVisible = 3;
@@ -12674,13 +13141,22 @@ window.submitNewEvent = async function(e) {
   const token = localStorage.getItem('vh_token') || sessionStorage.getItem('vh_token');
   const isPrivate = document.getElementById('eventPrivateCheck').checked;
   const type = document.getElementById('eventTypeValue').value;
+  const title = document.getElementById('eventTitleInput').value.trim();
+
+  if (!title) { alert('Please enter an event title.'); return; }
+
+  const dateVal = document.getElementById('eventDateInput').value;
+  if (!dateVal) { alert('Please set a date and time for the event.'); return; }
+
+  const submitBtn = e.target ? e.target.querySelector('button[type="submit"]') : null;
+  if (submitBtn) { submitBtn.disabled = true; submitBtn.textContent = 'Creating…'; }
 
   const body = {
     lobbyId: window._calendarState.lobbyId,
     eventType: isPrivate ? 'private' : type,
-    title: document.getElementById('eventTitleInput').value.trim(),
+    title,
     description: document.getElementById('eventDescInput').value.trim(),
-    eventDate: new Date(document.getElementById('eventDateInput').value).toISOString(),
+    eventDate: new Date(dateVal).toISOString(),
     location: document.getElementById('eventLocationInput').value.trim(),
     isPrivate
   };
@@ -12691,13 +13167,19 @@ window.submitNewEvent = async function(e) {
       headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' },
       body: JSON.stringify(body)
     });
-    if (!res.ok) throw new Error('Failed to create event');
+    if (!res.ok) {
+      let errMsg = `Server error (${res.status})`;
+      try { const errData = await res.json(); errMsg = errData.message || errData.error || errMsg; } catch(_) {}
+      throw new Error(errMsg);
+    }
     closeCreateEventModal();
     await _calendarFetchEvents();
     _calendarRender();
     await loadLobbyEvents(window._calendarState.lobbyId);
   } catch(err) {
     alert('Failed to create event: ' + err.message);
+  } finally {
+    if (submitBtn) { submitBtn.disabled = false; submitBtn.textContent = 'Create Event'; }
   }
 };
 
@@ -15259,13 +15741,19 @@ setTimeout(() => { updateMyStatusUI(); }, 100);
       });
     }
 
-    const mbHandle = document.getElementById('membersResizeHandle');
-    if (mbHandle && membersSidebar) {
-      setupDrag(mbHandle, 'y', function(e) {
-        const newH = Math.min(300, Math.max(60, window.innerHeight - e.clientY));
-        updateMembersHeight(newH);
-      });
+    function wireMembersHandle() {
+      const mbHandle = document.getElementById('membersResizeHandle');
+      if (mbHandle && membersSidebar && !mbHandle.dataset.wired) {
+        mbHandle.dataset.wired = '1';
+        setupDrag(mbHandle, 'y', function(e) {
+          const newH = Math.min(500, Math.max(60, window.innerHeight - e.clientY));
+          updateMembersHeight(newH);
+        });
+      }
     }
+    wireMembersHandle();
+    // Expose so renderMembers() can re-wire a freshly inserted handle if innerHTML cleared it
+    window._rewireMembersResize = wireMembersHandle;
   }
 
   if (document.readyState === 'loading') {
