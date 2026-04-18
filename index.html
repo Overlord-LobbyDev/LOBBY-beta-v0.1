@@ -7198,6 +7198,7 @@ async function startDirectCall(userId, username) {
   openOutgoingCallModal(username, null); showFloatingCallBar(username, null, "Calling…");
   LobbySound.loop("callOutgoing");
   const targetPeerId = `u${userId}`;
+  console.log("[call] sending call-invite to", targetPeerId, "ws.readyState=", ws?.readyState, "me.id=", me?.id);
   wsSend({ type:"call-invite", to:targetPeerId, fromUsername:me.username });
   let waited=0;
   const cancelPoll = setInterval(() => {
@@ -8807,9 +8808,11 @@ function setupCallSignalling() {
   if (_callSignallingReady) return;
   if (!ws||ws.readyState!==WebSocket.OPEN) { setTimeout(setupCallSignalling,500); return; }
   _callSignallingReady = true;
+  console.log("[call] signalling ready; listening on ws, me.id=", me?.id);
   ws.addEventListener("message", async ({ data }) => {
     let msg; try { msg = JSON.parse(data); } catch { return; }
     if (msg.type==="call-invite") {
+      console.log("[call] received call-invite from", msg.from, "(", msg.fromUsername, "); my peerId is u" + me?.id);
       if (me&&msg.from===`u${me.id}`) return;
       await handleIncomingCall(msg);
       return;
