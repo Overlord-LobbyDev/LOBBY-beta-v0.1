@@ -1059,6 +1059,74 @@ app.post("/banner", requireAuth, (req, res) => {
   });
 });
 
+// ── App wallpaper upload ─────────────────────────────────────────
+const wallpaperUpload = multer({
+  storage: multer.memoryStorage(),
+  limits: { fileSize: 50 * 1024 * 1024 },
+  fileFilter: (req, file, cb) => cb(null, /image\//.test(file.mimetype))
+});
+
+app.post("/wallpaper", requireAuth, (req, res) => {
+  wallpaperUpload.single("wallpaper")(req, res, async (err) => {
+    if (err) return res.status(400).json({ error: err.message });
+    if (!req.file) return res.status(400).json({ error: "No file uploaded" });
+    try {
+      const wallpaperUrl = await uploadToCloudinary(req.file.buffer, "wallpapers", `wp_${req.userId}`);
+      // Uploading a new custom image implicitly clears preset/use_cover
+      await pool.query(
+        `UPDATE users SET wallpaper_url = $1, wallpaper_preset = NULL, wallpaper_use_cover = FALSE WHERE id = $2`,
+        [wallpaperUrl, req.userId]
+      );
+      res.json({ wallpaperUrl });
+    } catch (e) {
+      console.error("[POST /wallpaper]", e.message);
+      res.status(500).json({ error: "Wallpaper upload failed: " + e.message });
+    }
+  });
+});
+
+// Update wallpaper settings (preset, toggles, sliders, or clear)
+app.patch("/wallpaper", requireAuth, async (req, res) => {
+  try {
+    const {
+      wallpaperUrl,
+      wallpaperPreset,
+      wallpaperUseCover,
+      wallpaperBlur,
+      wallpaperDim
+    } = req.body || {};
+
+    // Clamp slider values
+    const blur = Number.isFinite(+wallpaperBlur) ? Math.max(0, Math.min(80, +wallpaperBlur)) : null;
+    const dim  = Number.isFinite(+wallpaperDim)  ? Math.max(0, Math.min(100, +wallpaperDim)) : null;
+
+    // We use COALESCE-style behaviour: pass explicit `null` to clear a field,
+    // pass `undefined` / missing to leave it alone. Because the frontend
+    // always sends all five, this simplifies to an unconditional write.
+    await pool.query(
+      `UPDATE users SET
+         wallpaper_url       = $1,
+         wallpaper_preset    = $2,
+         wallpaper_use_cover = $3,
+         wallpaper_blur      = COALESCE($4, wallpaper_blur),
+         wallpaper_dim       = COALESCE($5, wallpaper_dim)
+       WHERE id = $6`,
+      [
+        wallpaperUrl ?? null,
+        wallpaperPreset ?? null,
+        !!wallpaperUseCover,
+        blur,
+        dim,
+        req.userId
+      ]
+    );
+    res.json({ success: true });
+  } catch (err) {
+    console.error("[PATCH /wallpaper]", err.message);
+    res.status(500).json({ error: "Wallpaper save failed: " + err.message });
+  }
+});
+
 // ── Tournament card image upload ─────────────────────────────
 const tournamentCardUpload = multer({
   storage: multer.memoryStorage(),
@@ -1131,7 +1199,9 @@ app.get("/profile/:id", requireAuth, async (req, res) => {
     const r = await pool.query(
       `SELECT id, username, avatar_url, bio, status, banner_url, banner_colour,
               display_name, status_emoji, status_text, location, website,
-              created_at AS joined_at, steam_id, steam_name, steam_avatar
+              created_at AS joined_at, steam_id, steam_name, steam_avatar,
+              wallpaper_url, wallpaper_preset, wallpaper_use_cover,
+              wallpaper_blur, wallpaper_dim
        FROM users WHERE id = $1`,
       [id]
     );
@@ -1727,12 +1797,18 @@ app.post("/upload", requireAuth, (req, res) => {
 });
 
 app.post("/attachments", requireAuth, async (req, res) => {
-  const { messageId, dmId, groupMsgId, url, filename, mimeType, sizeBytes } = req.body;
-  const r = await pool.query(
-    "INSERT INTO attachments (message_id, dm_id, group_msg_id, url, filename, mime_type, size_bytes) VALUES ($1,$2,$3,$4,$5,$6,$7) RETURNING *",
-    [messageId || null, dmId || null, groupMsgId || null, url, filename, mimeType, sizeBytes]
-  );
-  res.json(r.rows[0]);
+  try {
+    const { messageId, dmId, groupMsgId, url, filename, mimeType, sizeBytes } = req.body;
+    if (!url) return res.status(400).json({ error: "Missing url" });
+    const r = await pool.query(
+      "INSERT INTO attachments (message_id, dm_id, group_msg_id, url, filename, mime_type, size_bytes) VALUES ($1,$2,$3,$4,$5,$6,$7) RETURNING *",
+      [messageId || null, dmId || null, groupMsgId || null, url, filename || null, mimeType || null, sizeBytes || null]
+    );
+    res.json(r.rows[0]);
+  } catch (err) {
+    console.error("[attachments insert] failed:", err.message, err.code);
+    res.status(500).json({ error: err.message || "attachments insert failed" });
+  }
 });
 
 // ── Admin routes ─────────────────────────────────────────────

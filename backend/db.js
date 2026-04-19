@@ -164,6 +164,19 @@ async function initDb() {
         created_at   TIMESTAMPTZ DEFAULT NOW()
       );
     `);
+    // Migration: older databases were created before the attachment columns existed.
+    // CREATE TABLE IF NOT EXISTS does NOT alter an existing table, so we add any
+    // missing columns here. Using ADD COLUMN IF NOT EXISTS is idempotent.
+    await pool.query(`
+      ALTER TABLE attachments ADD COLUMN IF NOT EXISTS message_id   INTEGER DEFAULT NULL;
+      ALTER TABLE attachments ADD COLUMN IF NOT EXISTS dm_id        INTEGER DEFAULT NULL;
+      ALTER TABLE attachments ADD COLUMN IF NOT EXISTS group_msg_id INTEGER DEFAULT NULL;
+      ALTER TABLE attachments ADD COLUMN IF NOT EXISTS url          TEXT;
+      ALTER TABLE attachments ADD COLUMN IF NOT EXISTS filename     TEXT;
+      ALTER TABLE attachments ADD COLUMN IF NOT EXISTS mime_type    TEXT;
+      ALTER TABLE attachments ADD COLUMN IF NOT EXISTS size_bytes   INTEGER;
+      ALTER TABLE attachments ADD COLUMN IF NOT EXISTS created_at   TIMESTAMPTZ DEFAULT NOW();
+    `);
 
     // Group chats (like Discord group DMs)
     await pool.query(`
@@ -282,6 +295,12 @@ async function initDb() {
       "ALTER TABLE users ADD COLUMN IF NOT EXISTS status         TEXT DEFAULT 'online'",
       "ALTER TABLE users ADD COLUMN IF NOT EXISTS banner_url     TEXT DEFAULT NULL",
       "ALTER TABLE users ADD COLUMN IF NOT EXISTS banner_colour  TEXT DEFAULT '#5865f2'",
+      // App wallpaper settings (global blurred background behind every panel)
+      "ALTER TABLE users ADD COLUMN IF NOT EXISTS wallpaper_url      TEXT DEFAULT NULL",
+      "ALTER TABLE users ADD COLUMN IF NOT EXISTS wallpaper_preset   TEXT DEFAULT NULL",
+      "ALTER TABLE users ADD COLUMN IF NOT EXISTS wallpaper_use_cover BOOLEAN DEFAULT FALSE",
+      "ALTER TABLE users ADD COLUMN IF NOT EXISTS wallpaper_blur     INTEGER DEFAULT 40",
+      "ALTER TABLE users ADD COLUMN IF NOT EXISTS wallpaper_dim      INTEGER DEFAULT 60",
       "ALTER TABLE users ADD COLUMN IF NOT EXISTS post_visibility TEXT DEFAULT 'public'",
       // Profile fields used by the frontend
       "ALTER TABLE users ADD COLUMN IF NOT EXISTS display_name   TEXT DEFAULT NULL",
