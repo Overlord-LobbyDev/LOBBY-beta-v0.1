@@ -1800,8 +1800,12 @@ app.post("/attachments", requireAuth, async (req, res) => {
   try {
     const { messageId, dmId, groupMsgId, url, filename, mimeType, sizeBytes } = req.body;
     if (!url) return res.status(400).json({ error: "Missing url" });
+    // Write to both `url` and legacy `file_url` so the INSERT works on both
+    // the current schema and on older databases that still have a NOT NULL
+    // file_url column. The DB migration in db.js drops that NOT NULL, but
+    // populating both keeps us safe during rollout.
     const r = await pool.query(
-      "INSERT INTO attachments (message_id, dm_id, group_msg_id, url, filename, mime_type, size_bytes) VALUES ($1,$2,$3,$4,$5,$6,$7) RETURNING *",
+      "INSERT INTO attachments (message_id, dm_id, group_msg_id, url, file_url, filename, mime_type, size_bytes) VALUES ($1,$2,$3,$4,$4,$5,$6,$7) RETURNING *",
       [messageId || null, dmId || null, groupMsgId || null, url, filename || null, mimeType || null, sizeBytes || null]
     );
     res.json(r.rows[0]);

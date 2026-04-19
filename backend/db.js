@@ -178,6 +178,27 @@ async function initDb() {
       ALTER TABLE attachments ADD COLUMN IF NOT EXISTS created_at   TIMESTAMPTZ DEFAULT NOW();
     `);
 
+    // Legacy-column migration:
+    // The previous schema used "file_url" (NOT NULL) instead of "url".
+    // On databases created with that older schema the INSERT into "url"
+    // fails with: null value in column "file_url" violates not-null constraint.
+    // We:
+    //   1. Add file_url if it's somehow missing (no-op on fresh DBs).
+    //   2. Drop the NOT NULL constraint so new INSERTs that only set "url" succeed.
+    //   3. Backfill file_url from url (and vice-versa) so either column works
+    //      for code that reads the legacy name.
+    // All statements are idempotent and safe to run on every boot.
+    try {
+      await pool.query(`
+        ALTER TABLE attachments ADD COLUMN IF NOT EXISTS file_url TEXT;
+        ALTER TABLE attachments ALTER COLUMN file_url DROP NOT NULL;
+        UPDATE attachments SET file_url = url      WHERE file_url IS NULL AND url      IS NOT NULL;
+        UPDATE attachments SET url      = file_url WHERE url      IS NULL AND file_url IS NOT NULL;
+      `);
+    } catch (e) {
+      console.warn("[db] legacy file_url migration warning:", e.message);
+    }
+
     // Group chats (like Discord group DMs)
     await pool.query(`
       CREATE TABLE IF NOT EXISTS group_chats (
