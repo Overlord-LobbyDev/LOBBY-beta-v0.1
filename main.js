@@ -6,6 +6,35 @@ const { app, BrowserWindow, ipcMain, desktopCapturer, session, shell, screen, Me
 const path = require("path");
 const fs   = require("fs");   // moved here — was required at line 227 but used at line 79 (crash)
 
+// ── Icon resolution ──────────────────────────────────────────
+// macOS wants .icns (Info.plist) or .png (dock.setIcon), Windows wants .ico,
+// Linux wants .png. The BrowserWindow `icon` option silently no-ops when the
+// format doesn't match the platform — which is why Mac was showing the
+// generic Electron icon even though icon.icns exists. Pick the right file
+// per platform.
+const ICON_PATH = (() => {
+  if (process.platform === "darwin") return path.join(__dirname, "icon.icns");
+  if (process.platform === "win32")  return path.join(__dirname, "icon.ico");
+  return path.join(__dirname, "icon.png");
+})();
+const ICON_PNG_PATH = path.join(__dirname, "icon.png");
+
+// On macOS, BrowserWindow.icon doesn't control the dock icon — that comes
+// from the bundled .app's Info.plist when packaged, and from
+// `app.dock.setIcon()` in dev. Set it as early as possible so the dock
+// icon is correct when you run `electron .`.
+if (process.platform === "darwin" && app.dock && fs.existsSync(ICON_PNG_PATH)) {
+  app.whenReady().then(() => {
+    try {
+      const { nativeImage } = require("electron");
+      const img = nativeImage.createFromPath(ICON_PNG_PATH);
+      if (img && !img.isEmpty()) app.dock.setIcon(img);
+    } catch (e) {
+      console.warn("[dock icon]", e.message);
+    }
+  });
+}
+
 // On macOS, keep a minimal menu so that system-level keyboard shortcuts
 // (Cmd+C, Cmd+V, Cmd+X, Cmd+A, Cmd+Z, Cmd+Shift+Z) continue to work.
 // On Windows/Linux we remove the menu bar entirely (it's frameless).
@@ -60,7 +89,7 @@ function createWindow() {
     height: 800,
     minWidth: 800,
     minHeight: 600,
-    icon: path.join(__dirname, "icon.ico"),
+    icon: ICON_PATH,
     autoHideMenuBar: true,
     frame: false,
     resizable: true,
@@ -181,7 +210,13 @@ ipcMain.handle("set-app-icon", async (event, pngBuffer) => {
   try {
     const { nativeImage } = require("electron");
     const img = nativeImage.createFromBuffer(Buffer.from(pngBuffer));
-    BrowserWindow.getAllWindows().forEach(w => { if (!w.isDestroyed()) w.setIcon(img); });
+    // BrowserWindow.setIcon controls the taskbar icon on Windows/Linux.
+    // On macOS it's a no-op — the dock icon is controlled by app.dock.setIcon.
+    if (process.platform === "darwin") {
+      if (app.dock) app.dock.setIcon(img);
+    } else {
+      BrowserWindow.getAllWindows().forEach(w => { if (!w.isDestroyed()) w.setIcon(img); });
+    }
     return { success: true };
   } catch(e) {
     console.error("[set-app-icon]", e.message);

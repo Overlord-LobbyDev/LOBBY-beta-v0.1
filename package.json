@@ -16,7 +16,7 @@
   "build": {
     "appId": "com.lobby.app",
     "productName": "LOBBY",
-    "icon": "icon.ico",
+    "icon": "icon.png",
     "files": [
       "**/*",
       "!**/*.map"
