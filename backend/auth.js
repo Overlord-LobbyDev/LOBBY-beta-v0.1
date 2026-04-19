@@ -126,6 +126,12 @@ async function requireAdmin(req, res, next) {
   next();
 }
 
+async function requireOverlord(req, res, next) {
+  const result = await pool.query("SELECT is_overlord FROM users WHERE id = $1", [req.userId]);
+  if (!result.rows[0]?.is_overlord) return res.status(403).json({ error: "Overlord access required" });
+  next();
+}
+
 function isCurrentlyBanned(user) {
   if (!user.is_banned) return false;
   if (!user.banned_until) return true;
@@ -138,6 +144,12 @@ app.post("/register", async (req, res) => {
   const { username, password, email } = req.body;
   if (!username || !password) return res.status(400).json({ error: "Username and password required" });
   if (username.length < 2 || username.length > 32) return res.status(400).json({ error: "Username must be 2-32 characters" });
+  // Hard-blocked words for usernames (severe terms never allowed)
+  const HARD_BLOCKED = ['nigger','nigga','fuck','shit','cunt','faggot','retard','chink','spic','kike'];
+  const lowerUsername = username.trim().toLowerCase();
+  if (HARD_BLOCKED.some(w => lowerUsername.includes(w))) {
+    return res.status(400).json({ error: "Username contains prohibited words" });
+  }
   if (password.length < 6) return res.status(400).json({ error: "Password must be at least 6 characters" });
   if (email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) return res.status(400).json({ error: "Invalid email address" });
   try {
@@ -166,7 +178,7 @@ app.post("/login", async (req, res) => {
 
     if (isEmail) {
       const r = await pool.query(
-        "SELECT id, username, password_hash, avatar_url, is_admin, is_banned, banned_until, ban_reason, email FROM users WHERE LOWER(email) = $1",
+        "SELECT id, username, password_hash, avatar_url, is_admin, is_overlord, is_banned, banned_until, ban_reason, email FROM users WHERE LOWER(email) = $1",
         [input.toLowerCase()]
       );
       user = r.rows[0] || null;
@@ -177,7 +189,7 @@ app.post("/login", async (req, res) => {
       const tagPart   = input.slice(hashIdx);
       if (!unamePart) return res.status(400).json({ error: "Invalid format — use Username#Tag or your email" });
       const r = await pool.query(
-        "SELECT id, username, password_hash, avatar_url, is_admin, is_banned, banned_until, ban_reason, email FROM users WHERE username = $1",
+        "SELECT id, username, password_hash, avatar_url, is_admin, is_overlord, is_banned, banned_until, ban_reason, email FROM users WHERE username = $1",
         [unamePart]
       );
       const candidate = r.rows[0];
@@ -188,7 +200,7 @@ app.post("/login", async (req, res) => {
     } else {
       // Plain username — backwards compat
       const r = await pool.query(
-        "SELECT id, username, password_hash, avatar_url, is_admin, is_banned, banned_until, ban_reason, email FROM users WHERE username = $1",
+        "SELECT id, username, password_hash, avatar_url, is_admin, is_overlord, is_banned, banned_until, ban_reason, email FROM users WHERE username = $1",
         [input]
       );
       user = r.rows[0] || null;
@@ -203,13 +215,13 @@ app.post("/login", async (req, res) => {
       return res.status(403).json({ error: `Account banned ${until}.${reason}` });
     }
     const token = jwt.sign({ id: user.id, username: user.username }, SECRET, { expiresIn: "30d" });
-    res.json({ token, user: { id: user.id, username: user.username, avatarUrl: user.avatar_url, isAdmin: user.is_admin }, needs_email: !user.email });
+    res.json({ token, user: { id: user.id, username: user.username, avatarUrl: user.avatar_url, isAdmin: user.is_admin, isOverlord: user.is_overlord }, needs_email: !user.email });
   } catch (err) { console.error("[login error]", err); res.status(500).json({ error: "Server error" }); }
 });
 
 app.get("/me", requireAuth, async (req, res) => {
   const r = await pool.query(
-    `SELECT id, username, avatar_url, is_admin, is_banned, banned_until,
+    `SELECT id, username, avatar_url, is_admin, is_overlord, is_banned, banned_until,
             tournament_card_image_url, tournament_card_bg_colour,
             tournament_card_border_colour, tournament_card_name_colour, tournament_card_bg_pos,
             riot_puuid, riot_gamename, riot_tagline,
@@ -234,6 +246,7 @@ app.get("/me", requireAuth, async (req, res) => {
     avatarUrl: user.avatar_url,
     isAdmin: user.is_admin,
     is_admin: user.is_admin,
+    isOverlord: user.is_overlord,
     needs_email: !email,
     tournamentCard: {
       imageUrl:      user.tournament_card_image_url     || null,
@@ -1894,6 +1907,107 @@ app.patch("/admin/users/:id/admin", requireAuth, requireAdmin, async (req, res) 
   if (parseInt(req.params.id) === req.userId) return res.status(400).json({ error: "Cannot change own admin status" });
   await pool.query("UPDATE users SET is_admin=$1 WHERE id=$2", [!!req.body.isAdmin, parseInt(req.params.id)]);
   res.json({ success: true });
+});
+
+// GET /admin/profanity-words — list all words
+app.get("/admin/profanity-words", requireAuth, requireOverlord, async (req, res) => {
+  try {
+    const r = await pool.query("SELECT id, word, created_at FROM profanity_words ORDER BY word ASC");
+    res.json(r.rows);
+  } catch(e) { res.status(500).json({ error: "Server error" }); }
+});
+
+// POST /admin/profanity-words — add a word
+app.post("/admin/profanity-words", requireAuth, requireOverlord, async (req, res) => {
+  const { word } = req.body;
+  if (!word || !word.trim()) return res.status(400).json({ error: "Word required" });
+  try {
+    const r = await pool.query(
+      "INSERT INTO profanity_words (word, added_by) VALUES ($1, $2) ON CONFLICT (word) DO NOTHING RETURNING *",
+      [word.trim().toLowerCase(), req.userId]
+    );
+    res.json(r.rows[0] || { message: "Word already exists" });
+  } catch(e) { res.status(500).json({ error: "Server error" }); }
+});
+
+// DELETE /admin/profanity-words/:word — remove a word
+app.delete("/admin/profanity-words/:word", requireAuth, requireOverlord, async (req, res) => {
+  try {
+    await pool.query("DELETE FROM profanity_words WHERE word = $1", [req.params.word.toLowerCase()]);
+    res.json({ success: true });
+  } catch(e) { res.status(500).json({ error: "Server error" }); }
+});
+
+// GET /admin/servers?page=1 — list all servers (25 per page)
+app.get("/admin/servers", requireAuth, requireAdmin, async (req, res) => {
+  try {
+    const page = Math.max(1, parseInt(req.query.page) || 1);
+    const limit = 25;
+    const offset = (page - 1) * limit;
+    const r = await pool.query(
+      `SELECT s.id, s.name, s.icon_url, s.created_at, u.username as owner_name,
+              (SELECT COUNT(*) FROM server_members sm WHERE sm.server_id = s.id) as member_count
+       FROM servers s LEFT JOIN users u ON s.owner_id = u.id
+       ORDER BY s.created_at DESC LIMIT $1 OFFSET $2`,
+      [limit, offset]
+    );
+    const total = await pool.query("SELECT COUNT(*) FROM servers");
+    res.json({ servers: r.rows, total: parseInt(total.rows[0].count), page, limit });
+  } catch(e) { res.status(500).json({ error: "Server error" }); }
+});
+
+// POST /admin/announcements — create announcement (broadcasts to users via WS is handled client-side)
+app.post("/admin/announcements", requireAuth, requireAdmin, async (req, res) => {
+  const { title, body, link, serverId } = req.body;
+  if (!title?.trim() || !body?.trim()) return res.status(400).json({ error: "Title and body required" });
+  try {
+    const r = await pool.query(
+      "INSERT INTO announcements (title, body, link, server_id, sent_by) VALUES ($1, $2, $3, $4, $5) RETURNING *",
+      [title.trim(), body.trim(), link?.trim() || null, serverId || null, req.userId]
+    );
+    res.json(r.rows[0]);
+  } catch(e) { res.status(500).json({ error: "Server error" }); }
+});
+
+// GET /admin/announcements — get history (most recent 50)
+app.get("/admin/announcements", requireAuth, requireAdmin, async (req, res) => {
+  try {
+    const r = await pool.query(
+      `SELECT a.*, u.username as sent_by_name, s.name as server_name
+       FROM announcements a
+       LEFT JOIN users u ON a.sent_by = u.id
+       LEFT JOIN servers s ON a.server_id = s.id
+       ORDER BY a.created_at DESC LIMIT 50`
+    );
+    res.json(r.rows);
+  } catch(e) { res.status(500).json({ error: "Server error" }); }
+});
+
+// GET /announcements/recent — get recent announcements for notification panel (all users)
+app.get("/announcements/recent", requireAuth, async (req, res) => {
+  try {
+    const r = await pool.query(
+      `SELECT a.id, a.title, a.body, a.link, a.created_at, u.username as sent_by_name, s.name as server_name
+       FROM announcements a
+       LEFT JOIN users u ON a.sent_by = u.id
+       LEFT JOIN servers s ON a.server_id = s.id
+       WHERE a.server_id IS NULL OR a.server_id IN (
+         SELECT server_id FROM server_members WHERE user_id = $1
+       )
+       ORDER BY a.created_at DESC LIMIT 10`,
+      [req.userId]
+    );
+    res.json(r.rows);
+  } catch(e) { res.status(500).json({ error: "Server error" }); }
+});
+
+// PATCH /admin/users/:id/overlord — grant/revoke overlord (overlord only)
+app.patch("/admin/users/:id/overlord", requireAuth, requireOverlord, async (req, res) => {
+  const { grant } = req.body; // true or false
+  try {
+    await pool.query("UPDATE users SET is_overlord = $1 WHERE id = $2", [!!grant, req.params.id]);
+    res.json({ success: true });
+  } catch(e) { res.status(500).json({ error: "Server error" }); }
 });
 
 // ── Group Chats ──────────────────────────────────────────────

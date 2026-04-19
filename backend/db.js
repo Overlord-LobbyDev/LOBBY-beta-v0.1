@@ -374,6 +374,7 @@ async function initDb() {
       "ALTER TABLE users ADD COLUMN IF NOT EXISTS lichess_username  TEXT DEFAULT NULL",
       // Email — existing users prompted on next login
       "ALTER TABLE users ADD COLUMN IF NOT EXISTS email             TEXT DEFAULT NULL",
+      "ALTER TABLE users ADD COLUMN IF NOT EXISTS is_overlord BOOLEAN DEFAULT FALSE",
     ];
     for (const sql of alters) await pool.query(sql).catch(() => {});
 
@@ -534,6 +535,29 @@ async function initDb() {
     await pool.query(`CREATE INDEX IF NOT EXISTS idx_tournament_rounds_tournament_id ON tournament_rounds(tournament_id);`).catch(() => {});
     await pool.query(`CREATE INDEX IF NOT EXISTS idx_tournament_matches_round_id ON tournament_matches(round_id);`).catch(() => {});
     await pool.query(`CREATE INDEX IF NOT EXISTS idx_tournament_matches_tournament_id ON tournament_matches(tournament_id);`).catch(() => {});
+
+    // Profanity words list
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS profanity_words (
+        id         SERIAL PRIMARY KEY,
+        word       TEXT UNIQUE NOT NULL,
+        added_by   INTEGER REFERENCES users(id) ON DELETE SET NULL,
+        created_at TIMESTAMPTZ DEFAULT NOW()
+      );
+    `);
+
+    // Admin announcements
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS announcements (
+        id          SERIAL PRIMARY KEY,
+        title       TEXT NOT NULL,
+        body        TEXT NOT NULL,
+        link        TEXT DEFAULT NULL,
+        server_id   INTEGER REFERENCES servers(id) ON DELETE CASCADE DEFAULT NULL,
+        sent_by     INTEGER REFERENCES users(id) ON DELETE SET NULL,
+        created_at  TIMESTAMPTZ DEFAULT NOW()
+      );
+    `);
 
     console.log("✅ Database initialized successfully!");
     // process.exit(0) removed — let caller handle startup

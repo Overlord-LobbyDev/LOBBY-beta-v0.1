@@ -109,7 +109,18 @@
     .bracket-scroll {
       flex: 1; overflow: auto; padding: 32px 48px 32px 32px;
     }
-    .bracket-canvas { position: relative; display: inline-block; }
+    .bracket-canvas { position: relative; display: inline-block; transition: opacity 0.25s ease; }
+
+    @keyframes bellShake {
+      0%,100%{transform:rotate(0)}
+      15%{transform:rotate(15deg)}
+      30%{transform:rotate(-13deg)}
+      45%{transform:rotate(10deg)}
+      60%{transform:rotate(-8deg)}
+      75%{transform:rotate(5deg)}
+      90%{transform:rotate(-3deg)}
+    }
+    .bell-shake { animation: bellShake 0.6s ease-in-out infinite; }
 
     /* Match card */
     .bm {
@@ -418,8 +429,23 @@
         const p1w = !!(match.winner && match.winner === p1?.userId);
         const p2w = !!(match.winner && match.winner === p2?.userId);
 
-        html += `<div style="position:absolute;left:${x}px;top:${matchCY}px;width:${MATCH_W}px">${playerCardHTML(p1, p1w, p2w && !p1w, match.player1Score)}</div>`;
-        html += `<div style="position:absolute;left:${x}px;top:${matchCY + CARD_H + CARD_GAP}px;width:${MATCH_W}px">${playerCardHTML(p2, p2w, p1w && !p2w, match.player2Score)}</div>`;
+        let matchHtml = '';
+        matchHtml += `<div style="position:absolute;left:${x}px;top:${matchCY}px;width:${MATCH_W}px">${playerCardHTML(p1, p1w, p2w && !p1w, match.player1Score)}</div>`;
+        matchHtml += `<div style="position:absolute;left:${x}px;top:${matchCY + CARD_H + CARD_GAP}px;width:${MATCH_W}px">${playerCardHTML(p2, p2w, p1w && !p2w, match.player2Score)}</div>`;
+
+        // Add lock-in button if current user is in this match and status is in-progress
+        if (match.status === 'in-progress') {
+          const myPlayer = (p1?.userId === currentUserId) ? 'p1' : (p2?.userId === currentUserId) ? 'p2' : null;
+          const isLockedIn = Array.isArray(match.lockedPlayers) && match.lockedPlayers.includes(currentUserId);
+          const lockY = matchCY + MATCH_H + 6;
+          if (myPlayer && !isLockedIn) {
+            matchHtml += `<div style="position:absolute;left:${x}px;top:${lockY}px;width:${MATCH_W}px"><button class="btn btn-primary" style="margin-top:0;width:100%;font-size:12px" onclick="lockIn(${t.id}, ${match.id}, ${currentUserId})">🔒 Lock In</button></div>`;
+          } else if (myPlayer && isLockedIn) {
+            matchHtml += `<div style="position:absolute;left:${x}px;top:${lockY}px;width:${MATCH_W}px;text-align:center;color:#57f287;font-size:12px;font-weight:600">✓ Locked In</div>`;
+          }
+        }
+
+        html += matchHtml;
 
         // Watch Live / Watch link for chess-api mode
         if (match.gameUrl && t.resultMode === 'chess-api') {
@@ -461,7 +487,10 @@
       html += `<div style="position:absolute;left:${tx}px;top:${ty}px;font-size:32px;opacity:.35;pointer-events:none">🏆</div>`;
     }
 
+    canvas.style.opacity = '0';
+    canvas.style.transition = 'opacity 0.25s ease';
     canvas.innerHTML = html;
+    requestAnimationFrame(() => { canvas.style.opacity = '1'; });
 
     // Draw connectors
     requestAnimationFrame(() => {

@@ -178,6 +178,9 @@
     <button class="nav-item active" data-view="all"><span class="icon">👥</span> All Users</button>
     <button class="nav-item" data-view="banned"><span class="icon">🚫</span> Banned Users</button>
     <button class="nav-item" data-view="admin"><span class="icon">🛡️</span> Admins</button>
+    <button class="nav-item" data-view="servers"><span class="icon">🏠</span> Servers</button>
+    <button class="nav-item" data-view="announcements"><span class="icon">📢</span> Announcements</button>
+    <button class="nav-item" data-view="profanity"><span class="icon">🚫</span> Profanity Filter</button>
   </div>
   <div class="sidebar-bottom">
     <div class="admin-avatar" id="sidebarAvatar">A</div>
@@ -221,6 +224,77 @@
         <thead><tr><th>User</th><th>Status</th><th>Role</th><th>Joined</th><th>Actions</th></tr></thead>
         <tbody id="userTableBody"><tr><td colspan="5"><div class="empty"><div class="empty-icon">⏳</div><p>Loading…</p></div></td></tr></tbody>
       </table>
+    </div>
+
+    <!-- Servers View -->
+    <div id="view-servers" style="display:none">
+      <div class="toolbar" style="margin-bottom:16px">
+        <span style="color:var(--text-2);font-size:14px" id="serversTotalLabel">All Servers</span>
+        <div style="display:flex;gap:8px;margin-left:auto">
+          <button class="btn btn-grey" onclick="loadServers(1)">↻ Refresh</button>
+        </div>
+      </div>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>Server</th><th>Owner</th><th>Members</th><th>Created</th></tr></thead>
+          <tbody id="serverTableBody"><tr><td colspan="4"><div class="empty"><p>Loading…</p></div></td></tr></tbody>
+        </table>
+      </div>
+      <div style="display:flex;gap:8px;margin-top:12px;align-items:center" id="serversPagination"></div>
+    </div>
+
+    <!-- Announcements View -->
+    <div id="view-announcements" style="display:none">
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:20px">
+        <!-- Send form -->
+        <div style="background:var(--bg-1);border-radius:12px;padding:20px;border:1px solid rgba(255,255,255,.07)">
+          <h3 style="margin:0 0 16px;color:var(--text-1);font-size:15px">📢 Send Announcement</h3>
+          <div style="margin-bottom:12px">
+            <label style="font-size:12px;color:var(--text-2);display:block;margin-bottom:4px">Title *</label>
+            <input id="annTitle" type="text" placeholder="Announcement title…" style="width:100%;padding:8px 12px;background:var(--bg-2);border:1px solid rgba(255,255,255,.1);border-radius:8px;color:var(--text-1);font-size:13px;box-sizing:border-box" maxlength="100" />
+          </div>
+          <div style="margin-bottom:12px">
+            <label style="font-size:12px;color:var(--text-2);display:block;margin-bottom:4px">Message *</label>
+            <textarea id="annBody" placeholder="Write your announcement…" rows="4" style="width:100%;padding:8px 12px;background:var(--bg-2);border:1px solid rgba(255,255,255,.1);border-radius:8px;color:var(--text-1);font-size:13px;resize:vertical;box-sizing:border-box" maxlength="500"></textarea>
+          </div>
+          <div style="margin-bottom:12px">
+            <label style="font-size:12px;color:var(--text-2);display:block;margin-bottom:4px">Link (optional)</label>
+            <input id="annLink" type="url" placeholder="https://…" style="width:100%;padding:8px 12px;background:var(--bg-2);border:1px solid rgba(255,255,255,.1);border-radius:8px;color:var(--text-1);font-size:13px;box-sizing:border-box" />
+          </div>
+          <div style="margin-bottom:16px">
+            <label style="font-size:12px;color:var(--text-2);display:block;margin-bottom:4px">Target Server (leave blank for global)</label>
+            <select id="annServerId" style="width:100%;padding:8px 12px;background:var(--bg-2);border:1px solid rgba(255,255,255,.1);border-radius:8px;color:var(--text-1);font-size:13px">
+              <option value="">🌐 All Users (Global)</option>
+            </select>
+          </div>
+          <button class="btn btn-blue" onclick="sendAnnouncement()" style="width:100%">📢 Send Announcement</button>
+          <div id="annMsg" style="margin-top:8px;font-size:12px;min-height:16px"></div>
+        </div>
+
+        <!-- History -->
+        <div style="background:var(--bg-1);border-radius:12px;padding:20px;border:1px solid rgba(255,255,255,.07)">
+          <h3 style="margin:0 0 16px;color:var(--text-1);font-size:15px">📋 Announcement History</h3>
+          <div id="annHistory" style="display:flex;flex-direction:column;gap:10px;max-height:500px;overflow-y:auto">
+            <div style="color:var(--text-3);font-size:13px">Loading…</div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Profanity View -->
+    <div id="view-profanity" style="display:none">
+      <div style="background:var(--bg-1);border-radius:12px;padding:20px;border:1px solid rgba(255,255,255,.07);max-width:600px">
+        <h3 style="margin:0 0 4px;color:var(--text-1)">🚫 Profanity Word List</h3>
+        <p style="color:var(--text-3);font-size:12px;margin:0 0 16px">Overlord access required. These words are replaced with **** in all chat messages.</p>
+        <div style="display:flex;gap:8px;margin-bottom:16px">
+          <input id="pfNewWord" type="text" placeholder="Add a word…" style="flex:1;padding:8px 12px;background:var(--bg-2);border:1px solid rgba(255,255,255,.1);border-radius:8px;color:var(--text-1);font-size:13px" />
+          <button class="btn btn-blue" onclick="addProfanityWord()">Add</button>
+        </div>
+        <div id="pfMsg" style="font-size:12px;margin-bottom:12px;min-height:16px"></div>
+        <div id="pfWordList" style="display:flex;flex-wrap:wrap;gap:8px">
+          <span style="color:var(--text-3);font-size:13px">Loading…</span>
+        </div>
+      </div>
     </div>
   </div>
 </main>
@@ -374,16 +448,58 @@ function renderTable() {
 document.getElementById("searchInput").addEventListener("input", renderTable);
 document.getElementById("filterSelect").addEventListener("change", renderTable);
 
+// IDs of all view panels (user-table area + new panels)
+const USER_VIEW_IDS = ["view-servers", "view-announcements", "view-profanity"];
+const USER_TABLE_ELEMENTS = [
+  document.querySelector(".stats-row"),
+  document.querySelector(".toolbar"),
+  document.querySelector(".table-wrap"),
+];
+
+function showUserTableView() {
+  USER_TABLE_ELEMENTS.forEach(el => { if (el) el.style.display = ""; });
+  USER_VIEW_IDS.forEach(id => { document.getElementById(id).style.display = "none"; });
+}
+
+function showPanelView(panelId) {
+  USER_TABLE_ELEMENTS.forEach(el => { if (el) el.style.display = "none"; });
+  USER_VIEW_IDS.forEach(id => {
+    document.getElementById(id).style.display = id === panelId ? "" : "none";
+  });
+}
+
 document.querySelectorAll(".nav-item[data-view]").forEach(btn => {
   btn.addEventListener("click", () => {
     document.querySelectorAll(".nav-item").forEach(b => b.classList.remove("active"));
     btn.classList.add("active");
     const view = btn.dataset.view;
-    const titles = { all:"👥 All Users", banned:"🚫 Banned Users", admin:"🛡️ Admins" };
+    const titles = {
+      all: "👥 All Users",
+      banned: "🚫 Banned Users",
+      admin: "🛡️ Admins",
+      servers: "🏠 All Servers",
+      announcements: "📢 Announcements",
+      profanity: "🚫 Profanity Filter",
+    };
     const filters = { all:"all", banned:"banned", admin:"admin" };
-    document.getElementById("viewTitle").textContent = titles[view];
-    document.getElementById("filterSelect").value = filters[view];
-    renderTable();
+    document.getElementById("viewTitle").textContent = titles[view] || view;
+
+    if (view === "servers") {
+      showPanelView("view-servers");
+      loadServers(1);
+      loadAnnouncementServers();
+    } else if (view === "announcements") {
+      showPanelView("view-announcements");
+      loadAnnouncementHistory();
+      loadAnnouncementServers();
+    } else if (view === "profanity") {
+      showPanelView("view-profanity");
+      loadProfanityWords();
+    } else {
+      showUserTableView();
+      if (filters[view]) document.getElementById("filterSelect").value = filters[view];
+      renderTable();
+    }
   });
 });
 
@@ -492,6 +608,135 @@ async function toggleAdmin(id, makeAdmin) {
     showToast(`${user?.username} is ${makeAdmin?"now an admin":"no longer an admin"}`, "success");
     await loadUsers();
   } catch { showToast("Server error","error"); }
+}
+
+// ── Servers ──────────────────────────────────────────────────
+let serverCurrentPage = 1;
+async function loadServers(page = 1) {
+  serverCurrentPage = page;
+  document.getElementById('serverTableBody').innerHTML = '<tr><td colspan="4"><div class="empty"><p>Loading…</p></div></td></tr>';
+  const r = await fetch(`${AUTH_URL}/admin/servers?page=${page}`, { headers: auth() });
+  const data = await r.json();
+  if (!data.servers) return;
+  document.getElementById('serversTotalLabel').textContent = `All Servers — ${data.total} total`;
+  const tbody = document.getElementById('serverTableBody');
+  if (!data.servers.length) { tbody.innerHTML = '<tr><td colspan="4"><div class="empty"><p>No servers yet</p></div></td></tr>'; return; }
+  tbody.innerHTML = data.servers.map(s => `
+    <tr>
+      <td><div style="display:flex;align-items:center;gap:8px">
+        ${s.icon_url ? `<img src="${s.icon_url}" style="width:28px;height:28px;border-radius:6px;object-fit:cover">` : `<div style="width:28px;height:28px;border-radius:6px;background:var(--accent);display:flex;align-items:center;justify-content:center;font-size:13px;font-weight:700">${s.name[0]}</div>`}
+        <span style="font-weight:600">${s.name}</span>
+      </div></td>
+      <td>${s.owner_name || '—'}</td>
+      <td>${s.member_count}</td>
+      <td>${new Date(s.created_at).toLocaleDateString()}</td>
+    </tr>
+  `).join('');
+  // Pagination
+  const totalPages = Math.ceil(data.total / data.limit);
+  const pg = document.getElementById('serversPagination');
+  pg.innerHTML = '';
+  if (totalPages > 1) {
+    if (page > 1) { const b = document.createElement('button'); b.className='btn btn-grey'; b.textContent='← Prev'; b.onclick=()=>loadServers(page-1); pg.appendChild(b); }
+    const info = document.createElement('span'); info.style.color='var(--text-2)'; info.style.fontSize='13px'; info.textContent=`Page ${page} / ${totalPages}`; pg.appendChild(info);
+    if (page < totalPages) { const b = document.createElement('button'); b.className='btn btn-grey'; b.textContent='Next →'; b.onclick=()=>loadServers(page+1); pg.appendChild(b); }
+  }
+}
+
+// ── Announcements ────────────────────────────────────────────
+async function loadAnnouncementServers() {
+  const r = await fetch(`${AUTH_URL}/admin/servers?page=1`, { headers: auth() });
+  const data = await r.json();
+  if (!data.servers) return;
+  const sel = document.getElementById('annServerId');
+  // Clear existing options except the first (global)
+  while (sel.options.length > 1) sel.remove(1);
+  data.servers.forEach(s => {
+    const opt = document.createElement('option');
+    opt.value = s.id;
+    opt.textContent = `🏠 ${s.name}`;
+    sel.appendChild(opt);
+  });
+}
+
+async function loadAnnouncementHistory() {
+  const r = await fetch(`${AUTH_URL}/admin/announcements`, { headers: auth() });
+  const data = await r.json();
+  const el = document.getElementById('annHistory');
+  if (!Array.isArray(data) || !data.length) { el.innerHTML = '<div style="color:var(--text-3);font-size:13px">No announcements yet</div>'; return; }
+  el.innerHTML = data.map(a => `
+    <div style="background:var(--bg-2);border-radius:8px;padding:12px;border:1px solid rgba(255,255,255,.07)">
+      <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:4px">
+        <span style="font-weight:600;color:var(--text-1);font-size:13px">${a.title}</span>
+        <span style="font-size:11px;color:var(--text-3)">${new Date(a.created_at).toLocaleString()}</span>
+      </div>
+      <div style="color:var(--text-2);font-size:12px;margin-bottom:6px">${a.body}</div>
+      <div style="display:flex;gap:8px;font-size:11px;color:var(--text-3)">
+        ${a.server_name ? `<span>🏠 ${a.server_name}</span>` : '<span>🌐 Global</span>'}
+        <span>by ${a.sent_by_name || 'Unknown'}</span>
+        ${a.link ? `<a href="${a.link}" target="_blank" style="color:var(--accent)">🔗 Link</a>` : ''}
+      </div>
+    </div>
+  `).join('');
+}
+
+async function sendAnnouncement() {
+  const title = document.getElementById('annTitle').value.trim();
+  const body = document.getElementById('annBody').value.trim();
+  const link = document.getElementById('annLink').value.trim();
+  const serverId = document.getElementById('annServerId').value || null;
+  const msgEl = document.getElementById('annMsg');
+  if (!title || !body) { msgEl.style.color='var(--danger)'; msgEl.textContent='Title and body are required.'; return; }
+  const r = await fetch(`${AUTH_URL}/admin/announcements`, {
+    method: 'POST', headers: { ...auth(), 'Content-Type': 'application/json' },
+    body: JSON.stringify({ title, body, link: link || null, serverId })
+  });
+  const data = await r.json();
+  if (data.error) { msgEl.style.color='var(--danger)'; msgEl.textContent=data.error; return; }
+  msgEl.style.color='var(--green)'; msgEl.textContent='Announcement sent!';
+  // Broadcast via WebSocket
+  if (window._ws && window._ws.readyState === 1) {
+    window._ws.send(JSON.stringify({ type:'admin-announcement', title, body, link:link||null, serverId:serverId||null }));
+  }
+  document.getElementById('annTitle').value = '';
+  document.getElementById('annBody').value = '';
+  document.getElementById('annLink').value = '';
+  await loadAnnouncementHistory();
+}
+
+// ── Profanity ────────────────────────────────────────────────
+async function loadProfanityWords() {
+  const r = await fetch(`${AUTH_URL}/admin/profanity-words`, { headers: auth() });
+  const data = await r.json();
+  const el = document.getElementById('pfWordList');
+  if (data.error) { el.innerHTML = `<span style="color:var(--danger);font-size:13px">${data.error}</span>`; return; }
+  if (!data.length) { el.innerHTML = '<span style="color:var(--text-3);font-size:13px">No custom words yet</span>'; return; }
+  el.innerHTML = data.map(w => `
+    <span style="background:var(--bg-2);border:1px solid rgba(255,255,255,.1);border-radius:20px;padding:4px 10px;font-size:12px;display:flex;align-items:center;gap:6px;color:var(--text-1)">
+      ${w.word}
+      <button onclick="removeProfanityWord('${w.word}')" style="background:none;border:none;color:var(--danger);cursor:pointer;font-size:14px;line-height:1;padding:0">×</button>
+    </span>
+  `).join('');
+}
+
+async function addProfanityWord() {
+  const word = document.getElementById('pfNewWord').value.trim().toLowerCase();
+  const msgEl = document.getElementById('pfMsg');
+  if (!word) return;
+  const r = await fetch(`${AUTH_URL}/admin/profanity-words`, {
+    method:'POST', headers:{...auth(),'Content-Type':'application/json'},
+    body: JSON.stringify({ word })
+  });
+  const data = await r.json();
+  if (data.error) { msgEl.style.color='var(--danger)'; msgEl.textContent=data.error; return; }
+  msgEl.style.color='var(--green)'; msgEl.textContent=`"${word}" added`;
+  document.getElementById('pfNewWord').value = '';
+  await loadProfanityWords();
+}
+
+async function removeProfanityWord(word) {
+  await fetch(`${AUTH_URL}/admin/profanity-words/${encodeURIComponent(word)}`, { method:'DELETE', headers:auth() });
+  await loadProfanityWords();
 }
 
 function logout() { localStorage.removeItem("vh_token"); sessionStorage.removeItem("vh_token"); smoothNavigate("login.html", "down"); }

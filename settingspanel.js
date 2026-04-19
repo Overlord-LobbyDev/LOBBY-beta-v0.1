@@ -30,6 +30,20 @@
   function injectHTML() {
     const el = document.createElement("div");
     el.innerHTML = `
+<style>
+.sp-toggle-wrap { position:relative; display:inline-block; width:44px; height:24px; flex-shrink:0; }
+.sp-toggle-wrap input { opacity:0; width:0; height:0; }
+.sp-toggle { position:absolute; cursor:pointer; top:0;left:0;right:0;bottom:0; background:var(--bg-3); border-radius:24px; transition:.3s; }
+.sp-toggle:before { position:absolute; content:""; height:18px; width:18px; left:3px; bottom:3px; background:white; border-radius:50%; transition:.3s; }
+.sp-toggle-wrap input:checked + .sp-toggle { background:var(--accent); }
+.sp-toggle-wrap input:checked + .sp-toggle:before { transform:translateX(20px); }
+/* GIF playback mode */
+[data-gif-mode="hover"] img[src*=".gif"],
+[data-gif-mode="click"] img[src*=".gif"] {
+  /* Freeze GIFs by displaying them as static — we swap src on hover/click */
+}
+[data-gif-mode="hover"] .gif-container img:not(:hover) { animation-play-state: paused; }
+</style>
 <button id="settingsToggleBtn" title="Settings">⚙️</button>
 <div id="settingsPanelBackdrop"></div>
 <div id="settingsDrawer">
@@ -46,6 +60,7 @@
       <button class="sp-nav-btn" data-sp="security">🔒 Password</button>
       <div class="sp-nav-label" style="margin-top:10px">App Settings</div>
       <button class="sp-nav-btn" data-sp="audiovideo">🎙 Audio & Video</button>
+      <button class="sp-nav-btn" data-sp="content">🔒 Content</button>
       <button class="sp-nav-btn" data-sp="about">ℹ️ About & Updates</button>
       <div class="sp-nav-label" style="margin-top:10px">Tournament</div>
       <button class="sp-nav-btn" data-sp="tournaments">🏆 Tournaments</button>
@@ -297,6 +312,36 @@
         </div>
       </div>
 
+      <!-- ── Content ── -->
+      <div class="sp-section" id="sp-content">
+        <h2>Content Settings</h2>
+
+        <div class="sp-form-group">
+          <label class="sp-label">Profanity Filter</label>
+          <div style="display:flex;align-items:center;gap:10px">
+            <label class="sp-toggle-wrap">
+              <input type="checkbox" id="spProfanityFilter" />
+              <span class="sp-toggle"></span>
+            </label>
+            <span class="sp-hint" style="margin:0">Replace swear words with **** in chat</span>
+          </div>
+          <div class="sp-hint">Turned on by default. Applies to messages you send and receive.</div>
+        </div>
+
+        <div class="sp-form-group" style="margin-top:20px">
+          <label class="sp-label">GIF Playback</label>
+          <select class="sp-select" id="spGifMode">
+            <option value="auto">▶ Auto Play (always animated)</option>
+            <option value="hover">🖱 Play on Hover</option>
+            <option value="click">👆 Play on Click</option>
+          </select>
+          <div class="sp-hint">Controls how GIFs play in chat, profiles, and banners.</div>
+        </div>
+
+        <button class="sp-save-btn" id="spSaveContent">Save Content Settings</button>
+        <div class="sp-msg" id="spContentMsg"></div>
+      </div>
+
       <!-- ── Tournaments ── -->
       <div class="sp-section" id="sp-tournaments">
         <h2>Tournaments</h2>
@@ -464,6 +509,28 @@
     });
     document.getElementById("spStatus").addEventListener("input", function () {
       document.getElementById("spPreviewStatus").textContent = this.value ? `● ${this.value}` : "● Online";
+    });
+
+    // ── Content settings ──────────────────────────────────
+    // Load saved values
+    const savedProfanity = localStorage.getItem('vh_profanity_filter');
+    const profanityCheckbox = document.getElementById('spProfanityFilter');
+    if (profanityCheckbox) {
+      // Default ON if never set
+      profanityCheckbox.checked = savedProfanity === null ? true : savedProfanity === 'true';
+    }
+    const gifModeSelect = document.getElementById('spGifMode');
+    if (gifModeSelect) {
+      gifModeSelect.value = localStorage.getItem('vh_gif_mode') || 'auto';
+    }
+
+    document.getElementById('spSaveContent')?.addEventListener('click', () => {
+      const pf = document.getElementById('spProfanityFilter')?.checked;
+      const gm = document.getElementById('spGifMode')?.value;
+      localStorage.setItem('vh_profanity_filter', pf ? 'true' : 'false');
+      localStorage.setItem('vh_gif_mode', gm || 'auto');
+      applyGifMode(gm || 'auto');
+      spShowMsg('spContentMsg', 'Content settings saved!', 'success');
     });
   }
 
@@ -1065,5 +1132,15 @@
       if (preview) { preview.style.backgroundImage = 'none'; preview.style.backgroundColor = colour; preview.textContent = ''; }
     }
   };
+
+  function applyGifMode(mode) {
+    document.documentElement.setAttribute('data-gif-mode', mode || 'auto');
+    // Expose globally so other scripts can check
+    window.getGifMode = () => localStorage.getItem('vh_gif_mode') || 'auto';
+  }
+
+  // Apply on load
+  window.getGifMode = () => localStorage.getItem('vh_gif_mode') || 'auto';
+  applyGifMode(localStorage.getItem('vh_gif_mode') || 'auto');
 
 })();

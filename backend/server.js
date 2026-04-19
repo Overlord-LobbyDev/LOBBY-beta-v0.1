@@ -401,6 +401,27 @@ wss.on("connection", (ws, req) => {
       return;
     }
 
+    // ── Admin announcement broadcast ─────────────────────────────
+    if (msg.type === "admin-announcement") {
+      // Broadcast to all connected users
+      const json = JSON.stringify({
+        type: "admin-announcement",
+        title: msg.title,
+        body: msg.body,
+        link: msg.link || null,
+        serverId: msg.serverId || null,
+        sentBy: msg.sentBy || null,
+      });
+      for (const client of clients.values()) {
+        if (client.ws.readyState === 1) {
+          // If serverId specified, only send to members subscribed to that server's channels
+          // For now, send to all — the client will filter by server membership
+          client.ws.send(json);
+        }
+      }
+      return;
+    }
+
     // ── Leave call ───────────────────────────────────────
     if (msg.type === "leave") {
       broadcast(user.peerId, { type: "peer-left", id: user.peerId });

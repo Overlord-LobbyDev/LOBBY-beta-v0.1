@@ -1006,6 +1006,9 @@ function connectWS() {
     if (msg.type === "online-users") {
       onlineUserIds = new Set(msg.users.map(u => u.userId));
       updateOnlineDots();
+      if (window._currentMembers && document.getElementById("membersSidebar")?.style.display !== "none") {
+        renderMembers(window._currentMembers);
+      }
     }
     if (msg.type === "typing") {
       showTyping(msg);
@@ -1021,6 +1024,24 @@ function connectWS() {
       showToast(`✅ ${msg.fromUsername} accepted your friend request!`, "success");
       const title = document.getElementById("sidebarTitle")?.textContent;
       if (title === "Direct Messages") await showDMPanel();
+    }
+    if (msg.type === "admin-announcement") {
+      // Show as a toast
+      showToast(`📢 ${msg.title}: ${msg.body}`, 'info', 8000);
+      // Also add to notifications list if the function exists
+      if (typeof addNotification === 'function') {
+        addNotification({
+          type: 'announcement',
+          title: msg.title,
+          body: msg.body,
+          link: msg.link || null,
+          time: Date.now()
+        });
+      }
+      // Shake the notification bell
+      const bell = document.getElementById('notifBell') || document.querySelector('[data-notif-bell]');
+      if (bell) { bell.classList.add('bell-shake'); setTimeout(() => bell.classList.remove('bell-shake'), 3000); }
+      return;
     }
   };
 }
@@ -1116,6 +1137,7 @@ function renderChannelList(channels, members, server) {
   content.innerHTML = html;
 
   // Render members sidebar
+  window._currentMembers = members;
   renderMembers(members);
   document.getElementById("membersSidebar").style.display = "flex";
   document.getElementById("membersSidebar").style.flexDirection = "column";
@@ -1219,6 +1241,7 @@ async function showDMPanel() {
   document.getElementById("dmServerIcon").classList.add("active");
   document.getElementById("sidebarTitle").textContent = "Direct Messages";
   document.getElementById("membersSidebar").style.display = "none";
+  window._currentMembers = null;
   document.getElementById("chatMain").innerHTML = `<div class="empty-state"><div class="empty-icon">💬</div><h3>Your Messages</h3><p>Select a friend to start chatting</p></div>`;
 
   const friends = await api("/friends");
@@ -1609,11 +1632,11 @@ function showModalMsg(id, text, type) {
 }
 
 let toastTimer;
-function showToast(msg, type="success") {
+function showToast(msg, type="success", duration=3000) {
   const el = document.getElementById("toast");
   el.textContent = msg; el.className = `show ${type}`;
   clearTimeout(toastTimer);
-  toastTimer = setTimeout(() => el.className="", 3000);
+  toastTimer = setTimeout(() => el.className="", duration);
 }
 
 // ── Groups panel ──────────────────────────────────────────────
@@ -1623,6 +1646,7 @@ async function showGroupsPanel() {
   document.getElementById("groupsNavIcon").classList.add("active");
   document.getElementById("sidebarTitle").textContent = "Groups";
   document.getElementById("membersSidebar").style.display = "none";
+  window._currentMembers = null;
   
   // Hide social feed when entering groups
   const socialFeed = document.getElementById("socialFeed");
