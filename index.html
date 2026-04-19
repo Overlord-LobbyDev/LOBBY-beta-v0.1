@@ -108,6 +108,32 @@
     body.has-wallpaper .channel-sidebar,
     body.has-wallpaper #channelSidebar { background:rgba(0,0,0,.45); backdrop-filter:blur(18px); }
     body.has-wallpaper #membersSidebar { background:rgba(0,0,0,.45); backdrop-filter:blur(18px); }
+
+    /* ── Solid-sidebars option ───────────────────────────────────
+       When the user enables "Solid sidebars" in Settings → Appearance,
+       revert the side panels (server list, channel list, members list,
+       home header) back to their opaque theme backgrounds. The wallpaper
+       still shows through the main content area (chat / home / calendar
+       / profile) — only the chrome stays solid. */
+    body.has-wallpaper.wp-solid-sidebars .server-list {
+      background: var(--bg-0);
+      backdrop-filter: none;
+      z-index: 2;
+    }
+    body.has-wallpaper.wp-solid-sidebars .home-header {
+      background: var(--bg-1);
+      backdrop-filter: none;
+      z-index: 2;
+    }
+    body.has-wallpaper.wp-solid-sidebars .channel-sidebar,
+    body.has-wallpaper.wp-solid-sidebars #channelSidebar {
+      background: var(--bg-1);
+      backdrop-filter: none;
+    }
+    body.has-wallpaper.wp-solid-sidebars #membersSidebar {
+      background: var(--bg-1);
+      backdrop-filter: none;
+    }
     /* Profile page: the per-profile cover wallpaper hides when the user has
        set their own app wallpaper (the cover is for OTHER people viewing the
        profile; my own page should reflect MY wallpaper). */
@@ -5368,6 +5394,21 @@ function connectWS() {
         showToast(`💬 ${msg.fromUsername}: ${(msg.message?.content||"").slice(0,40)}`, "success");
       }
     }
+    // ── Live delete events ──────────────────────────────────────
+    // Remove the message from the DOM if the current view matches. If not
+    // visible, there's nothing to do — next time the user opens that view it
+    // will be re-fetched from the DB and the deleted message will be gone.
+    if (msg.type === "channel-message-delete") {
+      if (currentView?.type === "channel" && msg.channelId === currentView.id) {
+        removeMessageFromDom(msg.messageId);
+      }
+    }
+    if (msg.type === "direct-message-delete") {
+      // `fromUserId` is the peer whose DM list we render when chatting with them.
+      if (currentView?.type === "dm" && msg.fromUserId === currentView.id) {
+        removeMessageFromDom(msg.messageId);
+      }
+    }
     if (msg.type === "online-users") {
       onlineUserIds = new Set(msg.users.map(u => u.userId));
       onlineUserStatus = new Map();
@@ -6873,6 +6914,8 @@ function appendMessage(msg, type) {
   div.dataset.authorId = authorId;
   div.dataset.time = msgDate.getTime();
   div.dataset.dateStr = todayStr;
+  // Tag every message with its id so WS delete events can locate the node.
+  if (msg.id != null) div.dataset.messageId = msg.id;
   div.innerHTML = `
     ${isContinuation ? `<span class="msg-compact-time">${time}</span>` : ""}
     <div class="msg-avatar" onclick="openProfilePanel(${authorId})">${avatarHtml}</div>
@@ -6890,15 +6933,44 @@ function appendMessage(msg, type) {
 
 async function deleteMessage(id) {
   if (!currentView) return;
-  if (currentView.type === "channel") await api(`/channels/${currentView.id}/messages/${id}`, { method:"DELETE" });
-  else if (currentView.type === "group") await api(`/groups/${currentView.id}/messages/${id}`, { method:"DELETE" });
-  else await api(`/dm/${currentView.id}/messages/${id}`, { method:"DELETE" });
-  let messages;
-  if (currentView.type === "channel") messages = await api(`/channels/${currentView.id}/messages`);
-  else if (currentView.type === "group") messages = await api(`/groups/${currentView.id}/messages`);
-  else messages = await api(`/dm/${currentView.id}`);
-  const container = document.getElementById("msgContainer");
-  container.innerHTML = ""; (messages||[]).forEach(m => appendMessage(m, currentView.type));
+  try {
+    // 1. Hit the REST endpoint so the row goes from the DB.
+    if (currentView.type === "channel")      await api(`/channels/${currentView.id}/messages/${id}`, { method:"DELETE" });
+    else if (currentView.type === "group")   await api(`/groups/${currentView.id}/messages/${id}`,   { method:"DELETE" });
+    else                                     await api(`/dm/${currentView.id}/messages/${id}`,       { method:"DELETE" });
+  } catch (err) {
+    console.error("[deleteMessage] backend delete failed:", err);
+    showToast("Couldn't delete message", "error");
+    return;
+  }
+  // 2. Tell every other connected client live.
+  if (currentView.type === "channel")    wsSend({ type:"channel-message-delete", channelId: currentView.id, messageId: id });
+  else if (currentView.type === "group") wsSend({ type:"group-message-delete",   groupId:   currentView.id, messageId: id });
+  else                                   wsSend({ type:"direct-message-delete",  toUserId:  currentView.id, messageId: id });
+  // 3. Remove our own DOM node — no refetch needed.
+  removeMessageFromDom(id);
+}
+
+// Pull a message group out of the visible chat. Used both when *we* delete and
+// when a WS delete event arrives from another client. Idempotent; safe to call
+// for messages not currently rendered.
+function removeMessageFromDom(messageId) {
+  const node = document.querySelector(`#msgContainer .message-group[data-message-id="${messageId}"]`);
+  if (!node) return;
+  // If the next sibling was a continuation of *us*, promote it to a new-author
+  // header so the avatar/name reappear; otherwise it'd look orphaned.
+  const next = node.nextElementSibling;
+  if (next && next.classList.contains("msg-continuation") && next.dataset.authorId === node.dataset.authorId) {
+    next.classList.remove("msg-continuation");
+    next.classList.add("msg-new-author");
+  }
+  node.remove();
+  // Clean up an orphaned date divider that's now followed by another divider
+  // or by nothing.
+  document.querySelectorAll("#msgContainer .msg-date-divider").forEach(div => {
+    const sib = div.nextElementSibling;
+    if (!sib || sib.classList.contains("msg-date-divider")) div.remove();
+  });
 }
 
 function handleFileSelect() {
@@ -7643,6 +7715,12 @@ function patchWsForGroups() {
         unreadGroups[msg.groupId] = (unreadGroups[msg.groupId] || 0) + 1;
         LobbySound.play("messageReceived");
         updateGroupBadge();
+      }
+    }
+    // Live delete of a group message.
+    if (msg.type==="group-message-delete") {
+      if (currentView?.type==="group" && msg.groupId===currentView.id) {
+        removeMessageFromDom(msg.messageId);
       }
     }
   });
@@ -10197,13 +10275,14 @@ function saveWallpaperConfig(cfg) {
 
 /**
  * Apply the app wallpaper to the page.
- *   opts.url          image URL (takes priority)
- *   opts.preset       key into WP_PRESETS
- *   opts.useCover     when true, use the current user's profile cover
- *   opts.coverUrl     cover URL (passed in from caller, since this fn is theme-agnostic)
- *   opts.blur         px, 0..80
- *   opts.dim          %, 0..100
- *   opts.persist      when true (default), write to localStorage
+ *   opts.url            image URL (takes priority)
+ *   opts.preset         key into WP_PRESETS
+ *   opts.useCover       when true, use the current user's profile cover
+ *   opts.coverUrl       cover URL (passed in from caller, since this fn is theme-agnostic)
+ *   opts.blur           px, 0..80
+ *   opts.dim            %, 0..100
+ *   opts.solidSidebars  when true, keep side panels opaque (wallpaper only behind main content)
+ *   opts.persist        when true (default), write to localStorage
  */
 function applyAppWallpaper(opts = {}) {
   const root = document.documentElement;
@@ -10234,11 +10313,17 @@ function applyAppWallpaper(opts = {}) {
     body.classList.remove("has-wallpaper");
   }
 
+  // Solid-sidebars class is applied regardless of whether the wallpaper is
+  // active — the CSS selector itself is gated on `.has-wallpaper`, so it's
+  // a no-op when there's no wallpaper but still reflects saved state.
+  body.classList.toggle("wp-solid-sidebars", !!opts.solidSidebars);
+
   if (opts.persist !== false) {
     saveWallpaperConfig({
       url: opts.url || null,
       preset: opts.preset || null,
       useCover: !!opts.useCover,
+      solidSidebars: !!opts.solidSidebars,
       blur, dim
     });
   }
@@ -10249,7 +10334,8 @@ function clearAppWallpaper() {
   const root = document.documentElement;
   root.style.setProperty("--wp-image", "none");
   document.body?.classList.remove("has-wallpaper");
-  saveWallpaperConfig({ url:null, preset:null, useCover:false, blur:40, dim:60 });
+  document.body?.classList.remove("wp-solid-sidebars");
+  saveWallpaperConfig({ url:null, preset:null, useCover:false, solidSidebars:false, blur:40, dim:60 });
 }
 
 /** Boot wiring — called once on app start to restore the saved wallpaper. */
@@ -10265,6 +10351,7 @@ function bootAppWallpaper() {
     coverUrl: window.__myCoverUrl || null,
     blur: cfg.blur,
     dim: cfg.dim,
+    solidSidebars: !!cfg.solidSidebars,
     persist: false
   });
 }
@@ -11175,17 +11262,19 @@ async function loadUserPanel(userId) {
 
     // If the server returned wallpaper fields (wallpaper_url,
     // wallpaper_preset, wallpaper_blur, wallpaper_dim,
-    // wallpaper_use_cover) prefer those over localStorage so settings
-    // sync across devices. Otherwise fall back to the saved client cfg.
+    // wallpaper_use_cover, wallpaper_solid_sidebars) prefer those over
+    // localStorage so settings sync across devices. Otherwise fall back
+    // to the saved client cfg.
     try {
       const localCfg = loadWallpaperConfig() || {};
       const hasServerWp = data.wallpaper_url || data.wallpaper_preset || data.wallpaper_use_cover;
       const cfg = hasServerWp ? {
-        url:      data.wallpaper_url || null,
-        preset:   data.wallpaper_preset || null,
-        useCover: !!data.wallpaper_use_cover,
-        blur:     Number.isFinite(+data.wallpaper_blur) ? +data.wallpaper_blur : 40,
-        dim:      Number.isFinite(+data.wallpaper_dim)  ? +data.wallpaper_dim  : 60
+        url:           data.wallpaper_url || null,
+        preset:        data.wallpaper_preset || null,
+        useCover:      !!data.wallpaper_use_cover,
+        solidSidebars: !!data.wallpaper_solid_sidebars,
+        blur:          Number.isFinite(+data.wallpaper_blur) ? +data.wallpaper_blur : 40,
+        dim:           Number.isFinite(+data.wallpaper_dim)  ? +data.wallpaper_dim  : 60
       } : localCfg;
       if (cfg && (cfg.url || cfg.preset || cfg.useCover)) {
         applyAppWallpaper({
@@ -11195,8 +11284,13 @@ async function loadUserPanel(userId) {
           coverUrl: data.banner_url || null,
           blur: cfg.blur,
           dim: cfg.dim,
+          solidSidebars: !!cfg.solidSidebars,
           persist: hasServerWp // only persist if server-authoritative
         });
+      } else if (cfg && cfg.solidSidebars) {
+        // No wallpaper but a stale solid-sidebars flag — reflect the
+        // checkbox state without activating the .has-wallpaper class.
+        document.body?.classList.add("wp-solid-sidebars");
       }
     } catch (wpErr) { console.warn("[wallpaper apply]", wpErr); }
 
@@ -15287,6 +15381,19 @@ setTimeout(() => { updateMyStatusUI(); }, 100);
             </label>
           </div>
 
+          <!-- Solid sidebars toggle -->
+          <div class="sp-form-group" style="display:flex;align-items:flex-start;gap:12px">
+            <div style="flex:1;min-width:0">
+              <label class="sp-label" style="margin:0;display:block">Solid sidebars</label>
+              <div style="color:var(--text-3);font-size:12px;margin-top:4px">Keep the side panels opaque so the wallpaper only shows behind the main content.</div>
+            </div>
+            <label style="position:relative;display:inline-block;width:42px;height:24px;flex-shrink:0;margin-top:2px">
+              <input type="checkbox" id="spWpSolidSidebars" style="opacity:0;width:0;height:0" />
+              <span id="spWpSolidSidebarsTrack" style="position:absolute;cursor:pointer;inset:0;background:var(--bg-3);border-radius:24px;transition:background .2s"></span>
+              <span id="spWpSolidSidebarsKnob" style="position:absolute;top:3px;left:3px;width:18px;height:18px;background:#fff;border-radius:50%;transition:transform .2s;pointer-events:none"></span>
+            </label>
+          </div>
+
           <!-- Blur slider -->
           <div class="sp-form-group">
             <label class="sp-label">Blur <span id="spWpBlurLabel" style="color:var(--text-2);font-weight:400;text-transform:none;letter-spacing:0;font-size:12px">40px</span></label>
@@ -16237,17 +16344,18 @@ setTimeout(() => { updateMyStatusUI(); }, 100);
   // Working state for the wallpaper settings UI. When the user changes
   // a control, we live-preview immediately, but we only write the
   // CSS-variable wallpaper globally + persist on "Save".
-  let _spWpState = { url:null, preset:null, useCover:false, blur:40, dim:60 };
+  let _spWpState = { url:null, preset:null, useCover:false, solidSidebars:false, blur:40, dim:60 };
 
   function initWallpaperSection() {
     // Hydrate from the saved config (or defaults)
     const cfg = (typeof loadWallpaperConfig === "function" && loadWallpaperConfig()) || {};
     _spWpState = {
-      url:      cfg.url || null,
-      preset:   cfg.preset || null,
-      useCover: !!cfg.useCover,
-      blur:     Number.isFinite(+cfg.blur) ? +cfg.blur : 40,
-      dim:      Number.isFinite(+cfg.dim)  ? +cfg.dim  : 60
+      url:           cfg.url || null,
+      preset:        cfg.preset || null,
+      useCover:      !!cfg.useCover,
+      solidSidebars: !!cfg.solidSidebars,
+      blur:          Number.isFinite(+cfg.blur) ? +cfg.blur : 40,
+      dim:           Number.isFinite(+cfg.dim)  ? +cfg.dim  : 60
     };
 
     // Sliders
@@ -16292,6 +16400,21 @@ setTimeout(() => { updateMyStatusUI(); }, 100);
         }
         updateWpToggleVisual();
         updateWpPreview();
+      });
+    }
+
+    // Solid-sidebars toggle. Live-applies on change so the user sees the
+    // panels go opaque immediately — the formal save still happens via the
+    // "Save Wallpaper" button (or auto-persists locally).
+    const solidCb = document.getElementById("spWpSolidSidebars");
+    if (solidCb) {
+      solidCb.checked = _spWpState.solidSidebars;
+      updateWpSolidVisual();
+      solidCb.addEventListener("change", () => {
+        _spWpState.solidSidebars = solidCb.checked;
+        updateWpSolidVisual();
+        // Live-toggle on body so the change is visible without hitting Save.
+        document.body.classList.toggle("wp-solid-sidebars", solidCb.checked);
       });
     }
 
@@ -16391,6 +16514,16 @@ setTimeout(() => { updateMyStatusUI(); }, 100);
     knob.style.transform = on ? "translateX(18px)" : "translateX(0)";
   }
 
+  function updateWpSolidVisual() {
+    const cb = document.getElementById("spWpSolidSidebars");
+    const track = document.getElementById("spWpSolidSidebarsTrack");
+    const knob = document.getElementById("spWpSolidSidebarsKnob");
+    if (!cb || !track || !knob) return;
+    const on = cb.checked;
+    track.style.background = on ? "var(--accent)" : "var(--bg-3)";
+    knob.style.transform = on ? "translateX(18px)" : "translateX(0)";
+  }
+
   // Compute what the wallpaper image should be given current state
   function _spWpResolveImage() {
     const presets = (typeof WP_PRESETS === "object" && WP_PRESETS) || {};
@@ -16419,7 +16552,10 @@ setTimeout(() => { updateMyStatusUI(); }, 100);
 
   function saveWallpaperSettings() {
     const hasAny = _spWpState.url || _spWpState.preset || _spWpState.useCover;
-    if (!hasAny) {
+    // Solid-sidebars-only saves are allowed — the user may want it on
+    // even without a wallpaper image (ready for when they add one later,
+    // and to sync the preference across devices).
+    if (!hasAny && !_spWpState.solidSidebars) {
       spShowMsg("spWallpaperMsg", "Pick an image, preset, or enable 'use my cover' first", "error");
       return;
     }
@@ -16430,7 +16566,8 @@ setTimeout(() => { updateMyStatusUI(); }, 100);
       useCover: _spWpState.useCover,
       coverUrl: window.__myCoverUrl || null,
       blur: _spWpState.blur,
-      dim: _spWpState.dim
+      dim: _spWpState.dim,
+      solidSidebars: _spWpState.solidSidebars
     });
     // Sync to server if we can
     try {
@@ -16442,7 +16579,8 @@ setTimeout(() => { updateMyStatusUI(); }, 100);
           wallpaperPreset: _spWpState.preset,
           wallpaperUseCover: _spWpState.useCover,
           wallpaperBlur: _spWpState.blur,
-          wallpaperDim: _spWpState.dim
+          wallpaperDim: _spWpState.dim,
+          wallpaperSolidSidebars: _spWpState.solidSidebars
         })
       }).catch(() => {});
     } catch (_) {}
@@ -16450,7 +16588,7 @@ setTimeout(() => { updateMyStatusUI(); }, 100);
   }
 
   function clearWallpaperSettings() {
-    _spWpState = { url:null, preset:null, useCover:false, blur:40, dim:60 };
+    _spWpState = { url:null, preset:null, useCover:false, solidSidebars:false, blur:40, dim:60 };
     const blurSlider = document.getElementById("spWpBlur");
     const dimSlider  = document.getElementById("spWpDim");
     if (blurSlider) { blurSlider.value = 40; updateSliderFill(blurSlider); }
@@ -16460,6 +16598,9 @@ setTimeout(() => { updateMyStatusUI(); }, 100);
     const cb = document.getElementById("spWpUseCover");
     if (cb) cb.checked = false;
     updateWpToggleVisual();
+    const solidCb = document.getElementById("spWpSolidSidebars");
+    if (solidCb) solidCb.checked = false;
+    updateWpSolidVisual();
     document.querySelectorAll(".sp-wp-preset").forEach(el => {
       el.classList.remove("selected");
       el.style.borderColor = "transparent";
@@ -16473,7 +16614,7 @@ setTimeout(() => { updateMyStatusUI(); }, 100);
         headers: { "Content-Type": "application/json", Authorization: `Bearer ${token()}` },
         body: JSON.stringify({
           wallpaperUrl: null, wallpaperPreset: null, wallpaperUseCover: false,
-          wallpaperBlur: 40, wallpaperDim: 60
+          wallpaperBlur: 40, wallpaperDim: 60, wallpaperSolidSidebars: false
         })
       }).catch(() => {});
     } catch (_) {}

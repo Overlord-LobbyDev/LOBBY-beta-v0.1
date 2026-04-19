@@ -193,6 +193,22 @@ wss.on("connection", (ws, req) => {
       return;
     }
 
+    // ── Chat: channel message deleted ────────────────────
+    // Broadcast to every client subscribed to the channel so they drop the
+    // DOM node live without needing to refresh.
+    if (msg.type === "channel-message-delete") {
+      for (const [id, client] of clients) {
+        if (client.subscribedChannels.has(msg.channelId) && client.ws.readyState === 1) {
+          client.ws.send(JSON.stringify({
+            type: "channel-message-delete",
+            channelId: msg.channelId,
+            messageId: msg.messageId
+          }));
+        }
+      }
+      return;
+    }
+
     // ── Chat: direct message ─────────────────────────────
     if (msg.type === "direct-message") {
       const targetPeerId = `u${msg.toUserId}`;
@@ -210,6 +226,23 @@ wss.on("connection", (ws, req) => {
           fromUsername: user.username
         }));
       }
+      return;
+    }
+
+    // ── Chat: direct message deleted ─────────────────────
+    // Tell the other participant (or, for self-chats, your own other devices)
+    // to drop the message from their view. We send the *sender's* userId as
+    // `fromUserId` so the recipient knows which conversation it belongs to.
+    if (msg.type === "direct-message-delete") {
+      const targetPeerId = `u${msg.toUserId}`;
+      const target = clients.get(targetPeerId);
+      const payload = JSON.stringify({
+        type: "direct-message-delete",
+        messageId: msg.messageId,
+        fromUserId: user.userId,
+        toUserId: msg.toUserId
+      });
+      if (target?.ws.readyState === 1) target.ws.send(payload);
       return;
     }
 
@@ -435,6 +468,20 @@ wss.on("connection", (ws, req) => {
             type: "group-message",
             groupId: msg.groupId,
             message: msg.message
+          }));
+        }
+      }
+      return;
+    }
+
+    // ── Group chat message deleted ───────────────────────
+    if (msg.type === "group-message-delete") {
+      for (const [id, client] of clients) {
+        if (client.subscribedChannels.has(`group-${msg.groupId}`) && client.ws.readyState === 1) {
+          client.ws.send(JSON.stringify({
+            type: "group-message-delete",
+            groupId: msg.groupId,
+            messageId: msg.messageId
           }));
         }
       }

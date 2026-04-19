@@ -322,6 +322,11 @@ async function initDb() {
       "ALTER TABLE users ADD COLUMN IF NOT EXISTS wallpaper_use_cover BOOLEAN DEFAULT FALSE",
       "ALTER TABLE users ADD COLUMN IF NOT EXISTS wallpaper_blur     INTEGER DEFAULT 40",
       "ALTER TABLE users ADD COLUMN IF NOT EXISTS wallpaper_dim      INTEGER DEFAULT 60",
+      // When true, the side panels (server list, channel list, members list,
+      // home header) stay opaque with their normal background instead of
+      // getting a semi-transparent backdrop-blur tint. The wallpaper still
+      // shows through the main content area; this just keeps the chrome solid.
+      "ALTER TABLE users ADD COLUMN IF NOT EXISTS wallpaper_solid_sidebars BOOLEAN DEFAULT FALSE",
       "ALTER TABLE users ADD COLUMN IF NOT EXISTS post_visibility TEXT DEFAULT 'public'",
       // Profile fields used by the frontend
       "ALTER TABLE users ADD COLUMN IF NOT EXISTS display_name   TEXT DEFAULT NULL",

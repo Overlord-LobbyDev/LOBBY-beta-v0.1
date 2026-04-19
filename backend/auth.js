@@ -1093,7 +1093,8 @@ app.patch("/wallpaper", requireAuth, async (req, res) => {
       wallpaperPreset,
       wallpaperUseCover,
       wallpaperBlur,
-      wallpaperDim
+      wallpaperDim,
+      wallpaperSolidSidebars
     } = req.body || {};
 
     // Clamp slider values
@@ -1102,21 +1103,23 @@ app.patch("/wallpaper", requireAuth, async (req, res) => {
 
     // We use COALESCE-style behaviour: pass explicit `null` to clear a field,
     // pass `undefined` / missing to leave it alone. Because the frontend
-    // always sends all five, this simplifies to an unconditional write.
+    // always sends all six, this simplifies to an unconditional write.
     await pool.query(
       `UPDATE users SET
-         wallpaper_url       = $1,
-         wallpaper_preset    = $2,
-         wallpaper_use_cover = $3,
-         wallpaper_blur      = COALESCE($4, wallpaper_blur),
-         wallpaper_dim       = COALESCE($5, wallpaper_dim)
-       WHERE id = $6`,
+         wallpaper_url            = $1,
+         wallpaper_preset         = $2,
+         wallpaper_use_cover      = $3,
+         wallpaper_blur           = COALESCE($4, wallpaper_blur),
+         wallpaper_dim            = COALESCE($5, wallpaper_dim),
+         wallpaper_solid_sidebars = $6
+       WHERE id = $7`,
       [
         wallpaperUrl ?? null,
         wallpaperPreset ?? null,
         !!wallpaperUseCover,
         blur,
         dim,
+        !!wallpaperSolidSidebars,
         req.userId
       ]
     );
@@ -1201,7 +1204,7 @@ app.get("/profile/:id", requireAuth, async (req, res) => {
               display_name, status_emoji, status_text, location, website,
               created_at AS joined_at, steam_id, steam_name, steam_avatar,
               wallpaper_url, wallpaper_preset, wallpaper_use_cover,
-              wallpaper_blur, wallpaper_dim
+              wallpaper_blur, wallpaper_dim, wallpaper_solid_sidebars
        FROM users WHERE id = $1`,
       [id]
     );
@@ -1378,6 +1381,31 @@ app.post("/dm/:userId", requireAuth, async (req, res) => {
     [req.userId, to, content || ""]
   );
   res.json(r.rows[0]);
+});
+
+// Delete a DM. Either participant (sender or recipient) can delete.
+// Frontend expects this route to exist — previously it 404'd silently and
+// the message stayed in the DB even though the UI looked like it worked.
+app.delete("/dm/:userId/messages/:msgId", requireAuth, async (req, res) => {
+  try {
+    const msgId = parseInt(req.params.msgId);
+    const otherUserId = parseInt(req.params.userId);
+    const msg = await pool.query(
+      "SELECT from_user_id, to_user_id FROM direct_messages WHERE id = $1",
+      [msgId]
+    );
+    if (!msg.rows[0]) return res.status(404).json({ error: "Message not found" });
+    const isAdmin = (await pool.query("SELECT is_admin FROM users WHERE id = $1", [req.userId])).rows[0]?.is_admin;
+    const row = msg.rows[0];
+    const isParticipant = row.from_user_id === req.userId || row.to_user_id === req.userId;
+    if (!isParticipant && !isAdmin) return res.status(403).json({ error: "Not authorised" });
+    await pool.query("DELETE FROM attachments WHERE dm_id = $1", [msgId]);
+    await pool.query("DELETE FROM direct_messages WHERE id = $1", [msgId]);
+    res.json({ success: true, otherUserId });
+  } catch (err) {
+    console.error("[DELETE dm msg]", err.message);
+    res.status(500).json({ error: "Server error" });
+  }
 });
 
 
@@ -1775,6 +1803,7 @@ app.delete("/channels/:channelId/messages/:messageId", requireAuth, async (req, 
   const r = await pool.query("SELECT user_id FROM messages WHERE id = $1", [req.params.messageId]);
   const isAdmin = (await pool.query("SELECT is_admin FROM users WHERE id = $1", [req.userId])).rows[0]?.is_admin;
   if (r.rows[0]?.user_id !== req.userId && !isAdmin) return res.status(403).json({ error: "Not authorised" });
+  await pool.query("DELETE FROM attachments WHERE message_id = $1", [req.params.messageId]);
   await pool.query("DELETE FROM messages WHERE id = $1", [req.params.messageId]);
   res.json({ success: true });
 });
