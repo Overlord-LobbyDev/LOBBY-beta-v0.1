@@ -2128,78 +2128,265 @@
 
     /* ── Full Profile Page ─────────────────────────────────── */
 
+    /* ── Compact hero banner ──────────────────────────────────
+       Single full-bleed banner ~220px tall that contains EVERYTHING:
+       background art, avatar, name, status, and action buttons all layered
+       together. Replaces the old 200px banner + separate 120px identity bar
+       (which was wasting ~1/3 of the viewport on a mostly-empty strip). */
     .fp-cover {
       height:220px; flex-shrink:0; position:relative; overflow:hidden;
-      background:linear-gradient(135deg,#2b2d31 0%,#1e1f22 100%);
+      background:linear-gradient(135deg,var(--bg-2) 0%,var(--bg-0) 100%);
     }
-    .fp-cover img { width:100%; height:100%; object-fit:cover; display:block; }
-    .fp-cover-overlay { position:absolute; inset:0; background:linear-gradient(to bottom, transparent 40%, rgba(0,0,0,.7) 100%); }
+    .fp-cover-bg {
+      position:absolute; inset:0; background-size:cover; background-position:50% 50%;
+      filter:saturate(.95);
+    }
+    .fp-cover-overlay {
+      position:absolute; inset:0; pointer-events:none;
+      background:
+        linear-gradient(to bottom,
+          rgba(0,0,0,.25) 0%,
+          rgba(0,0,0,.1) 30%,
+          rgba(0,0,0,.55) 75%,
+          rgba(0,0,0,.92) 100%);
+    }
+    .fp-cover-tools {
+      position:absolute; top:14px; right:20px; display:flex; gap:6px;
+      background:rgba(0,0,0,.45); border:1px solid rgba(255,255,255,.12);
+      border-radius:10px; padding:4px; backdrop-filter:blur(10px);
+      box-shadow:0 2px 10px rgba(0,0,0,.4);
+      z-index:3;
+    }
     .fp-cover-edit {
-      position:absolute; bottom:12px; right:12px;
-      background:rgba(0,0,0,.55); border:1px solid rgba(255,255,255,.15);
-      color:var(--text-2); border-radius:8px; padding:6px 12px;
+      background:transparent; border:none;
+      color:rgba(255,255,255,.85); border-radius:7px; padding:6px 11px;
       font-size:12px; font-weight:600; font-family:var(--font); cursor:pointer;
-      backdrop-filter:blur(4px); transition:background .15s, color .15s;
+      display:inline-flex; align-items:center; gap:6px;
+      transition:background .15s, color .15s;
     }
-    .fp-cover-edit:hover { background:rgba(255,255,255,.15); color:var(--text-1); }
+    .fp-cover-edit:hover { background:rgba(255,255,255,.14); color:#fff; }
 
-    .fp-identity-bar {
-      background:var(--bg-1); border-bottom:1px solid rgba(255,255,255,.07);
-      padding:0 32px 0; display:flex; align-items:flex-end; gap:20px;
-      flex-shrink:0; position:relative;
+    /* Hero content — overlays the cover. Avatar sits on the left, name stack
+       flows to its right, action buttons pin to the far right. */
+    .fp-hero {
+      position:absolute; left:0; right:0; bottom:0; z-index:2;
+      padding:20px 28px 18px; display:flex; align-items:flex-end; gap:20px;
     }
-    .fp-avatar-wrap { position:relative; margin-top:-52px; flex-shrink:0; }
+    .fp-avatar-wrap { position:relative; flex-shrink:0; }
     .fp-avatar {
-      width:104px; height:104px; border-radius:50%;
-      border:5px solid var(--bg-1); background:var(--accent);
+      width:108px; height:108px; border-radius:50%;
+      border:4px solid var(--bg-0); background:var(--accent);
       display:flex; align-items:center; justify-content:center;
-      font-size:36px; font-weight:800; overflow:hidden;
-      box-shadow:0 4px 24px rgba(0,0,0,.5);
-      cursor:pointer; transition:filter .15s;
+      font-size:38px; font-weight:800; overflow:hidden;
+      box-shadow:0 8px 24px rgba(0,0,0,.6);
+      cursor:pointer; transition:filter .15s, transform .15s;
     }
-    .fp-avatar:hover { filter:brightness(1.1); }
+    .fp-avatar:hover { filter:brightness(1.08); transform:translateY(-1px); }
     .fp-avatar img { width:100%; height:100%; object-fit:cover; }
     .fp-avatar-online {
-      position:absolute; bottom:6px; right:6px;
+      position:absolute; bottom:5px; right:5px;
       width:22px; height:22px; border-radius:50%;
-      background:var(--green); border:4px solid var(--bg-1);
+      background:var(--green); border:4px solid var(--bg-0);
+      box-shadow:0 0 0 1px rgba(0,0,0,.25);
     }
-    .fp-name-block { flex:1; padding:14px 0 16px; min-width:0; }
-    .fp-display-name { font-size:24px; font-weight:900; color:var(--text-1); letter-spacing:-.4px; line-height:1.1; }
-    .fp-username { font-size:14px; color:var(--text-3); margin-top:2px; }
+    .fp-name-block {
+      flex:1; min-width:0; padding-bottom:6px;
+      display:flex; flex-direction:column; gap:6px;
+    }
+    .fp-display-name {
+      font-size:28px; font-weight:900; color:#fff; letter-spacing:-.4px;
+      line-height:1.05; text-shadow:0 2px 12px rgba(0,0,0,.6);
+      white-space:nowrap; overflow:hidden; text-overflow:ellipsis;
+    }
+    .fp-username {
+      font-size:13px; color:rgba(255,255,255,.75);
+      display:flex; align-items:center; gap:8px;
+      text-shadow:0 1px 4px rgba(0,0,0,.5);
+    }
+    .fp-username .fp-presence {
+      display:inline-flex; align-items:center; gap:4px;
+      font-weight:600;
+    }
     .fp-status-pill {
       display:inline-flex; align-items:center; gap:8px;
-      background:var(--bg-3); border:1.5px solid rgba(255,255,255,.1);
-      border-radius:20px; padding:7px 16px; font-size:13px; color:var(--text-2);
-      margin-top:8px; cursor:pointer;
-      transition:background .15s, border-color .15s, box-shadow .15s;
-      max-width:340px;
+      background:rgba(0,0,0,.45); border:1px solid rgba(255,255,255,.14);
+      backdrop-filter:blur(8px);
+      border-radius:999px; padding:6px 14px; font-size:12.5px; color:rgba(255,255,255,.9);
+      margin-top:2px; cursor:pointer; align-self:flex-start;
+      transition:background .15s, border-color .15s, box-shadow .15s, color .15s;
+      max-width:420px;
     }
     .fp-status-pill:hover {
-      background:var(--bg-2);
-      border-color:rgba(88,101,242,.5);
-      box-shadow:0 0 0 3px rgba(88,101,242,.1);
-      color:var(--text-1);
+      background:rgba(0,0,0,.65);
+      border-color:rgba(255,255,255,.25);
+      color:#fff;
     }
     .fp-status-edit-hint {
-      font-size:10px; color:var(--text-3); margin-left:4px; flex-shrink:0;
+      font-size:10px; color:rgba(255,255,255,.55); margin-left:4px; flex-shrink:0;
+      letter-spacing:.3px;
     }
     .fp-action-bar {
-      display:flex; gap:8px; padding:16px 0 16px; align-items:center; flex-wrap:wrap;
+      display:flex; gap:8px; align-items:center;
+      flex-wrap:wrap; flex-shrink:0; padding-bottom:6px;
     }
     .fp-btn {
-      padding:8px 18px; border-radius:8px; border:none;
-      font-size:13px; font-weight:700; font-family:var(--font); cursor:pointer;
-      display:flex; align-items:center; gap:6px;
-      transition:background .15s, transform .1s, box-shadow .15s;
+      padding:9px 16px; border-radius:9px; border:none;
+      font-size:12.5px; font-weight:700; font-family:var(--font); cursor:pointer;
+      display:inline-flex; align-items:center; gap:6px; line-height:1;
+      transition:background .15s, transform .1s, box-shadow .15s, border-color .15s, color .15s;
     }
     .fp-btn:active { transform:scale(.96); }
     .fp-btn-primary { background:var(--accent); color:#fff; }
-    .fp-btn-primary:hover { background:var(--accent-h); box-shadow:0 4px 14px rgba(88,101,242,.4); }
-    .fp-btn-ghost { background:var(--bg-3); color:var(--text-1); border:1px solid rgba(255,255,255,.1); }
-    .fp-btn-ghost:hover { background:var(--bg-2); }
+    .fp-btn-primary:hover { background:var(--accent-h); box-shadow:0 4px 14px rgba(0,0,0,.4); }
+    .fp-btn-ghost {
+      background:rgba(0,0,0,.45); color:rgba(255,255,255,.92);
+      border:1px solid rgba(255,255,255,.15);
+      backdrop-filter:blur(8px);
+    }
+    .fp-btn-ghost:hover {
+      background:rgba(0,0,0,.65); color:#fff;
+      border-color:rgba(255,255,255,.28);
+    }
     .fp-btn-danger { background:rgba(237,66,69,.15); color:var(--danger); border:1px solid rgba(237,66,69,.2); }
     .fp-btn-danger:hover { background:var(--danger); color:#fff; }
+
+    /* ── Stats hero strip (top of left column) ─────────────────
+       Replaces the sparse About-only card. Shows posts / friends / playtime /
+       joined as a compact 4-up grid so the left column opens with identity,
+       not just "Joined March 2026". */
+    .fp-stats-hero {
+      background:linear-gradient(135deg,var(--bg-2) 0%,var(--bg-1) 100%);
+      border:1px solid rgba(255,255,255,.08);
+      border-radius:12px; padding:14px;
+      display:grid; grid-template-columns:repeat(2,1fr); gap:10px;
+    }
+    .fp-stat {
+      display:flex; flex-direction:column; gap:3px;
+      padding:10px 12px;
+      background:rgba(255,255,255,.03);
+      border:1px solid rgba(255,255,255,.05);
+      border-radius:9px;
+    }
+    .fp-stat-label {
+      font-size:10px; font-weight:700; text-transform:uppercase;
+      letter-spacing:.8px; color:var(--text-3);
+      display:flex; align-items:center; gap:5px;
+    }
+    .fp-stat-value {
+      font-size:20px; font-weight:900; color:var(--text-1);
+      letter-spacing:-.3px; line-height:1.1;
+    }
+    .fp-stat-sub { font-size:11px; color:var(--text-3); }
+
+    /* ── Featured game hero card ──────────────────────────────
+       Top-played game gets a 180px-hero-art showcase with game name, rank,
+       and playtime overlaid. Matches the home page's bigger game-card feel
+       but tuned for the narrower profile right rail. */
+    .fp-game-hero {
+      position:relative; border-radius:12px; overflow:hidden;
+      border:1px solid rgba(255,255,255,.08);
+      background:var(--bg-1);
+      cursor:pointer; transition:border-color .15s, transform .15s, box-shadow .15s;
+    }
+    .fp-game-hero:hover {
+      border-color:rgba(255,255,255,.2); transform:translateY(-2px);
+      box-shadow:0 10px 28px rgba(0,0,0,.45);
+    }
+    .fp-game-hero-art {
+      width:100%; height:170px; object-fit:cover; display:block;
+      background:var(--bg-3);
+    }
+    .fp-game-hero-gradient {
+      position:absolute; inset:0; pointer-events:none;
+      background:linear-gradient(to top, rgba(0,0,0,.92) 0%, rgba(0,0,0,.3) 50%, transparent 100%);
+      height:170px;
+    }
+    .fp-game-hero-rank {
+      position:absolute; top:10px; left:10px;
+      background:linear-gradient(135deg,#fbbf24,#f59e0b);
+      color:#111; font-size:11px; font-weight:900;
+      padding:4px 10px; border-radius:99px;
+      letter-spacing:.4px; box-shadow:0 2px 8px rgba(251,191,36,.4);
+    }
+    .fp-game-hero-body {
+      position:absolute; left:14px; right:14px; bottom:12px;
+    }
+    .fp-game-hero-name {
+      font-size:17px; font-weight:900; color:#fff;
+      letter-spacing:-.2px; line-height:1.15;
+      text-shadow:0 2px 8px rgba(0,0,0,.75);
+      white-space:nowrap; overflow:hidden; text-overflow:ellipsis;
+    }
+    .fp-game-hero-meta {
+      display:flex; align-items:center; gap:10px;
+      margin-top:5px; font-size:12px; color:rgba(255,255,255,.85);
+      text-shadow:0 1px 4px rgba(0,0,0,.7);
+    }
+    .fp-game-hero-meta .week { color:#fff; font-weight:700; }
+    .fp-game-hero-dot { opacity:.5; }
+
+    /* Compact game row for #2+ */
+    .fp-game-row {
+      display:flex; gap:10px; padding:6px; background:var(--bg-1);
+      border:1px solid rgba(255,255,255,.06); border-radius:10px;
+      cursor:pointer; align-items:center;
+      transition:border-color .15s, background .15s;
+    }
+    .fp-game-row:hover {
+      border-color:rgba(255,255,255,.14);
+      background:var(--bg-2);
+    }
+    .fp-game-row-art {
+      width:72px; height:34px; border-radius:6px; object-fit:cover;
+      background:var(--bg-3); flex-shrink:0;
+    }
+    .fp-game-row-body { flex:1; min-width:0; }
+    .fp-game-row-name {
+      font-size:12.5px; font-weight:700; color:var(--text-1);
+      white-space:nowrap; overflow:hidden; text-overflow:ellipsis;
+      line-height:1.2;
+    }
+    .fp-game-row-meta {
+      font-size:10.5px; color:var(--text-3); margin-top:2px;
+      display:flex; gap:6px; align-items:center;
+    }
+    .fp-game-row-meta .week { color:var(--accent); font-weight:700; }
+    .fp-game-row-rank {
+      font-size:11px; font-weight:800; color:var(--text-3);
+      width:24px; text-align:center; flex-shrink:0;
+    }
+
+    /* ── Activity item (in feed, mixed with posts) ────────────
+       Lightweight one-line event cards — "Played Tekken 8 for 3h this week",
+       "Joined Overlord's Lobby", etc. Distinct from posts so the timeline
+       reads as activity, not noise. */
+    .fp-activity {
+      display:flex; align-items:center; gap:12px;
+      background:var(--bg-1); border:1px solid rgba(255,255,255,.06);
+      border-left:3px solid var(--accent);
+      border-radius:10px; padding:10px 14px;
+      transition:border-color .15s, background .15s;
+    }
+    .fp-activity:hover {
+      border-color:rgba(255,255,255,.12);
+      background:var(--bg-2);
+    }
+    .fp-activity-icon {
+      width:34px; height:34px; border-radius:8px;
+      background:rgba(255,255,255,.06); overflow:hidden;
+      display:flex; align-items:center; justify-content:center;
+      font-size:16px; flex-shrink:0;
+    }
+    .fp-activity-icon img { width:100%; height:100%; object-fit:cover; }
+    .fp-activity-text {
+      flex:1; min-width:0;
+      font-size:13px; color:var(--text-2); line-height:1.4;
+    }
+    .fp-activity-text .bold { color:var(--text-1); font-weight:700; }
+    .fp-activity-text .accent { color:var(--accent); font-weight:700; }
+    .fp-activity-time {
+      font-size:11px; color:var(--text-3); flex-shrink:0;
+    }
 
     .fp-body {
       flex:1; display:flex; min-height:0; overflow:hidden;
@@ -4905,8 +5092,38 @@ function connectWS() {
     if (typeof setupVoiceChannel==="function") setupVoiceChannel();
     // Re-register tournament handlers whenever connection is established
     if (typeof window.registerTournamentSocketHandlers === 'function') window.registerTournamentSocketHandlers();
+    // If we were in a voice channel before the ws dropped, re-announce our
+    // presence. The server resets vcChannelId to null on the "Replaced"
+    // connection path, so without this, peers who join after the bounce
+    // won't see us in the channel and we won't receive their vc-joined.
+    try {
+      if (typeof vcChannelId !== "undefined" && vcChannelId !== null && me) {
+        console.log("[vc] re-announcing vc-join after ws reconnect to channel", vcChannelId);
+        ws.send(JSON.stringify({
+          type: "vc-join",
+          channelId: vcChannelId,
+          userId: me.id,
+          username: me.username,
+          avatarUrl: me.avatarUrl || null
+        }));
+      }
+    } catch {}
   };
-  ws.onclose = () => setTimeout(connectWS, 3000);
+  ws.onclose = () => {
+    // If a call was active when the ws dropped, the remote side can no
+    // longer reach us via signalling — the PC will stall and callActive
+    // gets stranded. Force-clean so the user can place/receive new calls
+    // after reconnect. Self-healing in handleIncomingCall/startDirectCall
+    // catches any residual stuck state too, but cleaning here is cheaper
+    // and also stops the ringing/outgoing sounds immediately.
+    try {
+      if (typeof callActive !== "undefined" && callActive) {
+        console.warn("[ws] closed while call active — force-ending call");
+        if (typeof forceEndCall === "function") forceEndCall();
+      }
+    } catch {}
+    setTimeout(connectWS, 3000);
+  };
   ws.onmessage = async ({ data }) => {
     const msg = JSON.parse(data);
     // Route tournament-specific messages to the tournament handler
@@ -7188,6 +7405,18 @@ const CALL_ICE_SERVERS = [
 ];
 
 async function startDirectCall(userId, username) {
+  // Self-heal stuck callActive (see handleIncomingCall for full rationale).
+  // Without this, a single abnormally-ended call permanently locks the user
+  // out of starting new calls — "Already in a call" with no actual call.
+  const hasLivePeer = Object.values(callPeers).some(pc =>
+    pc && !["closed","failed","disconnected"].includes(pc.connectionState)
+  );
+  const hasLiveStream = !!callStream?.getTracks().some(t => t.readyState === "live");
+  if (callActive && !hasLivePeer && !hasLiveStream) {
+    console.warn("[call] callActive stuck without live peer/stream — clearing before starting new call to", userId);
+    forceEndCall();
+    await new Promise(r => setTimeout(r, 60));
+  }
   if (callActive) { showToast("Already in a call","error"); return; }
   try { callStream = await navigator.mediaDevices.getUserMedia({ audio:true, video:true }); }
   catch(e) {
@@ -7225,7 +7454,26 @@ function showFloatingCallBar(name, avatarUrl, status) {
 function hideFloatingCallBar() { document.getElementById("floatingCallBar").style.display="none"; }
 
 async function handleIncomingCall(msg) {
-  if (callActive) { wsSend({ type:"call-decline", to:msg.from }); return; }
+  // Self-heal stuck callActive. This flag gets stranded any time a call ends
+  // abnormally — peer disconnects silently, tab loses focus mid-call, network
+  // blip, renegotiation failure, or a refresh during a call — which causes
+  // every subsequent incoming call to be silently declined forever. Detect
+  // the "active flag but no real call" case and force-clear before deciding.
+  const hasLivePeer = Object.values(callPeers).some(pc =>
+    pc && !["closed","failed","disconnected"].includes(pc.connectionState)
+  );
+  const hasLiveStream = !!callStream?.getTracks().some(t => t.readyState === "live");
+  if (callActive && !hasLivePeer && !hasLiveStream) {
+    console.warn("[call] callActive stuck without live peer/stream — clearing before accepting incoming invite from", msg.from);
+    forceEndCall();
+    await new Promise(r => setTimeout(r, 60));
+  }
+  if (callActive) {
+    console.log("[call] declining incoming from", msg.from, "— genuinely in another call");
+    wsSend({ type:"call-decline", to:msg.from });
+    return;
+  }
+  console.log("[call] ringing for incoming invite from", msg.from, "(", msg.fromUsername, ")");
   LobbySound.loop("callIncoming");
   showIncomingCallModal(msg.fromUsername||"Unknown", null, msg.from);
 }
@@ -11654,14 +11902,14 @@ async function renderFullProfilePage() {
   const avHtml = fpData.avatar_url ? `<img src="${fpData.avatar_url}" />` : (fpData.username||"?").slice(0,1).toUpperCase();
   const displayName = fpData.display_name || fpData.username || "Unknown";
 
-  // Build action bar
+  // Build action bar — only unique actions live here. Change Cover /
+  // Reposition have been moved to the cover toolbar (top-right of banner)
+  // so we don't show two copies of the same button.
   let actions = "";
   if (fpIsOwn) {
     actions = `<button class="fp-btn fp-btn-primary" onclick="fpEnterEditMode()">✏️ Edit Profile</button>
-               <button class="fp-btn fp-btn-ghost"   onclick="fpEditCover()">🖼 Change Cover</button>
-               ${fpData.banner_url ? `<button class="fp-btn fp-btn-ghost" onclick="fpRepositionCover()">✥ Reposition</button>` : ""}
                <button class="fp-btn fp-btn-ghost" onclick="navigator.clipboard.writeText(window.location.origin+'?invite='+${fpUserId}).then(()=>showToast('Invite link copied!','success'))" title="Share this link so friends can add you even if your profile is private">🔗 Invite Link</button>
-               ${(fpData.is_private || fpData.privacy==='private') ? `<span style="display:inline-flex;align-items:center;gap:5px;font-size:12px;font-weight:700;color:var(--text-3);background:var(--bg-3);border:1px solid rgba(255,255,255,.1);padding:6px 12px;border-radius:8px">🔒 Private Profile</span>` : ""}`;
+               ${(fpData.is_private || fpData.privacy==='private') ? `<span style="display:inline-flex;align-items:center;gap:5px;font-size:11.5px;font-weight:700;color:var(--text-3);background:var(--bg-3);border:1px solid rgba(255,255,255,.1);padding:6px 12px;border-radius:999px">🔒 Private</span>` : ""}`;
   } else {
     let friendBtnHtml = "";
     const isPrivate = fpData.is_private === true || fpData.privacy === "private";
@@ -11690,25 +11938,33 @@ async function renderFullProfilePage() {
     <div class="fp-cover" id="fpCover" style="${coverStyle}">
       <div class="fp-cover-overlay"></div>
       ${fpIsOwn ? `
-        <button class="fp-cover-edit" onclick="fpEditCover()" style="right:12px;bottom:12px">🖼 Change Cover</button>
-        ${fpData.banner_url ? `<button class="fp-cover-edit" onclick="fpRepositionCover()" style="right:150px;bottom:12px">✥ Reposition</button>` : ""}
-      ` : ""}
-    </div>
-    <div class="fp-identity-bar">
-      <div class="fp-avatar-wrap">
-        <div class="fp-avatar" id="fpAvatar" ${fpIsOwn?"onclick='fpEditAvatar()' title='Change avatar'":""}>${avHtml}</div>
-        ${isOnline ? `<div class="fp-avatar-online"></div>` : ""}
-      </div>
-      <div class="fp-name-block">
-        <div class="fp-display-name" id="fpDisplayName">${escapeHtml(displayName)}</div>
-        <div class="fp-username">@${escapeHtml(fpData.username||"unknown")} ${isOnline?"<span style='color:var(--green);font-size:11px'>● Online</span>":"<span style='color:var(--text-3);font-size:11px'>○ Offline</span>"}</div>
-        <div class="fp-status-pill" id="fpStatusPill" ${fpIsOwn?"onclick='fpQuickStatus()' title='Click to update your status'":""}>
-          <span id="fpStatusEmoji">${fpData.status_emoji||"💬"}</span>
-          <span id="fpStatusTextEl" style="flex:1">${escapeHtml(fpData.status_text||"No status set")}</span>
-          ${fpIsOwn?`<span class="fp-status-edit-hint">✏️ Edit</span>`:""}
+        <div class="fp-cover-tools">
+          ${fpData.banner_url ? `<button class="fp-cover-edit" onclick="fpRepositionCover()" title="Reposition cover image">✥ Reposition</button>` : ""}
+          <button class="fp-cover-edit" onclick="fpEditCover()" title="Upload a new cover">🖼 Change Cover</button>
         </div>
+      ` : ""}
+      <div class="fp-hero">
+        <div class="fp-avatar-wrap">
+          <div class="fp-avatar" id="fpAvatar" ${fpIsOwn?"onclick='fpEditAvatar()' title='Change avatar'":""}>${avHtml}</div>
+          ${isOnline ? `<div class="fp-avatar-online"></div>` : ""}
+        </div>
+        <div class="fp-name-block">
+          <div class="fp-display-name" id="fpDisplayName">${escapeHtml(displayName)}</div>
+          <div class="fp-username">
+            <span>@${escapeHtml(fpData.username||"unknown")}</span>
+            <span style="opacity:.5">•</span>
+            ${isOnline
+              ? `<span class="fp-presence" style="color:#4ade80">● Online</span>`
+              : `<span class="fp-presence" style="color:rgba(255,255,255,.6)">○ Offline</span>`}
+          </div>
+          <div class="fp-status-pill" id="fpStatusPill" ${fpIsOwn?"onclick='fpQuickStatus()' title='Click to update your status'":""}>
+            <span id="fpStatusEmoji">${fpData.status_emoji||"💬"}</span>
+            <span id="fpStatusTextEl" style="flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${escapeHtml(fpData.status_text||"No status set")}</span>
+            ${fpIsOwn?`<span class="fp-status-edit-hint">✏️ Edit</span>`:""}
+          </div>
+        </div>
+        <div class="fp-action-bar">${actions}</div>
       </div>
-      <div class="fp-action-bar">${actions}</div>
     </div>
     <div class="fp-body">
       <div class="fp-left" id="fpLeft"></div>
@@ -11743,16 +11999,70 @@ async function renderFpLeft() {
   const left = document.getElementById("fpLeft");
   if (!left) return;
 
+  // Stats hero block data — computed once, filled in below.
+  // We fetch posts + friends + steam_recent in parallel so the stats hero
+  // lights up as a single block instead of four independent async fills.
+  const token = localStorage.getItem("vh_token") || sessionStorage.getItem("vh_token");
+  const [postsCountRes, friendsCountRes, steamStatsRes] = await Promise.all([
+    fetch(`${AUTH_URL}/profile/${fpUserId}/posts`, { headers:{ Authorization:`Bearer ${token}` }}).then(r=>r.json()).catch(()=>[]),
+    (async () => {
+      if (fpIsOwn) {
+        const all = await api("/friends").catch(()=>[]);
+        return (all||[]).filter(f => f.status==="accepted").length;
+      }
+      try {
+        const r = await fetch(`${AUTH_URL}/profile/${fpUserId}/friends`, { headers:{ Authorization:`Bearer ${token}` }}).then(r=>r.json());
+        return Array.isArray(r) ? r.length : 0;
+      } catch(e) { return 0; }
+    })(),
+    (async () => {
+      if (!fpData.steam_id) return null;
+      try {
+        const url = fpIsOwn ? `${AUTH_URL}/steam/recent` : `${AUTH_URL}/steam/recent/${fpUserId}`;
+        const games = await fetch(url, { headers:{ Authorization:`Bearer ${token}` }}).then(r=>r.json()).catch(()=>[]);
+        if (!Array.isArray(games) || !games.length) return null;
+        const totalMins = games.reduce((s,g) => s + (g.playtime_2weeks || (g.hours_recent?g.hours_recent*60:0) || 0), 0);
+        return totalMins;
+      } catch(e) { return null; }
+    })()
+  ]);
+  const postsCount = Array.isArray(postsCountRes) ? postsCountRes.length : 0;
+  const friendsCount = friendsCountRes || 0;
+  const fmtMins = m => !m || m<=0 ? "—" : (m<60 ? `${Math.round(m)}m` : `${Math.floor(m/60)}h`);
+  const weekPlaytime = steamStatsRes == null ? (fpData.steam_id ? "0h" : "—") : fmtMins(steamStatsRes);
+  const joinedLabel = fpData.joined_at
+    ? new Date(fpData.joined_at).toLocaleDateString("en-GB",{month:"short",year:"numeric"})
+    : "—";
+
+  const statsHero = `
+    <div class="fp-stats-hero">
+      <div class="fp-stat">
+        <div class="fp-stat-label">📝 Posts</div>
+        <div class="fp-stat-value">${postsCount}</div>
+      </div>
+      <div class="fp-stat">
+        <div class="fp-stat-label">👥 Friends</div>
+        <div class="fp-stat-value">${friendsCount}</div>
+      </div>
+      <div class="fp-stat">
+        <div class="fp-stat-label">🎮 This Week</div>
+        <div class="fp-stat-value">${weekPlaytime}</div>
+        <div class="fp-stat-sub">${fpData.steam_id ? "across recent games" : "No Steam linked"}</div>
+      </div>
+      <div class="fp-stat">
+        <div class="fp-stat-label">📅 Joined</div>
+        <div class="fp-stat-value" style="font-size:15px">${joinedLabel}</div>
+      </div>
+    </div>`;
+
   // About card — richer layout with avatar-level bio block
   const aboutRows = [
     fpData.bio ? `<div style="font-size:13.5px;color:var(--text-2);line-height:1.65;padding:2px 0 10px;white-space:pre-wrap;border-bottom:1px solid rgba(255,255,255,.05);margin-bottom:6px">${escapeHtml(fpData.bio)}</div>` : "",
     fpData.location  ? `<div class="fp-info-row"><span class="fp-info-icon">📍</span><span class="fp-info-label">Location</span><span>${escapeHtml(fpData.location)}</span></div>` : "",
     fpData.website   ? `<div class="fp-info-row"><span class="fp-info-icon">🔗</span><span class="fp-info-label">Website</span><a href="${fpData.website}" target="_blank" style="color:var(--accent);word-break:break-all">${escapeHtml(fpData.website)}</a></div>` : "",
-    fpData.joined_at ? `<div class="fp-info-row"><span class="fp-info-icon">📅</span><span class="fp-info-label">Joined</span><span>${new Date(fpData.joined_at).toLocaleDateString("en-GB",{month:"long",year:"numeric"})}</span></div>` : "",
   ].filter(Boolean).join("") || `<div style="color:var(--text-3);font-size:13px;padding:4px 0;line-height:1.6">${fpIsOwn?"Click Edit to add a bio and info about yourself.":"No info yet."}</div>`;
 
-  // Friends card
-  const token = localStorage.getItem("vh_token") || sessionStorage.getItem("vh_token");
+  // Friends card (reuses `token` declared above for the stats hero fetch)
   let friendsHtml = "";
   try {
     let flist = [];
@@ -11847,6 +12157,7 @@ async function renderFpLeft() {
   } catch(e) {}
 
   left.innerHTML = `
+    ${statsHero}
     <div class="fp-card">
       <div class="fp-card-header">About ${fpIsOwn?`<button class="fp-card-header-link" onclick="fpEnterEditMode()">Edit</button>`:""}
       </div>
@@ -11985,47 +12296,134 @@ async function renderFpRight() {
       </div>`);
   }
 
-  if (!allowed.length) {
+  // ── Build activity timeline events ─────────────────────────
+  // We synthesise a handful of activity items from real signals we already
+  // have (Steam recent play, joined date) and weave them into the post stream
+  // by timestamp so the column reads as a unified activity feed instead of
+  // just "all posts."
+  const activityItems = await buildFpActivity(allowed);
+
+  const fmtTimeAgo = ts => {
+    const d = (Date.now() - new Date(ts).getTime()) / 1000;
+    if (d < 60) return "just now";
+    if (d < 3600) return `${Math.floor(d/60)}m ago`;
+    if (d < 86400) return `${Math.floor(d/3600)}h ago`;
+    if (d < 86400*7) return `${Math.floor(d/86400)}d ago`;
+    return new Date(ts).toLocaleDateString("en-GB",{day:"numeric",month:"short"});
+  };
+
+  if (!allowed.length && !activityItems.length) {
     const existing = document.getElementById("fpRight");
     existing.insertAdjacentHTML("beforeend", `<div style="text-align:center;padding:40px;color:var(--text-3)"><div style="font-size:40px;margin-bottom:10px">📭</div>No posts yet</div>`);
     return;
   }
 
   const avHtml = fpData.avatar_url ? `<img src="${fpData.avatar_url}" />` : (fpData.username||"?").slice(0,1).toUpperCase();
-  const postsHtml = allowed.map(p => {
+
+  // Unified timeline — each entry has {ts, html} sorted newest first
+  const timeline = [];
+
+  for (const p of allowed) {
     const time = new Date(p.created_at).toLocaleDateString("en-GB",{day:"numeric",month:"short"}) + " · " + new Date(p.created_at).toLocaleTimeString([],{hour:"2-digit",minute:"2-digit"});
     const visIcon = p.visibility==="friends"?"👥":"🌐";
     const fpReactHtml = renderReactionBar(p, 'fp-');
     const cmt = `<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>`;
     const shr = `<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 12v8a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-8"/><polyline points="16 6 12 2 8 6"/><line x1="12" y1="2" x2="12" y2="15"/></svg>`;
-    return `<div class="fp-post" id="fp-post-${p.id}" style="width:100%">
-      <div class="fp-post-header">
-        <div class="fp-post-av">${avHtml}</div>
-        <div class="fp-post-meta">
-          <div class="fp-post-author">${escapeHtml(fpData.display_name||fpData.username||"")}</div>
-          <div class="fp-post-time">${time}</div>
+    timeline.push({
+      ts: p.created_at,
+      html: `<div class="fp-post" id="fp-post-${p.id}" style="width:100%">
+        <div class="fp-post-header">
+          <div class="fp-post-av">${avHtml}</div>
+          <div class="fp-post-meta">
+            <div class="fp-post-author">${escapeHtml(fpData.display_name||fpData.username||"")}</div>
+            <div class="fp-post-time">${time}</div>
+          </div>
+          <div class="fp-post-vis">${visIcon} ${p.visibility==="friends"?"Friends":"Public"}</div>
+          ${fpIsOwn||me?.is_admin?`<button onclick="fpDeletePost(${p.id})" style="background:none;border:none;color:var(--text-3);cursor:pointer;font-size:14px;padding:4px 8px;border-radius:6px;margin-left:4px;transition:color .15s,background .15s" onmouseover="this.style.color='var(--danger)';this.style.background='rgba(237,66,69,.1)'" onmouseout="this.style.color='var(--text-3)';this.style.background='none'">🗑</button>`:""}
         </div>
-        <div class="fp-post-vis">${visIcon} ${p.visibility==="friends"?"Friends":"Public"}</div>
-        ${fpIsOwn||me?.is_admin?`<button onclick="fpDeletePost(${p.id})" style="background:none;border:none;color:var(--text-3);cursor:pointer;font-size:14px;padding:4px 8px;border-radius:6px;margin-left:4px;transition:color .15s,background .15s" onmouseover="this.style.color='var(--danger)';this.style.background='rgba(237,66,69,.1)'" onmouseout="this.style.color='var(--text-3)';this.style.background='none'">🗑</button>`:""}
-      </div>
-      ${p.content?`<div class="fp-post-content">${escapeHtml(p.content)}</div>`:""}
-      ${p.image_url?`<img class="fp-post-image" src="${p.image_url}" onclick="openLightbox('${p.image_url}')" />`:""}
-      <div class="fp-post-actions">
-        ${fpReactHtml}
-        <button class="fp-post-btn" onclick="toggleComments(${p.id})">${cmt} <span>${p.comment_count||0}</span></button>
-        <button class="fp-post-btn" onclick="sharePost(${p.id})">${shr} Share</button>
-      </div>
-      <div class="post-comments" id="comments-${p.id}">
-        <div id="comment-list-${p.id}"></div>
-        <div class="comment-input-row">
-          <input class="comment-input" id="comment-input-${p.id}" placeholder="Write a comment… (@ to mention)" onkeydown="if(event.key==='Enter'){submitComment(${p.id})}" oninput="handleMentionTyping(this,'feed',${p.id})" />
-          <button class="comment-send-btn" onclick="submitComment(${p.id})">➤</button>
+        ${p.content?`<div class="fp-post-content">${escapeHtml(p.content)}</div>`:""}
+        ${p.image_url?`<img class="fp-post-image" src="${p.image_url}" onclick="openLightbox('${p.image_url}')" />`:""}
+        <div class="fp-post-actions">
+          ${fpReactHtml}
+          <button class="fp-post-btn" onclick="toggleComments(${p.id})">${cmt} <span>${p.comment_count||0}</span></button>
+          <button class="fp-post-btn" onclick="sharePost(${p.id})">${shr} Share</button>
         </div>
-      </div>
-    </div>`;
-  }).join("");
+        <div class="post-comments" id="comments-${p.id}">
+          <div id="comment-list-${p.id}"></div>
+          <div class="comment-input-row">
+            <input class="comment-input" id="comment-input-${p.id}" placeholder="Write a comment… (@ to mention)" onkeydown="if(event.key==='Enter'){submitComment(${p.id})}" oninput="handleMentionTyping(this,'feed',${p.id})" />
+            <button class="comment-send-btn" onclick="submitComment(${p.id})">➤</button>
+          </div>
+        </div>
+      </div>`
+    });
+  }
 
-  document.getElementById("fpRight").insertAdjacentHTML("beforeend", postsHtml);
+  for (const a of activityItems) {
+    timeline.push({
+      ts: a.ts,
+      html: `<div class="fp-activity">
+        <div class="fp-activity-icon">${a.icon}</div>
+        <div class="fp-activity-text">${a.text}</div>
+        <div class="fp-activity-time">${fmtTimeAgo(a.ts)}</div>
+      </div>`
+    });
+  }
+
+  // Sort newest first
+  timeline.sort((x, y) => new Date(y.ts) - new Date(x.ts));
+
+  document.getElementById("fpRight").insertAdjacentHTML("beforeend", timeline.map(t => t.html).join(""));
+}
+
+// ── Build activity timeline items from available signals ───
+// Returns [{ts, icon, text}, …] — these are interleaved with posts in
+// renderFpRight to produce a unified activity feed. We pull from:
+//   • Steam recent play (top game this week)
+//   • Joined date (account creation)
+//   • Friends-count milestones (if applicable)
+async function buildFpActivity(posts) {
+  const items = [];
+  const token = localStorage.getItem("vh_token") || sessionStorage.getItem("vh_token");
+
+  // Joined event — always include
+  if (fpData.joined_at) {
+    items.push({
+      ts: fpData.joined_at,
+      icon: "🎉",
+      text: `<span class="bold">${escapeHtml(fpData.display_name||fpData.username||"User")}</span> joined LOBBY`
+    });
+  }
+
+  // Steam recent — show top played as a "this week" event timestamped near
+  // the most recent post (or now if no posts) so it surfaces near the top.
+  if (fpData.steam_id) {
+    try {
+      const url = fpIsOwn ? `${AUTH_URL}/steam/recent` : `${AUTH_URL}/steam/recent/${fpUserId}`;
+      const games = await fetch(url, { headers:{ Authorization:`Bearer ${token}` }}).then(r=>r.json()).catch(()=>[]);
+      const list = Array.isArray(games) ? games.slice(0, 3) : [];
+      const fmtH = m => {
+        if (!m || m<=0) return "";
+        if (m < 60) return `${Math.round(m)}m`;
+        const h = Math.floor(m/60), mm = Math.round(m%60);
+        return mm > 0 ? `${h}h ${mm}m` : `${h}h`;
+      };
+      // Stagger timestamps so they don't all stack at "just now"
+      list.forEach((g, i) => {
+        const recent = g.playtime_2weeks || (g.hours_recent ? g.hours_recent*60 : 0);
+        if (!recent) return;
+        const when = new Date(Date.now() - (i+1) * 6 * 3600 * 1000).toISOString(); // staggered last 24h
+        const art  = `https://cdn.cloudflare.steamstatic.com/steam/apps/${g.appid}/capsule_sm_120.jpg`;
+        items.push({
+          ts: when,
+          icon: `<img src="${art}" alt="" />`,
+          text: `Played <span class="bold">${escapeHtml(g.name||"a game")}</span> for <span class="accent">${fmtH(recent)}</span> this week`
+        });
+      });
+    } catch(e) {}
+  }
+
+  return items;
 }
 
 let fpPostImageFile = null;
@@ -12175,8 +12573,6 @@ async function renderFpSteam() {
     const countEl = document.getElementById("fpSteamCount");
     if (countEl) countEl.textContent = `${list.length} games`;
 
-    const maxMins = Math.max(...list.map(x => x.playtime_2weeks || 0), 1);
-
     // Helper: format minutes into readable label
     function fmtMins(mins) {
       if (!mins || mins <= 0) return null;
@@ -12186,40 +12582,60 @@ async function renderFpSteam() {
       return m > 0 ? `${h}h ${m}m` : `${h}h`;
     }
 
-    document.getElementById("fpSteamGames").innerHTML = list.map((g, i) => {
-      const recent2w  = g.playtime_2weeks  || (g.hours_recent  ? g.hours_recent  * 60 : 0);
-      const totalMins = g.playtime_forever || (g.hours_total   ? g.hours_total   * 60 : 0);
-      const recentLabel = fmtMins(recent2w);
-      const totalLabel  = fmtMins(totalMins) || "0h";
+    // Hero showcase card for top game + compact rows for the rest.
+    // The #1 game gets the full art header treatment; #2-#10 are dense
+    // one-liners so the column doesn't become a wall of duplicate cards.
+    const heroGame = list[0];
+    const restGames = list.slice(1, 10);
 
-      const barPct = recent2w > 0 ? Math.max(4, Math.round((recent2w / maxMins) * 100)) : 0;
-      const bar = recent2w > 0
-        ? `<div style="margin-top:5px;background:var(--bg-3);border-radius:99px;height:3px;overflow:hidden">
-             <div style="height:100%;background:var(--accent);border-radius:99px;width:${barPct}%"></div>
-           </div>` : "";
+    function gameImg(appid) { return `https://cdn.cloudflare.steamstatic.com/steam/apps/${appid}/header.jpg`; }
+    function gameFallback(appid) { return `https://cdn.cloudflare.steamstatic.com/steam/apps/${appid}/capsule_sm_120.jpg`; }
 
-      const imgUrl     = `https://cdn.cloudflare.steamstatic.com/steam/apps/${g.appid}/header.jpg`;
-      const fallbackUrl = `https://cdn.cloudflare.steamstatic.com/steam/apps/${g.appid}/capsule_sm_120.jpg`;
-      const rankColor  = i === 0 ? "#fbbf24" : i === 1 ? "#9ca3af" : i === 2 ? "#b45309" : "var(--text-3)";
-
-      return `
-        <div style="background:var(--bg-1);border:1px solid rgba(255,255,255,.07);border-radius:10px;overflow:hidden;cursor:pointer;transition:border-color .15s,transform .15s,box-shadow .15s" onmouseover="this.style.borderColor='rgba(255,255,255,.15)';this.style.transform='translateY(-1px)';this.style.boxShadow='0 4px 16px rgba(0,0,0,.3)'" onmouseout="this.style.borderColor='rgba(255,255,255,.07)';this.style.transform='';this.style.boxShadow=''" onclick="window.open('https://store.steampowered.com/app/${g.appid}','_blank')">
-          <div style="position:relative;width:100%;height:64px;background:var(--bg-3);overflow:hidden">
-            <img src="${imgUrl}" style="width:100%;height:100%;object-fit:cover;display:block" onerror="this.src='${fallbackUrl}';this.onerror=null" />
-            <div style="position:absolute;inset:0;background:linear-gradient(to right,rgba(0,0,0,.6) 0%,transparent 55%)"></div>
-            <div style="position:absolute;top:6px;left:8px;font-size:10px;font-weight:800;color:${rankColor};background:rgba(0,0,0,.7);padding:1px 6px;border-radius:5px;line-height:16px">#${i+1}</div>
-            ${recentLabel ? `<div style="position:absolute;top:6px;right:8px;font-size:10px;font-weight:800;color:#fff;background:rgba(88,101,242,.85);padding:1px 7px;border-radius:5px;line-height:16px">${recentLabel} recent</div>` : ""}
-          </div>
-          <div style="padding:8px 11px 9px">
-            <div style="font-size:13px;font-weight:700;color:var(--text-1);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;line-height:1.3">${escapeHtml(g.name||"Unknown")}</div>
-            <div style="font-size:11px;color:var(--text-3);margin-top:3px;display:flex;align-items:center;gap:6px">
-              ${recentLabel ? `<span style="color:var(--accent);font-weight:700">${recentLabel} this week</span><span style="opacity:.35">·</span>` : ""}
+    let heroHtml = "";
+    if (heroGame) {
+      const recent = heroGame.playtime_2weeks  || (heroGame.hours_recent ? heroGame.hours_recent * 60 : 0);
+      const total  = heroGame.playtime_forever || (heroGame.hours_total  ? heroGame.hours_total  * 60 : 0);
+      const recentLabel = fmtMins(recent);
+      const totalLabel  = fmtMins(total) || "0h";
+      heroHtml = `
+        <div class="fp-game-hero" onclick="window.open('https://store.steampowered.com/app/${heroGame.appid}','_blank')">
+          <img class="fp-game-hero-art" src="${gameImg(heroGame.appid)}" onerror="this.src='${gameFallback(heroGame.appid)}';this.onerror=null" />
+          <div class="fp-game-hero-gradient"></div>
+          <div class="fp-game-hero-rank">★ #1 MOST PLAYED</div>
+          <div class="fp-game-hero-body">
+            <div class="fp-game-hero-name">${escapeHtml(heroGame.name||"Unknown")}</div>
+            <div class="fp-game-hero-meta">
+              ${recentLabel
+                ? `<span class="week">${recentLabel} this week</span><span class="fp-game-hero-dot">·</span>`
+                : ""}
               <span>${totalLabel} total</span>
             </div>
-            ${bar}
+          </div>
+        </div>`;
+    }
+
+    const rowsHtml = restGames.map((g, i) => {
+      const recent = g.playtime_2weeks  || (g.hours_recent ? g.hours_recent * 60 : 0);
+      const total  = g.playtime_forever || (g.hours_total  ? g.hours_total  * 60 : 0);
+      const recentLabel = fmtMins(recent);
+      const totalLabel  = fmtMins(total) || "0h";
+      return `
+        <div class="fp-game-row" onclick="window.open('https://store.steampowered.com/app/${g.appid}','_blank')">
+          <div class="fp-game-row-rank">#${i+2}</div>
+          <img class="fp-game-row-art" src="${gameImg(g.appid)}" onerror="this.src='${gameFallback(g.appid)}';this.onerror=null" />
+          <div class="fp-game-row-body">
+            <div class="fp-game-row-name">${escapeHtml(g.name||"Unknown")}</div>
+            <div class="fp-game-row-meta">
+              ${recentLabel
+                ? `<span class="week">${recentLabel} this week</span><span style="opacity:.5">·</span>`
+                : ""}
+              <span>${totalLabel}</span>
+            </div>
           </div>
         </div>`;
     }).join("");
+
+    document.getElementById("fpSteamGames").innerHTML = heroHtml + (rowsHtml ? `<div style="display:flex;flex-direction:column;gap:5px;margin-top:6px">${rowsHtml}</div>` : "");
 
     col.insertAdjacentHTML("beforeend", `
       <a href="https://steamcommunity.com/profiles/${profile.steam_id}" target="_blank"

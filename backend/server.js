@@ -368,15 +368,6 @@ wss.on("connection", (ws, req) => {
       return;
     }
 
-    // ── 1-1 call signalling ──────────────────────────────
-    if (["call-invite","call-accept","call-decline","call-offer","call-answer","call-candidate","call-end"].includes(msg.type)) {
-      const target = clients.get(msg.to);
-      if (target?.ws.readyState === 1) {
-        target.ws.send(JSON.stringify({ ...msg, from: user.peerId, fromUsername: user.username }));
-      }
-      return;
-    }
-
     // ── Leave call ───────────────────────────────────────
     if (msg.type === "leave") {
       broadcast(user.peerId, { type: "peer-left", id: user.peerId });
