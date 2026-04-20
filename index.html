@@ -8326,14 +8326,20 @@ function showIncomingCallModal(fromUsername, fromAvatarUrl, fromPeerId) {
 function peerUserIdFromCallPeerId(peerId) { return peerId.startsWith("u") ? parseInt(peerId.slice(1)) : null; }
 
 function createCallPeerConnection(peerId) {
+  console.log(`[call][${peerId}] createCallPeerConnection — iceServers=`, CALL_ICE_SERVERS.map(s => s.urls));
   const pc = new RTCPeerConnection({ iceServers: CALL_ICE_SERVERS });
   callPeers[peerId] = pc;
   // Add whatever local tracks we have (audio always, video if user granted it).
   let hasLocalVideo = false;
-  callStream?.getTracks().forEach(t => {
+  const tracks = callStream?.getTracks() || [];
+  console.log(`[call][${peerId}] adding ${tracks.length} local tracks:`, tracks.map(t => `${t.kind}/${t.readyState}`));
+  tracks.forEach(t => {
     pc.addTrack(t, callStream);
     if (t.kind === "video") hasLocalVideo = true;
   });
+  if (tracks.length === 0) {
+    console.warn(`[call][${peerId}] WARNING: callStream is empty — no local media will be sent. This usually means getUserMedia never succeeded on this side.`);
+  }
   // Always ensure there's a video sender/transceiver. If the user started audio-only
   // (e.g. no webcam or declined video perm), webcam/screen share still need a
   // video sender to replaceTrack() onto. sendrecv means we can also receive remote
@@ -8342,8 +8348,26 @@ function createCallPeerConnection(peerId) {
     try { pc.addTransceiver("video", { direction: "sendrecv" }); }
     catch(e) { console.warn("[call] addTransceiver(video) failed:", e); }
   }
-  pc.onicecandidate = ({ candidate }) => { if (candidate) wsSend({ type:"call-candidate", candidate, to:peerId }); };
+  pc.onicecandidate = ({ candidate }) => {
+    if (candidate) {
+      // Log every candidate so we can see if ICE is actually gathering and which
+      // transports are in play (host / srflx / relay). If we only ever see "host"
+      // candidates and never "srflx"/"relay", STUN/TURN aren't reachable.
+      const parts = (candidate.candidate || "").split(" ");
+      const type = parts[7] || "?";
+      console.log(`[call][${peerId}] ICE candidate type=${type} proto=${parts[2] || "?"}`);
+      if (!ws || ws.readyState !== 1) {
+        console.warn(`[call][${peerId}] cannot send ICE candidate — ws not open`);
+        return;
+      }
+      try { ws.send(JSON.stringify({ type:"call-candidate", candidate, to:peerId })); }
+      catch (err) { console.error(`[call][${peerId}] call-candidate send failed:`, err); }
+    } else {
+      console.log(`[call][${peerId}] ICE gathering complete`);
+    }
+  };
   pc.ontrack = e => {
+    console.log(`[call][${peerId}] ontrack — kind=${e.track.kind} streams=${e.streams.length}`);
     // Show remote stream in the video overlay
     const remoteVid = document.getElementById("callRemoteVideo");
     if (remoteVid) remoteVid.srcObject = e.streams[0];
@@ -8351,11 +8375,25 @@ function createCallPeerConnection(peerId) {
     // Open the video overlay
     document.getElementById("callVideoOverlay")?.classList.add("open");
   };
+  pc.onicegatheringstatechange = () => {
+    console.log(`[call][${peerId}] iceGatheringState:`, pc.iceGatheringState);
+  };
   pc.oniceconnectionstatechange = () => {
     console.log(`[call][${peerId}] iceConnectionState:`, pc.iceConnectionState);
+    if (pc.iceConnectionState === "failed") {
+      console.error(`[call][${peerId}] ICE failed — TURN/STUN likely unreachable or blocked`);
+      showToast && showToast("Call failed: could not establish connection (ICE)", "error");
+    }
+  };
+  pc.onsignalingstatechange = () => {
+    console.log(`[call][${peerId}] signalingState:`, pc.signalingState);
   };
   pc.onconnectionstatechange = () => {
     console.log(`[call][${peerId}] connectionState:`, pc.connectionState);
+    if (pc.connectionState === "connected") {
+      const status = document.getElementById("floatingCallStatus");
+      if (status) status.textContent = "● Connected";
+    }
     if (["disconnected","failed","closed"].includes(pc.connectionState)) endCall();
   };
   return pc;
@@ -9898,12 +9936,33 @@ function setupCallSignalling() {
       LobbySound.stop("callOutgoing");
       closeOutgoingCallModal();
       showFloatingCallBar(callTargetName,null,"Connecting…");
+      console.log("[call] call-accept received from", msg.from, "— creating PC, callStream tracks=", callStream?.getTracks().map(t=>t.kind));
       const pc=createCallPeerConnection(msg.from);
       try {
+        console.log("[call]", msg.from, "createOffer()…");
         const offer=await pc.createOffer();
+        console.log("[call]", msg.from, "setLocalDescription(offer)…");
         await pc.setLocalDescription(offer);
-        wsSend({ type:"call-offer", offer:pc.localDescription, to:msg.from });
-      } catch(e) { console.error("[call-accept] offer error:", e); }
+        console.log("[call]", msg.from, "sending call-offer, ws.readyState=", ws?.readyState);
+        if (!ws || ws.readyState !== 1) {
+          console.error("[call-accept] cannot send call-offer — ws not open");
+          showToast("Connection lost during call setup", "error");
+          forceEndCall();
+          return;
+        }
+        try {
+          ws.send(JSON.stringify({ type:"call-offer", offer:pc.localDescription, to:msg.from }));
+        } catch (sendErr) {
+          console.error("[call-accept] call-offer send failed:", sendErr);
+          showToast("Could not send call offer", "error");
+          forceEndCall();
+          return;
+        }
+      } catch(e) {
+        console.error("[call-accept] offer error:", e);
+        showToast("Call setup failed: " + (e?.message || e), "error");
+        forceEndCall();
+      }
       return;
     }
     if (msg.type==="call-decline") {
@@ -9914,26 +9973,54 @@ function setupCallSignalling() {
     }
     if (msg.type==="call-offer") {
       // Reuse existing PC if present (supports renegotiation for cam/screen share)
+      console.log("[call] call-offer received from", msg.from, "— existingPC=", !!callPeers[msg.from], "callStream tracks=", callStream?.getTracks().map(t=>t.kind));
       let pc = callPeers[msg.from];
       if (!pc) pc = createCallPeerConnection(msg.from);
       try {
         // Handle glare (both sides offered simultaneously)
         if (pc.signalingState !== "stable") {
+          console.log("[call]", msg.from, "glare — rolling back, signalingState=", pc.signalingState);
           await pc.setLocalDescription({ type: "rollback" }).catch(()=>{});
         }
+        console.log("[call]", msg.from, "setRemoteDescription(offer)…");
         await pc.setRemoteDescription(msg.offer);
         await drainCallCandidates(msg.from);
+        console.log("[call]", msg.from, "createAnswer()…");
         const answer=await pc.createAnswer();
+        console.log("[call]", msg.from, "setLocalDescription(answer)…");
         await pc.setLocalDescription(answer);
-        wsSend({ type:"call-answer", answer:pc.localDescription, to:msg.from });
-      } catch(e) { console.error("[call-offer] error:", e); }
+        console.log("[call]", msg.from, "sending call-answer, ws.readyState=", ws?.readyState);
+        if (!ws || ws.readyState !== 1) {
+          console.error("[call-offer] cannot send call-answer — ws not open");
+          showToast("Connection lost during call setup", "error");
+          forceEndCall();
+          return;
+        }
+        try {
+          ws.send(JSON.stringify({ type:"call-answer", answer:pc.localDescription, to:msg.from }));
+        } catch (sendErr) {
+          console.error("[call-offer] call-answer send failed:", sendErr);
+          showToast("Could not send call answer", "error");
+          forceEndCall();
+          return;
+        }
+      } catch(e) {
+        console.error("[call-offer] error:", e);
+        showToast("Call answer failed: " + (e?.message || e), "error");
+        forceEndCall();
+      }
       return;
     }
     if (msg.type==="call-answer") {
+      console.log("[call] call-answer received from", msg.from, "— havePC=", !!callPeers[msg.from]);
       try {
         await callPeers[msg.from]?.setRemoteDescription(msg.answer);
         await drainCallCandidates(msg.from);
-      } catch(e) { console.error("[call-answer] error:", e); }
+        console.log("[call]", msg.from, "setRemoteDescription(answer) done; ICE should start");
+      } catch(e) {
+        console.error("[call-answer] error:", e);
+        showToast("Call answer failed: " + (e?.message || e), "error");
+      }
       return;
     }
     if (msg.type==="call-candidate") {
