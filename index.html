@@ -2,7 +2,8 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8" />
-  <link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&display=swap" rel="stylesheet">
+  <link rel="preload" href="https://fonts.googleapis.com/css2?family=Bebas+Neue&display=swap" as="style" onload="this.onload=null;this.rel='stylesheet'">
+  <noscript><link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bebas+Neue&display=swap"></noscript>
   <link rel="stylesheet" href="transitions.css" />
   <title>LOBBY</title>
   <style>
@@ -2727,9 +2728,9 @@
       position:relative; z-index:2;
     }
     .fp-right {
-      flex:1; min-width:0; max-width:680px; overflow-y:auto; padding:20px 18px;
+      flex:1; min-width:0; overflow-y:auto; padding:20px 18px;
       display:flex; flex-direction:column; gap:12px;
-      scroll-behavior:smooth; margin:0 auto;
+      scroll-behavior:smooth;
     }
     .fp-left {
       width:380px; min-width:380px; max-width:380px; overflow-y:auto;
@@ -3733,6 +3734,51 @@
             min-width: 150px;
         }
     }
+
+  /* ── Performance body-class overrides ───────────────────────── */
+
+  /* GIF: always play — hide all pause overlays */
+  body.gif-always .spotlight-gif-overlay { display: none !important; }
+  body.gif-always .chat-gif-overlay       { display: none !important; }
+
+  /* GIF: click to play — overlay stays; clicking it removes the canvas freeze */
+  body.gif-click .spotlight-gif-overlay  { cursor: pointer; }
+  body.gif-click .spotlight-card:hover .spotlight-gif-overlay { opacity: 1; pointer-events: auto; }
+
+  /* Reduce Motion — collapse all animations & transitions to near-zero */
+  body.lobby-reduce-motion *,
+  body.lobby-reduce-motion *::before,
+  body.lobby-reduce-motion *::after {
+    animation-duration:  0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+
+  /* Reduce Blur — strip backdrop-filter everywhere */
+  body.lobby-no-blur *,
+  body.lobby-no-blur *::before,
+  body.lobby-no-blur *::after {
+    backdrop-filter: none !important;
+    -webkit-backdrop-filter: none !important;
+  }
+  /* Compensate: make panels opaque so they stay readable without blur */
+  body.lobby-no-blur .server-list,
+  body.lobby-no-blur .home-header,
+  body.lobby-no-blur #channelSidebar,
+  body.lobby-no-blur #membersSidebar {
+    background: var(--bg-0) !important;
+  }
+
+  /* Compact chat — tighter padding on messages */
+  body.lobby-compact #msgContainer .chat-msg { padding: 2px 16px !important; }
+  body.lobby-compact #msgContainer .chat-msg + .chat-msg { margin-top: 0 !important; }
+  body.lobby-compact .chat-msg-content { font-size: 13px !important; }
+
+  /* Hide reactions */
+  body.lobby-no-reactions .post-reactions,
+  body.lobby-no-reactions .chat-reactions,
+  body.lobby-no-reactions [class*="reaction"] { display: none !important; }
 
   </style>
   <script src="nav.js"></script>
@@ -5223,6 +5269,35 @@
 const AUTH_URL = "https://lobby-auth-server.onrender.com";
 const FEED_AUTH_URL = "https://lobby-auth-server.onrender.com";
 
+// ── Performance utilities ──────────────────────────────────────
+/** Debounce: delay fn until ms of silence. */
+function debounce(fn, ms) {
+  let t;
+  return function (...a) { clearTimeout(t); t = setTimeout(() => fn.apply(this, a), ms); };
+}
+/** RAF-throttle: fire fn at most once per animation frame (~60fps). */
+function rafThrottle(fn) {
+  let af = null;
+  return function (...a) {
+    if (af !== null) return;
+    af = requestAnimationFrame(() => { fn.apply(this, a); af = null; });
+  };
+}
+
+// ── Profile data cache (30 s TTL) ─────────────────────────────
+const _profileCache   = new Map();
+const PROFILE_CACHE_TTL = 30_000;
+async function fetchProfileCached(userId, token) {
+  const cached = _profileCache.get(userId);
+  if (cached && (Date.now() - cached.ts) < PROFILE_CACHE_TTL) return cached.data;
+  const data = await fetch(`${AUTH_URL}/profile/${userId}`, {
+    headers: { Authorization: `Bearer ${token}` }
+  }).then(r => r.json()).catch(() => ({}));
+  _profileCache.set(userId, { data, ts: Date.now() });
+  return data;
+}
+function invalidateProfileCache(userId) { if (userId) _profileCache.delete(userId); }
+
 // ── Sound Manager ─────────────────────────────────────────────
 const LobbySound = (() => {
   const sounds = {};
@@ -6328,7 +6403,7 @@ function _initBannerDrag(el) {
     if (dh) { dh.style.opacity = "0"; setTimeout(() => { dh.style.display = "none"; }, 200); }
   });
 
-  document.addEventListener("mousemove", e => {
+  document.addEventListener("mousemove", rafThrottle(e => {
     if (!dragging) return;
     const dx = e.clientX - sx;
     const dy = e.clientY - sy;
@@ -6340,7 +6415,7 @@ function _initBannerDrag(el) {
     el.style.backgroundPosition = `${px}% ${py}%`;
     sx = e.clientX; sy = e.clientY;
     el.dataset.bgX = px; el.dataset.bgY = py;
-  });
+  }));
 
   document.addEventListener("mouseup", () => {
     if (!dragging) return;
@@ -7100,6 +7175,16 @@ function appendMessage(msg, type) {
       ${attachHtml?`<div class="msg-attachments">${attachHtml}</div>`:""}
     </div>`;
   container.appendChild(div);
+
+  // Trim DOM to the user's message history limit (skip when unlimited = "0")
+  const msgLimit = parseInt(localStorage.getItem("lobby_msg_limit") || "200", 10);
+  if (msgLimit > 0) {
+    const groups = container.querySelectorAll(".message-group");
+    if (groups.length > msgLimit) {
+      const toRemove = groups.length - msgLimit;
+      for (let i = 0; i < toRemove; i++) groups[i].remove();
+    }
+  }
 }
 
 async function deleteMessage(id) {
@@ -8473,13 +8558,13 @@ function maybeShowVcPip() {
     pip.style.transition = "opacity .25s, transform .25s";
     e.preventDefault();
   });
-  document.addEventListener("mousemove", e => {
+  document.addEventListener("mousemove", rafThrottle(e => {
     if (!dragging) return;
     const x = Math.max(0, Math.min(window.innerWidth  - pip.offsetWidth,  e.clientX - ox));
     const y = Math.max(0, Math.min(window.innerHeight - pip.offsetHeight, e.clientY - oy));
     pip.style.right = "auto"; pip.style.bottom = "auto";
     pip.style.left = x + "px"; pip.style.top  = y + "px";
-  });
+  }));
   document.addEventListener("mouseup", () => { dragging = false; });
 
   // ── Resize ──
@@ -8490,13 +8575,13 @@ function maybeShowVcPip() {
     rsw = pip.offsetWidth; rsh = pip.offsetHeight;
     e.preventDefault(); e.stopPropagation();
   });
-  document.addEventListener("mousemove", e => {
+  document.addEventListener("mousemove", rafThrottle(e => {
     if (!resizing) return;
     const w = Math.max(220, Math.min(700, rsw + (e.clientX - rsx)));
     const h = Math.max(160, Math.min(600, rsh + (e.clientY - rsy)));
     pip.style.width  = w + "px";
     pip.style.height = h + "px";
-  });
+  }));
   document.addEventListener("mouseup", () => { resizing = false; });
 
   // ── Buttons ──
@@ -9912,11 +9997,11 @@ function setupFeedScroll() {
     el.style.userSelect = "none";
   });
 
-  document.addEventListener("mousemove", (e) => {
+  document.addEventListener("mousemove", rafThrottle((e) => {
     if (!isDragging) return;
     const dy = e.clientY - startY;
     el.scrollTop = startScrollTop - dy;
-  });
+  }));
 
   document.addEventListener("mouseup", () => {
     if (!isDragging) return;
@@ -11866,6 +11951,35 @@ document.getElementById("chatSidebarToggle").addEventListener("click", e => { e.
 
 let feedVisible = true;
 
+// ── GIF click-to-play (used in gif-click mode) ────────────────
+function gifClickPlay(overlay) {
+  // Restore gif src on the sibling img, then hide overlay
+  const img = overlay.closest(".spotlight-card-media,.chat-msg-media")?.querySelector("img[data-frozen-gif]");
+  if (img) { img.src = img.dataset.frozenGif; delete img.dataset.frozenGif; }
+  overlay.style.display = "none";
+}
+
+// Freeze every GIF image on the page (canvas snapshot trick)
+function freezeAllGifs() {
+  document.querySelectorAll("img").forEach(img => {
+    if (!img.src || !/\.gif(\?|$)/i.test(img.src) || img.dataset.frozenGif) return;
+    try {
+      const c = document.createElement("canvas");
+      c.width = img.naturalWidth || img.offsetWidth || 1;
+      c.height = img.naturalHeight || img.offsetHeight || 1;
+      c.getContext("2d").drawImage(img, 0, 0);
+      img.dataset.frozenGif = img.src;
+      img.src = c.toDataURL("image/png");
+    } catch(e) {}
+  });
+}
+function thawAllGifs() {
+  document.querySelectorAll("img[data-frozen-gif]").forEach(img => {
+    img.src = img.dataset.frozenGif;
+    delete img.dataset.frozenGif;
+  });
+}
+
 // Feed GIFs freeze when hidden, play when visible. Home page GIFs unaffected.
 function feedFreezeGifs() {
   document.querySelectorAll("#feedPosts img").forEach(img => {
@@ -12214,6 +12328,8 @@ async function loadSpotlight() {
         : p.image_url
           ? `<div class="spotlight-card-media">
                <img class="spotlight-card-img" src="${p.image_url}" />
+               ${isGif ? `<div class="spotlight-gif-overlay" onclick="event.stopPropagation();gifClickPlay(this)">
+                 <span class="gif-badge">GIF</span></div>` : ""}
              </div>`
           : `<div class="spotlight-card-media" style="background:linear-gradient(135deg,var(--accent),var(--bg-0));position:absolute;inset:0"></div>`;
 
@@ -12636,9 +12752,7 @@ async function renderFullProfilePage() {
   page.innerHTML = `<div style="flex:1;display:flex;align-items:center;justify-content:center;color:var(--text-3)">Loading…</div>`;
 
   try {
-    fpData = await fetch(`${AUTH_URL}/profile/${fpUserId}`, {
-      headers: { Authorization: `Bearer ${token}` }
-    }).then(r => r.json());
+    fpData = await fetchProfileCached(fpUserId, token);
   } catch(e) { fpData = {}; }
 
   const isOnline    = onlineUserIds.has(fpUserId);
@@ -12740,10 +12854,10 @@ async function renderFullProfilePage() {
       dragging = true; startY = e.clientY; startTop = fpR.scrollTop;
       fpR.style.cursor = "grabbing"; fpR.style.userSelect = "none";
     });
-    document.addEventListener("mousemove", e => {
+    document.addEventListener("mousemove", rafThrottle(e => {
       if (!dragging) return;
       fpR.scrollTop = startTop - (e.clientY - startY);
-    });
+    }));
     document.addEventListener("mouseup", () => {
       if (!dragging) return;
       dragging = false; fpR.style.cursor = ""; fpR.style.userSelect = "";
@@ -13684,13 +13798,13 @@ function fpEnableCustomiseMode() {
   // Mouse move + up on document
   if (!left._dragHandlerAdded) {
     left._dragHandlerAdded = true;
-    document.addEventListener("mousemove", e => {
+    document.addEventListener("mousemove", rafThrottle(e => {
       const dragSrc = left.querySelector("[style*='opacity: 0.6'], [style*='opacity:.6']");
       if (!dragSrc) return;
       const afterEl = fpGetDragAfterEl(left, e.clientY);
       if (afterEl == null) left.insertBefore(dragSrc, document.getElementById("fpCustomiseBtn"));
       else left.insertBefore(dragSrc, afterEl);
-    });
+    }));
     document.addEventListener("mouseup", () => {
       const dragSrc = left.querySelector("[style*='opacity: 0.6'], [style*='opacity:.6']");
       if (!dragSrc) return;
@@ -13855,6 +13969,7 @@ async function fpSaveEdits() {
     if (r.error) {
       msgEl.textContent = r.error; msgEl.style.color = "var(--danger)"; msgEl.style.display = "block";
     } else {
+      invalidateProfileCache(me.id);
       Object.assign(fpData, body);
       // Update header live
       document.getElementById("fpDisplayName").textContent  = body.display_name || fpData.username;
@@ -14030,7 +14145,7 @@ function fpRepositionCover() {
     e.preventDefault();
   });
 
-  document.addEventListener("mousemove", e => {
+  document.addEventListener("mousemove", rafThrottle(e => {
     if (!dragging) return;
     const coverW = cover.offsetWidth;
     const coverH = cover.offsetHeight;
@@ -14040,7 +14155,7 @@ function fpRepositionCover() {
     posX = Math.max(0, Math.min(100, startPosX + dx));
     posY = Math.max(0, Math.min(100, startPosY + dy));
     cover.style.backgroundPosition = `${posX}% ${posY}%`;
-  });
+  }));
 
   document.addEventListener("mouseup", () => {
     if (!dragging) return;
@@ -14115,11 +14230,9 @@ document.getElementById("profileBackdrop").addEventListener("click", closeProfil
 async function loadProfilePanel(userId) {
   const token = localStorage.getItem("vh_token") || sessionStorage.getItem("vh_token");
 
-  // Fetch profile
+  // Fetch profile (cached for 30 s to avoid repeated round-trips)
   try {
-    profileData = await fetch(`${AUTH_URL}/profile/${userId}`, {
-      headers: { Authorization: `Bearer ${token}` }
-    }).then(r => r.json());
+    profileData = await fetchProfileCached(userId, token);
   } catch(e) { profileData = {}; }
 
   // Cover
@@ -15254,10 +15367,37 @@ document.body.classList.add("feed-open");
 .sp-nav-btn.active { background: var(--bg-3); color: var(--text-1); font-weight: 600; }
 
 .sp-content { flex: 1; overflow-y: auto; padding: 28px 36px; }
+
+/* ── Section page title ── */
 .sp-content h2 {
-  font-size: 18px; font-weight: 800; margin-bottom: 20px; padding-bottom: 12px;
-  border-bottom: 1px solid rgba(255,255,255,.06);
+  font-size: 20px; font-weight: 800; letter-spacing: .02em;
+  color: var(--text-1); margin-bottom: 4px; padding-bottom: 0; border: none;
 }
+.sp-subtitle {
+  font-size: 13px; color: var(--text-3); margin-bottom: 18px; line-height: 1.5;
+}
+.sp-section-rule {
+  height: 1px; background: rgba(255,255,255,.06); margin: 12px 0 18px;
+}
+
+/* ── Sub-group label ── */
+.sp-group-label {
+  font-size: 12px; font-weight: 700; letter-spacing: .07em; text-transform: uppercase;
+  color: var(--text-2); margin: 20px 0 8px; padding-left: 2px;
+}
+.sp-group-label:first-child { margin-top: 0; }
+
+/* ── Card bubble ── */
+.sp-card {
+  background: var(--bg-3); border-radius: 10px; padding: 10px 14px;
+  display: flex; flex-direction: column; gap: 8px; margin-bottom: 6px;
+}
+.sp-card-row {
+  display: flex; align-items: center; justify-content: space-between; gap: 12px;
+}
+.sp-card-title { font-weight: 700; font-size: 13px; color: var(--text-1); }
+.sp-card-desc  { font-size: 12px; color: var(--text-3); margin-top: 1px; line-height: 1.4; }
+.sp-card-info  { flex: 1; min-width: 0; }
 
 .sp-section { display: none; }
 .sp-section.active { display: block; }
@@ -15269,7 +15409,7 @@ document.body.classList.add("feed-open");
 }
 .sp-hint { font-size: 12px; color: var(--text-3); margin-top: 2px; }
 .sp-input, .sp-textarea, .sp-select {
-  background: var(--bg-3); border: 1.5px solid rgba(255,255,255,.06);
+  background: var(--bg-2); border: 1.5px solid rgba(255,255,255,.06);
   border-radius: 8px; color: var(--text-1); font-size: 14px;
   padding: 9px 13px; outline: none; font-family: inherit; transition: border-color .15s;
 }
@@ -15468,10 +15608,37 @@ body.resizing-row * { cursor:row-resize !important; user-select:none !important;
 .sp-nav-btn.active { background: var(--bg-3); color: var(--text-1); font-weight: 600; }
 
 .sp-content { flex: 1; overflow-y: auto; padding: 28px 36px; }
+
+/* ── Section page title ── */
 .sp-content h2 {
-  font-size: 18px; font-weight: 800; margin-bottom: 20px; padding-bottom: 12px;
-  border-bottom: 1px solid rgba(255,255,255,.06);
+  font-size: 20px; font-weight: 800; letter-spacing: .02em;
+  color: var(--text-1); margin-bottom: 4px; padding-bottom: 0; border: none;
 }
+.sp-subtitle {
+  font-size: 13px; color: var(--text-3); margin-bottom: 18px; line-height: 1.5;
+}
+.sp-section-rule {
+  height: 1px; background: rgba(255,255,255,.06); margin: 12px 0 18px;
+}
+
+/* ── Sub-group label ── */
+.sp-group-label {
+  font-size: 12px; font-weight: 700; letter-spacing: .07em; text-transform: uppercase;
+  color: var(--text-2); margin: 20px 0 8px; padding-left: 2px;
+}
+.sp-group-label:first-child { margin-top: 0; }
+
+/* ── Card bubble ── */
+.sp-card {
+  background: var(--bg-3); border-radius: 10px; padding: 10px 14px;
+  display: flex; flex-direction: column; gap: 8px; margin-bottom: 6px;
+}
+.sp-card-row {
+  display: flex; align-items: center; justify-content: space-between; gap: 12px;
+}
+.sp-card-title { font-weight: 700; font-size: 13px; color: var(--text-1); }
+.sp-card-desc  { font-size: 12px; color: var(--text-3); margin-top: 1px; line-height: 1.4; }
+.sp-card-info  { flex: 1; min-width: 0; }
 
 .sp-section { display: none; }
 .sp-section.active { display: block; }
@@ -15483,7 +15650,7 @@ body.resizing-row * { cursor:row-resize !important; user-select:none !important;
 }
 .sp-hint { font-size: 12px; color: var(--text-3); margin-top: 2px; }
 .sp-input, .sp-textarea, .sp-select {
-  background: var(--bg-3); border: 1.5px solid rgba(255,255,255,.06);
+  background: var(--bg-2); border: 1.5px solid rgba(255,255,255,.06);
   border-radius: 8px; color: var(--text-1); font-size: 14px;
   padding: 9px 13px; outline: none; font-family: inherit; transition: border-color .15s;
 }
@@ -15789,6 +15956,10 @@ setTimeout(() => { updateMyStatusUI(); }, 100);
       <!-- ── Profile ── -->
       <div class="sp-section active" id="sp-profile">
         <h2>My Profile</h2>
+        <p class="sp-subtitle">Customise how you appear to others on LOBBY.</p>
+        <div class="sp-section-rule"></div>
+
+        <!-- Live preview -->
         <div class="sp-preview">
           <div class="sp-preview-banner" id="spPreviewBanner"></div>
           <div class="sp-preview-avatar-wrap">
@@ -15800,172 +15971,198 @@ setTimeout(() => { updateMyStatusUI(); }, 100);
             <div class="sp-preview-bio"      id="spPreviewBio"></div>
           </div>
         </div>
-        <div class="sp-form-group">
-          <label class="sp-label">Avatar</label>
-          <label class="sp-upload-btn" for="spAvatarInput">📷 Upload Avatar</label>
+
+        <div class="sp-group-label">Avatar</div>
+        <div class="sp-card">
+          <div class="sp-card-row">
+            <div class="sp-card-info">
+              <div class="sp-card-title">Profile Picture</div>
+              <div class="sp-card-desc">GIF, PNG, JPG, WebP · max 8 MB. GIFs animate on hover.</div>
+            </div>
+            <label class="sp-upload-btn" for="spAvatarInput" style="margin:0;white-space:nowrap">📷 Upload</label>
+          </div>
           <input type="file" id="spAvatarInput" accept="image/*" style="display:none" />
-          <div class="sp-hint">GIF, PNG, JPG, WebP · max 8MB.</div>
         </div>
-        <div class="sp-form-group">
-          <label class="sp-label">Status Message</label>
+
+        <div class="sp-group-label">Info</div>
+        <div class="sp-card">
+          <div class="sp-card-title">Status Message</div>
           <input class="sp-input" id="spStatus" placeholder="What are you up to?" maxlength="100" />
         </div>
-        <div class="sp-form-group">
-          <label class="sp-label">Bio</label>
+        <div class="sp-card">
+          <div class="sp-card-title">Bio <span id="spBioCounter" style="font-weight:400;font-size:12px;color:var(--text-3)">0 / 300</span></div>
           <textarea class="sp-textarea" id="spBio" placeholder="Tell people about yourself…" maxlength="300"></textarea>
-          <div class="sp-hint" id="spBioCounter">0 / 300</div>
         </div>
-        <div class="sp-form-group">
-          <label class="sp-label">Default Post Visibility</label>
+
+        <div class="sp-group-label">Privacy</div>
+        <div class="sp-card">
+          <div class="sp-card-title">Default Post Visibility</div>
           <select class="sp-select" id="spPostVisibility">
             <option value="public">🌐 Public</option>
             <option value="friends">👥 Friends only</option>
           </select>
         </div>
-
-        <div class="sp-form-group">
-          <label class="sp-label">Profile Privacy</label>
+        <div class="sp-card">
+          <div class="sp-card-title">Profile Visibility</div>
+          <div class="sp-card-desc">Private profiles can only be found via invite link.</div>
           <div style="display:flex;gap:10px;margin-top:4px">
             <button id="spPrivacyPublicBtn" onclick="spSetPrivacy('public')"
-              style="flex:1;display:flex;align-items:center;justify-content:center;gap:7px;padding:10px 14px;border-radius:8px;border:1.5px solid rgba(255,255,255,.1);background:var(--bg-3);color:var(--text-2);font-size:13px;font-weight:600;font-family:var(--font);cursor:pointer;transition:all .15s">
+              style="flex:1;display:flex;align-items:center;justify-content:center;gap:7px;padding:10px 14px;border-radius:8px;border:1.5px solid rgba(255,255,255,.1);background:var(--bg-2);color:var(--text-2);font-size:13px;font-weight:600;font-family:var(--font);cursor:pointer;transition:all .15s">
               🌐 Public
             </button>
             <button id="spPrivacyPrivateBtn" onclick="spSetPrivacy('private')"
-              style="flex:1;display:flex;align-items:center;justify-content:center;gap:7px;padding:10px 14px;border-radius:8px;border:1.5px solid rgba(255,255,255,.1);background:var(--bg-3);color:var(--text-2);font-size:13px;font-weight:600;font-family:var(--font);cursor:pointer;transition:all .15s">
+              style="flex:1;display:flex;align-items:center;justify-content:center;gap:7px;padding:10px 14px;border-radius:8px;border:1.5px solid rgba(255,255,255,.1);background:var(--bg-2);color:var(--text-2);font-size:13px;font-weight:600;font-family:var(--font);cursor:pointer;transition:all .15s">
               🔒 Private
             </button>
           </div>
-          <div class="sp-hint" id="spPrivacyHint">Public profiles appear in search and can receive friend requests from anyone.</div>
+          <div class="sp-card-desc" id="spPrivacyHint" style="margin-top:4px">Public profiles appear in search and can receive friend requests from anyone.</div>
         </div>
-        <button class="sp-save-btn" id="spSaveProfile">Save Changes</button>
+
+        <button class="sp-save-btn" id="spSaveProfile" style="margin-top:16px">Save Changes</button>
         <div class="sp-msg" id="spProfileMsg"></div>
       </div>
 
       <!-- ── Appearance ── -->
       <div class="sp-section" id="sp-appearance">
-        <h2>Profile Appearance</h2>
-        <div class="sp-form-group">
-          <label class="sp-label">Banner Image</label>
-          <label class="sp-upload-btn" for="spBannerInput" style="justify-content:center">🖼 Upload Banner</label>
+        <h2>Appearance</h2>
+        <p class="sp-subtitle">Personalise your banner, post bar and app wallpaper.</p>
+        <div class="sp-section-rule"></div>
+
+        <!-- Profile Banner -->
+        <div class="sp-group-label">Profile Banner</div>
+        <div class="sp-card">
+          <div class="sp-card-row">
+            <div class="sp-card-info">
+              <div class="sp-card-title">Banner Image</div>
+              <div class="sp-card-desc">Shown at the top of your profile. GIFs supported.</div>
+            </div>
+            <label class="sp-upload-btn" for="spBannerInput" style="margin:0;white-space:nowrap">🖼 Upload</label>
+          </div>
           <input type="file" id="spBannerInput" accept="image/*" style="display:none" />
-          <div class="sp-hint">Shown at the top of your profile. GIFs supported.</div>
         </div>
-        <div class="sp-form-group">
-          <label class="sp-label">Banner Colour</label>
-          <div class="sp-colour-row">
+        <div class="sp-card">
+          <div class="sp-card-title">Banner Colour</div>
+          <div class="sp-card-desc">Used when no image is set.</div>
+          <div class="sp-colour-row" style="margin-top:4px">
             <input type="color" class="sp-colour-picker" id="spBannerColour" />
             <div class="sp-colour-presets" id="spColourPresets"></div>
           </div>
         </div>
-        <button class="sp-save-btn" id="spSaveAppearance">Save Appearance</button>
+        <button class="sp-save-btn" id="spSaveAppearance" style="margin-top:6px">Save Banner</button>
         <div class="sp-msg" id="spAppearanceMsg"></div>
 
-        <div style="margin-top:28px;padding-top:20px;border-top:1px solid rgba(255,255,255,.06)">
-          <h2>Post Bar Background</h2>
-          <div class="sp-form-group">
-            <label class="sp-label">Background Image</label>
-            <label class="sp-upload-btn" for="spComposeImageInput">🖼 Upload Image</label>
-            <input type="file" id="spComposeImageInput" accept="image/*" style="display:none" />
-          </div>
-          <div class="sp-form-group">
-            <label class="sp-label">Background Colour</label>
-            <div class="sp-colour-row">
-              <input type="color" class="sp-colour-picker" id="spComposeColour" value="#5865f2" />
-              <div class="sp-colour-presets" id="spComposePresets"></div>
+        <!-- Post Bar -->
+        <div class="sp-group-label">Post Bar Background</div>
+        <div class="sp-card">
+          <div class="sp-card-row">
+            <div class="sp-card-info">
+              <div class="sp-card-title">Background Image</div>
+              <div class="sp-card-desc">Shown behind the compose box on your profile.</div>
             </div>
+            <label class="sp-upload-btn" for="spComposeImageInput" style="margin:0;white-space:nowrap">🖼 Upload</label>
           </div>
-          <div class="sp-form-group">
-            <label class="sp-label">Opacity <span id="spComposeOpacityLabel" style="color:var(--text-2);font-weight:400;text-transform:none;letter-spacing:0;font-size:12px">15%</span></label>
-            <div class="sp-volume-row">
-              <span class="sp-volume-icon">○</span>
-              <div class="sp-volume-wrap"><input type="range" class="sp-slider" id="spComposeOpacity" min="0" max="40" value="15" /></div>
-              <span class="sp-volume-icon">●</span>
-            </div>
+          <input type="file" id="spComposeImageInput" accept="image/*" style="display:none" />
+        </div>
+        <div class="sp-card">
+          <div class="sp-card-title">Background Colour</div>
+          <div class="sp-colour-row" style="margin-top:6px">
+            <input type="color" class="sp-colour-picker" id="spComposeColour" value="#5865f2" />
+            <div class="sp-colour-presets" id="spComposePresets"></div>
           </div>
+        </div>
+        <div class="sp-card">
+          <div class="sp-card-title">Opacity &nbsp;<span id="spComposeOpacityLabel" style="font-weight:400;font-size:12px;color:var(--text-3)">15%</span></div>
+          <div class="sp-volume-row">
+            <span class="sp-volume-icon">○</span>
+            <div class="sp-volume-wrap"><input type="range" class="sp-slider" id="spComposeOpacity" min="0" max="40" value="15" /></div>
+            <span class="sp-volume-icon">●</span>
+          </div>
+        </div>
+        <div style="display:flex;gap:8px;margin-top:6px">
           <button class="sp-save-btn" id="spSaveCompose">Save Post Bar Style</button>
-          <button class="sp-save-btn" id="spClearCompose" style="background:var(--bg-3);color:var(--text-2);margin-left:8px">Clear</button>
-          <div class="sp-msg" id="spComposeMsg"></div>
+          <button class="sp-save-btn" id="spClearCompose" style="background:var(--bg-3);color:var(--text-2)">Clear</button>
+        </div>
+        <div class="sp-msg" id="spComposeMsg"></div>
+
+        <!-- App Wallpaper -->
+        <div class="sp-group-label">App Wallpaper</div>
+        <p class="sp-subtitle" style="margin-top:-12px">A blurred background image that sits behind the whole app — home, chat, calendar and profile.</p>
+
+        <div id="spWpPreview" style="position:relative;height:120px;border-radius:14px;overflow:hidden;margin-bottom:12px;border:1px solid rgba(255,255,255,.08);background:#111">
+          <div id="spWpPreviewBg" style="position:absolute;inset:0;background-size:cover;background-position:50% 50%;filter:blur(40px) saturate(1.15);transform:scale(1.18);transition:filter .2s ease"></div>
+          <div id="spWpPreviewDim" style="position:absolute;inset:0;background:#000;opacity:.6;transition:opacity .2s ease"></div>
+          <div style="position:absolute;inset:0;display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:700;color:rgba(255,255,255,.7);letter-spacing:1px;text-transform:uppercase">Live preview</div>
         </div>
 
-        <!-- ── App Wallpaper ── -->
-        <div style="margin-top:28px;padding-top:20px;border-top:1px solid rgba(255,255,255,.06)">
-          <h2>App Wallpaper</h2>
-          <p style="font-size:13px;color:var(--text-3);margin-top:-12px;margin-bottom:20px">A blurred background image that sits behind the whole app — home, chat, calendar and your profile.</p>
-
-          <!-- Live preview strip -->
-          <div id="spWpPreview" style="position:relative;height:120px;border-radius:14px;overflow:hidden;margin-bottom:20px;border:1px solid rgba(255,255,255,.08);background:#111">
-            <div id="spWpPreviewBg" style="position:absolute;inset:0;background-size:cover;background-position:50% 50%;filter:blur(40px) saturate(1.15);transform:scale(1.18);transition:filter .2s ease"></div>
-            <div id="spWpPreviewDim" style="position:absolute;inset:0;background:#000;opacity:.6;transition:opacity .2s ease"></div>
-            <div style="position:absolute;inset:0;display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:700;color:rgba(255,255,255,.7);letter-spacing:1px;text-transform:uppercase">Live preview</div>
+        <div class="sp-card">
+          <div class="sp-card-row">
+            <div class="sp-card-info">
+              <div class="sp-card-title">Custom Image</div>
+              <div class="sp-card-desc">PNG, JPG or GIF. Will be blurred — high-res photos look best.</div>
+            </div>
+            <label class="sp-upload-btn" for="spWpFileInput" style="margin:0;white-space:nowrap">🖼 Upload</label>
           </div>
+          <input type="file" id="spWpFileInput" accept="image/*" style="display:none" />
+        </div>
 
-          <!-- Upload -->
-          <div class="sp-form-group">
-            <label class="sp-label">Custom Image</label>
-            <label class="sp-upload-btn" for="spWpFileInput" style="justify-content:center">🖼 Upload Wallpaper</label>
-            <input type="file" id="spWpFileInput" accept="image/*" style="display:none" />
-            <div class="sp-hint">PNG, JPG or GIF. Will be blurred — high-res photos look best.</div>
-          </div>
+        <div class="sp-card">
+          <div class="sp-card-title">Preset Gallery</div>
+          <div id="spWpPresets" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(84px,1fr));gap:8px;margin-top:4px"></div>
+        </div>
 
-          <!-- Preset gallery -->
-          <div class="sp-form-group">
-            <label class="sp-label">Or pick a preset</label>
-            <div id="spWpPresets" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(84px,1fr));gap:8px"></div>
-          </div>
-
-          <!-- Use my cover toggle -->
-          <div class="sp-form-group" style="display:flex;align-items:center;gap:12px">
-            <label class="sp-label" style="margin:0;flex:1">Use my profile cover as wallpaper</label>
+        <div class="sp-card">
+          <div class="sp-card-row">
+            <div class="sp-card-info">
+              <div class="sp-card-title">Use Profile Cover as Wallpaper</div>
+            </div>
             <label style="position:relative;display:inline-block;width:42px;height:24px;flex-shrink:0">
               <input type="checkbox" id="spWpUseCover" style="opacity:0;width:0;height:0" />
-              <span id="spWpUseCoverTrack" style="position:absolute;cursor:pointer;inset:0;background:var(--bg-3);border-radius:24px;transition:background .2s"></span>
+              <span id="spWpUseCoverTrack" style="position:absolute;cursor:pointer;inset:0;background:var(--bg-1);border-radius:24px;transition:background .2s"></span>
               <span id="spWpUseCoverKnob" style="position:absolute;top:3px;left:3px;width:18px;height:18px;background:#fff;border-radius:50%;transition:transform .2s;pointer-events:none"></span>
             </label>
           </div>
-
-          <!-- Solid sidebars toggle -->
-          <div class="sp-form-group" style="display:flex;align-items:flex-start;gap:12px">
-            <div style="flex:1;min-width:0">
-              <label class="sp-label" style="margin:0;display:block">Solid sidebars</label>
-              <div style="color:var(--text-3);font-size:12px;margin-top:4px">Keep the side panels opaque so the wallpaper only shows behind the main content.</div>
+          <div class="sp-card-row" style="margin-top:4px">
+            <div class="sp-card-info">
+              <div class="sp-card-title">Solid Sidebars</div>
+              <div class="sp-card-desc">Keep side panels opaque so the wallpaper only shows behind main content.</div>
             </div>
-            <label style="position:relative;display:inline-block;width:42px;height:24px;flex-shrink:0;margin-top:2px">
+            <label style="position:relative;display:inline-block;width:42px;height:24px;flex-shrink:0">
               <input type="checkbox" id="spWpSolidSidebars" style="opacity:0;width:0;height:0" />
-              <span id="spWpSolidSidebarsTrack" style="position:absolute;cursor:pointer;inset:0;background:var(--bg-3);border-radius:24px;transition:background .2s"></span>
+              <span id="spWpSolidSidebarsTrack" style="position:absolute;cursor:pointer;inset:0;background:var(--bg-1);border-radius:24px;transition:background .2s"></span>
               <span id="spWpSolidSidebarsKnob" style="position:absolute;top:3px;left:3px;width:18px;height:18px;background:#fff;border-radius:50%;transition:transform .2s;pointer-events:none"></span>
             </label>
           </div>
-
-          <!-- Blur slider -->
-          <div class="sp-form-group">
-            <label class="sp-label">Blur <span id="spWpBlurLabel" style="color:var(--text-2);font-weight:400;text-transform:none;letter-spacing:0;font-size:12px">40px</span></label>
-            <div class="sp-volume-row">
-              <span class="sp-volume-icon" style="font-size:10px">none</span>
-              <div class="sp-volume-wrap"><input type="range" class="sp-slider" id="spWpBlur" min="0" max="80" value="40" /></div>
-              <span class="sp-volume-icon" style="font-size:10px">max</span>
-            </div>
-          </div>
-
-          <!-- Dim slider -->
-          <div class="sp-form-group">
-            <label class="sp-label">Darken <span id="spWpDimLabel" style="color:var(--text-2);font-weight:400;text-transform:none;letter-spacing:0;font-size:12px">60%</span></label>
-            <div class="sp-volume-row">
-              <span class="sp-volume-icon">○</span>
-              <div class="sp-volume-wrap"><input type="range" class="sp-slider" id="spWpDim" min="0" max="100" value="60" /></div>
-              <span class="sp-volume-icon">●</span>
-            </div>
-          </div>
-
-          <button class="sp-save-btn" id="spSaveWallpaper">Save Wallpaper</button>
-          <button class="sp-save-btn" id="spClearWallpaper" style="background:var(--bg-3);color:var(--text-2);margin-left:8px">Clear</button>
-          <div class="sp-msg" id="spWallpaperMsg"></div>
         </div>
+
+        <div class="sp-card">
+          <div class="sp-card-title">Blur &nbsp;<span id="spWpBlurLabel" style="font-weight:400;font-size:12px;color:var(--text-3)">40px</span></div>
+          <div class="sp-volume-row">
+            <span class="sp-volume-icon" style="font-size:10px">none</span>
+            <div class="sp-volume-wrap"><input type="range" class="sp-slider" id="spWpBlur" min="0" max="80" value="40" /></div>
+            <span class="sp-volume-icon" style="font-size:10px">max</span>
+          </div>
+        </div>
+        <div class="sp-card">
+          <div class="sp-card-title">Darken &nbsp;<span id="spWpDimLabel" style="font-weight:400;font-size:12px;color:var(--text-3)">60%</span></div>
+          <div class="sp-volume-row">
+            <span class="sp-volume-icon">○</span>
+            <div class="sp-volume-wrap"><input type="range" class="sp-slider" id="spWpDim" min="0" max="100" value="60" /></div>
+            <span class="sp-volume-icon">●</span>
+          </div>
+        </div>
+
+        <div style="display:flex;gap:8px;margin-top:6px">
+          <button class="sp-save-btn" id="spSaveWallpaper">Save Wallpaper</button>
+          <button class="sp-save-btn" id="spClearWallpaper" style="background:var(--bg-3);color:var(--text-2)">Clear</button>
+        </div>
+        <div class="sp-msg" id="spWallpaperMsg"></div>
       </div>
 
       <!-- ── Themes ── -->
       <div class="sp-section" id="sp-themes">
         <h2>Themes</h2>
-        <p style="font-size:13px;color:var(--text-3);margin-top:-12px;margin-bottom:20px">Choose a colour preset crafted for LOBBY. Changes apply instantly.</p>
+        <p class="sp-subtitle">Choose a colour preset crafted for LOBBY. Changes apply instantly.</p>
+        <div class="sp-section-rule"></div>
 
         <!-- Category tabs -->
         <div id="spThemeCatTabs" style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:16px"></div>
@@ -15991,27 +16188,31 @@ setTimeout(() => { updateMyStatusUI(); }, 100);
 
       <!-- ── Password ── -->
       <div class="sp-section" id="sp-security">
-        <h2>Change Password</h2>
-        <div class="sp-form-group">
-          <label class="sp-label">Current Password</label>
+        <h2>Password</h2>
+        <p class="sp-subtitle">Update your account password. You'll need your current password to confirm.</p>
+        <div class="sp-section-rule"></div>
+
+        <div class="sp-card">
+          <div class="sp-card-title">Current Password</div>
           <input class="sp-input" type="password" id="spCurrentPw" placeholder="Enter current password" />
         </div>
-        <div class="sp-form-group">
-          <label class="sp-label">New Password</label>
+        <div class="sp-card">
+          <div class="sp-card-title">New Password</div>
           <input class="sp-input" type="password" id="spNewPw" placeholder="At least 6 characters" />
         </div>
-        <div class="sp-form-group">
-          <label class="sp-label">Confirm New Password</label>
+        <div class="sp-card">
+          <div class="sp-card-title">Confirm New Password</div>
           <input class="sp-input" type="password" id="spConfirmPw" placeholder="Repeat new password" />
         </div>
-        <button class="sp-save-btn" id="spSavePassword">Change Password</button>
+        <button class="sp-save-btn" id="spSavePassword" style="margin-top:10px">Change Password</button>
         <div class="sp-msg" id="spPasswordMsg"></div>
       </div>
 
-      <!-- ── Audio & Video ── -->
+      <!-- ── Steam ── -->
       <div class="sp-section" id="sp-steam">
-        <h2>🎮 Steam Integration</h2>
-        <p style="font-size:13px;color:var(--text-3);margin-top:-12px;margin-bottom:20px">Link your Steam account to show recently played games on your profile and the home page.</p>
+        <h2>Steam Integration</h2>
+        <p class="sp-subtitle">Link your Steam account to show recently played games on your profile and the home page.</p>
+        <div class="sp-section-rule"></div>
 
         <!-- Connected state -->
         <div id="spSteamConnected" style="display:none;background:var(--bg-2);border-radius:12px;padding:16px;margin-bottom:20px;border:1px solid rgba(255,255,255,.08)">
@@ -16052,12 +16253,13 @@ setTimeout(() => { updateMyStatusUI(); }, 100);
 
       <!-- ── Chess ── -->
       <div class="sp-section" id="sp-chess">
-        <h2>♟️ Chess Accounts</h2>
-        <p style="font-size:13px;color:var(--text-3);margin-top:-12px;margin-bottom:20px">Link your Chess.com and Lichess accounts so tournaments can automatically fetch match results.</p>
+        <h2>Chess Accounts</h2>
+        <p class="sp-subtitle">Link your Chess.com and Lichess accounts so tournaments can automatically fetch match results.</p>
+        <div class="sp-section-rule"></div>
 
-        <!-- Chess.com row -->
-        <div class="sp-form-group">
-          <label class="sp-label">Chess.com Username</label>
+        <div class="sp-group-label">Chess.com</div>
+        <div class="sp-card">
+          <div class="sp-card-title">Chess.com Username</div>
           <div style="display:flex;gap:8px;align-items:center">
             <input class="sp-input" id="spChesscomInput" placeholder="e.g. hikaru" style="flex:1" />
             <button id="spChesscomLinkBtn" onclick="spLinkChess('chess.com')"
@@ -16065,12 +16267,12 @@ setTimeout(() => { updateMyStatusUI(); }, 100);
               onmouseover="this.style.background='var(--accent-h)'" onmouseout="this.style.background='var(--accent)'">Link</button>
             <button id="spChesscomUnlinkBtn" onclick="spUnlinkChess('chess.com')" style="display:none;flex-shrink:0;padding:9px 10px;background:rgba(237,66,69,.12);color:var(--danger);border:1px solid rgba(237,66,69,.25);border-radius:8px;font-size:13px;cursor:pointer;font-family:var(--font)" title="Unlink">✕</button>
           </div>
-          <div id="spChesscomStatus" style="font-size:12px;color:var(--text-3);margin-top:4px;min-height:16px"></div>
+          <div id="spChesscomStatus" class="sp-card-desc" style="min-height:16px"></div>
         </div>
 
-        <!-- Lichess row -->
-        <div class="sp-form-group">
-          <label class="sp-label">Lichess Username</label>
+        <div class="sp-group-label">Lichess</div>
+        <div class="sp-card">
+          <div class="sp-card-title">Lichess Username</div>
           <div style="display:flex;gap:8px;align-items:center">
             <input class="sp-input" id="spLichessInput" placeholder="e.g. DrNykterstein" style="flex:1" />
             <button id="spLichessLinkBtn" onclick="spLinkChess('lichess')"
@@ -16078,44 +16280,52 @@ setTimeout(() => { updateMyStatusUI(); }, 100);
               onmouseover="this.style.background='var(--accent-h)'" onmouseout="this.style.background='var(--accent)'">Link</button>
             <button id="spLichessUnlinkBtn" onclick="spUnlinkChess('lichess')" style="display:none;flex-shrink:0;padding:9px 10px;background:rgba(237,66,69,.12);color:var(--danger);border:1px solid rgba(237,66,69,.25);border-radius:8px;font-size:13px;cursor:pointer;font-family:var(--font)" title="Unlink">✕</button>
           </div>
-          <div id="spLichessStatus" style="font-size:12px;color:var(--text-3);margin-top:4px;min-height:16px"></div>
+          <div id="spLichessStatus" class="sp-card-desc" style="min-height:16px"></div>
         </div>
 
         <div class="sp-msg" id="spChessMsg"></div>
       </div>
 
       <div class="sp-section" id="sp-audiovideo">
-        <h2>Audio & Video</h2>
-        <div class="sp-form-group">
-          <label class="sp-label">Microphone</label>
+        <h2>Audio &amp; Video</h2>
+        <p class="sp-subtitle">Configure your microphone, speakers, camera and call quality.</p>
+        <div class="sp-section-rule"></div>
+
+        <div class="sp-group-label">Input</div>
+        <div class="sp-card">
+          <div class="sp-card-title">Microphone</div>
           <select class="sp-select" id="spMicSelect"></select>
         </div>
-        <div class="sp-form-group">
-          <label class="sp-label">Input Volume <span id="spInputVolLabel" style="color:var(--text-2);font-weight:400;text-transform:none;letter-spacing:0;font-size:12px">100%</span></label>
+        <div class="sp-card">
+          <div class="sp-card-title">Input Volume &nbsp;<span id="spInputVolLabel" style="font-weight:400;font-size:12px;color:var(--text-3)">100%</span></div>
           <div class="sp-volume-row">
             <span class="sp-volume-icon">🔇</span>
             <div class="sp-volume-wrap"><input type="range" class="sp-slider" id="spInputVol" min="0" max="100" value="100" /></div>
             <span class="sp-volume-icon">🎙</span>
           </div>
         </div>
-        <div class="sp-form-group">
-          <label class="sp-label">Webcam</label>
-          <select class="sp-select" id="spCamSelect"></select>
-        </div>
-        <div class="sp-form-group">
-          <label class="sp-label">Speaker / Output Device</label>
+
+        <div class="sp-group-label">Output</div>
+        <div class="sp-card">
+          <div class="sp-card-title">Speaker / Output Device</div>
           <select class="sp-select" id="spSpeakerSelect"></select>
         </div>
-        <div class="sp-form-group">
-          <label class="sp-label">Output Volume <span id="spOutputVolLabel" style="color:var(--text-2);font-weight:400;text-transform:none;letter-spacing:0;font-size:12px">100%</span></label>
+        <div class="sp-card">
+          <div class="sp-card-title">Output Volume &nbsp;<span id="spOutputVolLabel" style="font-weight:400;font-size:12px;color:var(--text-3)">100%</span></div>
           <div class="sp-volume-row">
             <span class="sp-volume-icon">🔇</span>
             <div class="sp-volume-wrap"><input type="range" class="sp-slider" id="spOutputVol" min="0" max="100" value="100" /></div>
             <span class="sp-volume-icon">🔊</span>
           </div>
         </div>
-        <div class="sp-form-group">
-          <label class="sp-label">Webcam Quality</label>
+
+        <div class="sp-group-label">Video</div>
+        <div class="sp-card">
+          <div class="sp-card-title">Webcam</div>
+          <select class="sp-select" id="spCamSelect"></select>
+        </div>
+        <div class="sp-card">
+          <div class="sp-card-title">Webcam Quality</div>
           <select class="sp-select" id="spCamQuality">
             <option value="720p30">720p 30fps</option>
             <option value="720p60">720p 60fps</option>
@@ -16126,8 +16336,8 @@ setTimeout(() => { updateMyStatusUI(); }, 100);
             <option value="source">Source (max)</option>
           </select>
         </div>
-        <div class="sp-form-group">
-          <label class="sp-label">Screen Share Quality</label>
+        <div class="sp-card">
+          <div class="sp-card-title">Screen Share Quality</div>
           <select class="sp-select" id="spScreenQuality">
             <option value="720p30">720p 30fps</option>
             <option value="720p60">720p 60fps</option>
@@ -16138,47 +16348,56 @@ setTimeout(() => { updateMyStatusUI(); }, 100);
             <option value="source">Source (max)</option>
           </select>
         </div>
-        <div class="sp-form-group">
-          <label class="sp-label">Test Microphone</label>
-          <div style="display:flex;gap:10px;align-items:center">
-            <button class="sp-save-btn" id="spTestMicBtn" style="padding:8px 16px;font-size:13px;margin-top:0">🎤 Test Mic</button>
+
+        <div class="sp-group-label">Test</div>
+        <div class="sp-card">
+          <div class="sp-card-title">Microphone Test</div>
+          <div style="display:flex;gap:10px;align-items:center;margin-top:4px">
+            <button class="sp-save-btn" id="spTestMicBtn" style="padding:8px 16px;font-size:13px;margin:0">🎤 Test Mic</button>
             <span id="spTestMicStatus" style="font-size:12px;color:var(--text-3)">Click to test</span>
           </div>
-          <canvas class="sp-mic-meter" id="spMicMeter" width="400" height="22"></canvas>
+          <canvas class="sp-mic-meter" id="spMicMeter" width="400" height="22" style="margin-top:6px"></canvas>
         </div>
-        <button class="sp-save-btn" id="spSaveAV">Save Audio & Video</button>
+
+        <button class="sp-save-btn" id="spSaveAV" style="margin-top:10px">Save Audio &amp; Video</button>
         <div class="sp-msg" id="spAVMsg"></div>
       </div>
 
       <!-- ── Sounds ── -->
       <div class="sp-section" id="sp-sounds">
         <h2>Sounds</h2>
-        <p style="color:var(--text-2);font-size:13px;margin-bottom:20px">Control notification and UI sound effects.</p>
+        <p class="sp-subtitle">Control notification and UI sound effects.</p>
+        <div class="sp-section-rule"></div>
 
-        <div class="sp-form-group">
-          <label class="sp-label" style="display:flex;align-items:center;justify-content:space-between;">
-            Enable Sounds
-            <label style="position:relative;display:inline-block;width:44px;height:24px;cursor:pointer;margin:0">
+        <div class="sp-group-label">Playback</div>
+        <div class="sp-card">
+          <div class="sp-card-row">
+            <div class="sp-card-info">
+              <div class="sp-card-title">Enable Sounds</div>
+              <div class="sp-card-desc">Play audio cues for messages, calls and notifications.</div>
+            </div>
+            <label style="position:relative;display:inline-block;width:44px;height:24px;cursor:pointer;flex-shrink:0">
               <input type="checkbox" id="spSoundEnabled" style="opacity:0;width:0;height:0;position:absolute"
                 onchange="LobbySound.toggleMute();this.checked=!LobbySound.muted;document.getElementById('spSoundStatus').textContent=LobbySound.muted?'Off':'On'">
-              <span style="position:absolute;inset:0;background:var(--bg-3);border-radius:24px;transition:background .2s"></span>
+              <span style="position:absolute;inset:0;background:var(--bg-1);border-radius:24px;transition:background .2s"></span>
               <span id="spSoundToggleKnob" style="position:absolute;top:3px;left:3px;width:18px;height:18px;background:#fff;border-radius:50%;transition:transform .2s;pointer-events:none"></span>
             </label>
-          </label>
+          </div>
           <span id="spSoundStatus" style="font-size:12px;color:var(--text-3)">On</span>
         </div>
 
-        <div class="sp-form-group">
-          <label class="sp-label">Sound Volume <span id="spSoundVolLabel" style="color:var(--text-2);font-weight:400;text-transform:none;letter-spacing:0;font-size:12px">50%</span></label>
-          <div class="sp-volume-row">
+        <div class="sp-card">
+          <div class="sp-card-title">Sound Volume &nbsp;<span id="spSoundVolLabel" style="font-weight:400;font-size:12px;color:var(--text-3)">50%</span></div>
+          <div class="sp-volume-row" style="margin-top:4px">
             <span class="sp-volume-icon">🔇</span>
             <div class="sp-volume-wrap"><input type="range" class="sp-slider" id="spSoundVol" min="0" max="100" value="50" /></div>
             <span class="sp-volume-icon">🔊</span>
           </div>
         </div>
 
-        <div style="margin-top:20px;display:flex;flex-direction:column;gap:8px">
-          <label class="sp-label">Test Sounds</label>
+        <div class="sp-group-label">Test Sounds</div>
+        <div class="sp-card">
+          <div class="sp-card-desc" style="margin-bottom:8px">Click to preview each notification sound.</div>
           <div style="display:flex;flex-wrap:wrap;gap:8px">
             <button class="sp-save-btn" style="padding:6px 14px;font-size:12px;margin:0" onclick="LobbySound.play('messageSent')">Message Sent</button>
             <button class="sp-save-btn" style="padding:6px 14px;font-size:12px;margin:0" onclick="LobbySound.play('messageReceived')">Message Received</button>
@@ -16194,25 +16413,32 @@ setTimeout(() => { updateMyStatusUI(); }, 100);
       <!-- ── Updates ── -->
       <div class="sp-section" id="sp-updates">
         <h2>Updates</h2>
-        <p style="color:var(--text-2);font-size:13px;margin-bottom:16px">Check for new versions of LOBBY from GitHub.</p>
+        <p class="sp-subtitle">Check for new versions of LOBBY from GitHub.</p>
+        <div class="sp-section-rule"></div>
 
-        <div style="display:flex;align-items:center;gap:12px;margin-bottom:16px">
-          <span style="font-size:13px;color:var(--text-2)">Current version:</span>
-          <span id="spCurrentVersion" style="font-size:14px;font-weight:600;color:var(--text-1)">loading…</span>
+        <div class="sp-card">
+          <div class="sp-card-row">
+            <div class="sp-card-info">
+              <div class="sp-card-title">Current Version</div>
+            </div>
+            <span id="spCurrentVersion" style="font-size:14px;font-weight:700;color:var(--text-1)">loading…</span>
+          </div>
         </div>
 
-        <button class="sp-save-btn" id="spCheckUpdateBtn" style="margin-bottom:12px">🔄 Check for Updates</button>
+        <button class="sp-save-btn" id="spCheckUpdateBtn" style="margin:10px 0">🔄 Check for Updates</button>
 
-        <div id="spUpdateResult" style="display:none;background:var(--bg-2);border-radius:10px;padding:16px;margin-top:8px">
-          <div id="spUpdateStatus" style="font-size:14px;color:var(--text-1);margin-bottom:8px"></div>
-          <div id="spUpdateChangelog" style="font-size:12px;color:var(--text-2);margin-bottom:12px;white-space:pre-wrap;max-height:120px;overflow-y:auto"></div>
-          <div id="spUpdateActions" style="display:none;gap:10px">
-            <button class="sp-save-btn" id="spDownloadUpdateBtn" style="background:var(--accent);margin-top:0">⬇️ Download & Install</button>
-          </div>
-          <div id="spDownloadProgress" style="display:none;margin-top:12px">
-            <div style="font-size:12px;color:var(--text-2);margin-bottom:4px">Downloading… <span id="spDownloadPct">0%</span></div>
-            <div style="background:var(--bg-3);border-radius:6px;height:8px;overflow:hidden">
-              <div id="spDownloadBar" style="background:var(--accent);height:100%;width:0%;transition:width .3s ease;border-radius:6px"></div>
+        <div id="spUpdateResult" style="display:none;margin-top:8px">
+          <div class="sp-card">
+            <div id="spUpdateStatus" class="sp-card-title"></div>
+            <div id="spUpdateChangelog" style="font-size:12px;color:var(--text-2);white-space:pre-wrap;max-height:120px;overflow-y:auto"></div>
+            <div id="spUpdateActions" style="display:none">
+              <button class="sp-save-btn" id="spDownloadUpdateBtn" style="background:var(--accent);margin-top:4px">⬇️ Download &amp; Install</button>
+            </div>
+            <div id="spDownloadProgress" style="display:none;margin-top:8px">
+              <div style="font-size:12px;color:var(--text-2);margin-bottom:4px">Downloading… <span id="spDownloadPct">0%</span></div>
+              <div style="background:var(--bg-2);border-radius:6px;height:8px;overflow:hidden">
+                <div id="spDownloadBar" style="background:var(--accent);height:100%;width:0%;transition:width .3s ease;border-radius:6px"></div>
+              </div>
             </div>
           </div>
         </div>
@@ -16222,7 +16448,8 @@ setTimeout(() => { updateMyStatusUI(); }, 100);
       <!-- ── Tournaments ── -->
       <div class="sp-section" id="sp-tournaments">
         <h2>Tournaments</h2>
-        <p style="font-size:13px;color:var(--text-3);margin-top:-12px;margin-bottom:20px">Personalise your match card — flex on everyone in the bracket. GIFs supported.</p>
+        <p class="sp-subtitle">Personalise your match card — flex on everyone in the bracket. GIFs supported.</p>
+        <div class="sp-section-rule"></div>
 
         <div class="sp-form-group">
           <label class="sp-label">Live Preview</label>
@@ -16285,39 +16512,169 @@ setTimeout(() => { updateMyStatusUI(); }, 100);
       <!-- ── Performance ── -->
       <div class="sp-section" id="sp-performance">
         <h2>Performance</h2>
-        <p style="color:var(--text-3);margin-bottom:18px;font-size:13px">Control which panels are open when LOBBY starts up.</p>
-        <div style="display:flex;flex-direction:column;gap:16px">
-          <div style="display:flex;align-items:center;justify-content:space-between;padding:14px 16px;background:var(--bg-3);border-radius:10px">
-            <div>
-              <div style="font-weight:700;font-size:14px;color:var(--text-1)">Left Sidebar</div>
-              <div style="font-size:12px;color:var(--text-3);margin-top:2px">Server list, channels &amp; friends</div>
-            </div>
-            <label style="position:relative;width:44px;height:24px;cursor:pointer">
-              <input type="checkbox" id="spPerfLeftSidebar" checked style="opacity:0;width:0;height:0;position:absolute">
-              <span style="position:absolute;inset:0;background:var(--bg-1);border-radius:12px;transition:background .2s"></span>
-              <span style="position:absolute;top:2px;left:2px;width:20px;height:20px;background:#fff;border-radius:50%;transition:transform .2s;box-shadow:0 1px 3px rgba(0,0,0,.3)"></span>
-              <style>
-                #spPerfLeftSidebar:checked + span { background:var(--accent) !important; }
-                #spPerfLeftSidebar:checked + span + span { transform:translateX(20px); }
-              </style>
-            </label>
+        <p class="sp-subtitle">Tune LOBBY's behaviour to keep things feeling snappy on your device.</p>
+        <div class="sp-section-rule"></div>
+
+        <style>
+          .perf-group-label {
+            font-size:12px; font-weight:700; letter-spacing:.07em; text-transform:uppercase;
+            color:var(--text-2); margin:20px 0 8px; padding-left:2px;
+          }
+          .perf-row {
+            display:flex; align-items:center; justify-content:space-between;
+            padding:10px 14px; background:var(--bg-3); border-radius:10px; gap:12px;
+          }
+          .perf-row + .perf-row { margin-top:6px; }
+          .perf-row-info { flex:1; min-width:0; }
+          .perf-row-title { font-weight:700; font-size:13px; color:var(--text-1); }
+          .perf-row-desc  { font-size:12px; color:var(--text-3); margin-top:1px; line-height:1.4; }
+          /* Segment control for multi-choice options */
+          .perf-seg { display:flex; gap:4px; flex-shrink:0; }
+          .perf-seg button {
+            padding:5px 11px; font-size:12px; font-weight:600; font-family:var(--font);
+            background:var(--bg-2); color:var(--text-3); border:1px solid rgba(255,255,255,.08);
+            border-radius:7px; cursor:pointer; transition:all .15s; white-space:nowrap;
+          }
+          .perf-seg button:hover  { background:var(--bg-1); color:var(--text-1); }
+          .perf-seg button.active { background:var(--accent); color:#fff; border-color:var(--accent); }
+          /* Toggle switch */
+          .perf-toggle { position:relative; width:44px; height:24px; cursor:pointer; flex-shrink:0; }
+          .perf-toggle input { opacity:0; width:0; height:0; position:absolute; }
+          .perf-toggle .track {
+            position:absolute; inset:0; background:var(--bg-1); border-radius:12px;
+            transition:background .2s;
+          }
+          .perf-toggle input:checked + .track { background:var(--accent); }
+          .perf-toggle .thumb {
+            position:absolute; top:2px; left:2px; width:20px; height:20px;
+            background:#fff; border-radius:50%; transition:transform .2s;
+            box-shadow:0 1px 3px rgba(0,0,0,.3); pointer-events:none;
+          }
+          .perf-toggle input:checked ~ .thumb { transform:translateX(20px); }
+          /* Select */
+          .perf-select {
+            background:var(--bg-2); color:var(--text-1); border:1px solid rgba(255,255,255,.1);
+            border-radius:8px; padding:6px 10px; font-family:var(--font); font-size:13px;
+            cursor:pointer; outline:none; flex-shrink:0;
+          }
+        </style>
+
+        <!-- ── Media ─────────────────────────────────────────── -->
+        <div class="perf-group-label">Media</div>
+
+        <div class="perf-row">
+          <div class="perf-row-info">
+            <div class="perf-row-title">GIF Playback</div>
+            <div class="perf-row-desc">Choose when animated GIFs play across the app.</div>
           </div>
-          <div style="display:flex;align-items:center;justify-content:space-between;padding:14px 16px;background:var(--bg-3);border-radius:10px">
-            <div>
-              <div style="font-weight:700;font-size:14px;color:var(--text-1)">Right Sidebar</div>
-              <div style="font-size:12px;color:var(--text-3);margin-top:2px">Social feed &amp; members panel</div>
-            </div>
-            <label style="position:relative;width:44px;height:24px;cursor:pointer">
-              <input type="checkbox" id="spPerfRightSidebar" style="opacity:0;width:0;height:0;position:absolute">
-              <span style="position:absolute;inset:0;background:var(--bg-1);border-radius:12px;transition:background .2s"></span>
-              <span style="position:absolute;top:2px;left:2px;width:20px;height:20px;background:#fff;border-radius:50%;transition:transform .2s;box-shadow:0 1px 3px rgba(0,0,0,.3)"></span>
-              <style>
-                #spPerfRightSidebar:checked + span { background:var(--accent) !important; }
-                #spPerfRightSidebar:checked + span + span { transform:translateX(20px); }
-              </style>
-            </label>
+          <div class="perf-seg" id="spGifModeSeg">
+            <button data-gif="always">Always</button>
+            <button data-gif="hover" class="active">On Hover</button>
+            <button data-gif="click">On Click</button>
+            <button data-gif="none">Disabled</button>
           </div>
         </div>
+
+        <div class="perf-row">
+          <div class="perf-row-info">
+            <div class="perf-row-title">Lazy Load Images</div>
+            <div class="perf-row-desc">Defer loading off-screen images until you scroll to them. Reduces initial load time.</div>
+          </div>
+          <label class="perf-toggle">
+            <input type="checkbox" id="spPerfLazyImages">
+            <span class="track"></span><span class="thumb"></span>
+          </label>
+        </div>
+
+        <!-- ── Rendering ──────────────────────────────────────── -->
+        <div class="perf-group-label">Rendering</div>
+
+        <div class="perf-row">
+          <div class="perf-row-info">
+            <div class="perf-row-title">Reduce Transparency</div>
+            <div class="perf-row-desc">Removes glass blur effects (backdrop-filter). Gives a large GPU boost on slower machines.</div>
+          </div>
+          <label class="perf-toggle">
+            <input type="checkbox" id="spPerfNoBlur">
+            <span class="track"></span><span class="thumb"></span>
+          </label>
+        </div>
+
+        <div class="perf-row">
+          <div class="perf-row-info">
+            <div class="perf-row-title">Reduce Motion</div>
+            <div class="perf-row-desc">Collapses animations and transitions to near-zero. Good for accessibility and low-end devices.</div>
+          </div>
+          <label class="perf-toggle">
+            <input type="checkbox" id="spPerfReduceMotion">
+            <span class="track"></span><span class="thumb"></span>
+          </label>
+        </div>
+
+        <div class="perf-row">
+          <div class="perf-row-info">
+            <div class="perf-row-title">Compact Chat</div>
+            <div class="perf-row-desc">Reduces message padding so more messages fit on screen at once.</div>
+          </div>
+          <label class="perf-toggle">
+            <input type="checkbox" id="spPerfCompact">
+            <span class="track"></span><span class="thumb"></span>
+          </label>
+        </div>
+
+        <div class="perf-row">
+          <div class="perf-row-info">
+            <div class="perf-row-title">Hide Reactions</div>
+            <div class="perf-row-desc">Hides emoji reactions on messages and posts. Reduces DOM size in busy channels.</div>
+          </div>
+          <label class="perf-toggle">
+            <input type="checkbox" id="spPerfNoReactions">
+            <span class="track"></span><span class="thumb"></span>
+          </label>
+        </div>
+
+        <!-- ── Chat ──────────────────────────────────────────── -->
+        <div class="perf-group-label">Chat</div>
+
+        <div class="perf-row">
+          <div class="perf-row-info">
+            <div class="perf-row-title">Message History Limit</div>
+            <div class="perf-row-desc">Maximum messages kept in the DOM at once. Lower = less memory use.</div>
+          </div>
+          <select class="perf-select" id="spPerfMsgLimit">
+            <option value="50">50 messages</option>
+            <option value="100">100 messages</option>
+            <option value="200" selected>200 messages</option>
+            <option value="500">500 messages</option>
+            <option value="0">Unlimited</option>
+          </select>
+        </div>
+
+        <!-- ── Startup ────────────────────────────────────────── -->
+        <div class="perf-group-label">Startup Panels</div>
+
+        <div class="perf-row">
+          <div class="perf-row-info">
+            <div class="perf-row-title">Left Sidebar</div>
+            <div class="perf-row-desc">Server list, channels &amp; friends — open at launch.</div>
+          </div>
+          <label class="perf-toggle">
+            <input type="checkbox" id="spPerfLeftSidebar" checked>
+            <span class="track"></span><span class="thumb"></span>
+          </label>
+        </div>
+
+        <div class="perf-row">
+          <div class="perf-row-info">
+            <div class="perf-row-title">Right Sidebar</div>
+            <div class="perf-row-desc">Social feed &amp; members panel — open at launch.</div>
+          </div>
+          <label class="perf-toggle">
+            <input type="checkbox" id="spPerfRightSidebar">
+            <span class="track"></span><span class="thumb"></span>
+          </label>
+        </div>
+
       </div>
 
     </div><!-- sp-content -->
@@ -16361,7 +16718,93 @@ setTimeout(() => { updateMyStatusUI(); }, 100);
   window._spClosePanel = closePanel;
   window.openSettingsPanel = openPanel;
 
+  // ── Performance settings: apply persisted values to <body> ────
+  function applyPerfSettings() {
+    const gifMode    = localStorage.getItem("lobby_gif_mode")      || "hover";
+    const noBlur     = localStorage.getItem("lobby_no_blur")       === "true";
+    const reduceMotion = localStorage.getItem("lobby_reduce_motion") === "true";
+    const compact    = localStorage.getItem("lobby_compact_mode")  === "true";
+    const noReact    = localStorage.getItem("lobby_no_reactions")  === "true";
+    const lazyImages = localStorage.getItem("lobby_lazy_images")   === "true";
+
+    // GIF mode — toggle body classes
+    document.body.classList.remove("gif-always", "gif-hover", "gif-click", "gif-none");
+    document.body.classList.add(`gif-${gifMode}`);
+    // Immediately freeze/thaw based on mode
+    if (gifMode === "none" && typeof freezeAllGifs === "function") freezeAllGifs();
+    else if (gifMode !== "none" && typeof thawAllGifs === "function") thawAllGifs();
+
+    // Blur
+    document.body.classList.toggle("lobby-no-blur",          noBlur);
+    // Reduce motion
+    document.body.classList.toggle("lobby-reduce-motion",    reduceMotion);
+    // Compact chat
+    document.body.classList.toggle("lobby-compact",          compact);
+    // Reactions
+    document.body.classList.toggle("lobby-no-reactions",     noReact);
+
+    // Lazy images — set loading attribute on all current + future images via mutation
+    if (lazyImages) {
+      document.querySelectorAll("img:not([loading])").forEach(img => { img.loading = "lazy"; });
+    }
+  }
+
+  // Call once on startup
+  applyPerfSettings();
+
   function wirePerformance() {
+    // ── GIF mode segment ──────────────────────────────────────
+    const gifSeg = document.getElementById("spGifModeSeg");
+    const curGif = localStorage.getItem("lobby_gif_mode") || "hover";
+    gifSeg?.querySelectorAll("button[data-gif]").forEach(btn => {
+      btn.classList.toggle("active", btn.dataset.gif === curGif);
+      btn.addEventListener("click", () => {
+        gifSeg.querySelectorAll("button").forEach(b => b.classList.remove("active"));
+        btn.classList.add("active");
+        localStorage.setItem("lobby_gif_mode", btn.dataset.gif);
+        applyPerfSettings();
+        // For "none" mode, also freeze feed GIFs immediately
+        if (btn.dataset.gif === "none") feedFreezeGifs();
+        else feedThawGifs();
+      });
+    });
+
+    // ── Toggle helper ─────────────────────────────────────────
+    function wireToggle(id, key, defaultVal, onApply) {
+      const el = document.getElementById(id);
+      if (!el) return;
+      const stored = localStorage.getItem(key);
+      el.checked = stored === null ? defaultVal : stored === "true";
+      el.addEventListener("change", () => {
+        localStorage.setItem(key, el.checked);
+        applyPerfSettings();
+        if (onApply) onApply(el.checked);
+      });
+    }
+
+    // ── Select helper ─────────────────────────────────────────
+    function wireSelect(id, key, defaultVal, onApply) {
+      const el = document.getElementById(id);
+      if (!el) return;
+      el.value = localStorage.getItem(key) || defaultVal;
+      el.addEventListener("change", () => {
+        localStorage.setItem(key, el.value);
+        if (onApply) onApply(el.value);
+      });
+    }
+
+    wireToggle("spPerfNoBlur",        "lobby_no_blur",       false);
+    wireToggle("spPerfReduceMotion",  "lobby_reduce_motion", false);
+    wireToggle("spPerfCompact",       "lobby_compact_mode",  false);
+    wireToggle("spPerfNoReactions",   "lobby_no_reactions",  false);
+    wireToggle("spPerfLazyImages",    "lobby_lazy_images",   false, (on) => {
+      if (on) document.querySelectorAll("img:not([loading])").forEach(img => { img.loading = "lazy"; });
+      else    document.querySelectorAll("img[loading='lazy']").forEach(img => { img.removeAttribute("loading"); });
+    });
+
+    wireSelect("spPerfMsgLimit", "lobby_msg_limit", "200");
+
+    // ── Startup sidebar toggles (existing) ────────────────────
     const leftToggle  = document.getElementById("spPerfLeftSidebar");
     const rightToggle = document.getElementById("spPerfRightSidebar");
     const leftPref  = localStorage.getItem("lobby_pref_left_sidebar");
@@ -16406,22 +16849,22 @@ setTimeout(() => { updateMyStatusUI(); }, 100);
     try { initWallpaperSection(); } catch (e) { console.warn("[wallpaper init]", e); }
 
     const composeOpacitySlider = document.getElementById("spComposeOpacity");
-    composeOpacitySlider.addEventListener("input", () => {
+    composeOpacitySlider.addEventListener("input", rafThrottle(() => {
       document.getElementById("spComposeOpacityLabel").textContent = `${composeOpacitySlider.value}%`;
       updateSliderFill(composeOpacitySlider);
       applyComposePreview();
-    });
-    document.getElementById("spComposeColour").addEventListener("input", () => {
+    }));
+    document.getElementById("spComposeColour").addEventListener("input", debounce(() => {
       buildComposePresets(document.getElementById("spComposeColour").value);
       applyComposePreview();
-    });
+    }, 120));
     loadComposeStyle();
 
-    document.getElementById("spBannerColour").addEventListener("input", e => {
+    document.getElementById("spBannerColour").addEventListener("input", rafThrottle(e => {
       spPendingColour = e.target.value;
       document.querySelectorAll(".sp-colour-preset").forEach(el => el.classList.remove("selected"));
       updateBannerPreview(null, e.target.value);
-    });
+    }));
     document.getElementById("spBio").addEventListener("input", function () {
       document.getElementById("spBioCounter").textContent = `${this.value.length} / 300`;
       document.getElementById("spPreviewBio").textContent = this.value;
@@ -16683,6 +17126,7 @@ setTimeout(() => { updateMyStatusUI(); }, 100);
       is_private,
     })});
     await api("/profile/visibility", { method:"PATCH", body:JSON.stringify({ visibility: document.getElementById("spPostVisibility").value })});
+    if (r.success) invalidateProfileCache(me?.id);
     spShowMsg("spProfileMsg", r.success ? "Saved!" : r.error||"Failed", r.success ? "success" : "error");
     // Cache privacy locally so filtering works without another API call
     localStorage.setItem("lobby_my_privacy", _spPrivacy);
@@ -16906,23 +17350,23 @@ setTimeout(() => { updateMyStatusUI(); }, 100);
     if (blurSlider) {
       blurSlider.value = _spWpState.blur;
       updateSliderFill(blurSlider);
-      blurSlider.addEventListener("input", () => {
+      blurSlider.addEventListener("input", rafThrottle(() => {
         _spWpState.blur = +blurSlider.value;
         document.getElementById("spWpBlurLabel").textContent = `${_spWpState.blur}px`;
         updateSliderFill(blurSlider);
         updateWpPreview();
-      });
+      }));
       document.getElementById("spWpBlurLabel").textContent = `${_spWpState.blur}px`;
     }
     if (dimSlider) {
       dimSlider.value = _spWpState.dim;
       updateSliderFill(dimSlider);
-      dimSlider.addEventListener("input", () => {
+      dimSlider.addEventListener("input", rafThrottle(() => {
         _spWpState.dim = +dimSlider.value;
         document.getElementById("spWpDimLabel").textContent = `${_spWpState.dim}%`;
         updateSliderFill(dimSlider);
         updateWpPreview();
-      });
+      }));
       document.getElementById("spWpDimLabel").textContent = `${_spWpState.dim}%`;
     }
 
@@ -17630,6 +18074,12 @@ setTimeout(() => { updateMyStatusUI(); }, 100);
       if (track) track.style.background = e.target.checked ? 'var(--accent)' : 'var(--bg-3)';
       if (knob)  knob.style.transform   = e.target.checked ? 'translateX(18px)' : 'translateX(0)';
     }
+    if (e.target.id === 'tournamentInviteOnly') {
+      const track = document.getElementById('inviteOnlyToggleTrack');
+      const knob  = document.getElementById('inviteOnlyToggleKnob');
+      if (track) track.style.background = e.target.checked ? 'var(--accent)' : 'var(--bg-3)';
+      if (knob)  knob.style.transform   = e.target.checked ? 'translateX(18px)' : 'translateX(0)';
+    }
     if (e.target.id === 'tournamentScheduleToggle') {
       const track  = document.getElementById('scheduleToggleTrack');
       const knob   = document.getElementById('scheduleToggleKnob');
@@ -17792,7 +18242,7 @@ setTimeout(() => { updateMyStatusUI(); }, 100);
       e.preventDefault();
     });
 
-    window.addEventListener('mousemove', e => {
+    window.addEventListener('mousemove', rafThrottle(e => {
       if (!dragging) return;
       // How far moved as % of wrap size (inverted — drag right moves image left)
       const dx = ((e.clientX - startX) / wrap.offsetWidth)  * -100;
@@ -17800,7 +18250,7 @@ setTimeout(() => { updateMyStatusUI(); }, 100);
       pctX = Math.max(0, Math.min(100, startPctX + dx));
       pctY = Math.max(0, Math.min(100, startPctY + dy));
       applyPos();
-    });
+    }));
 
     window.addEventListener('mouseup', () => {
       if (!dragging) return;
@@ -17985,7 +18435,7 @@ setTimeout(() => { updateMyStatusUI(); }, 100);
         const cursorClass = axis === 'x' ? 'resizing-col' : 'resizing-row';
         document.body.classList.add(cursorClass);
         handle.classList.add('active');
-        function onMouseMove(e2) { onMove(e2); }
+        const onMouseMove = rafThrottle(function(e2) { onMove(e2); });
         function onMouseUp() {
           document.body.classList.remove(cursorClass);
           handle.classList.remove('active');
@@ -18294,6 +18744,18 @@ document.addEventListener("click", () => hideProfileHoverCard());
                     </label>
                 </label>
                 <div style="font-size:11px;color:var(--text-3);margin-top:4px">Show running point totals next to player names (based on match scores)</div>
+            </div>
+
+            <div class="form-group">
+                <label style="display:flex;align-items:center;justify-content:space-between;cursor:pointer">
+                    <span>Invite Only</span>
+                    <label style="position:relative;display:inline-block;width:40px;height:22px;cursor:pointer;margin:0">
+                        <input type="checkbox" id="tournamentInviteOnly" style="opacity:0;width:0;height:0;position:absolute">
+                        <span id="inviteOnlyToggleTrack" style="position:absolute;inset:0;background:var(--bg-3);border-radius:22px;transition:background .2s;border:1.5px solid rgba(255,255,255,.1)"></span>
+                        <span id="inviteOnlyToggleKnob" style="position:absolute;top:3px;left:3px;width:14px;height:14px;background:#fff;border-radius:50%;transition:transform .2s;pointer-events:none"></span>
+                    </label>
+                </label>
+                <div style="font-size:11px;color:var(--text-3);margin-top:4px">Only players you invite can join this tournament</div>
             </div>
 
             <div class="form-group">

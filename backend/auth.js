@@ -120,15 +120,39 @@ function requireAuth(req, res, next) {
   } catch { res.status(401).json({ error: "Invalid or expired token" }); }
 }
 
+// ── Per-process user-flags cache (is_admin / is_overlord) ────
+// Avoids a SELECT on every request that needs to check admin status.
+// TTL is 60 s — short enough that promotions take effect quickly.
+const _userFlagsCache = new Map();
+const USER_FLAGS_TTL  = 60_000;
+
+async function getUserFlags(userId) {
+  const cached = _userFlagsCache.get(userId);
+  if (cached && Date.now() - cached.ts < USER_FLAGS_TTL) return cached;
+  const r = await pool.query(
+    "SELECT is_admin, is_overlord FROM users WHERE id = $1", [userId]
+  );
+  const flags = {
+    isAdmin:    r.rows[0]?.is_admin    || false,
+    isOverlord: r.rows[0]?.is_overlord || false,
+    ts: Date.now(),
+  };
+  _userFlagsCache.set(userId, flags);
+  return flags;
+}
+
+// Call this whenever admin/overlord status changes so the cache is fresh
+function invalidateUserFlags(userId) { _userFlagsCache.delete(userId); }
+
 async function requireAdmin(req, res, next) {
-  const result = await pool.query("SELECT is_admin FROM users WHERE id = $1", [req.userId]);
-  if (!result.rows[0]?.is_admin) return res.status(403).json({ error: "Admin access required" });
+  const { isAdmin } = await getUserFlags(req.userId);
+  if (!isAdmin) return res.status(403).json({ error: "Admin access required" });
   next();
 }
 
 async function requireOverlord(req, res, next) {
-  const result = await pool.query("SELECT is_overlord FROM users WHERE id = $1", [req.userId]);
-  if (!result.rows[0]?.is_overlord) return res.status(403).json({ error: "Overlord access required" });
+  const { isOverlord } = await getUserFlags(req.userId);
+  if (!isOverlord) return res.status(403).json({ error: "Overlord access required" });
   next();
 }
 
@@ -278,9 +302,16 @@ app.post("/email-verify/send", requireAuth, async (req, res) => {
     const code      = Math.floor(100000 + Math.random() * 900000).toString();
     const expiresAt = new Date(Date.now() + 10 * 60 * 1000); // 10 mins
 
-    await pool.query("DELETE FROM email_verifications WHERE user_id = $1", [req.userId]);
+    // UPSERT — replaces old code atomically without a separate DELETE round-trip
     await pool.query(
-      "INSERT INTO email_verifications (user_id, email, verification_code, code_expires_at) VALUES ($1,$2,$3,$4)",
+      `INSERT INTO email_verifications (user_id, email, verification_code, code_expires_at, attempts)
+       VALUES ($1,$2,$3,$4,0)
+       ON CONFLICT (user_id) DO UPDATE SET
+         email = EXCLUDED.email,
+         verification_code = EXCLUDED.verification_code,
+         code_expires_at = EXCLUDED.code_expires_at,
+         attempts = 0,
+         created_at = NOW()`,
       [req.userId, normalised, code, expiresAt]
     );
 
@@ -1411,7 +1442,7 @@ app.delete("/dm/:userId/messages/:msgId", requireAuth, async (req, res) => {
       [msgId]
     );
     if (!msg.rows[0]) return res.status(404).json({ error: "Message not found" });
-    const isAdmin = (await pool.query("SELECT is_admin FROM users WHERE id = $1", [req.userId])).rows[0]?.is_admin;
+    const isAdmin = (await getUserFlags(req.userId)).isAdmin;
     const row = msg.rows[0];
     const isParticipant = row.from_user_id === req.userId || row.to_user_id === req.userId;
     if (!isParticipant && !isAdmin) return res.status(403).json({ error: "Not authorised" });
@@ -1541,7 +1572,7 @@ app.patch("/servers/:id", requireAuth, (req, res) => {
   serverPatchUpload.fields([{ name: "banner", maxCount: 1 }, { name: "icon", maxCount: 1 }])(req, res, async (err) => {
     if (err) return res.status(400).json({ error: err.message });
     const memberRow = await pool.query("SELECT role FROM server_members WHERE server_id = $1 AND user_id = $2", [req.params.id, req.userId]);
-    const isAdmin = (await pool.query("SELECT is_admin FROM users WHERE id = $1", [req.userId])).rows[0]?.is_admin;
+    const isAdmin = (await getUserFlags(req.userId)).isAdmin;
     const role = memberRow.rows[0]?.role;
     if (!["owner", "moderator"].includes(role) && !isAdmin) return res.status(403).json({ error: "Not authorised" });
     const updates = [];
@@ -1617,7 +1648,7 @@ app.delete("/servers/:id", requireAuth, async (req, res) => {
   const r = await pool.query("SELECT owner_id FROM servers WHERE id = $1", [req.params.id]);
   const server = r.rows[0];
   if (!server) return res.status(404).json({ error: "Lobby not found" });
-  const isAdmin = (await pool.query("SELECT is_admin FROM users WHERE id = $1", [req.userId])).rows[0]?.is_admin;
+  const isAdmin = (await getUserFlags(req.userId)).isAdmin;
   if (server.owner_id !== req.userId && !isAdmin) return res.status(403).json({ error: "Not authorised" });
   await pool.query("DELETE FROM servers WHERE id = $1", [req.params.id]);
   res.json({ success: true });
@@ -1817,7 +1848,7 @@ app.post("/channels/:id/messages", requireAuth, async (req, res) => {
 
 app.delete("/channels/:channelId/messages/:messageId", requireAuth, async (req, res) => {
   const r = await pool.query("SELECT user_id FROM messages WHERE id = $1", [req.params.messageId]);
-  const isAdmin = (await pool.query("SELECT is_admin FROM users WHERE id = $1", [req.userId])).rows[0]?.is_admin;
+  const isAdmin = (await getUserFlags(req.userId)).isAdmin;
   if (r.rows[0]?.user_id !== req.userId && !isAdmin) return res.status(403).json({ error: "Not authorised" });
   await pool.query("DELETE FROM attachments WHERE message_id = $1", [req.params.messageId]);
   await pool.query("DELETE FROM messages WHERE id = $1", [req.params.messageId]);
@@ -1909,6 +1940,7 @@ app.patch("/admin/users/:id/username", requireAuth, requireAdmin, async (req, re
 app.patch("/admin/users/:id/admin", requireAuth, requireAdmin, async (req, res) => {
   if (parseInt(req.params.id) === req.userId) return res.status(400).json({ error: "Cannot change own admin status" });
   await pool.query("UPDATE users SET is_admin=$1 WHERE id=$2", [!!req.body.isAdmin, parseInt(req.params.id)]);
+  invalidateUserFlags(parseInt(req.params.id));
   res.json({ success: true });
 });
 
@@ -2009,6 +2041,7 @@ app.patch("/admin/users/:id/overlord", requireAuth, requireOverlord, async (req,
   const { grant } = req.body; // true or false
   try {
     await pool.query("UPDATE users SET is_overlord = $1 WHERE id = $2", [!!grant, req.params.id]);
+    invalidateUserFlags(parseInt(req.params.id));
     res.json({ success: true });
   } catch(e) { res.status(500).json({ error: "Server error" }); }
 });
@@ -2036,12 +2069,12 @@ app.post("/groups", requireAuth, async (req, res) => {
       [name.trim(), req.userId]
     );
     const group = r.rows[0];
-    for (const uid of allIds) {
-      await pool.query(
-        "INSERT INTO group_members (group_id, user_id) VALUES ($1, $2) ON CONFLICT DO NOTHING",
-        [group.id, uid]
-      );
-    }
+    // Batch insert all members in a single query instead of N sequential inserts
+    const memberValues = allIds.map((uid, i) => `($1, $${i + 2})`).join(", ");
+    await pool.query(
+      `INSERT INTO group_members (group_id, user_id) VALUES ${memberValues} ON CONFLICT DO NOTHING`,
+      [group.id, ...allIds]
+    );
     res.json(group);
   } catch(err) { console.error("API error at line " + 801 + ":", err.message || err); res.status(500).json({ error: "Server error: " + (err.message || "unknown") }); }
 });
@@ -2205,7 +2238,7 @@ app.get("/posts/:id", requireAuth, async (req, res) => {
 
 app.delete("/posts/:id", requireAuth, async (req, res) => {
   const r = await pool.query("SELECT user_id FROM posts WHERE id = $1", [req.params.id]);
-  const isAdmin = (await pool.query("SELECT is_admin FROM users WHERE id = $1", [req.userId])).rows[0]?.is_admin;
+  const isAdmin = (await getUserFlags(req.userId)).isAdmin;
   if (r.rows[0]?.user_id !== req.userId && !isAdmin) return res.status(403).json({ error: "Not authorised" });
   await pool.query("DELETE FROM posts WHERE id = $1", [req.params.id]);
   res.json({ success: true });
@@ -2289,7 +2322,7 @@ app.post("/posts/:id/comments", requireAuth, async (req, res) => {
 
 app.delete("/posts/:postId/comments/:commentId", requireAuth, async (req, res) => {
   const r = await pool.query("SELECT user_id FROM post_comments WHERE id = $1", [req.params.commentId]);
-  const isAdmin = (await pool.query("SELECT is_admin FROM users WHERE id = $1", [req.userId])).rows[0]?.is_admin;
+  const isAdmin = (await getUserFlags(req.userId)).isAdmin;
   if (r.rows[0]?.user_id !== req.userId && !isAdmin) return res.status(403).json({ error: "Not authorised" });
   await pool.query("DELETE FROM post_comments WHERE id = $1", [req.params.commentId]);
   res.json({ success: true });
@@ -2683,29 +2716,32 @@ app.get("/steam/recent/:userId", requireAuth, async (req, res) => {
 
 // Create a new tournament
 app.post("/tournaments/create", requireAuth, async (req, res) => {
-  const { lobbyId, name, description, format, playerCount, rules, prize, startTime } = req.body;
-  
+  const { lobbyId, name, description, format, playerCount, rules, prize, startTime, joinType } = req.body;
+
   // Validate input
   if (!lobbyId || !name || !format || !playerCount) {
     return res.status(400).json({ error: "Missing required fields" });
   }
-  
+
   const validFormats = ['single', 'double', 'round-robin'];
   const validPlayerCounts = [4, 8, 16, 32, 64, 128];
-  
+  const validJoinTypes = ['open', 'invite_only'];
+
   if (!validFormats.includes(format)) {
     return res.status(400).json({ error: "Invalid tournament format" });
   }
-  
+
   if (!validPlayerCounts.includes(playerCount)) {
     return res.status(400).json({ error: "Invalid player count" });
   }
 
+  const resolvedJoinType = validJoinTypes.includes(joinType) ? joinType : 'open';
+
   try {
     const result = await pool.query(
-      `INSERT INTO tournaments 
-        (lobby_id, host_id, name, description, format, player_count, max_players, status, rules, prize, start_time)
-      VALUES ($1, $2, $3, $4, $5, $6, $7, 'setup', $8, $9, $10)
+      `INSERT INTO tournaments
+        (lobby_id, host_id, name, description, format, player_count, max_players, status, rules, prize, start_time, join_type)
+      VALUES ($1, $2, $3, $4, $5, $6, $7, 'setup', $8, $9, $10, $11)
       RETURNING *;`,
       [
         lobbyId,
@@ -2717,7 +2753,8 @@ app.post("/tournaments/create", requireAuth, async (req, res) => {
         playerCount,
         rules || null,
         prize || null,
-        startTime ? new Date(startTime) : null
+        startTime ? new Date(startTime) : null,
+        resolvedJoinType
       ]
     );
 
@@ -2871,6 +2908,25 @@ app.post("/tournaments/:tournamentId/register", requireAuth, async (req, res) =>
 
     const tournament = tournamentResult.rows[0];
 
+    // Check invite-only restriction (host is always allowed)
+    if (tournament.join_type === 'invite_only' && tournament.host_id !== userId) {
+      const inviteResult = await client.query(
+        `SELECT id FROM tournament_invites
+         WHERE tournament_id = $1 AND invited_user = $2 AND status = 'pending';`,
+        [tournamentId, userId]
+      );
+      if (inviteResult.rows.length === 0) {
+        await client.query('ROLLBACK');
+        return res.status(403).json({ error: "This tournament is invite-only" });
+      }
+      // Mark invite accepted
+      await client.query(
+        `UPDATE tournament_invites SET status = 'accepted'
+         WHERE tournament_id = $1 AND invited_user = $2;`,
+        [tournamentId, userId]
+      );
+    }
+
     // Check if already registered
     const checkResult = await client.query(
       "SELECT id FROM tournament_players WHERE tournament_id = $1 AND user_id = $2;",
@@ -2905,6 +2961,94 @@ app.post("/tournaments/:tournamentId/register", requireAuth, async (req, res) =>
     res.status(500).json({ error: "Failed to register for tournament" });
   } finally {
     client.release();
+  }
+});
+
+// Invite a player to an invite-only tournament (host only)
+app.post("/tournaments/:tournamentId/invite", requireAuth, async (req, res) => {
+  try {
+    const { tournamentId } = req.params;
+    const { userId: invitedUserId } = req.body;
+
+    if (!invitedUserId) {
+      return res.status(400).json({ error: "Missing userId" });
+    }
+
+    // Verify caller is the host
+    const tResult = await pool.query(
+      "SELECT host_id, join_type, name FROM tournaments WHERE id = $1;",
+      [tournamentId]
+    );
+    if (tResult.rows.length === 0) {
+      return res.status(404).json({ error: "Tournament not found" });
+    }
+    const tournament = tResult.rows[0];
+    if (tournament.host_id !== req.userId) {
+      return res.status(403).json({ error: "Only the host can send invites" });
+    }
+    if (tournament.join_type !== 'invite_only') {
+      return res.status(400).json({ error: "Tournament is not invite-only" });
+    }
+
+    // Check invited user exists
+    const userResult = await pool.query(
+      "SELECT id, username FROM users WHERE id = $1;",
+      [invitedUserId]
+    );
+    if (userResult.rows.length === 0) {
+      return res.status(404).json({ error: "User not found" });
+    }
+
+    // Upsert invite (re-invite if previously declined)
+    await pool.query(
+      `INSERT INTO tournament_invites (tournament_id, invited_by, invited_user, status)
+       VALUES ($1, $2, $3, 'pending')
+       ON CONFLICT (tournament_id, invited_user)
+       DO UPDATE SET status = 'pending', created_at = NOW();`,
+      [tournamentId, req.userId, invitedUserId]
+    );
+
+    res.json({ success: true, message: `Invite sent to ${userResult.rows[0].username}` });
+  } catch (error) {
+    console.error("[tournament/invite error]", error);
+    res.status(500).json({ error: "Failed to send invite" });
+  }
+});
+
+// Get pending invites for current user
+app.get("/tournaments/invites/mine", requireAuth, async (req, res) => {
+  try {
+    const result = await pool.query(
+      `SELECT ti.id, ti.tournament_id, ti.status, ti.created_at,
+              t.name AS tournament_name, t.format, t.player_count, t.status AS tournament_status,
+              u.username AS invited_by_username
+       FROM tournament_invites ti
+       JOIN tournaments t ON ti.tournament_id = t.id
+       JOIN users u ON ti.invited_by = u.id
+       WHERE ti.invited_user = $1 AND ti.status = 'pending'
+       ORDER BY ti.created_at DESC;`,
+      [req.userId]
+    );
+    res.json({ invites: result.rows });
+  } catch (error) {
+    console.error("[tournament/invites/mine error]", error);
+    res.status(500).json({ error: "Failed to fetch invites" });
+  }
+});
+
+// Decline a tournament invite
+app.post("/tournaments/:tournamentId/invite/decline", requireAuth, async (req, res) => {
+  try {
+    const { tournamentId } = req.params;
+    await pool.query(
+      `UPDATE tournament_invites SET status = 'declined'
+       WHERE tournament_id = $1 AND invited_user = $2;`,
+      [tournamentId, req.userId]
+    );
+    res.json({ success: true });
+  } catch (error) {
+    console.error("[tournament/invite/decline error]", error);
+    res.status(500).json({ error: "Failed to decline invite" });
   }
 });
 

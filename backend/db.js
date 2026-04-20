@@ -360,6 +360,7 @@ async function initDb() {
       "ALTER TABLE tournaments ADD COLUMN IF NOT EXISTS scheduled_start   TIMESTAMPTZ DEFAULT NULL",
       "ALTER TABLE tournaments ADD COLUMN IF NOT EXISTS alert_before_minutes INTEGER DEFAULT 15",
       "ALTER TABLE tournaments ADD COLUMN IF NOT EXISTS winner_id         INTEGER DEFAULT NULL",
+      "ALTER TABLE tournaments ADD COLUMN IF NOT EXISTS join_type         TEXT DEFAULT 'open'",
       "ALTER TABLE tournament_matches ADD COLUMN IF NOT EXISTS locked_players  JSONB DEFAULT '[]'",
       "ALTER TABLE tournament_matches ADD COLUMN IF NOT EXISTS round_locked    BOOLEAN DEFAULT FALSE",
       "ALTER TABLE tournament_matches ADD COLUMN IF NOT EXISTS p1_report       JSONB DEFAULT NULL",
@@ -530,7 +531,67 @@ async function initDb() {
       );
     `);
 
-    // Create indexes for tournament performance
+    // Tournament Invites (for invite-only tournaments)
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS tournament_invites (
+        id            SERIAL PRIMARY KEY,
+        tournament_id INTEGER REFERENCES tournaments(id) ON DELETE CASCADE,
+        invited_by    INTEGER REFERENCES users(id) ON DELETE CASCADE,
+        invited_user  INTEGER REFERENCES users(id) ON DELETE CASCADE,
+        status        TEXT NOT NULL DEFAULT 'pending' CHECK (status IN ('pending', 'accepted', 'declined')),
+        created_at    TIMESTAMPTZ DEFAULT NOW(),
+        UNIQUE(tournament_id, invited_user)
+      );
+    `);
+
+    // ── Core performance indexes ─────────────────────────────────
+    // users — login lookups and search
+    await pool.query(`CREATE INDEX IF NOT EXISTS idx_users_username       ON users(username);`).catch(() => {});
+    await pool.query(`CREATE INDEX IF NOT EXISTS idx_users_username_lower ON users(lower(username));`).catch(() => {});
+    await pool.query(`CREATE INDEX IF NOT EXISTS idx_users_email          ON users(email) WHERE email IS NOT NULL;`).catch(() => {});
+
+    // messages — channel history (most-queried table)
+    await pool.query(`CREATE INDEX IF NOT EXISTS idx_messages_channel_id         ON messages(channel_id);`).catch(() => {});
+    await pool.query(`CREATE INDEX IF NOT EXISTS idx_messages_channel_created    ON messages(channel_id, created_at DESC);`).catch(() => {});
+
+    // direct_messages — DM conversation queries
+    await pool.query(`CREATE INDEX IF NOT EXISTS idx_dm_from_user   ON direct_messages(from_user_id);`).catch(() => {});
+    await pool.query(`CREATE INDEX IF NOT EXISTS idx_dm_to_user     ON direct_messages(to_user_id);`).catch(() => {});
+    await pool.query(`CREATE INDEX IF NOT EXISTS idx_dm_convo       ON direct_messages(LEAST(from_user_id,to_user_id), GREATEST(from_user_id,to_user_id), created_at DESC);`).catch(() => {});
+
+    // friends — friend list and request lookups
+    await pool.query(`CREATE INDEX IF NOT EXISTS idx_friends_user_id   ON friends(user_id);`).catch(() => {});
+    await pool.query(`CREATE INDEX IF NOT EXISTS idx_friends_friend_id ON friends(friend_id);`).catch(() => {});
+    await pool.query(`CREATE INDEX IF NOT EXISTS idx_friends_status    ON friends(user_id, status);`).catch(() => {});
+
+    // follows — follower/following counts
+    await pool.query(`CREATE INDEX IF NOT EXISTS idx_follows_follower  ON follows(follower_id);`).catch(() => {});
+    await pool.query(`CREATE INDEX IF NOT EXISTS idx_follows_following ON follows(following_id);`).catch(() => {});
+
+    // server_members — role checks (hit on almost every server request)
+    await pool.query(`CREATE INDEX IF NOT EXISTS idx_server_members_server_user ON server_members(server_id, user_id);`).catch(() => {});
+    await pool.query(`CREATE INDEX IF NOT EXISTS idx_server_members_user        ON server_members(user_id);`).catch(() => {});
+
+    // posts — feed and profile page
+    await pool.query(`CREATE INDEX IF NOT EXISTS idx_posts_user_id     ON posts(user_id);`).catch(() => {});
+    await pool.query(`CREATE INDEX IF NOT EXISTS idx_posts_created_at  ON posts(created_at DESC);`).catch(() => {});
+    await pool.query(`CREATE INDEX IF NOT EXISTS idx_posts_visibility  ON posts(visibility);`).catch(() => {});
+
+    // post_reactions — reaction counts and per-user checks
+    await pool.query(`CREATE INDEX IF NOT EXISTS idx_post_reactions_post       ON post_reactions(post_id);`).catch(() => {});
+    await pool.query(`CREATE INDEX IF NOT EXISTS idx_post_reactions_post_user  ON post_reactions(post_id, user_id);`).catch(() => {});
+
+    // post_comments — comment counts per post
+    await pool.query(`CREATE INDEX IF NOT EXISTS idx_post_comments_post_id ON post_comments(post_id);`).catch(() => {});
+    await pool.query(`CREATE INDEX IF NOT EXISTS idx_post_comments_user_id ON post_comments(user_id);`).catch(() => {});
+
+    // group_members / group_messages — group chat performance
+    await pool.query(`CREATE INDEX IF NOT EXISTS idx_group_members_group   ON group_members(group_id);`).catch(() => {});
+    await pool.query(`CREATE INDEX IF NOT EXISTS idx_group_members_user    ON group_members(user_id);`).catch(() => {});
+    await pool.query(`CREATE INDEX IF NOT EXISTS idx_group_messages_group  ON group_messages(group_id);`).catch(() => {});
+    await pool.query(`CREATE INDEX IF NOT EXISTS idx_group_messages_group_created ON group_messages(group_id, created_at DESC);`).catch(() => {});
+
+    // ── Tournament performance indexes ───────────────────────────
     await pool.query(`CREATE INDEX IF NOT EXISTS idx_tournaments_lobby_id ON tournaments(lobby_id);`).catch(() => {});
     await pool.query(`CREATE INDEX IF NOT EXISTS idx_tournaments_host_id ON tournaments(host_id);`).catch(() => {});
     await pool.query(`CREATE INDEX IF NOT EXISTS idx_tournaments_status ON tournaments(status);`).catch(() => {});
@@ -539,6 +600,8 @@ async function initDb() {
     await pool.query(`CREATE INDEX IF NOT EXISTS idx_tournament_rounds_tournament_id ON tournament_rounds(tournament_id);`).catch(() => {});
     await pool.query(`CREATE INDEX IF NOT EXISTS idx_tournament_matches_round_id ON tournament_matches(round_id);`).catch(() => {});
     await pool.query(`CREATE INDEX IF NOT EXISTS idx_tournament_matches_tournament_id ON tournament_matches(tournament_id);`).catch(() => {});
+    await pool.query(`CREATE INDEX IF NOT EXISTS idx_tournament_invites_tournament_id ON tournament_invites(tournament_id);`).catch(() => {});
+    await pool.query(`CREATE INDEX IF NOT EXISTS idx_tournament_invites_invited_user ON tournament_invites(invited_user);`).catch(() => {});
 
     // Profanity words list
     await pool.query(`

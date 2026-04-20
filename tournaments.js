@@ -149,7 +149,8 @@ async function handleTournamentSubmit(e) {
         scheduledStart:       document.getElementById('tournamentScheduleToggle')?.checked
                                 ? document.getElementById('tournamentScheduledTime')?.value || null
                                 : null,
-        alertBeforeMinutes:   parseInt(document.getElementById('tournamentAlertMins')?.value) || 15
+        alertBeforeMinutes:   parseInt(document.getElementById('tournamentAlertMins')?.value) || 15,
+        joinType:             document.getElementById('tournamentInviteOnly')?.checked ? 'invite_only' : 'open'
     };
 
     try {
@@ -242,11 +243,17 @@ function displayTournaments(tournaments) {
                 </div>`;
             }
         }
+        const joinBadge = tournament.joinType === 'invite_only' || tournament.join_type === 'invite_only'
+            ? `<span style="display:inline-flex;align-items:center;gap:4px;font-size:10px;font-weight:700;color:var(--text-2);background:rgba(255,255,255,.07);border:1px solid rgba(255,255,255,.12);border-radius:4px;padding:2px 6px;letter-spacing:.4px;text-transform:uppercase">🔒 Invite Only</span>`
+            : `<span style="display:inline-flex;align-items:center;gap:4px;font-size:10px;font-weight:700;color:var(--text-2);background:rgba(255,255,255,.07);border:1px solid rgba(255,255,255,.12);border-radius:4px;padding:2px 6px;letter-spacing:.4px;text-transform:uppercase">🔓 Open</span>`;
         return `
         <div class="tournament-card" onclick="openTournamentDetails('${tournament.id}')">
             <div class="tournament-card-header">
                 <div class="tournament-card-title">${tournament.name}</div>
-                <span class="tournament-card-status ${tournament.status === 'in-progress' ? 'in-progress' : ''}\">${tournament.status}</span>
+                <div style="display:flex;align-items:center;gap:6px">
+                    ${joinBadge}
+                    <span class="tournament-card-status ${tournament.status === 'in-progress' ? 'in-progress' : ''}\">${tournament.status}</span>
+                </div>
             </div>
             <div class="tournament-card-details">
                 <div class="tournament-detail">
