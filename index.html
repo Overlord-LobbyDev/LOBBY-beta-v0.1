@@ -473,17 +473,31 @@
     .user-panel-row1, .user-panel-row2 { position:relative; z-index:1; }
     .user-panel-row1 { display:flex; align-items:center; gap:12px; padding:0 2px; }
     .user-panel-row2 { display:flex; align-items:center; gap:0; }
+    .user-panel-avatar-wrap { position:relative; flex-shrink:0; }
     .user-panel-avatar {
       width:38px; height:38px; border-radius:11px;
       background:var(--accent); display:flex; align-items:center; justify-content:center;
-      font-weight:700; font-size:16px; overflow:hidden; flex-shrink:0;
+      font-weight:700; font-size:16px; overflow:hidden;
       border:1.5px solid rgba(255,255,255,.12);
     }
     .user-panel-avatar img { width:100%; height:100%; object-fit:cover; }
+    /* Status badge on avatar corner */
+    .avatar-status-badge {
+      position:absolute; bottom:-3px; right:-3px;
+      width:13px; height:13px; border-radius:50%;
+      background:#3ba55d;
+      border:2.5px solid var(--bg-0);
+      cursor:pointer; z-index:2;
+      transition:transform .15s;
+    }
+    .avatar-status-badge:hover { transform:scale(1.25); }
+    .avatar-status-badge.dnd { background:#ed4245; }
+    .avatar-status-badge.away { background:#faa61a; }
+    .avatar-status-badge.invisible { background:#747f8d; }
     .user-panel-info { flex:1; min-width:0; overflow:hidden; }
     .user-panel-name { font-size:15px; font-weight:800; color:var(--text-1); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; letter-spacing:-.2px; }
-    .user-panel-status { font-size:11px; color:var(--green); margin-top:1px; cursor:pointer; position:relative; user-select:none; }
-    .user-panel-status:hover { opacity:.8; }
+    /* Status text label removed — now shown as avatar badge only */
+    .user-panel-status { display:none; }
     .status-dropdown {
       display:none; position:fixed; border-radius:8px;
       background:var(--bg-2); border:1px solid rgba(255,255,255,.1);
@@ -3702,7 +3716,26 @@
   <div class="user-panel" id="chatUserPanel">
     <div class="user-panel-banner" id="chatPanelBanner"></div>
     <div class="user-panel-row1">
-      <div class="user-panel-avatar" id="myPanelAvatar" style="cursor:pointer" onclick="if(me)openProfilePanel(me.id)" title="View profile">U</div>
+      <div class="user-panel-avatar-wrap">
+        <div class="user-panel-avatar" id="myPanelAvatar" style="cursor:pointer" onclick="if(me)openProfilePanel(me.id)" title="View profile">U</div>
+        <div class="avatar-status-badge" id="myStatusBadge" onclick="toggleStatusDropdown(event)" title="Set status">
+          <div class="status-dropdown" id="statusDropdown">
+            <div class="status-dropdown-item active" data-status="online" onclick="setMyStatus('online',event)">
+              <span class="status-dot online"></span> Online
+            </div>
+            <div class="status-dropdown-item" data-status="away" onclick="setMyStatus('away',event)">
+              <span class="status-dot away"></span> Away
+            </div>
+            <div class="status-dropdown-item" data-status="dnd" onclick="setMyStatus('dnd',event)">
+              <span class="status-dot dnd"></span> Do Not Disturb
+            </div>
+            <div class="status-dropdown-divider"></div>
+            <div class="status-dropdown-item" data-status="invisible" onclick="setMyStatus('invisible',event)">
+              <span class="status-dot invisible"></span> Invisible
+            </div>
+          </div>
+        </div>
+      </div>
       <div class="user-panel-info">
         <div style="display:flex;align-items:center;gap:6px">
           <div class="user-panel-name" id="myPanelName" style="cursor:pointer" onclick="if(me)openProfilePanel(me.id)">Loading…</div>
@@ -3716,25 +3749,8 @@
             🛡 Admin
           </button>
         </div>
-        <div style="display:flex;align-items:center;gap:6px;margin-top:1px;">
-          <div class="user-panel-status" id="myStatusBtn" onclick="toggleStatusDropdown(event)">
-            <span id="myStatusDot">●</span> <span id="myStatusLabel">Online</span>
-            <div class="status-dropdown" id="statusDropdown">
-              <div class="status-dropdown-item active" data-status="online" onclick="setMyStatus('online',event)">
-                <span class="status-dot online"></span> Online
-              </div>
-              <div class="status-dropdown-item" data-status="away" onclick="setMyStatus('away',event)">
-                <span class="status-dot away"></span> Away
-              </div>
-              <div class="status-dropdown-item" data-status="dnd" onclick="setMyStatus('dnd',event)">
-                <span class="status-dot dnd"></span> Do Not Disturb
-              </div>
-              <div class="status-dropdown-divider"></div>
-              <div class="status-dropdown-item" data-status="invisible" onclick="setMyStatus('invisible',event)">
-                <span class="status-dot invisible"></span> Invisible
-              </div>
-            </div>
-          </div>
+        <div style="display:flex;align-items:center;gap:6px;margin-top:2px;">
+          <span id="myStatusLabel" style="font-size:11px;color:var(--text-3);font-weight:500"></span>
           <span id="myPanelLobbyTag" style="font-size:10px;font-weight:700;color:var(--accent);letter-spacing:.3px;opacity:.85;"></span>
         </div>
       </div>
@@ -15068,10 +15084,10 @@ let myPresenceStatus = localStorage.getItem("vh_presence_status") || "online";
 function toggleStatusDropdown(e) {
   e.stopPropagation();
   const dd = document.getElementById("statusDropdown");
-  const btn = document.getElementById("myStatusBtn");
+  const badge = document.getElementById("myStatusBadge");
   dd.classList.toggle("open");
-  if (dd.classList.contains("open")) {
-    const rect = btn.getBoundingClientRect();
+  if (dd.classList.contains("open") && badge) {
+    const rect = badge.getBoundingClientRect();
     dd.style.left = rect.left + "px";
     dd.style.bottom = (window.innerHeight - rect.top + 8) + "px";
   }
@@ -15105,21 +15121,27 @@ async function setMyStatus(status, e) {
 }
 
 function updateMyStatusUI() {
-  const dot = document.getElementById("myStatusDot");
+  const badge = document.getElementById("myStatusBadge");
   const label = document.getElementById("myStatusLabel");
-  const statusBtn = document.getElementById("myStatusBtn");
-  if (!dot || !label) return;
   const configs = {
-    online:    { dot: "●", color: "var(--green,#3ba55d)", label: "Online" },
-    away:      { dot: "🌙", color: "#faa61a", label: "Away" },
-    dnd:       { dot: "⛔", color: "#ed4245", label: "Do Not Disturb" },
-    invisible: { dot: "●", color: "#747f8d", label: "Invisible" }
+    online:    { badgeClass: "",          color: "#3ba55d", label: "Online" },
+    away:      { badgeClass: "away",      color: "#faa61a", label: "Away" },
+    dnd:       { badgeClass: "dnd",       color: "#ed4245", label: "Do Not Disturb" },
+    invisible: { badgeClass: "invisible", color: "#747f8d", label: "Invisible" }
   };
   const cfg = configs[myPresenceStatus] || configs.online;
-  dot.textContent = cfg.dot;
-  dot.style.color = cfg.color;
-  label.textContent = cfg.label;
-  statusBtn.style.color = cfg.color;
+
+  // Update badge colour
+  if (badge) {
+    badge.className = "avatar-status-badge" + (cfg.badgeClass ? " " + cfg.badgeClass : "");
+    badge.style.background = cfg.color;
+  }
+
+  // Keep a subtle status text next to the tag (optional — muted colour, small)
+  if (label) {
+    label.textContent = cfg.label;
+    label.style.color = cfg.color;
+  }
 
   // Update active state in dropdown
   document.querySelectorAll(".status-dropdown-item").forEach(el => {

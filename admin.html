@@ -373,6 +373,8 @@ if (!token) window.location.href = "login.html";
 
 let allUsers = [], currentUser = null, actionTarget = null;
 
+const WS_URL = "wss://lobby-ws-server.onrender.com";
+
 async function boot() {
   try {
     const res = await fetch(`${AUTH_URL}/me`, { headers: auth() });
@@ -381,8 +383,24 @@ async function boot() {
     currentUser = data;
     document.getElementById("sidebarName").textContent   = data.username;
     document.getElementById("sidebarAvatar").textContent = data.username.slice(0,1).toUpperCase();
+    // Show Overlord badge if applicable
+    if (data.isOverlord) {
+      document.querySelector(".admin-role").textContent = "⚡ Overlord";
+      document.querySelector(".admin-role").style.color = "gold";
+    }
+    // Connect WebSocket so announcements can broadcast
+    connectAdminWS();
   } catch { alert("Cannot connect to auth server."); window.location.href = "login.html"; return; }
   await loadUsers();
+}
+
+function connectAdminWS() {
+  try {
+    const ws = new WebSocket(`${WS_URL}?token=${token}`);
+    window._ws = ws;
+    ws.onopen = () => console.log("[admin] WS connected");
+    ws.onclose = () => { window._ws = null; setTimeout(connectAdminWS, 5000); };
+  } catch(e) { console.warn("[admin] WS connection failed", e); }
 }
 
 function auth() { return { Authorization: `Bearer ${token}`, "Content-Type": "application/json" }; }

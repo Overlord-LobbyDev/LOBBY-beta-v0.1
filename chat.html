@@ -499,6 +499,16 @@
       0%,80%,100% { transform:translateY(0); opacity:.4; }
       40%          { transform:translateY(-3px); opacity:1; }
     }
+    @keyframes bellShake {
+      0%,100%{transform:rotate(0)}
+      15%{transform:rotate(15deg)}
+      30%{transform:rotate(-13deg)}
+      45%{transform:rotate(10deg)}
+      60%{transform:rotate(-8deg)}
+      75%{transform:rotate(5deg)}
+      90%{transform:rotate(-3deg)}
+    }
+    .bell-shake { animation: bellShake 0.6s ease-in-out infinite; }
     .call-modal-name { font-size: 22px; font-weight: 800; color: var(--text-1); }
     .call-modal-countdown {
       display: flex; align-items: center; gap: 8px;

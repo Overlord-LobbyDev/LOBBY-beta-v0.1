@@ -223,6 +223,26 @@
 
 <div class="toast" id="toast"></div>
 
+<!-- Match-ready notification modal -->
+<div id="matchReadyModal" style="display:none;position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,.72);z-index:1000;align-items:center;justify-content:center">
+  <div style="background:var(--bg-1);border-radius:16px;padding:24px;width:360px;border:1px solid rgba(255,255,255,.1);box-shadow:0 20px 60px rgba(0,0,0,.5)">
+    <h3 style="margin:0 0 6px;color:var(--text-1)">🔔 Notify Match Ready</h3>
+    <p style="color:var(--text-3);font-size:12px;margin:0 0 16px">Players will get a shaking bell notification until they visit this page.</p>
+    <div style="margin-bottom:12px">
+      <label style="font-size:12px;color:var(--text-2);display:block;margin-bottom:4px">Player 1 User ID</label>
+      <input id="mrPlayer1Id" type="number" placeholder="User ID…" style="width:100%;padding:8px 12px;background:var(--bg-2);border:1px solid rgba(255,255,255,.1);border-radius:8px;color:var(--text-1);font-family:inherit;box-sizing:border-box" />
+    </div>
+    <div style="margin-bottom:20px">
+      <label style="font-size:12px;color:var(--text-2);display:block;margin-bottom:4px">Player 2 User ID</label>
+      <input id="mrPlayer2Id" type="number" placeholder="User ID…" style="width:100%;padding:8px 12px;background:var(--bg-2);border:1px solid rgba(255,255,255,.1);border-radius:8px;color:var(--text-1);font-family:inherit;box-sizing:border-box" />
+    </div>
+    <div style="display:flex;gap:8px">
+      <button onclick="sendMatchReady()" style="flex:1;padding:10px;background:var(--accent);color:#1a0a10;border:none;border-radius:8px;font-weight:700;cursor:pointer;font-family:inherit">Send Notification</button>
+      <button onclick="document.getElementById('matchReadyModal').style.display='none'" style="padding:10px 16px;background:var(--bg-3);color:var(--text-2);border:1px solid rgba(255,255,255,.1);border-radius:8px;cursor:pointer;font-family:inherit">Cancel</button>
+    </div>
+  </div>
+</div>
+
 <script>
   const TOURNAMENT_ID = new URLSearchParams(window.location.search).get('id');
   const AUTH_URL = 'https://lobby-auth-server.onrender.com';
@@ -311,14 +331,18 @@
 
     if (t.status === 'in-progress' && isHost) {
       html += `<button class="btn btn-danger" onclick="endTournament()">⏹ End Tournament</button>`;
+      html += `<button class="btn btn-secondary" onclick="showMatchReadyModal()">🔔 Notify Match Ready</button>`;
     }
 
     if (t.status === 'completed') {
       html += `<div class="action-hint" style="padding:8px 0;font-size:13px">🏆 Tournament Complete</div>`;
     }
 
+    // Refresh button always visible to all users
+    html += `<button class="btn btn-secondary" onclick="load()" style="margin-top:4px">↻ Refresh</button>`;
+
     el.innerHTML = html;
-    el.style.display = html ? 'flex' : 'none';
+    el.style.display = 'flex';
   }
 
   function renderPlayers(t, players) {
@@ -577,6 +601,44 @@
     el.style.display = el.style.display === 'none' ? 'block' : 'none';
   }
 
+  /* ── Lock-in ── */
+  function lockIn(tournamentId, matchId, userId) {
+    if (!_viewerWs || _viewerWs.readyState !== 1) { showToast('Not connected to server', 'error'); return; }
+    _viewerWs.send(JSON.stringify({
+      type: 'tournament-lock-in',
+      tournamentId,
+      matchId,
+      userId,
+      bothLocked: false
+    }));
+    showToast('🔒 Locked in!', 'success');
+    setTimeout(() => load(), 500);
+  }
+
+  /* ── Match-ready notification ── */
+  function showMatchReadyModal() {
+    document.getElementById('matchReadyModal').style.display = 'flex';
+  }
+
+  function sendMatchReady() {
+    const p1 = parseInt(document.getElementById('mrPlayer1Id').value);
+    const p2 = parseInt(document.getElementById('mrPlayer2Id').value);
+    if (!p1 && !p2) { showToast('Enter at least one player ID', 'error'); return; }
+    const userIds = [p1, p2].filter(Boolean);
+    if (_viewerWs && _viewerWs.readyState === 1) {
+      _viewerWs.send(JSON.stringify({
+        type: 'tournament-notify',
+        userIds,
+        tournamentId: TOURNAMENT_ID,
+        tournamentName: document.getElementById('tTitle')?.textContent || 'Tournament',
+        notifType: 'match-ready',
+        text: 'Your match is ready! Head to the tournament now.'
+      }));
+    }
+    document.getElementById('matchReadyModal').style.display = 'none';
+    showToast('🔔 Match-ready notification sent!', 'success');
+  }
+
   // ── WebSocket: live bracket updates ──────────────────────────
   // Connects to the WebSocket server so viewers get auto-refresh
   // when a result is submitted without needing to reload.
@@ -609,6 +671,17 @@
         // Live score update (lock-in)
         if (msg.type === 'tournament-lock-in' && String(msg.tournamentId) === String(TOURNAMENT_ID)) {
           load();
+        }
+
+        // Match-ready notification — shake bell + sound
+        if (msg.type === 'tournament-notify' && msg.notifType === 'match-ready' &&
+            String(msg.tournamentId) === String(TOURNAMENT_ID)) {
+          showToast('🔔 Your match is ready! Lock in now!', 'success');
+          // Shake bell until user navigates away
+          const bell = document.getElementById('notifBell') || document.querySelector('.notif-bell');
+          if (bell) bell.classList.add('bell-shake');
+          // Play sound
+          try { const a = new Audio('../sounds/notification.mp3'); a.volume = 0.6; a.play().catch(()=>{}); } catch(e) {}
         }
       };
 
