@@ -331,6 +331,24 @@
       gap:6px;
     }
     .channel-section-label::before { display:none; }
+    /* ── Section reorder (admin only) ────────────────────────── */
+    .section-drag-handle {
+      display:inline-flex; align-items:center; justify-content:center;
+      width:14px; height:14px; flex-shrink:0;
+      color:var(--text-3); cursor:grab; font-size:13px; line-height:1;
+      opacity:0; transition:opacity .15s;
+      margin-right:2px;
+    }
+    .channel-section:hover .section-drag-handle { opacity:.6; }
+    .section-drag-handle:hover { opacity:1 !important; color:var(--text-1); }
+    .channel-section.section-dragging {
+      opacity:.4;
+    }
+    .channel-section.section-drag-over {
+      outline:1.5px solid var(--accent);
+      border-radius:6px;
+      background:rgba(88,101,242,.06);
+    }
     .channel-add {
       background:none; border:none; color:var(--text-3); cursor:pointer;
       width:18px; height:18px; border-radius:4px; font-size:14px; line-height:1;
@@ -5862,6 +5880,80 @@ function initServerDrag(container) {
   });
 }
 
+// ── Sidebar Section Drag-to-Reorder (admin/owner only) ───────────
+function initSectionDrag(container, server) {
+  let dragEl = null, dragOver = null;
+
+  // Make all draggable sections respond to drag events
+  container.querySelectorAll('.section-draggable').forEach(el => {
+    el.setAttribute('draggable', 'true');
+  });
+
+  container.addEventListener('dragstart', e => {
+    // Only allow drag initiated from the section label or the drag handle itself
+    if (!e.target.closest('.channel-section-label')) return;
+    const section = e.target.closest('.section-draggable');
+    if (!section) return;
+    dragEl = section;
+    setTimeout(() => dragEl.classList.add('section-dragging'), 0);
+    e.dataTransfer.effectAllowed = 'move';
+  });
+
+  container.addEventListener('dragend', async () => {
+    if (!dragEl) return;
+    dragEl.classList.remove('section-dragging');
+    dragEl = null;
+    if (dragOver) { dragOver.classList.remove('section-drag-over'); dragOver = null; }
+
+    // Collect new order from DOM
+    const newOrder = [...container.querySelectorAll('.section-draggable[data-section-key]')]
+      .map(el => el.dataset.sectionKey);
+
+    // Persist to server (affects all users)
+    try {
+      await api(`/servers/${server.id}/sidebar-order`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ order: newOrder })
+      });
+      // Update in-memory so re-renders stay correct
+      if (selectedServer && selectedServer.id === server.id) {
+        selectedServer.sidebar_section_order = JSON.stringify(newOrder);
+      }
+    } catch (err) {
+      console.warn('[sidebar-order] save failed', err);
+    }
+  });
+
+  container.addEventListener('dragover', e => {
+    e.preventDefault();
+    const target = e.target.closest('.section-draggable');
+    if (!target || target === dragEl) return;
+    if (dragOver && dragOver !== target) dragOver.classList.remove('section-drag-over');
+    dragOver = target;
+    dragOver.classList.add('section-drag-over');
+    const rect = target.getBoundingClientRect();
+    const midY = rect.top + rect.height / 2;
+    if (e.clientY < midY) {
+      container.insertBefore(dragEl, target);
+    } else {
+      container.insertBefore(dragEl, target.nextSibling);
+    }
+  });
+
+  container.addEventListener('dragleave', e => {
+    if (dragOver && !container.contains(e.relatedTarget)) {
+      dragOver.classList.remove('section-drag-over');
+      dragOver = null;
+    }
+  });
+
+  container.addEventListener('drop', e => {
+    e.preventDefault();
+    if (dragOver) { dragOver.classList.remove('section-drag-over'); dragOver = null; }
+  });
+}
+
 // ── Home Section Drag-to-Reorder ──────────────────────────────────
 function initHomeSecDrag(container) {
   let dragEl = null, dragOver = null;
@@ -6046,69 +6138,86 @@ function renderChannelList(channels, members, server) {
   const ann   = channels.filter(c => c.type === "announcement");
 
   const addBtn = canManage ? `<button class="channel-add" onclick="openModal('createChannelModal')">+</button>` : "";
+  const grip   = canManage
+    ? `<span class="section-drag-handle" title="Drag to reorder sections">⠿</span>`
+    : "";
 
   const svgAnn  = `<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 12H3"/><path d="M3 12l4-4M3 12l4 4"/><path d="M22 5v14"/></svg>`;
   const svgText = `<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><line x1="4" y1="6" x2="20" y2="6"/><line x1="4" y1="12" x2="20" y2="12"/><line x1="4" y1="18" x2="14" y2="18"/></svg>`;
   const svgVoice= `<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"/><path d="M19.07 4.93a10 10 0 0 1 0 14.14M15.54 8.46a5 5 0 0 1 0 7.07"/></svg>`;
 
-  let html = "";
-  if (ann.length) {
-    html += `<div class="channel-section">
-      <div class="channel-section-label"><span style="display:flex;align-items:center;gap:6px">${svgAnn} Announcements</span>${addBtn}</div>`;
-    ann.forEach(c => { html += channelItem(c, canManage); }); html += "</div>";
-  }
-  if (text.length) {
-    html += `<div class="channel-section">
-      <div class="channel-section-label"><span style="display:flex;align-items:center;gap:6px">${svgText} Text Channels</span>${addBtn}</div>`;
-    text.forEach(c => { html += channelItem(c, canManage); }); html += "</div>";
-  }
-  if (voice.length) {
-    html += `<div class="channel-section">
-      <div class="channel-section-label"><span style="display:flex;align-items:center;gap:6px">${svgVoice} Voice Channels</span>${addBtn}</div>`;
-    voice.forEach(c => { html += channelItem(c, canManage); }); html += "</div>";
+  // Helper — wrap any section in a drag-ready .channel-section div
+  function sec(key, inner, extraStyle) {
+    return `<div class="channel-section${canManage ? ' section-draggable' : ''}" data-section-key="${key}"${extraStyle ? ` style="${extraStyle}"` : ''}>${inner}</div>`;
   }
 
-  // Lobby actions card
-  const isOwner = myServerRole === "owner";
-  const isAloneOwner = isOwner && members.length <= 1;
+  // Build section HTML for each key (null = hide if no channels)
+  const sectionHTML = {
+    announcements: ann.length ? sec('announcements',
+      `<div class="channel-section-label">${grip}<span style="display:flex;align-items:center;gap:6px">${svgAnn} Announcements</span>${addBtn}</div>` +
+      ann.map(c => channelItem(c, canManage)).join('')) : null,
 
-  html += `<div class="channel-section" style="margin-top:12px;">
-    <div class="channel-section-label" onclick="window._toggleTournaments()" style="cursor:pointer;user-select:none;display:flex;align-items:center;justify-content:space-between;">
-      <span style="display:flex;align-items:center;gap:6px">
-        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"></polyline></svg>
-        Tournaments
-        <span id="tournamentStatusBadge" style="display:none;font-size:8px;font-weight:800;padding:1px 5px;border-radius:3px;text-transform:uppercase;letter-spacing:.3px"></span>
-      </span>
-      <svg id="tournamentsChevron" width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" style="transition:transform .2s;flex-shrink:0"><polyline points="6 9 12 15 18 9"></polyline></svg>
-    </div>
-    <div id="tournamentsDropdown" style="overflow:hidden;max-height:420px;transition:max-height .25s ease,opacity .2s;opacity:1">
-      <div id="tournamentsList" class="tournaments-list" style="padding:0 10px 6px;box-sizing:border-box;width:100%;max-height:400px;overflow-y:auto;overflow-x:hidden;overscroll-behavior:contain;"></div>
-    </div>
-  </div>`;
+    text: text.length ? sec('text',
+      `<div class="channel-section-label">${grip}<span style="display:flex;align-items:center;gap:6px">${svgText} Text Channels</span>${addBtn}</div>` +
+      text.map(c => channelItem(c, canManage)).join('')) : null,
 
-  // ── EVENTS CALENDAR SECTION ────────────────────────────────
-  html += `<div class="channel-section" style="margin-top:12px;">
-    <div class="channel-section-label" onclick="window._toggleEvents()" style="cursor:pointer;user-select:none;display:flex;align-items:center;justify-content:space-between;">
-      <span style="display:flex;align-items:center;gap:6px">
-        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
-        Events
-        <span id="eventsCountBadge" style="display:none;font-size:8px;font-weight:800;padding:1px 5px;border-radius:3px;background:rgba(88,101,242,.2);color:var(--accent);text-transform:uppercase;letter-spacing:.3px"></span>
-      </span>
-      <svg id="eventsChevron" width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" style="transition:transform .2s;flex-shrink:0"><polyline points="6 9 12 15 18 9"></polyline></svg>
-    </div>
-    <div id="eventsDropdown" style="overflow:hidden;max-height:400px;transition:max-height .25s ease,opacity .2s;opacity:1">
-      <div id="eventsList" style="padding:6px 10px;box-sizing:border-box;width:100%;overflow-y:auto;overflow-x:hidden;max-height:300px;">
-        <div style="padding:12px;text-align:center;color:var(--text-3);font-size:11px">Loading events…</div>
+    voice: voice.length ? sec('voice',
+      `<div class="channel-section-label">${grip}<span style="display:flex;align-items:center;gap:6px">${svgVoice} Voice Channels</span>${addBtn}</div>` +
+      voice.map(c => channelItem(c, canManage)).join('')) : null,
+
+    tournaments: sec('tournaments',
+      `<div class="channel-section-label" onclick="window._toggleTournaments()" style="cursor:pointer;user-select:none;display:flex;align-items:center;justify-content:space-between;">
+        ${grip}<span style="display:flex;align-items:center;gap:6px">
+          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"></polyline></svg>
+          Tournaments
+          <span id="tournamentStatusBadge" style="display:none;font-size:8px;font-weight:800;padding:1px 5px;border-radius:3px;text-transform:uppercase;letter-spacing:.3px"></span>
+        </span>
+        <svg id="tournamentsChevron" width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" style="transition:transform .2s;flex-shrink:0"><polyline points="6 9 12 15 18 9"></polyline></svg>
       </div>
-      <div style="padding:0 10px 10px">
-        <button onclick="openLobbyCalendar(${server.id}, ${JSON.stringify(server.name).replace(/"/g,'&quot;')})" style="width:100%;padding:8px 10px;background:linear-gradient(135deg,rgba(88,101,242,.15),rgba(88,101,242,.08));border:1px solid rgba(88,101,242,.25);border-radius:6px;color:var(--accent);font-size:11px;font-weight:700;cursor:pointer;font-family:var(--font);display:flex;align-items:center;justify-content:center;gap:6px;transition:all .15s" onmouseover="this.style.background='linear-gradient(135deg,rgba(88,101,242,.25),rgba(88,101,242,.15))'" onmouseout="this.style.background='linear-gradient(135deg,rgba(88,101,242,.15),rgba(88,101,242,.08))'">
-          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
-          Open Full Calendar
-        </button>
+      <div id="tournamentsDropdown" style="overflow:hidden;max-height:420px;transition:max-height .25s ease,opacity .2s;opacity:1">
+        <div id="tournamentsList" class="tournaments-list" style="padding:0 10px 6px;box-sizing:border-box;width:100%;max-height:400px;overflow-y:auto;overflow-x:hidden;overscroll-behavior:contain;"></div>
+      </div>`, 'margin-top:12px'),
+
+    events: sec('events',
+      `<div class="channel-section-label" onclick="window._toggleEvents()" style="cursor:pointer;user-select:none;display:flex;align-items:center;justify-content:space-between;">
+        ${grip}<span style="display:flex;align-items:center;gap:6px">
+          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
+          Events
+          <span id="eventsCountBadge" style="display:none;font-size:8px;font-weight:800;padding:1px 5px;border-radius:3px;background:rgba(88,101,242,.2);color:var(--accent);text-transform:uppercase;letter-spacing:.3px"></span>
+        </span>
+        <svg id="eventsChevron" width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" style="transition:transform .2s;flex-shrink:0"><polyline points="6 9 12 15 18 9"></polyline></svg>
       </div>
-    </div>
-  </div>`;
+      <div id="eventsDropdown" style="overflow:hidden;max-height:400px;transition:max-height .25s ease,opacity .2s;opacity:1">
+        <div id="eventsList" style="padding:6px 10px;box-sizing:border-box;width:100%;overflow-y:auto;overflow-x:hidden;max-height:300px;">
+          <div style="padding:12px;text-align:center;color:var(--text-3);font-size:11px">Loading events…</div>
+        </div>
+        <div style="padding:0 10px 10px">
+          <button onclick="openLobbyCalendar(${server.id}, ${JSON.stringify(server.name).replace(/"/g,'&quot;')})" style="width:100%;padding:8px 10px;background:linear-gradient(135deg,rgba(88,101,242,.15),rgba(88,101,242,.08));border:1px solid rgba(88,101,242,.25);border-radius:6px;color:var(--accent);font-size:11px;font-weight:700;cursor:pointer;font-family:var(--font);display:flex;align-items:center;justify-content:center;gap:6px;transition:all .15s" onmouseover="this.style.background='linear-gradient(135deg,rgba(88,101,242,.25),rgba(88,101,242,.15))'" onmouseout="this.style.background='linear-gradient(135deg,rgba(88,101,242,.15),rgba(88,101,242,.08))'">
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
+            Open Full Calendar
+          </button>
+        </div>
+      </div>`, 'margin-top:12px'),
+  };
+
+  // Determine render order — use saved order, fall back to default
+  const DEFAULT_ORDER = ['announcements', 'text', 'voice', 'tournaments', 'events'];
+  let order = DEFAULT_ORDER;
+  try {
+    const saved = server?.sidebar_section_order;
+    if (saved) {
+      const parsed = JSON.parse(saved);
+      if (Array.isArray(parsed) && parsed.length) order = parsed;
+    }
+  } catch {}
+  // Append any keys missing from the saved order (future-proofing)
+  DEFAULT_ORDER.forEach(k => { if (!order.includes(k)) order.push(k); });
+
+  const html = order.map(k => sectionHTML[k]).filter(Boolean).join('');
   content.innerHTML = html;
+
+  // Wire section drag-and-drop for admins
+  if (canManage) initSectionDrag(content, server);
 
   // Inject the Lobby Menu wrap directly into .channel-sidebar (outside the scrollable content)
   // so it stays pinned at the bottom regardless of scroll position

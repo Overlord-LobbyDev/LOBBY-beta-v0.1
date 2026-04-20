@@ -1614,6 +1614,39 @@ app.post("/servers/:id/banner", requireAuth, (req, res) => {
   });
 });
 
+// PUT /servers/:id/sidebar-order — save sidebar section order (owner/moderator only)
+app.put("/servers/:id/sidebar-order", requireAuth, async (req, res) => {
+  try {
+    const serverId = parseInt(req.params.id);
+    const { order } = req.body;
+
+    const VALID_KEYS = ['announcements', 'text', 'voice', 'tournaments', 'events'];
+    if (!Array.isArray(order) || !order.every(k => VALID_KEYS.includes(k))) {
+      return res.status(400).json({ error: "Invalid section order" });
+    }
+
+    // Verify caller is owner or moderator
+    const memberResult = await pool.query(
+      "SELECT role FROM server_members WHERE server_id = $1 AND user_id = $2",
+      [serverId, req.userId]
+    );
+    const role = memberResult.rows[0]?.role;
+    if (role !== 'owner' && role !== 'moderator') {
+      return res.status(403).json({ error: "Only owners and moderators can reorder sections" });
+    }
+
+    await pool.query(
+      "UPDATE servers SET sidebar_section_order = $1 WHERE id = $2",
+      [JSON.stringify(order), serverId]
+    );
+
+    res.json({ success: true, order });
+  } catch (error) {
+    console.error("[servers/sidebar-order error]", error);
+    res.status(500).json({ error: "Failed to save section order" });
+  }
+});
+
 // POST /servers/:id/join — join a PUBLIC server (discovery/browse only, not invite flow)
 app.post("/servers/:id/join", requireAuth, async (req, res) => {
   try {
