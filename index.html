@@ -2071,6 +2071,132 @@
       font-style:italic;
     }
 
+    /* ── Hall of Fame ───────────────────────────────────────── */
+    .lir-hof-btn {
+      background: linear-gradient(135deg, #b8860b, #ffd700, #b8860b);
+      background-size: 200% 200%;
+      animation: hofShimmer 3s ease infinite;
+      border: 1.5px solid rgba(255,215,0,.5);
+      color: #1a1200;
+      font-size: 11px; font-weight: 800;
+      padding: 7px 12px; border-radius: 8px; cursor: pointer;
+      font-family: var(--font);
+      display: inline-flex; align-items: center; gap: 5px;
+      letter-spacing: .3px;
+      box-shadow: 0 2px 12px rgba(255,215,0,.3), 0 0 0 0 rgba(255,215,0,.4);
+      transition: transform .15s, box-shadow .15s;
+      width: 100%; justify-content: center; margin-top: 4px;
+    }
+    .lir-hof-btn:hover {
+      transform: translateY(-1px);
+      box-shadow: 0 4px 20px rgba(255,215,0,.45), 0 0 0 3px rgba(255,215,0,.15);
+    }
+    .lir-hof-btn.active {
+      box-shadow: 0 0 0 2px rgba(255,215,0,.6), 0 4px 16px rgba(255,215,0,.3);
+    }
+    @keyframes hofShimmer {
+      0%   { background-position: 0% 50%; }
+      50%  { background-position: 100% 50%; }
+      100% { background-position: 0% 50%; }
+    }
+
+    /* HOF panel within lir-scroll */
+    #lirHofPanel { display:none; }
+    #lirHofPanel.open { display:block; }
+
+    .hof-tabs {
+      display: flex; border-bottom: 1px solid rgba(255,255,255,.07);
+      margin: 0 -0px; padding: 0 16px;
+    }
+    .hof-tab {
+      flex: 1; padding: 10px 0; font-size: 11px; font-weight: 700;
+      color: var(--text-3); text-align: center; cursor: pointer;
+      letter-spacing: .4px; text-transform: uppercase;
+      border-bottom: 2px solid transparent; transition: color .15s, border-color .15s;
+      background: none; border-left: none; border-right: none; border-top: none;
+      font-family: var(--font);
+    }
+    .hof-tab.active { color: #ffd700; border-bottom-color: #ffd700; }
+
+    .hof-event-card {
+      margin: 8px 12px; padding: 10px 12px; border-radius: 10px;
+      background: var(--bg-2); border: 1px solid rgba(255,255,255,.07);
+      position: relative; transition: background .15s, border-color .15s;
+    }
+    .hof-event-card:hover { background: var(--bg-3); border-color: rgba(255,255,255,.12); }
+    .hof-event-card.pinned {
+      border-color: rgba(255,215,0,.3);
+      background: linear-gradient(135deg, rgba(255,215,0,.05), var(--bg-2));
+    }
+    .hof-event-type {
+      font-size: 9px; font-weight: 800; text-transform: uppercase; letter-spacing: .6px;
+      margin-bottom: 4px;
+    }
+    .hof-event-type.tournament { color: #ffd700; }
+    .hof-event-type.viral_post { color: #ff6b6b; }
+    .hof-event-type.milestone  { color: #a78bfa; }
+    .hof-event-type.manual     { color: var(--accent); }
+    .hof-event-title {
+      font-size: 12.5px; font-weight: 700; color: var(--text-1);
+      line-height: 1.3; margin-bottom: 3px;
+    }
+    .hof-event-desc {
+      font-size: 11px; color: var(--text-3); line-height: 1.4;
+      overflow: hidden; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical;
+    }
+    .hof-event-date {
+      font-size: 10px; color: var(--text-3); margin-top: 5px; opacity: .7;
+    }
+    .hof-event-actions {
+      display: flex; gap: 4px; margin-top: 7px;
+    }
+    .hof-event-actions button {
+      font-size: 10px; font-weight: 700; padding: 3px 8px; border-radius: 5px;
+      border: 1px solid rgba(255,255,255,.1); background: var(--bg-3);
+      color: var(--text-3); cursor: pointer; font-family: var(--font);
+      transition: background .1s, color .1s, border-color .1s;
+    }
+    .hof-event-actions .pin-btn { color: #ffd700; border-color: rgba(255,215,0,.3); }
+    .hof-event-actions .pin-btn:hover { background: rgba(255,215,0,.12); }
+    .hof-event-actions .del-btn:hover { background: rgba(237,66,69,.15); color: var(--danger); border-color: rgba(237,66,69,.3); }
+    .hof-empty {
+      padding: 28px 16px; text-align: center;
+      color: var(--text-3); font-size: 12px; line-height: 1.6;
+    }
+    .hof-empty .hof-empty-crown { font-size: 32px; margin-bottom: 8px; opacity: .5; }
+    .hof-add-moment {
+      margin: 10px 12px 4px; padding: 8px 12px;
+      background: rgba(88,101,242,.08); border: 1.5px dashed rgba(88,101,242,.3);
+      border-radius: 8px; color: var(--accent); font-size: 11px; font-weight: 700;
+      cursor: pointer; text-align: center; transition: background .15s;
+      font-family: var(--font); width: calc(100% - 24px); box-sizing: border-box;
+    }
+    .hof-add-moment:hover { background: rgba(88,101,242,.16); }
+    .hof-share-btn {
+      margin: 8px 12px 12px; padding: 9px 12px;
+      background: linear-gradient(135deg, rgba(255,215,0,.12), rgba(255,215,0,.06));
+      border: 1px solid rgba(255,215,0,.25); border-radius: 8px;
+      color: #ffd700; font-size: 11px; font-weight: 700; cursor: pointer;
+      font-family: var(--font); width: calc(100% - 24px); box-sizing: border-box;
+      display: flex; align-items: center; justify-content: center; gap: 6px;
+      transition: background .15s, box-shadow .15s;
+    }
+    .hof-share-btn:hover {
+      background: linear-gradient(135deg, rgba(255,215,0,.2), rgba(255,215,0,.1));
+      box-shadow: 0 0 12px rgba(255,215,0,.2);
+    }
+    .hof-add-modal-overlay {
+      display: none; position: fixed; inset: 0; z-index: 10000;
+      background: rgba(0,0,0,.75); align-items: center; justify-content: center;
+    }
+    .hof-add-modal-overlay.open { display: flex; }
+    .hof-add-modal {
+      background: var(--bg-1); border-radius: 12px; padding: 24px;
+      width: min(380px, 90vw); box-shadow: 0 24px 64px rgba(0,0,0,.6);
+      display: flex; flex-direction: column; gap: 14px;
+    }
+    .hof-add-modal h3 { font-size: 16px; font-weight: 800; color: #ffd700; }
+
     /* Panels slide smoothly when feed opens/closes */
     #homePanel, #chatPanel, #profilePage, #calendarPanel {
       transition: right .28s cubic-bezier(0.16,1,0.3,1),
@@ -5225,22 +5351,64 @@
         <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.3" stroke-linecap="round" stroke-linejoin="round"><path d="M16 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="8.5" cy="7" r="4"/><line x1="20" y1="8" x2="20" y2="14"/><line x1="23" y1="11" x2="17" y2="11"/></svg>
         Invite
       </button>
+      <button class="lir-hof-btn" id="lirHofBtn" onclick="toggleHofPanel()">
+        👑 Hall of Fame
+      </button>
     </div>
   </div>
   <div class="lir-scroll">
-    <div class="lir-section">
-      <div class="lir-section-title">
-        <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.3" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
-        Upcoming
-        <span class="count-badge" id="lirEventCount">0</span>
+    <!-- ── Upcoming Events (default view) ── -->
+    <div id="lirEventsView">
+      <div class="lir-section">
+        <div class="lir-section-title">
+          <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.3" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+          Upcoming
+          <span class="count-badge" id="lirEventCount">0</span>
+        </div>
+        <div id="lirEventsList">
+          <div class="lir-empty">No upcoming events.</div>
+        </div>
       </div>
-      <div id="lirEventsList">
-        <div class="lir-empty">No upcoming events.</div>
+      <div class="lir-decor">
+        <div class="lir-decor-glyph">◈</div>
+        <div class="lir-decor-text">Your home for play.<br>Bring the feed back anytime.</div>
       </div>
     </div>
-    <div class="lir-decor">
-      <div class="lir-decor-glyph">◈</div>
-      <div class="lir-decor-text">Your home for play.<br>Bring the feed back anytime.</div>
+
+    <!-- ── Hall of Fame Panel ── -->
+    <div id="lirHofPanel">
+      <div class="hof-tabs">
+        <button class="hof-tab active" id="hofTabTimeline" onclick="setHofTab('timeline')">⏳ Timeline</button>
+        <button class="hof-tab" id="hofTabHof" onclick="setHofTab('hof')">👑 Hall of Fame</button>
+      </div>
+      <div id="hofEventsList">
+        <div class="hof-empty"><div class="hof-empty-crown">👑</div>No moments captured yet.<br><span style="font-size:10.5px">Win tournaments or go viral!</span></div>
+      </div>
+      <!-- Admin controls rendered by JS -->
+      <div id="hofAdminControls"></div>
+      <button class="hof-share-btn" id="hofShareBtn" onclick="exportBestOfMonth()">
+        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 12v8a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-8"/><polyline points="16 6 12 2 8 6"/><line x1="12" y1="2" x2="12" y2="15"/></svg>
+        Best of the Month
+      </button>
+    </div>
+  </div>
+</div>
+
+<!-- Hall of Fame — Add Moment Modal -->
+<div class="hof-add-modal-overlay" id="hofAddModal">
+  <div class="hof-add-modal">
+    <h3>📌 Add a Moment</h3>
+    <div style="display:flex;flex-direction:column;gap:10px">
+      <input id="hofMomentTitle" placeholder="Title (e.g. First 100 Members!)" maxlength="80"
+        style="padding:9px 12px;background:var(--bg-3);border:1px solid rgba(255,255,255,.1);border-radius:8px;color:var(--text-1);font-size:13px;font-family:var(--font)" />
+      <textarea id="hofMomentDesc" placeholder="Description (optional)" rows="2" maxlength="200"
+        style="padding:9px 12px;background:var(--bg-3);border:1px solid rgba(255,255,255,.1);border-radius:8px;color:var(--text-1);font-size:13px;font-family:var(--font);resize:vertical"></textarea>
+    </div>
+    <div style="display:flex;gap:8px;margin-top:4px">
+      <button onclick="submitHofMoment()"
+        style="flex:1;padding:9px;background:linear-gradient(135deg,#b8860b,#ffd700);color:#1a1200;font-weight:800;font-size:13px;border:none;border-radius:8px;cursor:pointer;font-family:var(--font)">Add</button>
+      <button onclick="document.getElementById('hofAddModal').classList.remove('open')"
+        style="padding:9px 16px;background:var(--bg-3);border:1px solid rgba(255,255,255,.1);border-radius:8px;color:var(--text-2);font-size:13px;cursor:pointer;font-family:var(--font)">Cancel</button>
     </div>
   </div>
 </div>
@@ -6202,6 +6370,10 @@ function renderChannelList(channels, members, server) {
         </div>
       </div>`, 'margin-top:12px'),
   };
+
+  // Lobby action menu helpers (needed in the menu HTML below)
+  const isOwner = myServerRole === "owner";
+  const isAloneOwner = isOwner && members.length <= 1;
 
   // Determine render order — use saved order, fall back to default
   const DEFAULT_ORDER = ['announcements', 'text', 'voice', 'tournaments', 'events'];
@@ -12308,8 +12480,24 @@ function updateLobbyInfoRail() {
     document.body.classList.add("lobby-selected");
   } else {
     document.body.classList.remove("lobby-selected");
+    // Reset HOF panel when no lobby selected
+    _hofOpen = false;
+    document.getElementById('lirHofPanel')?.classList.remove('open');
+    const ev = document.getElementById('lirEventsView');
+    if (ev) ev.style.display = '';
+    document.getElementById('lirHofBtn')?.classList.remove('active');
     return;
   }
+
+  // Reset HOF if switching to a different lobby
+  if (_hofOpen && window._hofServerId && window._hofServerId !== selectedServer.id) {
+    _hofOpen = false; _hofEvents = [];
+    document.getElementById('lirHofPanel')?.classList.remove('open');
+    const ev = document.getElementById('lirEventsView');
+    if (ev) ev.style.display = '';
+    document.getElementById('lirHofBtn')?.classList.remove('active');
+  }
+  window._hofServerId = selectedServer.id;
 
   // Populate header
   const iconEl = document.getElementById("lirIcon");
@@ -12382,6 +12570,211 @@ function updateLobbyInfoRail() {
   }
 }
 window.updateLobbyInfoRail = updateLobbyInfoRail;
+
+// ── Hall of Fame ─────────────────────────────────────────────────
+let _hofOpen = false;
+let _hofTab  = 'timeline';   // 'timeline' | 'hof'
+let _hofEvents = [];
+
+function toggleHofPanel() {
+  _hofOpen = !_hofOpen;
+  const panel     = document.getElementById('lirHofPanel');
+  const eventsView = document.getElementById('lirEventsView');
+  const btn       = document.getElementById('lirHofBtn');
+  if (_hofOpen) {
+    panel.classList.add('open');
+    eventsView.style.display = 'none';
+    btn.classList.add('active');
+    loadHofEvents();
+  } else {
+    panel.classList.remove('open');
+    eventsView.style.display = '';
+    btn.classList.remove('active');
+  }
+}
+
+function setHofTab(tab) {
+  _hofTab = tab;
+  document.getElementById('hofTabTimeline').classList.toggle('active', tab === 'timeline');
+  document.getElementById('hofTabHof').classList.toggle('active', tab === 'hof');
+  renderHofEvents();
+}
+
+async function loadHofEvents() {
+  if (!selectedServer) return;
+  try {
+    const events = await api(`/servers/${selectedServer.id}/timeline`);
+    _hofEvents = Array.isArray(events) ? events : [];
+    renderHofEvents();
+    renderHofAdminControls();
+  } catch (e) {
+    console.warn('[hof load]', e);
+  }
+}
+
+function renderHofEvents() {
+  const el = document.getElementById('hofEventsList');
+  if (!el) return;
+
+  const canManage = myServerRole === 'owner' || myServerRole === 'moderator';
+
+  let filtered = _hofEvents;
+  if (_hofTab === 'hof') {
+    filtered = _hofEvents.filter(e => e.pinned);
+  }
+
+  if (!filtered.length) {
+    const emptyMsg = _hofTab === 'hof'
+      ? '<div class="hof-empty"><div class="hof-empty-crown">👑</div>No pinned moments yet.<br><span style="font-size:10.5px">Pin events from the Timeline tab.</span></div>'
+      : '<div class="hof-empty"><div class="hof-empty-crown">👑</div>No moments captured yet.<br><span style="font-size:10.5px">Win tournaments or go viral to appear here!</span></div>';
+    el.innerHTML = emptyMsg;
+    return;
+  }
+
+  const typeLabels = { tournament:'🏆 Tournament', viral_post:'🔥 Viral Post', milestone:'🌟 Milestone', manual:'📌 Moment' };
+  const TYPE_CLASSES = { tournament:'tournament', viral_post:'viral_post', milestone:'milestone', manual:'manual' };
+
+  el.innerHTML = filtered.map(ev => {
+    const date = new Date(ev.captured_at).toLocaleDateString('en-GB', { day:'numeric', month:'short', year:'numeric' });
+    const adminBtns = canManage ? `
+      <div class="hof-event-actions">
+        <button class="pin-btn" onclick="hofTogglePin(${ev.id})" title="${ev.pinned?'Unpin':'Pin to Hall of Fame'}">
+          ${ev.pinned ? '📌 Unpin' : '📌 Pin'}
+        </button>
+        <button class="del-btn" onclick="hofDeleteEvent(${ev.id})">✕ Remove</button>
+      </div>` : '';
+    return `<div class="hof-event-card${ev.pinned?' pinned':''}" data-hof-id="${ev.id}">
+      <div class="hof-event-type ${TYPE_CLASSES[ev.type]||'manual'}">${typeLabels[ev.type]||ev.type}</div>
+      <div class="hof-event-title">${escapeHtml(ev.title)}</div>
+      ${ev.description ? `<div class="hof-event-desc">${escapeHtml(ev.description)}</div>` : ''}
+      <div class="hof-event-date">${date}</div>
+      ${adminBtns}
+    </div>`;
+  }).join('');
+}
+
+function renderHofAdminControls() {
+  const el = document.getElementById('hofAdminControls');
+  if (!el) return;
+  const canManage = myServerRole === 'owner' || myServerRole === 'moderator';
+  el.innerHTML = canManage
+    ? `<button class="hof-add-moment" onclick="openHofAddModal()">+ Add a Moment</button>`
+    : '';
+}
+
+function openHofAddModal() {
+  document.getElementById('hofAddModal').classList.add('open');
+  document.getElementById('hofMomentTitle').value = '';
+  document.getElementById('hofMomentDesc').value = '';
+  setTimeout(() => document.getElementById('hofMomentTitle').focus(), 50);
+}
+
+async function submitHofMoment() {
+  if (!selectedServer) return;
+  const title = document.getElementById('hofMomentTitle').value.trim();
+  const desc  = document.getElementById('hofMomentDesc').value.trim();
+  if (!title) { document.getElementById('hofMomentTitle').focus(); return; }
+  try {
+    await api(`/servers/${selectedServer.id}/timeline`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ title, description: desc || null })
+    });
+    document.getElementById('hofAddModal').classList.remove('open');
+    showToast('Moment added to Hall of Fame!', 'success');
+    loadHofEvents();
+  } catch (e) {
+    showToast('Failed to add moment', 'error');
+  }
+}
+
+async function hofTogglePin(eventId) {
+  if (!selectedServer) return;
+  try {
+    const r = await api(`/servers/${selectedServer.id}/timeline/${eventId}/pin`, {
+      method: 'PATCH', headers: { 'Content-Type': 'application/json' }
+    });
+    const ev = _hofEvents.find(e => e.id === eventId);
+    if (ev) ev.pinned = r.pinned;
+    renderHofEvents();
+  } catch (e) {
+    showToast('Failed to update pin', 'error');
+  }
+}
+
+async function hofDeleteEvent(eventId) {
+  if (!selectedServer || !confirm('Remove this moment from the timeline?')) return;
+  try {
+    await api(`/servers/${selectedServer.id}/timeline/${eventId}`, { method: 'DELETE' });
+    _hofEvents = _hofEvents.filter(e => e.id !== eventId);
+    renderHofEvents();
+    showToast('Moment removed', 'success');
+  } catch (e) {
+    showToast('Failed to remove moment', 'error');
+  }
+}
+
+function exportBestOfMonth() {
+  if (!selectedServer) return;
+  const now = new Date();
+  const monthName = now.toLocaleString('default', { month: 'long', year: 'numeric' });
+  const monthStart = new Date(now.getFullYear(), now.getMonth(), 1).getTime();
+
+  const monthEvents = _hofEvents.filter(e => new Date(e.captured_at).getTime() >= monthStart);
+
+  const typeLabels = { tournament:'🏆 Tournament', viral_post:'🔥 Viral Post', milestone:'🌟 Milestone', manual:'📌 Moment' };
+  const rows = (monthEvents.length ? monthEvents : _hofEvents.slice(0, 10)).map(ev => `
+    <div style="background:#1a1a2e;border:1px solid rgba(255,215,0,.2);border-radius:12px;padding:16px 20px;margin-bottom:12px">
+      <div style="font-size:10px;font-weight:800;text-transform:uppercase;letter-spacing:.6px;color:#ffd700;margin-bottom:6px">${typeLabels[ev.type]||ev.type}</div>
+      <div style="font-size:16px;font-weight:800;color:#fff;margin-bottom:4px">${ev.title.replace(/</g,'&lt;')}</div>
+      ${ev.description ? `<div style="font-size:12px;color:#aaa;line-height:1.5">${ev.description.replace(/</g,'&lt;')}</div>` : ''}
+      <div style="font-size:10px;color:#666;margin-top:8px">${new Date(ev.captured_at).toLocaleDateString('en-GB',{day:'numeric',month:'short',year:'numeric'})}</div>
+    </div>`).join('');
+
+  const html = `<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>${selectedServer.name} — Best of ${monthName}</title>
+<style>
+  * { box-sizing:border-box; margin:0; padding:0; }
+  body { font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif; background:#0d0d1a; color:#fff; min-height:100vh; }
+  .page { max-width:560px; margin:0 auto; padding:48px 20px 60px; }
+  .crown { font-size:48px; text-align:center; margin-bottom:8px; filter:drop-shadow(0 0 20px rgba(255,215,0,.5)); }
+  h1 { text-align:center; font-size:26px; font-weight:900; background:linear-gradient(135deg,#b8860b,#ffd700,#b8860b); -webkit-background-clip:text; -webkit-text-fill-color:transparent; margin-bottom:4px; }
+  .subtitle { text-align:center; color:#666; font-size:13px; margin-bottom:36px; }
+  .footer { text-align:center; color:#444; font-size:11px; margin-top:32px; }
+</style>
+</head>
+<body>
+<div class="page">
+  <div class="crown">👑</div>
+  <h1>${selectedServer.name.replace(/</g,'&lt;')}</h1>
+  <div class="subtitle">Best of ${monthName}</div>
+  ${rows || '<div style="text-align:center;color:#555;padding:40px">No moments this month yet.</div>'}
+  <div class="footer">Generated by LOBBY · ${now.toLocaleDateString('en-GB',{day:'numeric',month:'long',year:'numeric'})}</div>
+</div>
+</body>
+</html>`;
+
+  const blob = new Blob([html], { type: 'text/html' });
+  const url  = URL.createObjectURL(blob);
+  const win  = window.open(url, '_blank');
+  if (!win) {
+    const a = document.createElement('a');
+    a.href = url; a.download = `${selectedServer.name}-best-of-${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,'0')}.html`;
+    a.click();
+  }
+  setTimeout(() => URL.revokeObjectURL(url), 10000);
+}
+window.toggleHofPanel   = toggleHofPanel;
+window.setHofTab        = setHofTab;
+window.hofTogglePin     = hofTogglePin;
+window.hofDeleteEvent   = hofDeleteEvent;
+window.exportBestOfMonth = exportBestOfMonth;
+window.openHofAddModal  = openHofAddModal;
+window.submitHofMoment  = submitHofMoment;
 
 // Wire up rail action buttons
 (function wireLobbyInfoRailActions() {

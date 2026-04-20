@@ -472,6 +472,26 @@ async function initDb() {
       WHERE unique_id IS NULL
     `).catch(() => {});
 
+    // ==================== HALL OF FAME / TIMELINE ====================
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS lobby_timeline_events (
+        id           SERIAL PRIMARY KEY,
+        server_id    INTEGER REFERENCES servers(id) ON DELETE CASCADE,
+        type         TEXT NOT NULL DEFAULT 'manual'
+                       CHECK (type IN ('tournament','viral_post','milestone','manual')),
+        title        TEXT NOT NULL,
+        description  TEXT DEFAULT NULL,
+        image_url    TEXT DEFAULT NULL,
+        ref_id       INTEGER DEFAULT NULL,
+        ref_type     TEXT DEFAULT NULL,
+        captured_at  TIMESTAMPTZ DEFAULT NOW(),
+        pinned       BOOLEAN DEFAULT FALSE,
+        created_by   INTEGER REFERENCES users(id) ON DELETE SET NULL
+      );
+    `);
+    await pool.query(`CREATE INDEX IF NOT EXISTS idx_timeline_server_id ON lobby_timeline_events(server_id);`).catch(()=>{});
+    await pool.query(`CREATE INDEX IF NOT EXISTS idx_timeline_captured_at ON lobby_timeline_events(server_id, captured_at DESC);`).catch(()=>{});
+
     // ==================== TOURNAMENTS ====================
     // Tournaments
     await pool.query(`

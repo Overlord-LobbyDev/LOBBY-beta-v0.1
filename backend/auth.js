@@ -2301,6 +2301,42 @@ app.post("/posts/:id/react", requireAuth, async (req, res) => {
   } else {
     // No existing reaction → insert
     await pool.query("INSERT INTO post_reactions (post_id, user_id, emoji) VALUES ($1,$2,$3)", [postId, req.userId, emoji]);
+
+    // Auto-capture viral post into lobby timeline when it hits the threshold
+    try {
+      const VIRAL_THRESHOLD = 5;
+      const countRow = await pool.query(
+        "SELECT COUNT(*)::int AS cnt FROM post_reactions WHERE post_id=$1", [postId]
+      );
+      const totalReactions = countRow.rows[0]?.cnt || 0;
+      if (totalReactions === VIRAL_THRESHOLD) {
+        // Find which server this post belongs to (posts linked to a server via channel)
+        const postRow = await pool.query(
+          `SELECT p.id, p.content, p.channel_id, c.server_id
+           FROM posts p
+           LEFT JOIN channels c ON c.id = p.channel_id
+           WHERE p.id = $1;`,
+          [postId]
+        );
+        const post = postRow.rows[0];
+        if (post?.server_id) {
+          const existsRow = await pool.query(
+            "SELECT 1 FROM lobby_timeline_events WHERE ref_id=$1 AND ref_type='post';", [postId]
+          );
+          if (!existsRow.rows.length) {
+            const excerpt = (post.content || "").replace(/<[^>]+>/g, "").slice(0, 80);
+            await pool.query(
+              `INSERT INTO lobby_timeline_events (server_id, type, title, description, ref_id, ref_type)
+               VALUES ($1, 'viral_post', $2, $3, $4, 'post');`,
+              [post.server_id, `🔥 Viral Post`, excerpt || "A post blew up!", parseInt(postId)]
+            );
+          }
+        }
+      }
+    } catch (captureErr) {
+      console.warn("[viral capture]", captureErr.message);
+    }
+
     return res.json({ reacted: true, emoji });
   }
 });
@@ -3223,7 +3259,150 @@ app.post("/tournaments/:tournamentId/match-result", requireAuth, async (req, res
   }
 });
 
+// Declare tournament winner / finalize (host only) — also auto-captures HOF event
+app.post("/tournaments/:tournamentId/complete", requireAuth, async (req, res) => {
+  const client = await pool.connect();
+  try {
+    const { tournamentId } = req.params;
+    const { winnerPlayerId } = req.body; // tournament_players.id (not user id)
+
+    await client.query('BEGIN');
+
+    const tResult = await client.query("SELECT * FROM tournaments WHERE id = $1;", [tournamentId]);
+    if (!tResult.rows.length) { await client.query('ROLLBACK'); return res.status(404).json({ error: "Tournament not found" }); }
+    const t = tResult.rows[0];
+    if (t.host_id !== req.userId) { await client.query('ROLLBACK'); return res.status(403).json({ error: "Only host can finalize" }); }
+
+    // Resolve winner username
+    let winnerUsername = null;
+    if (winnerPlayerId) {
+      const wp = await client.query("SELECT username FROM tournament_players WHERE id = $1;", [winnerPlayerId]);
+      winnerUsername = wp.rows[0]?.username || null;
+    }
+
+    await client.query(
+      `UPDATE tournaments SET status = 'completed', winner_id = $1 WHERE id = $2;`,
+      [winnerPlayerId || null, tournamentId]
+    );
+
+    // Auto-capture Hall of Fame entry
+    const playerCountRow = await client.query(
+      "SELECT COUNT(*) AS cnt FROM tournament_players WHERE tournament_id = $1;", [tournamentId]
+    );
+    const playerCount = parseInt(playerCountRow.rows[0]?.cnt || 0);
+    const winnerLine = winnerUsername ? ` — Winner: ${winnerUsername}` : "";
+    await client.query(
+      `INSERT INTO lobby_timeline_events (server_id, type, title, description, ref_id, ref_type, pinned)
+       VALUES ($1, 'tournament', $2, $3, $4, 'tournament', false)
+       ON CONFLICT DO NOTHING;`,
+      [
+        parseInt(t.lobby_id),
+        `🏆 ${t.name}`,
+        `${t.format} · ${playerCount} players${winnerLine}`,
+        parseInt(tournamentId)
+      ]
+    );
+
+    await client.query('COMMIT');
+    res.json({ success: true, winnerUsername });
+  } catch (error) {
+    await client.query('ROLLBACK');
+    console.error("[tournament/complete error]", error);
+    res.status(500).json({ error: "Failed to complete tournament" });
+  } finally {
+    client.release();
+  }
+});
+
 // ==================== END TOURNAMENT ROUTES ====================
+
+// ==================== HALL OF FAME / TIMELINE ====================
+
+// GET /servers/:id/timeline — fetch all timeline events for this lobby
+app.get("/servers/:id/timeline", requireAuth, async (req, res) => {
+  try {
+    const serverId = parseInt(req.params.id);
+    // Check membership
+    const mem = await pool.query("SELECT 1 FROM server_members WHERE server_id=$1 AND user_id=$2", [serverId, req.userId]);
+    if (!mem.rows.length) return res.status(403).json({ error: "Not a member" });
+
+    const result = await pool.query(
+      `SELECT te.*, u.username AS created_by_username, u.avatar_url AS created_by_avatar
+       FROM lobby_timeline_events te
+       LEFT JOIN users u ON te.created_by = u.id
+       WHERE te.server_id = $1
+       ORDER BY te.captured_at DESC
+       LIMIT 100;`,
+      [serverId]
+    );
+    res.json(result.rows);
+  } catch (err) {
+    console.error("[timeline/get]", err);
+    res.status(500).json({ error: "Failed to fetch timeline" });
+  }
+});
+
+// POST /servers/:id/timeline — admin manually adds a moment
+app.post("/servers/:id/timeline", requireAuth, async (req, res) => {
+  try {
+    const serverId = parseInt(req.params.id);
+    const { title, description, image_url } = req.body;
+    if (!title) return res.status(400).json({ error: "Title required" });
+
+    const mem = await pool.query("SELECT role FROM server_members WHERE server_id=$1 AND user_id=$2", [serverId, req.userId]);
+    const role = mem.rows[0]?.role;
+    if (role !== 'owner' && role !== 'moderator') return res.status(403).json({ error: "Admins only" });
+
+    const r = await pool.query(
+      `INSERT INTO lobby_timeline_events (server_id, type, title, description, image_url, pinned, created_by)
+       VALUES ($1, 'manual', $2, $3, $4, true, $5) RETURNING *;`,
+      [serverId, title, description || null, image_url || null, req.userId]
+    );
+    res.status(201).json(r.rows[0]);
+  } catch (err) {
+    console.error("[timeline/post]", err);
+    res.status(500).json({ error: "Failed to add moment" });
+  }
+});
+
+// PATCH /servers/:id/timeline/:eventId/pin — toggle pin (admin)
+app.patch("/servers/:id/timeline/:eventId/pin", requireAuth, async (req, res) => {
+  try {
+    const serverId = parseInt(req.params.id);
+    const eventId  = parseInt(req.params.eventId);
+    const mem = await pool.query("SELECT role FROM server_members WHERE server_id=$1 AND user_id=$2", [serverId, req.userId]);
+    const role = mem.rows[0]?.role;
+    if (role !== 'owner' && role !== 'moderator') return res.status(403).json({ error: "Admins only" });
+
+    const r = await pool.query(
+      `UPDATE lobby_timeline_events SET pinned = NOT pinned WHERE id=$1 AND server_id=$2 RETURNING pinned;`,
+      [eventId, serverId]
+    );
+    res.json({ pinned: r.rows[0]?.pinned });
+  } catch (err) {
+    console.error("[timeline/pin]", err);
+    res.status(500).json({ error: "Failed to toggle pin" });
+  }
+});
+
+// DELETE /servers/:id/timeline/:eventId — remove a moment (admin)
+app.delete("/servers/:id/timeline/:eventId", requireAuth, async (req, res) => {
+  try {
+    const serverId = parseInt(req.params.id);
+    const eventId  = parseInt(req.params.eventId);
+    const mem = await pool.query("SELECT role FROM server_members WHERE server_id=$1 AND user_id=$2", [serverId, req.userId]);
+    const role = mem.rows[0]?.role;
+    if (role !== 'owner' && role !== 'moderator') return res.status(403).json({ error: "Admins only" });
+
+    await pool.query("DELETE FROM lobby_timeline_events WHERE id=$1 AND server_id=$2;", [eventId, serverId]);
+    res.json({ success: true });
+  } catch (err) {
+    console.error("[timeline/delete]", err);
+    res.status(500).json({ error: "Failed to delete moment" });
+  }
+});
+
+// ==================== END HALL OF FAME ROUTES ====================
 // ── Global error handlers ────────────────────────────────────
 process.on("unhandledRejection", (reason, promise) => {
   console.error("[UNHANDLED REJECTION]", reason);
