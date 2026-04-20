@@ -1434,18 +1434,21 @@
     ::-webkit-scrollbar-corner { background:transparent; }
 
     #floatingCallBar {
-      position:fixed; bottom:20px; left:50%; transform:translateX(-50%);
-      background:var(--bg-0); border:1px solid rgba(255,255,255,.1);
-      border-radius:16px; padding:10px 16px;
-      display:flex; align-items:center; gap:16px;
-      box-shadow:0 8px 32px rgba(0,0,0,.6); z-index:9998;
-      min-width:320px; backdrop-filter:blur(12px);
+      /* Pinned to the top-left next to the LOBBY wordmark so the call stays
+         reachable while the rest of the app is navigable beneath it. */
+      position:fixed; top:12px; left:120px;
+      background:var(--bg-0); border:1px solid rgba(255,255,255,.12);
+      border-radius:12px; padding:6px 10px;
+      display:flex; align-items:center; gap:10px;
+      box-shadow:0 6px 20px rgba(0,0,0,.55); z-index:10000;
+      backdrop-filter:blur(12px);
+      height:48px;
     }
-    .floating-call-info { display:flex; align-items:center; gap:10px; flex:1; }
+    .floating-call-info { display:flex; align-items:center; gap:8px; }
     .floating-call-avatar {
-      width:36px; height:36px; border-radius:10px; background:var(--accent);
+      width:30px; height:30px; border-radius:8px; background:var(--accent);
       display:flex; align-items:center; justify-content:center;
-      font-size:15px; font-weight:700; overflow:hidden; flex-shrink:0;
+      font-size:13px; font-weight:700; overflow:hidden; flex-shrink:0;
     }
     .floating-call-avatar img { width:100%; height:100%; object-fit:cover; }
     .floating-call-name { font-size:14px; font-weight:700; color:var(--text-1); }
@@ -8388,13 +8391,34 @@ function createCallPeerConnection(peerId) {
   pc.onsignalingstatechange = () => {
     console.log(`[call][${peerId}] signalingState:`, pc.signalingState);
   };
+  // Transient "disconnected" states are common (brief network blips, roaming,
+  // wifi handoff) and recover within seconds. Killing the call immediately means
+  // a half-second hiccup terminates a long call. Give it a grace window; only
+  // end immediately on "failed" or "closed". Track a per-PC timer so we can
+  // cancel if the connection recovers.
+  pc._disconnectTimer = null;
   pc.onconnectionstatechange = () => {
     console.log(`[call][${peerId}] connectionState:`, pc.connectionState);
+    const status = document.getElementById("floatingCallStatus");
     if (pc.connectionState === "connected") {
-      const status = document.getElementById("floatingCallStatus");
+      if (pc._disconnectTimer) { clearTimeout(pc._disconnectTimer); pc._disconnectTimer = null; }
       if (status) status.textContent = "● Connected";
     }
-    if (["disconnected","failed","closed"].includes(pc.connectionState)) endCall();
+    if (pc.connectionState === "disconnected") {
+      if (status) status.textContent = "● Reconnecting…";
+      if (pc._disconnectTimer) clearTimeout(pc._disconnectTimer);
+      pc._disconnectTimer = setTimeout(() => {
+        // Only give up if we're still disconnected after the grace window.
+        if (pc.connectionState === "disconnected") {
+          console.warn(`[call][${peerId}] disconnect grace expired — ending call`);
+          endCall();
+        }
+      }, 20000); // 20s grace window
+    }
+    if (["failed","closed"].includes(pc.connectionState)) {
+      if (pc._disconnectTimer) { clearTimeout(pc._disconnectTimer); pc._disconnectTimer = null; }
+      endCall();
+    }
   };
   return pc;
 }
