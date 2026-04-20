@@ -1451,12 +1451,12 @@
       font-size:13px; font-weight:700; overflow:hidden; flex-shrink:0;
     }
     .floating-call-avatar img { width:100%; height:100%; object-fit:cover; }
-    .floating-call-name { font-size:14px; font-weight:700; color:var(--text-1); }
-    .floating-call-status { font-size:11px; color:var(--green); }
-    .floating-call-controls { display:flex; gap:6px; align-items:center; }
+    .floating-call-name { font-size:12px; font-weight:700; color:var(--text-1); line-height:1.2; }
+    .floating-call-status { font-size:10px; color:var(--green); line-height:1.2; }
+    .floating-call-controls { display:flex; gap:4px; align-items:center; }
     .floating-btn {
-      width:36px; height:36px; border-radius:50%; border:none;
-      background:var(--bg-3); color:var(--text-1); font-size:16px;
+      width:30px; height:30px; border-radius:50%; border:none;
+      background:var(--bg-3); color:var(--text-1); font-size:14px;
       cursor:pointer; display:flex; align-items:center; justify-content:center;
       transition:background .15s; font-family:var(--font);
     }
@@ -8371,12 +8371,13 @@ function createCallPeerConnection(peerId) {
   };
   pc.ontrack = e => {
     console.log(`[call][${peerId}] ontrack — kind=${e.track.kind} streams=${e.streams.length}`);
-    // Show remote stream in the video overlay
+    // Route the remote stream to the video overlay so it's ready when the user
+    // expands it — but DON'T auto-open the overlay. Auto-opening trapped the
+    // user on the video view and blocked navigation for the whole call. They
+    // now use the expand button on the top-left call pill to toggle it.
     const remoteVid = document.getElementById("callRemoteVideo");
     if (remoteVid) remoteVid.srcObject = e.streams[0];
     document.getElementById("floatingCallStatus").textContent = "● Connected";
-    // Open the video overlay
-    document.getElementById("callVideoOverlay")?.classList.add("open");
   };
   pc.onicegatheringstatechange = () => {
     console.log(`[call][${peerId}] iceGatheringState:`, pc.iceGatheringState);
@@ -8553,9 +8554,16 @@ document.getElementById("fcScreenBtn").addEventListener("click", async () => {
 document.getElementById("fcLeaveBtn").addEventListener("click", endCall);
 
 // ── Video Call Overlay controls ──
+// Expand button on the top-left pill toggles the full-screen video overlay
+// on/off so the user can dip in and out of the video view while continuing to
+// browse the app underneath. The minimize button inside the overlay does the
+// same thing (closes the overlay, pill stays visible).
 document.getElementById("fcExpandBtn")?.addEventListener("click", () => {
-  document.getElementById("callVideoOverlay")?.classList.add("open");
-  showCallLocalVideo();
+  const ov = document.getElementById("callVideoOverlay");
+  if (!ov) return;
+  const willOpen = !ov.classList.contains("open");
+  ov.classList.toggle("open", willOpen);
+  if (willOpen) showCallLocalVideo();
 });
 document.getElementById("callOverlayMinimize")?.addEventListener("click", () => {
   document.getElementById("callVideoOverlay")?.classList.remove("open");
