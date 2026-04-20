@@ -2478,10 +2478,116 @@
       background:rgba(15,18,26,.7); backdrop-filter:blur(14px);
       border:1px solid rgba(255,255,255,.08);
       border-radius:12px; padding:14px;
-      display:grid; grid-template-columns:repeat(2,1fr); gap:10px;
+      display:grid; grid-template-columns:repeat(3,1fr); gap:10px;
       box-shadow:0 4px 16px rgba(0,0,0,.25);
     }
     body[data-theme="light"] .fp-stats-hero { background:rgba(255,255,255,.85); }
+
+    /* ── Compose Top Pill ─────────────────────────────────────── */
+    #composeTopPill {
+      display: none;
+      position: fixed;
+      top: 18px;
+      left: calc(50% + 260px);
+      align-items: center;
+      gap: 8px;
+      background: rgba(255,255,255,.06);
+      border: 1px solid rgba(255,255,255,.1);
+      border-radius: 99px;
+      padding: 7px 16px 7px 12px;
+      color: var(--text-3);
+      font-size: 13px;
+      font-family: var(--font);
+      cursor: pointer;
+      white-space: nowrap;
+      z-index: 502;
+      transition: background .15s, border-color .15s, color .15s;
+      -webkit-app-region: no-drag;
+      pointer-events: auto;
+    }
+    #composeTopPill:hover {
+      background: rgba(88,101,242,.18);
+      border-color: rgba(88,101,242,.45);
+      color: var(--text-1);
+    }
+    body.own-profile-active #composeTopPill { display: flex; }
+
+    /* ── Compose Modal ────────────────────────────────────────── */
+    #composeModal {
+      display: none;
+      position: fixed;
+      inset: 0;
+      z-index: 10060;
+      background: rgba(0,0,0,.72);
+      backdrop-filter: blur(8px);
+      align-items: center;
+      justify-content: center;
+    }
+    #composeModal.open { display: flex; }
+    #composeModalBox {
+      width: 100%;
+      max-width: 520px;
+      margin: 0 16px;
+      background: var(--bg-1);
+      border: 1px solid rgba(255,255,255,.1);
+      border-radius: 16px;
+      padding: 20px;
+      box-shadow: 0 24px 64px rgba(0,0,0,.6);
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+    }
+
+    /* ── Social Links Card ────────────────────────────────────── */
+    .fp-social-links { display:flex; flex-direction:column; gap:6px; padding:4px 0 8px; }
+    .fp-social-link {
+      display:flex; align-items:center; gap:9px;
+      padding:8px 12px; border-radius:9px;
+      background:rgba(255,255,255,.03); border:1px solid rgba(255,255,255,.07);
+      color:var(--text-2); text-decoration:none; font-size:13px;
+      transition:background .15s, color .15s, border-color .15s;
+      font-weight:500;
+    }
+    .fp-social-link:hover { background:rgba(255,255,255,.08); border-color:rgba(255,255,255,.14); color:var(--text-1); }
+    .fp-social-link svg { flex-shrink:0; opacity:.75; }
+
+    /* ── Currently Playing Badge ──────────────────────────────── */
+    .fp-now-playing {
+      display:flex; align-items:center; gap:10px;
+      padding:10px 14px; border-radius:10px;
+      background:rgba(88,101,242,.1); border:1px solid rgba(88,101,242,.22);
+      cursor:pointer; transition:background .15s; text-decoration:none;
+    }
+    .fp-now-playing:hover { background:rgba(88,101,242,.2); border-color:rgba(88,101,242,.4); }
+    .fp-now-playing-art {
+      width:42px; height:42px; border-radius:7px; object-fit:cover;
+      flex-shrink:0; background:var(--bg-3);
+    }
+    .fp-now-playing-pulse {
+      width:8px; height:8px; background:#43b581; border-radius:50%; flex-shrink:0;
+      animation:npPulse 2s ease-in-out infinite;
+    }
+    @keyframes npPulse {
+      0%,100% { opacity:1; transform:scale(1); }
+      50% { opacity:.55; transform:scale(.8); }
+    }
+
+    /* ── Profile Section Reorder ─────────────────────────────── */
+    .fp-section-wrap { position: relative; }
+    .fp-section-overlay { border-radius: 12px; }
+    .fp-drag-handle:active { cursor: grabbing !important; }
+
+    /* ── Achievement Showcase ─────────────────────────────────── */
+    .fp-achievements-grid {
+      display:grid; grid-template-columns:repeat(3,1fr); gap:8px; padding:4px 0 8px;
+    }
+    .fp-achievement-slot {
+      aspect-ratio:1; background:rgba(255,255,255,.03); border:1px dashed rgba(255,255,255,.1);
+      border-radius:10px; display:flex; flex-direction:column;
+      align-items:center; justify-content:center; gap:4px; cursor:default;
+    }
+    .fp-achievement-slot .ach-icon { font-size:26px; }
+    .fp-achievement-slot .ach-name { font-size:10px; color:var(--text-3); text-align:center; padding:0 4px; line-height:1.3; }
     .fp-stat {
       display:flex; flex-direction:column; gap:3px;
       padding:10px 12px;
@@ -3815,6 +3921,55 @@
       onfocus="if(this.value.trim())document.getElementById('globalSearchResults').classList.add('open')" />
     <span id="gsearchKbd">⌘K</span>
     <div id="globalSearchResults"></div>
+  </div>
+  <button id="composeTopPill" onclick="fpOpenComposeModal()">
+    <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20h9"/><path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"/></svg>
+    What's on your mind?
+  </button>
+</div>
+
+<!-- ── Compose Modal ─────────────────────────────────────────── -->
+<div id="composeModal" onclick="if(event.target===this)fpCloseComposeModal()">
+  <div id="composeModalBox">
+    <div style="display:flex;align-items:center;justify-content:space-between">
+      <div style="font-size:16px;font-weight:700;color:var(--text-1)">Create Post</div>
+      <button onclick="fpCloseComposeModal()" style="background:var(--bg-2);border:none;color:var(--text-2);cursor:pointer;border-radius:8px;padding:5px 10px;font-size:14px;font-family:var(--font)">✕</button>
+    </div>
+    <div style="display:flex;align-items:flex-start;gap:10px">
+      <div class="fp-post-av" id="modalComposeAv" style="flex-shrink:0;width:38px;height:38px;font-size:14px"></div>
+      <textarea id="modalPostInput"
+        placeholder="What's on your mind?"
+        maxlength="255"
+        rows="3"
+        style="flex:1;background:var(--bg-2);border:1.5px solid rgba(255,255,255,.08);border-radius:10px;
+               color:var(--text-1);font-size:14px;font-family:var(--font);
+               padding:10px 14px;outline:none;resize:none;min-height:80px;
+               line-height:1.6;transition:border-color .2s,box-shadow .2s"
+        onfocus="this.style.borderColor='rgba(88,101,242,.6)';this.style.boxShadow='0 0 0 3px rgba(88,101,242,.1)'"
+        onblur="this.style.borderColor='rgba(255,255,255,.08)';this.style.boxShadow='none'"
+        oninput="document.getElementById('modalCharCount').textContent=this.value.length+'/255'"></textarea>
+    </div>
+    <div id="modalImgPreview" style="display:none;padding-left:48px"></div>
+    <div style="display:flex;align-items:center;gap:8px;padding-left:48px;flex-wrap:wrap">
+      <label style="display:flex;align-items:center;gap:5px;background:transparent;border:1px solid rgba(255,255,255,.08);color:var(--text-3);padding:5px 11px;border-radius:8px;font-size:12.5px;cursor:pointer;font-family:var(--font);transition:background .15s,color .15s"
+        onmouseover="this.style.background='var(--bg-2)';this.style.color='var(--text-1)'"
+        onmouseout="this.style.background='transparent';this.style.color='var(--text-3)'">
+        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/></svg>
+        Photo
+        <input type="file" accept="image/*" id="modalPostImg" style="display:none" onchange="modalPreviewImg(this)" />
+      </label>
+      <button id="modalVisToggle" onclick="modalToggleVisibility()" data-vis="friends"
+        style="display:flex;align-items:center;gap:5px;background:transparent;border:1px solid rgba(255,255,255,.08);color:var(--text-3);padding:5px 11px;border-radius:20px;font-size:12.5px;cursor:pointer;font-family:var(--font);transition:background .15s,border-color .15s,color .15s"
+        onmouseover="this.style.background='var(--bg-2)';this.style.borderColor='rgba(88,101,242,.35)';this.style.color='var(--text-1)'"
+        onmouseout="this.style.background='transparent';this.style.borderColor='rgba(255,255,255,.08)';this.style.color='var(--text-3)'">
+        👥 Friends only
+      </button>
+      <span id="modalCharCount" style="font-size:11px;color:var(--text-3);margin-left:auto;opacity:.6">0/255</span>
+      <button onclick="withLoading(this,()=>modalSubmitPost())"
+        style="background:var(--accent);color:#fff;border:none;border-radius:8px;padding:7px 20px;font-size:13px;font-weight:700;font-family:var(--font);cursor:pointer;transition:background .15s,transform .1s"
+        onmouseover="this.style.background='var(--accent-h)';this.style.transform='translateY(-1px)'"
+        onmouseout="this.style.background='var(--accent)';this.style.transform=''">Post</button>
+    </div>
   </div>
 </div>
 
@@ -12635,6 +12790,9 @@ async function renderFpLeft() {
     ? new Date(fpData.joined_at).toLocaleDateString("en-GB",{month:"short",year:"numeric"})
     : "—";
 
+  const followersCount   = fpData.followers_count   ?? 0;
+  const tournamentsCount = fpData.tournaments_played ?? 0;
+
   const statsHero = `
     <div class="fp-stats-hero">
       <div class="fp-stat">
@@ -12644,6 +12802,14 @@ async function renderFpLeft() {
       <div class="fp-stat">
         <div class="fp-stat-label">👥 Friends</div>
         <div class="fp-stat-value">${friendsCount}</div>
+      </div>
+      <div class="fp-stat">
+        <div class="fp-stat-label">❤️ Followers</div>
+        <div class="fp-stat-value">${followersCount}</div>
+      </div>
+      <div class="fp-stat">
+        <div class="fp-stat-label">🏆 Tournaments</div>
+        <div class="fp-stat-value">${tournamentsCount}</div>
       </div>
       <div class="fp-stat">
         <div class="fp-stat-label">🎮 This Week</div>
@@ -12757,76 +12923,171 @@ async function renderFpLeft() {
     }
   } catch(e) {}
 
-  left.innerHTML = `
-    ${statsHero}
+  // ── Currently Playing card (most recent Steam game) ──────────
+  let nowPlayingHtml = "";
+  if (fpData.steam_id) {
+    try {
+      const steamUrl = fpIsOwn ? `${AUTH_URL}/steam/recent` : `${AUTH_URL}/steam/recent/${fpUserId}`;
+      const games = await fetch(steamUrl, { headers:{ Authorization:`Bearer ${token}` }}).then(r=>r.json()).catch(()=>[]);
+      const topGame = Array.isArray(games) && games.length ? games[0] : null;
+      if (topGame) {
+        const appid = topGame.appid;
+        const gameName = topGame.name || "Unknown Game";
+        const recentMins = topGame.playtime_2weeks || (topGame.hours_recent ? topGame.hours_recent*60 : 0);
+        const recentLabel = recentMins > 0 ? (recentMins < 60 ? `${Math.round(recentMins)}m this week` : `${Math.floor(recentMins/60)}h this week`) : null;
+        const artUrl = `https://media.steampowered.com/steamcommunity/public/images/apps/${appid}/${topGame.img_icon_url || ""}.jpg`;
+        const fallbackArt = `https://cdn.cloudflare.steamstatic.com/steam/apps/${appid}/capsule_sm_120.jpg`;
+        nowPlayingHtml = `
+          <a class="fp-now-playing" href="https://store.steampowered.com/app/${appid}" target="_blank">
+            <img class="fp-now-playing-art" src="${fallbackArt}" onerror="this.src='${artUrl}';this.onerror=null" />
+            <div style="flex:1;min-width:0">
+              <div style="font-size:10px;font-weight:800;text-transform:uppercase;letter-spacing:.7px;color:var(--accent);margin-bottom:2px;display:flex;align-items:center;gap:5px">
+                <span class="fp-now-playing-pulse"></span> Now Playing
+              </div>
+              <div style="font-size:13px;font-weight:700;color:var(--text-1);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${escapeHtml(gameName)}</div>
+              ${recentLabel ? `<div style="font-size:11px;color:var(--text-3);margin-top:1px">${recentLabel}</div>` : ""}
+            </div>
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" style="opacity:.4;flex-shrink:0"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><polyline points="15 3 21 3 21 9"/><line x1="10" y1="14" x2="21" y2="3"/></svg>
+          </a>`;
+      }
+    } catch(e) {}
+  }
+
+  // ── Social links card ──────────────────────────────────────────
+  const twitchIcon = `<svg width="15" height="15" viewBox="0 0 24 24" fill="currentColor" style="color:#9146ff"><path d="M11.571 4.714h1.715v5.143H11.57zm4.715 0H18v5.143h-1.714zM6 0L1.714 4.286v15.428h5.143V24l4.286-4.286h3.428L22.286 12V0zm14.571 11.143l-3.428 3.428h-3.429l-3 3v-3H6.857V1.714h13.714z"/></svg>`;
+  const youtubeIcon = `<svg width="15" height="15" viewBox="0 0 24 24" fill="currentColor" style="color:#ff0000"><path d="M23.495 6.205a3.007 3.007 0 0 0-2.088-2.088c-1.87-.501-9.396-.501-9.396-.501s-7.507-.01-9.396.501A3.007 3.007 0 0 0 .527 6.205a31.247 31.247 0 0 0-.522 5.805 31.247 31.247 0 0 0 .522 5.783 3.007 3.007 0 0 0 2.088 2.088c1.868.502 9.396.502 9.396.502s7.506 0 9.396-.502a3.007 3.007 0 0 0 2.088-2.088 31.247 31.247 0 0 0 .5-5.783 31.247 31.247 0 0 0-.5-5.805zM9.609 15.601V8.408l6.264 3.602z"/></svg>`;
+  const twitterIcon = `<svg width="15" height="15" viewBox="0 0 24 24" fill="currentColor" style="color:#1da1f2"><path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-4.714-6.231-5.401 6.231H2.744l7.737-8.836L1.254 2.25H8.08l4.253 5.622zm-1.161 17.52h1.833L7.084 4.126H5.117z"/></svg>`;
+
+  let socialLinksHtml = "";
+  const hasSocial = fpData.twitch_url || fpData.youtube_url || fpData.twitter_url;
+  if (hasSocial || fpIsOwn) {
+    const links = [];
+    if (fpData.twitch_url) links.push(`<a class="fp-social-link" href="${fpData.twitch_url}" target="_blank">${twitchIcon}<span style="flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${escapeHtml(fpData.twitch_url.replace(/^https?:\/\/(www\.)?twitch\.tv\//,'').split('/')[0])}</span></a>`);
+    if (fpData.youtube_url) links.push(`<a class="fp-social-link" href="${fpData.youtube_url}" target="_blank">${youtubeIcon}<span style="flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${escapeHtml(fpData.youtube_url.replace(/^https?:\/\/(www\.)?youtube\.com\//,'').split('/')[0])}</span></a>`);
+    if (fpData.twitter_url) links.push(`<a class="fp-social-link" href="${fpData.twitter_url}" target="_blank">${twitterIcon}<span style="flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">@${escapeHtml(fpData.twitter_url.replace(/^https?:\/\/(www\.)?(twitter|x)\.com\//,'').split('/')[0].replace('@',''))}</span></a>`);
+    if (links.length > 0) {
+      socialLinksHtml = `
+        <div class="fp-card">
+          <div class="fp-card-header">Socials ${fpIsOwn ? `<button class="fp-card-header-link" onclick="fpEnterEditMode()">Edit</button>` : ""}
+          </div>
+          <div class="fp-card-body" style="padding-bottom:12px">
+            <div class="fp-social-links">${links.join("")}</div>
+          </div>
+        </div>`;
+    } else if (fpIsOwn) {
+      socialLinksHtml = `
+        <div class="fp-card">
+          <div class="fp-card-header">Socials <button class="fp-card-header-link" onclick="fpEnterEditMode()">Add</button></div>
+          <div class="fp-card-body" style="padding-bottom:12px;color:var(--text-3);font-size:13px">Link your Twitch, YouTube, or X account.</div>
+        </div>`;
+    }
+  }
+
+  // ── Achievement showcase ────────────────────────────────────
+  const achieveHtml = `
     <div class="fp-card">
-      <div class="fp-card-header">About ${fpIsOwn?`<button class="fp-card-header-link" onclick="fpEnterEditMode()">Edit</button>`:""}
+      <div class="fp-card-header">Achievements
+        <span style="font-size:11px;color:var(--text-3);font-weight:400;background:var(--bg-2);padding:1px 7px;border-radius:99px">Coming Soon</span>
       </div>
-      <div class="fp-card-body" style="padding-bottom:16px">${aboutRows}</div>
-    </div>
-    ${photosHtml}
-    <div class="fp-card">
-      <div class="fp-card-header">Friends <button class="fp-card-header-link" onclick="fpShowAllFriends()">See all</button></div>
-      ${friendsHtml}
+      <div class="fp-card-body" style="padding-bottom:12px">
+        <div class="fp-achievements-grid">
+          ${["🏆","🎮","🔥","⭐","💎","🎯"].map(icon=>`<div class="fp-achievement-slot"><span class="ach-icon" style="opacity:.25">${icon}</span><span class="ach-name" style="opacity:.35">Locked</span></div>`).join("")}
+        </div>
+      </div>
     </div>`;
+
+  // ── Section order + visibility (stored in localStorage) ──────
+  const FP_SECTIONS_DEFAULT = ["stats","nowplaying","about","social","achievements","photos","friends"];
+  const secOrderKey = `vh_fp_section_order_${fpUserId}`;
+  const secHideKey  = `vh_fp_section_hidden_${fpUserId}`;
+  let sectionOrder;
+  try { sectionOrder = JSON.parse(localStorage.getItem(secOrderKey)) || FP_SECTIONS_DEFAULT; } catch { sectionOrder = [...FP_SECTIONS_DEFAULT]; }
+  // Ensure any new sections added after initial save are appended
+  FP_SECTIONS_DEFAULT.forEach(s => { if (!sectionOrder.includes(s)) sectionOrder.push(s); });
+  let hiddenSections;
+  try { hiddenSections = JSON.parse(localStorage.getItem(secHideKey)) || []; } catch { hiddenSections = []; }
+
+  const sectionHtmlMap = {
+    stats:        statsHero,
+    nowplaying:   nowPlayingHtml ? `<div class="fp-card"><div class="fp-card-body" style="padding:12px">${nowPlayingHtml}</div></div>` : "",
+    about:        `<div class="fp-card"><div class="fp-card-header">About ${fpIsOwn?`<button class="fp-card-header-link" onclick="fpEnterEditMode()">Edit</button>`:""}</div><div class="fp-card-body" style="padding-bottom:16px">${aboutRows}</div></div>`,
+    social:       socialLinksHtml,
+    achievements: achieveHtml,
+    photos:       photosHtml,
+    friends:      `<div class="fp-card"><div class="fp-card-header">Friends <button class="fp-card-header-link" onclick="fpShowAllFriends()">See all</button></div>${friendsHtml}</div>`,
+  };
+
+  // Customise button (own profile only)
+  const customiseBtn = fpIsOwn ? `
+    <button id="fpCustomiseBtn" onclick="fpToggleCustomiseMode()" style="width:100%;background:transparent;border:1px dashed rgba(255,255,255,.12);color:var(--text-3);border-radius:9px;padding:7px;font-size:12px;font-weight:600;font-family:var(--font);cursor:pointer;display:flex;align-items:center;justify-content:center;gap:6px;transition:background .15s,color .15s,border-color .15s" onmouseover="this.style.background='var(--bg-2)';this.style.color='var(--text-1)';this.style.borderColor='rgba(255,255,255,.2)'" onmouseout="this.style.background='transparent';this.style.color='var(--text-3)';this.style.borderColor='rgba(255,255,255,.12)'">
+      ⚙ Customise Sections
+    </button>` : "";
+
+  // Build sections HTML
+  const sectionsHtml = sectionOrder
+    .filter(id => sectionHtmlMap[id])
+    .map(id => {
+      const html = sectionHtmlMap[id];
+      if (!html) return "";
+      const isHidden = hiddenSections.includes(id);
+      return `<div class="fp-section-wrap" data-section="${id}" style="display:${isHidden?'none':'block'};position:relative">${html}</div>`;
+    }).join("");
+
+  left.innerHTML = sectionsHtml + customiseBtn;
+
+  // Wire up drag-to-reorder if customise mode was active
+  if (left.dataset.customiseMode === "true") fpEnableCustomiseMode();
 }
 
 async function renderFpRight() {
   const right = document.getElementById("fpRight");
   if (!right) return;
 
-  // Compose box — own profile only
+  // Compose prompt — own profile only (opens modal in top bar)
   if (fpIsOwn) {
-    right.innerHTML = `<div style="width:100%;background:rgba(15,18,26,.7);backdrop-filter:blur(14px);border:1px solid rgba(255,255,255,.08);border-radius:12px;padding:12px 16px;transition:border-color .2s,box-shadow .2s;box-shadow:0 4px 16px rgba(0,0,0,.25)" id="fpComposeCard">
-      <div style="display:flex;align-items:center;gap:10px">
-        <div class="fp-post-av" id="fpComposeAv" style="flex-shrink:0;width:38px;height:38px;font-size:14px">${fpData.avatar_url?`<img src="${fpData.avatar_url}"/>`:(fpData.username||"U").slice(0,1).toUpperCase()}</div>
-        <textarea id="fpPostInput"
-          placeholder="What's on your mind, ${escapeHtml(fpData.username||"")}?"
-          maxlength="255"
-          rows="1"
-          style="flex:1;background:var(--bg-2);border:1.5px solid rgba(255,255,255,.08);border-radius:10px;
-                 color:var(--text-1);font-size:14px;font-family:var(--font);
-                 padding:9px 16px;outline:none;resize:none;min-height:40px;max-height:120px;
-                 line-height:1.5;transition:border-color .2s,box-shadow .2s,background .2s;overflow:hidden"
-          onfocus="this.style.borderColor='rgba(88,101,242,.6)';this.style.boxShadow='0 0 0 3px rgba(88,101,242,.1)';this.style.background='var(--bg-3)';this.style.overflow='auto'"
-          onblur="this.style.borderColor='rgba(255,255,255,.08)';this.style.boxShadow='none';this.style.background='var(--bg-2)';if(this.value.length===0){this.style.minHeight='40px';this.style.overflow='hidden'}"></textarea>
-      </div>
-      <div style="display:flex;align-items:center;gap:8px;margin-top:8px;padding-left:48px">
-        <label style="display:flex;align-items:center;gap:5px;background:transparent;border:1px solid rgba(255,255,255,.08);
-                      color:var(--text-3);padding:5px 11px;border-radius:8px;font-size:12.5px;
-                      cursor:pointer;font-family:var(--font);transition:background .15s,color .15s,border-color .15s"
-          onmouseover="this.style.background='var(--bg-2)';this.style.color='var(--text-1)';this.style.borderColor='rgba(255,255,255,.15)'"
-          onmouseout="this.style.background='transparent';this.style.color='var(--text-3)';this.style.borderColor='rgba(255,255,255,.08)'">
-          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/></svg>
-          Photo
-          <input type="file" accept="image/*" id="fpPostImg" style="display:none" onchange="fpPreviewImg(this)" />
-        </label>
-        <button id="fpVisToggle" onclick="fpToggleVisibility()" data-vis="friends"
-          style="display:flex;align-items:center;gap:5px;background:transparent;
-                 border:1px solid rgba(255,255,255,.08);color:var(--text-3);
-                 padding:5px 11px;border-radius:20px;font-size:12.5px;
-                 cursor:pointer;font-family:var(--font);transition:background .15s,border-color .15s,color .15s"
-          onmouseover="this.style.background='var(--bg-2)';this.style.borderColor='rgba(88,101,242,.35)';this.style.color='var(--text-1)'"
-          onmouseout="this.style.background='transparent';this.style.borderColor='rgba(255,255,255,.08)';this.style.color='var(--text-3)'">
-          👥 Friends only
-        </button>
-        <span id="fpCharCount" style="font-size:11px;color:var(--text-3);margin-left:auto;opacity:.6">0/255</span>
-        <button onclick="fpSubmitPost()"
-          style="background:var(--accent);color:#fff;border:none;border-radius:8px;
-                 padding:7px 20px;font-size:13px;font-weight:700;font-family:var(--font);
-                 cursor:pointer;transition:background .15s,transform .1s,box-shadow .15s"
-          onmouseover="this.style.background='var(--accent-h)';this.style.transform='translateY(-1px)';this.style.boxShadow='0 4px 12px rgba(88,101,242,.4)'"
-          onmouseout="this.style.background='var(--accent)';this.style.transform='';this.style.boxShadow=''">Post</button>
-      </div>
-      <div id="fpImgPreview" style="display:none;margin-top:8px;padding-left:48px"></div>
-    </div>`;
-    document.getElementById("fpPostInput")?.addEventListener("input", function() {
-      document.getElementById("fpCharCount").textContent = `${this.value.length}/255`;
-    });
+    right.innerHTML = `
+      <div style="width:100%;background:rgba(15,18,26,.5);backdrop-filter:blur(14px);border:1px solid rgba(255,255,255,.07);border-radius:12px;padding:11px 16px;display:flex;align-items:center;gap:10px;cursor:pointer;transition:background .15s,border-color .15s"
+        onclick="fpOpenComposeModal()"
+        onmouseover="this.style.background='rgba(88,101,242,.1)';this.style.borderColor='rgba(88,101,242,.3)'"
+        onmouseout="this.style.background='rgba(15,18,26,.5)';this.style.borderColor='rgba(255,255,255,.07)'">
+        <div class="fp-post-av" style="flex-shrink:0;width:36px;height:36px;font-size:13px">${fpData.avatar_url?`<img src="${fpData.avatar_url}"/>`:(fpData.username||"U").slice(0,1).toUpperCase()}</div>
+        <span style="color:var(--text-3);font-size:14px;flex:1">What's on your mind, <b style="color:var(--text-2)">${escapeHtml(fpData.username||"")}</b>?</span>
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" style="opacity:.35"><path d="M12 20h9"/><path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"/></svg>
+      </div>`;
+  }
+
+  // ── Pinned Post ──────────────────────────────────────────────
+  const token = localStorage.getItem("vh_token") || sessionStorage.getItem("vh_token");
+  if (fpData.pinned_post_id) {
+    try {
+      const pRes = await fetch(`${AUTH_URL}/posts/${fpData.pinned_post_id}`, { headers:{ Authorization:`Bearer ${token}` }}).then(r=>r.json()).catch(()=>null);
+      if (pRes && !pRes.error) {
+        const p = pRes;
+        const pinnedAvHtml = fpData.avatar_url ? `<img src="${fpData.avatar_url}" />` : (fpData.username||"?").slice(0,1).toUpperCase();
+        const pinnedTime = new Date(p.created_at).toLocaleDateString("en-GB",{day:"numeric",month:"short"}) + " · " + new Date(p.created_at).toLocaleTimeString([],{hour:"2-digit",minute:"2-digit"});
+        right.insertAdjacentHTML("beforeend", `
+          <div style="width:100%;background:rgba(15,18,26,.7);backdrop-filter:blur(14px);border:1px solid rgba(251,191,36,.2);border-radius:12px;overflow:hidden;box-shadow:0 4px 16px rgba(0,0,0,.25)">
+            <div style="padding:8px 14px 6px;font-size:11px;font-weight:800;text-transform:uppercase;letter-spacing:.7px;color:#fbbf24;display:flex;align-items:center;gap:5px;border-bottom:1px solid rgba(251,191,36,.1)">
+              📌 Pinned Post
+              ${fpIsOwn ? `<button onclick="fpUnpinPost()" style="margin-left:auto;background:transparent;border:none;color:var(--text-3);cursor:pointer;font-size:11px;font-family:var(--font);padding:2px 8px;border-radius:5px;transition:color .15s" onmouseover="this.style.color='var(--danger)'" onmouseout="this.style.color='var(--text-3)'">Unpin</button>` : ""}
+            </div>
+            <div class="fp-post" style="padding:12px 14px">
+              <div class="fp-post-header">
+                <div class="fp-post-av">${pinnedAvHtml}</div>
+                <div class="fp-post-meta">
+                  <div class="fp-post-author">${escapeHtml(fpData.display_name||fpData.username||"")}</div>
+                  <div class="fp-post-time">${pinnedTime}</div>
+                </div>
+              </div>
+              ${p.content ? `<div class="fp-post-content">${escapeHtml(p.content)}</div>` : ""}
+              ${p.image_url ? `<img class="fp-post-image" src="${p.image_url}" onclick="openLightbox('${p.image_url}')" />` : ""}
+            </div>
+          </div>`);
+      }
+    } catch(e) {}
   }
 
   // Posts
-  const token = localStorage.getItem("vh_token") || sessionStorage.getItem("vh_token");
   let posts = [];
   try {
     const res = await fetch(`${AUTH_URL}/profile/${fpUserId}/posts`, { headers:{ Authorization:`Bearer ${token}` }});
@@ -12940,7 +13201,8 @@ async function renderFpRight() {
             <div class="fp-post-time">${time}</div>
           </div>
           <div class="fp-post-vis">${visIcon} ${p.visibility==="friends"?"Friends":"Public"}</div>
-          ${fpIsOwn||me?.is_admin?`<button onclick="fpDeletePost(${p.id})" style="background:none;border:none;color:var(--text-3);cursor:pointer;font-size:14px;padding:4px 8px;border-radius:6px;margin-left:4px;transition:color .15s,background .15s" onmouseover="this.style.color='var(--danger)';this.style.background='rgba(237,66,69,.1)'" onmouseout="this.style.color='var(--text-3)';this.style.background='none'">🗑</button>`:""}
+          ${fpIsOwn?`<button onclick="fpPinPost(${p.id})" title="${fpData.pinned_post_id===p.id?'Unpin post':'Pin to profile'}" style="background:none;border:none;color:${fpData.pinned_post_id===p.id?'#fbbf24':'var(--text-3)'};cursor:pointer;font-size:13px;padding:4px 7px;border-radius:6px;margin-left:2px;transition:color .15s,background .15s" onmouseover="this.style.color='#fbbf24';this.style.background='rgba(251,191,36,.1)'" onmouseout="this.style.color='${fpData.pinned_post_id===p.id?'#fbbf24':'var(--text-3)'}'">📌</button>`:""}
+          ${fpIsOwn||me?.is_admin?`<button onclick="fpDeletePost(${p.id})" style="background:none;border:none;color:var(--text-3);cursor:pointer;font-size:14px;padding:4px 8px;border-radius:6px;margin-left:2px;transition:color .15s,background .15s" onmouseover="this.style.color='var(--danger)';this.style.background='rgba(237,66,69,.1)'" onmouseout="this.style.color='var(--text-3)';this.style.background='none'">🗑</button>`:""}
         </div>
         ${p.content?`<div class="fp-post-content">${escapeHtml(p.content)}</div>`:""}
         ${p.image_url?`<img class="fp-post-image" src="${p.image_url}" onclick="openLightbox('${p.image_url}')" />`:""}
@@ -13075,6 +13337,104 @@ async function fpSubmitPost() {
   if (document.getElementById("profilePanel")?.classList.contains("open") && profilePanelUserId === me?.id) {
     await loadComments && renderProfileTab("posts");
   }
+}
+
+// ── Compose Modal (top-bar pill) ──────────────────────────────
+let modalPostImageFile = null;
+
+function fpOpenComposeModal() {
+  const modal = document.getElementById("composeModal");
+  if (!modal) return;
+  const av = document.getElementById("modalComposeAv");
+  if (av) av.innerHTML = fpData?.avatar_url ? `<img src="${fpData.avatar_url}"/>` : (me?.username||"U").slice(0,1).toUpperCase();
+  const input = document.getElementById("modalPostInput");
+  if (input) input.value = "";
+  const count = document.getElementById("modalCharCount");
+  if (count) count.textContent = "0/255";
+  const preview = document.getElementById("modalImgPreview");
+  if (preview) { preview.style.display = "none"; preview.innerHTML = ""; }
+  const visBtn = document.getElementById("modalVisToggle");
+  if (visBtn) { visBtn.dataset.vis = "friends"; visBtn.textContent = "👥 Friends only"; }
+  modalPostImageFile = null;
+  const imgInput = document.getElementById("modalPostImg");
+  if (imgInput) imgInput.value = "";
+  modal.classList.add("open");
+  setTimeout(() => document.getElementById("modalPostInput")?.focus(), 60);
+}
+
+function fpCloseComposeModal() {
+  document.getElementById("composeModal")?.classList.remove("open");
+}
+
+function modalPreviewImg(input) {
+  const file = input.files[0];
+  if (!file) return;
+  modalPostImageFile = file;
+  const reader = new FileReader();
+  reader.onload = e => {
+    const preview = document.getElementById("modalImgPreview");
+    if (!preview) return;
+    preview.style.display = "block";
+    preview.innerHTML = `<div style="position:relative;display:inline-block"><img src="${e.target.result}" style="max-height:150px;max-width:100%;border-radius:8px;display:block" /><button onclick="modalClearImg()" style="position:absolute;top:-6px;right:-6px;background:var(--bg-3);border:1px solid rgba(255,255,255,.15);color:var(--text-1);border-radius:50%;width:22px;height:22px;cursor:pointer;font-size:12px;display:flex;align-items:center;justify-content:center;padding:0">✕</button></div>`;
+  };
+  reader.readAsDataURL(file);
+}
+
+function modalClearImg() {
+  modalPostImageFile = null;
+  const preview = document.getElementById("modalImgPreview");
+  if (preview) { preview.style.display = "none"; preview.innerHTML = ""; }
+  const input = document.getElementById("modalPostImg");
+  if (input) input.value = "";
+}
+
+function modalToggleVisibility() {
+  const btn = document.getElementById("modalVisToggle");
+  if (!btn) return;
+  if (btn.dataset.vis === "friends") {
+    btn.dataset.vis = "public";
+    btn.textContent = "🌐 Everyone";
+  } else {
+    btn.dataset.vis = "friends";
+    btn.textContent = "👥 Friends only";
+  }
+}
+
+async function modalSubmitPost() {
+  const content = document.getElementById("modalPostInput")?.value.trim();
+  if (!content && !modalPostImageFile) return;
+  const token = localStorage.getItem("vh_token") || sessionStorage.getItem("vh_token");
+  const visBtn = document.getElementById("modalVisToggle");
+  const visibility = visBtn?.dataset.vis === "public" ? "public" : "friends";
+  const formData = new FormData();
+  formData.append("content", content || "");
+  formData.append("visibility", visibility);
+  if (modalPostImageFile) formData.append("image", modalPostImageFile);
+  const r = await fetch(`${AUTH_URL}/posts`, { method:"POST", headers:{ Authorization:`Bearer ${token}` }, body:formData }).then(r=>r.json());
+  if (r.error) { showToast(r.error, "error"); return; }
+  fpCloseComposeModal();
+  showToast("Posted!", "success");
+  if (document.getElementById("fpRight")) await renderFpRight();
+}
+
+// ── Pin / Unpin post ──────────────────────────────────────────
+async function fpPinPost(postId) {
+  const token = localStorage.getItem("vh_token") || sessionStorage.getItem("vh_token");
+  const isAlreadyPinned = fpData.pinned_post_id === postId;
+  const newPinnedId = isAlreadyPinned ? null : postId;
+  const r = await fetch(`${AUTH_URL}/profile/${me.id}/pin`, {
+    method: "PATCH",
+    headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
+    body: JSON.stringify({ post_id: newPinnedId })
+  }).then(r => r.json());
+  if (r.error) { showToast(r.error, "error"); return; }
+  fpData.pinned_post_id = newPinnedId;
+  showToast(isAlreadyPinned ? "Post unpinned" : "Post pinned to profile!", "success");
+  await renderFpRight();
+}
+
+async function fpUnpinPost() {
+  await fpPinPost(fpData.pinned_post_id);
 }
 
 async function fpDeletePost(postId) {
@@ -13256,6 +13616,139 @@ function fpShowAllFriends() {
   left.querySelectorAll(".fp-card")[1]?.scrollIntoView({ behavior:"smooth" });
 }
 
+// ── Profile section drag-to-reorder + show/hide ────────────
+function fpToggleCustomiseMode() {
+  const left = document.getElementById("fpLeft");
+  if (!left) return;
+  if (left.dataset.customiseMode === "true") {
+    left.dataset.customiseMode = "false";
+    fpDisableCustomiseMode();
+  } else {
+    left.dataset.customiseMode = "true";
+    fpEnableCustomiseMode();
+  }
+}
+
+function fpEnableCustomiseMode() {
+  const left = document.getElementById("fpLeft");
+  if (!left) return;
+  const secOrderKey = `vh_fp_section_order_${fpUserId}`;
+  const secHideKey  = `vh_fp_section_hidden_${fpUserId}`;
+  let hiddenSections;
+  try { hiddenSections = JSON.parse(localStorage.getItem(secHideKey)) || []; } catch { hiddenSections = []; }
+
+  const sectionLabels = { stats:"Stats", nowplaying:"Now Playing", about:"About", social:"Social Links", achievements:"Achievements", photos:"Photos & Videos", friends:"Friends" };
+
+  // Update customise button
+  const btn = document.getElementById("fpCustomiseBtn");
+  if (btn) {
+    btn.textContent = "✓ Done";
+    btn.style.background = "var(--accent)";
+    btn.style.color = "#fff";
+    btn.style.borderColor = "var(--accent)";
+    btn.onmouseover = null; btn.onmouseout = null;
+  }
+
+  // Add drag handles and visibility toggles to each section
+  left.querySelectorAll(".fp-section-wrap").forEach(wrap => {
+    const secId = wrap.dataset.section;
+    const label = sectionLabels[secId] || secId;
+    const isHidden = hiddenSections.includes(secId);
+
+    // Add customise overlay
+    const overlay = document.createElement("div");
+    overlay.className = "fp-section-overlay";
+    overlay.style.cssText = `position:absolute;inset:0;z-index:10;background:rgba(0,0,0,.55);border-radius:12px;display:flex;align-items:center;justify-content:space-between;padding:0 14px;gap:8px;`;
+    overlay.innerHTML = `
+      <div style="display:flex;align-items:center;gap:8px">
+        <span class="fp-drag-handle" style="cursor:grab;color:var(--text-3);font-size:16px;line-height:1;user-select:none" title="Drag to reorder">⠿</span>
+        <span style="font-size:13px;font-weight:700;color:#fff">${label}</span>
+      </div>
+      <button onclick="fpToggleSectionVisibility('${secId}')" style="background:${isHidden?'var(--accent)':'rgba(255,255,255,.15)'};border:none;color:#fff;border-radius:7px;padding:4px 12px;font-size:12px;font-weight:700;font-family:var(--font);cursor:pointer;transition:background .15s">
+        ${isHidden ? 'Show' : 'Hide'}
+      </button>`;
+    wrap.style.position = "relative";
+    wrap.appendChild(overlay);
+
+    // Drag-to-reorder
+    const handle = overlay.querySelector(".fp-drag-handle");
+    let dragSrc = null;
+    handle.addEventListener("mousedown", e => {
+      e.preventDefault();
+      dragSrc = wrap;
+      wrap.style.opacity = ".6";
+      wrap.style.cursor = "grabbing";
+    });
+  });
+
+  // Mouse move + up on document
+  if (!left._dragHandlerAdded) {
+    left._dragHandlerAdded = true;
+    document.addEventListener("mousemove", e => {
+      const dragSrc = left.querySelector("[style*='opacity: 0.6'], [style*='opacity:.6']");
+      if (!dragSrc) return;
+      const afterEl = fpGetDragAfterEl(left, e.clientY);
+      if (afterEl == null) left.insertBefore(dragSrc, document.getElementById("fpCustomiseBtn"));
+      else left.insertBefore(dragSrc, afterEl);
+    });
+    document.addEventListener("mouseup", () => {
+      const dragSrc = left.querySelector("[style*='opacity: 0.6'], [style*='opacity:.6']");
+      if (!dragSrc) return;
+      dragSrc.style.opacity = "";
+      dragSrc.style.cursor = "";
+      // Save new order
+      const newOrder = [...left.querySelectorAll(".fp-section-wrap")].map(w => w.dataset.section);
+      localStorage.setItem(secOrderKey, JSON.stringify(newOrder));
+    });
+  }
+}
+
+function fpGetDragAfterEl(container, y) {
+  const els = [...container.querySelectorAll(".fp-section-wrap:not(.dragging)")];
+  return els.reduce((closest, child) => {
+    const box = child.getBoundingClientRect();
+    const offset = y - box.top - box.height / 2;
+    if (offset < 0 && offset > closest.offset) return { offset, element: child };
+    return closest;
+  }, { offset: Number.NEGATIVE_INFINITY }).element;
+}
+
+function fpDisableCustomiseMode() {
+  const left = document.getElementById("fpLeft");
+  if (!left) return;
+  // Remove overlays
+  left.querySelectorAll(".fp-section-overlay").forEach(o => o.remove());
+  // Restore button
+  const btn = document.getElementById("fpCustomiseBtn");
+  if (btn) {
+    btn.textContent = "⚙ Customise Sections";
+    btn.style.background = "transparent";
+    btn.style.color = "var(--text-3)";
+    btn.style.borderColor = "rgba(255,255,255,.12)";
+    btn.onmouseover = function() { this.style.background='var(--bg-2)';this.style.color='var(--text-1)';this.style.borderColor='rgba(255,255,255,.2)'; };
+    btn.onmouseout  = function() { this.style.background='transparent';this.style.color='var(--text-3)';this.style.borderColor='rgba(255,255,255,.12)'; };
+  }
+}
+
+function fpToggleSectionVisibility(secId) {
+  const secHideKey = `vh_fp_section_hidden_${fpUserId}`;
+  let hidden;
+  try { hidden = JSON.parse(localStorage.getItem(secHideKey)) || []; } catch { hidden = []; }
+  if (hidden.includes(secId)) hidden = hidden.filter(s => s !== secId);
+  else hidden.push(secId);
+  localStorage.setItem(secHideKey, JSON.stringify(hidden));
+  // Refresh left
+  const left = document.getElementById("fpLeft");
+  const wrap = left?.querySelector(`.fp-section-wrap[data-section="${secId}"]`);
+  if (wrap) {
+    const isNowHidden = hidden.includes(secId);
+    wrap.style.display = isNowHidden ? "none" : "block";
+    // Update button in overlay
+    const hideBtn = wrap.querySelector(".fp-section-overlay button");
+    if (hideBtn) hideBtn.textContent = isNowHidden ? "Show" : "Hide";
+  }
+}
+
 // ── Full profile edit mode ─────────────────────────────────
 function fpEnterEditMode() {
   const left = document.getElementById("fpLeft");
@@ -13293,6 +13786,30 @@ function fpEnterEditMode() {
             <div class="fp-edit-label">Website</div>
             <input class="fp-edit-input" id="fpEditWebsite" value="${escapeHtml(fpData.website||"")}" placeholder="https://" maxlength="128" />
           </div>
+          <div style="margin-top:8px;padding-top:8px;border-top:1px solid rgba(255,255,255,.07)">
+            <div style="font-size:11px;font-weight:800;text-transform:uppercase;letter-spacing:.7px;color:var(--text-3);margin-bottom:8px">Social Links</div>
+            <div class="fp-edit-field">
+              <div class="fp-edit-label" style="display:flex;align-items:center;gap:5px">
+                <svg width="13" height="13" viewBox="0 0 24 24" fill="currentColor" style="color:#9146ff"><path d="M11.571 4.714h1.715v5.143H11.57zm4.715 0H18v5.143h-1.714zM6 0L1.714 4.286v15.428h5.143V24l4.286-4.286h3.428L22.286 12V0zm14.571 11.143l-3.428 3.428h-3.429l-3 3v-3H6.857V1.714h13.714z"/></svg>
+                Twitch
+              </div>
+              <input class="fp-edit-input" id="fpEditTwitch" value="${escapeHtml(fpData.twitch_url||"")}" placeholder="https://twitch.tv/username" maxlength="128" />
+            </div>
+            <div class="fp-edit-field">
+              <div class="fp-edit-label" style="display:flex;align-items:center;gap:5px">
+                <svg width="13" height="13" viewBox="0 0 24 24" fill="currentColor" style="color:#ff0000"><path d="M23.495 6.205a3.007 3.007 0 0 0-2.088-2.088c-1.87-.501-9.396-.501-9.396-.501s-7.507-.01-9.396.501A3.007 3.007 0 0 0 .527 6.205a31.247 31.247 0 0 0-.522 5.805 31.247 31.247 0 0 0 .522 5.783 3.007 3.007 0 0 0 2.088 2.088c1.868.502 9.396.502 9.396.502s7.506 0 9.396-.502a3.007 3.007 0 0 0 2.088-2.088 31.247 31.247 0 0 0 .5-5.783 31.247 31.247 0 0 0-.5-5.805zM9.609 15.601V8.408l6.264 3.602z"/></svg>
+                YouTube
+              </div>
+              <input class="fp-edit-input" id="fpEditYoutube" value="${escapeHtml(fpData.youtube_url||"")}" placeholder="https://youtube.com/@channel" maxlength="128" />
+            </div>
+            <div class="fp-edit-field">
+              <div class="fp-edit-label" style="display:flex;align-items:center;gap:5px">
+                <svg width="13" height="13" viewBox="0 0 24 24" fill="currentColor" style="color:#1da1f2"><path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-4.714-6.231-5.401 6.231H2.744l7.737-8.836L1.254 2.25H8.08l4.253 5.622zm-1.161 17.52h1.833L7.084 4.126H5.117z"/></svg>
+                X / Twitter
+              </div>
+              <input class="fp-edit-input" id="fpEditTwitter" value="${escapeHtml(fpData.twitter_url||"")}" placeholder="https://x.com/username" maxlength="128" />
+            </div>
+          </div>
           <div style="display:flex;gap:8px;margin-top:4px">
             <button class="fp-btn fp-btn-primary" onclick="withLoading(this, () => fpSaveEdits())" style="flex:1">💾 Save</button>
             <button class="fp-btn fp-btn-ghost" onclick="renderFpLeft()" style="flex:0 0 auto">Cancel</button>
@@ -13325,6 +13842,9 @@ async function fpSaveEdits() {
     bio:          document.getElementById("fpEditBio")?.value.trim(),
     location:     document.getElementById("fpEditLocation")?.value.trim(),
     website:      document.getElementById("fpEditWebsite")?.value.trim(),
+    twitch_url:   document.getElementById("fpEditTwitch")?.value.trim() || null,
+    youtube_url:  document.getElementById("fpEditYoutube")?.value.trim() || null,
+    twitter_url:  document.getElementById("fpEditTwitter")?.value.trim() || null,
   };
   const msgEl = document.getElementById("fpEditMsg");
   try {
@@ -13338,7 +13858,7 @@ async function fpSaveEdits() {
       Object.assign(fpData, body);
       // Update header live
       document.getElementById("fpDisplayName").textContent  = body.display_name || fpData.username;
-      document.getElementById("fpStatusEmoji").textContent  = body.status_emoji;
+      document.getElementById("fpStatusEmoji").textContent  = body.status_emoji || "💬";
       document.getElementById("fpStatusTextEl").textContent = body.status_text || "No status set";
       msgEl.textContent = "✓ Saved!"; msgEl.style.color = "var(--green)"; msgEl.style.display = "block";
       setTimeout(() => renderFpLeft(), 1200);

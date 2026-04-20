@@ -1213,12 +1213,15 @@ app.get("/profile/:id", requireAuth, async (req, res) => {
     const id = parseInt(req.params.id);
     if (!id || isNaN(id)) return res.status(400).json({ error: "Invalid user ID" });
     const r = await pool.query(
-      `SELECT id, username, avatar_url, bio, status, banner_url, banner_colour,
-              display_name, status_emoji, status_text, location, website,
-              created_at AS joined_at, steam_id, steam_name, steam_avatar,
-              wallpaper_url, wallpaper_preset, wallpaper_use_cover,
-              wallpaper_blur, wallpaper_dim, wallpaper_solid_sidebars
-       FROM users WHERE id = $1`,
+      `SELECT u.id, u.username, u.avatar_url, u.bio, u.status, u.banner_url, u.banner_colour,
+              u.display_name, u.status_emoji, u.status_text, u.location, u.website,
+              u.created_at AS joined_at, u.steam_id, u.steam_name, u.steam_avatar,
+              u.wallpaper_url, u.wallpaper_preset, u.wallpaper_use_cover,
+              u.wallpaper_blur, u.wallpaper_dim, u.wallpaper_solid_sidebars,
+              u.twitch_url, u.youtube_url, u.twitter_url, u.pinned_post_id,
+              (SELECT COUNT(*) FROM follows WHERE following_id = u.id)::int          AS followers_count,
+              (SELECT COUNT(*) FROM tournament_players WHERE user_id = u.id)::int    AS tournaments_played
+       FROM users u WHERE u.id = $1`,
       [id]
     );
     if (!r.rows[0]) return res.status(404).json({ error: "User not found" });
@@ -2186,6 +2189,20 @@ app.post("/posts", requireAuth, (req, res) => {
   });
 });
 
+// GET /posts/:id — fetch a single post by ID (for pinned post display)
+app.get("/posts/:id", requireAuth, async (req, res) => {
+  try {
+    const r = await pool.query(
+      `SELECT p.*, u.username, u.display_name, u.avatar_url
+       FROM posts p JOIN users u ON u.id = p.user_id
+       WHERE p.id = $1`,
+      [req.params.id]
+    );
+    if (!r.rows[0]) return res.status(404).json({ error: "Post not found" });
+    res.json(r.rows[0]);
+  } catch(err) { res.status(500).json({ error: err.message }); }
+});
+
 app.delete("/posts/:id", requireAuth, async (req, res) => {
   const r = await pool.query("SELECT user_id FROM posts WHERE id = $1", [req.params.id]);
   const isAdmin = (await pool.query("SELECT is_admin FROM users WHERE id = $1", [req.userId])).rows[0]?.is_admin;
@@ -2358,7 +2375,7 @@ app.get("/profile/:id/friends", requireAuth, async (req, res) => {
 // PATCH /profile/:id — update own profile fields
 app.patch("/profile/:id", requireAuth, async (req, res) => {
   if (parseInt(req.params.id) !== req.userId) return res.status(403).json({ error: "Not authorised" });
-  const { display_name, bio, status_emoji, status_text, location, website, banner_colour } = req.body;
+  const { display_name, bio, status_emoji, status_text, location, website, banner_colour, twitch_url, youtube_url, twitter_url } = req.body;
   await pool.query(`
     UPDATE users SET
       display_name  = COALESCE($1, display_name),
@@ -2367,10 +2384,22 @@ app.patch("/profile/:id", requireAuth, async (req, res) => {
       status_text   = COALESCE($4, status_text),
       location      = COALESCE($5, location),
       website       = COALESCE($6, website),
-      banner_colour = COALESCE($7, banner_colour)
-    WHERE id = $8
+      banner_colour = COALESCE($7, banner_colour),
+      twitch_url    = $8,
+      youtube_url   = $9,
+      twitter_url   = $10
+    WHERE id = $11
   `, [display_name ?? null, bio ?? null, status_emoji ?? null, status_text ?? null,
-      location ?? null, website ?? null, banner_colour ?? null, req.userId]);
+      location ?? null, website ?? null, banner_colour ?? null,
+      twitch_url || null, youtube_url || null, twitter_url || null, req.userId]);
+  res.json({ success: true });
+});
+
+// PATCH /profile/:id/pin — pin or unpin a post
+app.patch("/profile/:id/pin", requireAuth, async (req, res) => {
+  if (parseInt(req.params.id) !== req.userId) return res.status(403).json({ error: "Not authorised" });
+  const { post_id } = req.body;
+  await pool.query("UPDATE users SET pinned_post_id = $1 WHERE id = $2", [post_id || null, req.userId]);
   res.json({ success: true });
 });
 

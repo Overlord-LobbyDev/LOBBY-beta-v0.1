@@ -374,7 +374,11 @@ async function initDb() {
       "ALTER TABLE users ADD COLUMN IF NOT EXISTS lichess_username  TEXT DEFAULT NULL",
       // Email — existing users prompted on next login
       "ALTER TABLE users ADD COLUMN IF NOT EXISTS email             TEXT DEFAULT NULL",
-      "ALTER TABLE users ADD COLUMN IF NOT EXISTS is_overlord BOOLEAN DEFAULT FALSE",
+      "ALTER TABLE users ADD COLUMN IF NOT EXISTS is_overlord       BOOLEAN DEFAULT FALSE",
+      "ALTER TABLE users ADD COLUMN IF NOT EXISTS twitch_url        TEXT DEFAULT NULL",
+      "ALTER TABLE users ADD COLUMN IF NOT EXISTS youtube_url       TEXT DEFAULT NULL",
+      "ALTER TABLE users ADD COLUMN IF NOT EXISTS twitter_url       TEXT DEFAULT NULL",
+      "ALTER TABLE users ADD COLUMN IF NOT EXISTS pinned_post_id    INTEGER DEFAULT NULL",
     ];
     for (const sql of alters) await pool.query(sql).catch(() => {});
 
