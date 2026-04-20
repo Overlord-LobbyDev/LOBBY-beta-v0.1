@@ -8189,6 +8189,25 @@ async function startDirectCall(userId, username) {
     await new Promise(r => setTimeout(r, 60));
   }
   if (callActive) { showToast("Already in a call","error"); return; }
+
+  // Fail fast if the signalling WebSocket isn't connected. Without this, wsSend
+  // silently drops the call-invite and the caller sees "Calling…" for 30s with
+  // zero feedback — matches the "UI shows calling but nothing happens" bug.
+  if (!ws || ws.readyState !== 1) {
+    console.warn("[call] aborting startDirectCall — ws not open, readyState=", ws?.readyState);
+    showToast("Not connected — please wait for reconnect and try again", "error");
+    return;
+  }
+
+  // Fail fast if the callee isn't currently online. The server would silently
+  // drop (or, post-eba78d7, reply with call-undeliverable) and the caller would
+  // ring uselessly. Checking locally gives an immediate, honest error.
+  if (typeof onlineUserIds !== "undefined" && onlineUserIds && !onlineUserIds.has(userId)) {
+    console.warn("[call] aborting startDirectCall —", username, "not in onlineUserIds");
+    showToast(`${username || "User"} is offline`, "error");
+    return;
+  }
+
   try { callStream = await navigator.mediaDevices.getUserMedia({ audio:true, video:true }); }
   catch(e) {
     try { callStream = await navigator.mediaDevices.getUserMedia({ audio:true }); }
@@ -8199,7 +8218,17 @@ async function startDirectCall(userId, username) {
   LobbySound.loop("callOutgoing");
   const targetPeerId = `u${userId}`;
   console.log("[call] sending call-invite to", targetPeerId, "ws.readyState=", ws?.readyState, "me.id=", me?.id);
-  wsSend({ type:"call-invite", to:targetPeerId, fromUsername:me.username });
+  // Send directly (not via wsSend) so we can detect and surface a send failure
+  // instead of silently dropping the invite when the ws has flipped closed
+  // between the guard above and this line.
+  try {
+    ws.send(JSON.stringify({ type:"call-invite", to:targetPeerId, fromUsername:me.username }));
+  } catch (err) {
+    console.error("[call] call-invite send failed:", err);
+    showToast("Could not send call — connection lost", "error");
+    forceEndCall();
+    return;
+  }
   let waited=0;
   const cancelPoll = setInterval(() => {
     waited++; if (!callActive) { clearInterval(cancelPoll); return; }
@@ -8265,11 +8294,28 @@ function showIncomingCallModal(fromUsername, fromAvatarUrl, fromPeerId) {
   document.getElementById("acceptCallBtn").addEventListener("click", async () => {
     clearInterval(incomingTimer); closeIncomingCallModal();
     LobbySound.stop("callIncoming");
+    // Guard: if the ws dropped between ring and accept, the call-accept will
+    // never reach the caller and they'll sit on "Calling…" until timeout.
+    // Surface it immediately instead of silently failing.
+    if (!ws || ws.readyState !== 1) {
+      console.warn("[call] cannot accept — ws not open, readyState=", ws?.readyState);
+      showToast("Not connected — call cannot be accepted", "error");
+      forceEndCall();
+      return;
+    }
     try {
       try { callStream=await navigator.mediaDevices.getUserMedia({ audio:true, video:true }); }
       catch { callStream=await navigator.mediaDevices.getUserMedia({ audio:true }); }
       callActive=true; callTargetId=peerUserIdFromCallPeerId(fromPeerId); callTargetName=fromUsername;
-      wsSend({ type:"call-accept", to:fromPeerId }); showFloatingCallBar(fromUsername,null,"Connecting…");
+      try {
+        ws.send(JSON.stringify({ type:"call-accept", to:fromPeerId }));
+      } catch (err) {
+        console.error("[call] call-accept send failed:", err);
+        showToast("Could not accept — connection lost", "error");
+        forceEndCall();
+        return;
+      }
+      showFloatingCallBar(fromUsername,null,"Connecting…");
     } catch(e) { showToast("Could not access microphone","error"); wsSend({ type:"call-decline", to:fromPeerId }); forceEndCall(); }
   });
   document.getElementById("declineCallBtn").addEventListener("click", () => {
