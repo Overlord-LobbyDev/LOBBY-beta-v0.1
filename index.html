@@ -2072,127 +2072,253 @@
     }
 
     /* ── Hall of Fame ───────────────────────────────────────── */
-    .lir-hof-btn {
-      background: linear-gradient(135deg, #b8860b, #ffd700, #b8860b);
-      background-size: 200% 200%;
-      animation: hofShimmer 3s ease infinite;
-      border: 1.5px solid rgba(255,215,0,.5);
-      color: #1a1200;
-      font-size: 11px; font-weight: 800;
-      padding: 7px 12px; border-radius: 8px; cursor: pointer;
-      font-family: var(--font);
-      display: inline-flex; align-items: center; gap: 5px;
-      letter-spacing: .3px;
-      box-shadow: 0 2px 12px rgba(255,215,0,.3), 0 0 0 0 rgba(255,215,0,.4);
-      transition: transform .15s, box-shadow .15s;
-      width: 100%; justify-content: center; margin-top: 4px;
+
+    /* Sidebar footer HOF button */
+    #lirHofFooter {
+      flex-shrink: 0; padding: 10px 14px 14px;
+      border-top: 1px solid rgba(255,215,0,.1);
+      background: linear-gradient(to top, rgba(184,134,11,.07), transparent);
     }
-    .lir-hof-btn:hover {
-      transform: translateY(-1px);
-      box-shadow: 0 4px 20px rgba(255,215,0,.45), 0 0 0 3px rgba(255,215,0,.15);
+    #lirHofBtn {
+      width: 100%; display: flex; align-items: center; justify-content: center;
+      gap: 9px; padding: 12px 16px; border-radius: 10px; cursor: pointer;
+      border: 1.5px solid rgba(255,215,0,.38);
+      background: linear-gradient(135deg, rgba(184,134,11,.22), rgba(255,215,0,.13), rgba(184,134,11,.22));
+      background-size: 200% 200%; animation: hofShimmer 3s ease infinite;
+      color: #FFD700; font-family: var(--font);
+      font-size: 11.5px; font-weight: 900; letter-spacing: 1.8px; text-transform: uppercase;
+      box-shadow: 0 2px 18px rgba(255,215,0,.18), inset 0 1px 0 rgba(255,255,255,.07);
+      transition: transform .15s, box-shadow .15s, border-color .15s;
+      position: relative; overflow: hidden;
     }
-    .lir-hof-btn.active {
-      box-shadow: 0 0 0 2px rgba(255,215,0,.6), 0 4px 16px rgba(255,215,0,.3);
+    #lirHofBtn::before {
+      content:''; position:absolute; inset:0;
+      background: linear-gradient(105deg, transparent 38%, rgba(255,255,255,.09) 50%, transparent 62%);
+      background-size: 200% 100%; animation: hofShine 4s linear infinite;
+    }
+    #lirHofBtn:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 6px 26px rgba(255,215,0,.38), 0 0 0 2px rgba(255,215,0,.18), inset 0 1px 0 rgba(255,255,255,.1);
+      border-color: rgba(255,215,0,.65);
     }
     @keyframes hofShimmer {
       0%   { background-position: 0% 50%; }
       50%  { background-position: 100% 50%; }
       100% { background-position: 0% 50%; }
     }
+    @keyframes hofShine {
+      0%   { background-position: -200% 0; }
+      100% { background-position:  200% 0; }
+    }
 
-    /* HOF panel within lir-scroll */
-    #lirHofPanel { display:none; }
-    #lirHofPanel.open { display:block; }
+    /* ── Full-screen HOF Overlay ──────────────────────────── */
+    #hofOverlay {
+      display: none; position: fixed; inset: 0; z-index: 9000;
+      background: linear-gradient(160deg, #090508 0%, #110910 40%, #0c0b14 100%);
+      flex-direction: column; overflow: hidden;
+    }
+    #hofOverlay.open { display: flex; }
 
+    .hof-overlay-header {
+      flex-shrink: 0; display: flex; align-items: center; gap: 18px;
+      padding: 18px 32px 16px;
+      background: linear-gradient(to bottom, rgba(184,134,11,.1), transparent);
+      border-bottom: 1px solid rgba(255,215,0,.1);
+    }
+    .hof-logo-area { display: flex; align-items: center; gap: 16px; }
+    .hof-logo-text { display: flex; flex-direction: column; gap: 2px; }
+    .hof-logo-title {
+      font-size: 24px; font-weight: 900; letter-spacing: 4px; text-transform: uppercase;
+      background: linear-gradient(135deg, #b8860b 0%, #ffd700 35%, #ffe566 50%, #ffd700 65%, #b8860b 100%);
+      -webkit-background-clip: text; -webkit-text-fill-color: transparent;
+      background-clip: text; line-height: 1;
+      filter: drop-shadow(0 0 14px rgba(255,215,0,.3));
+    }
+    .hof-logo-subtitle {
+      font-size: 10px; font-weight: 700; letter-spacing: 2px; text-transform: uppercase;
+      color: rgba(255,215,0,.4);
+    }
+    .hof-lobby-name-badge {
+      background: rgba(255,215,0,.09); border: 1px solid rgba(255,215,0,.18);
+      border-radius: 6px; padding: 5px 13px;
+      font-size: 12px; font-weight: 700; color: rgba(255,215,0,.75); letter-spacing: .4px;
+    }
+    .hof-close-btn {
+      margin-left: auto; background: rgba(255,255,255,.05);
+      border: 1px solid rgba(255,255,255,.09); border-radius: 8px;
+      color: var(--text-3); font-size: 16px; cursor: pointer;
+      padding: 6px 12px; font-family: var(--font); line-height: 1;
+      transition: background .15s, color .15s;
+    }
+    .hof-close-btn:hover { background: rgba(237,66,69,.18); color: var(--danger); border-color: rgba(237,66,69,.3); }
+
+    .hof-overlay-toolbar {
+      flex-shrink: 0; display: flex; align-items: center; gap: 14px;
+      padding: 10px 32px; border-bottom: 1px solid rgba(255,255,255,.05);
+      background: rgba(0,0,0,.18);
+    }
     .hof-tabs {
-      display: flex; border-bottom: 1px solid rgba(255,255,255,.07);
-      margin: 0 -0px; padding: 0 16px;
+      display: flex; gap: 4px; background: rgba(255,255,255,.04);
+      border-radius: 8px; padding: 3px; border: 1px solid rgba(255,255,255,.06);
     }
     .hof-tab {
-      flex: 1; padding: 10px 0; font-size: 11px; font-weight: 700;
-      color: var(--text-3); text-align: center; cursor: pointer;
-      letter-spacing: .4px; text-transform: uppercase;
-      border-bottom: 2px solid transparent; transition: color .15s, border-color .15s;
-      background: none; border-left: none; border-right: none; border-top: none;
-      font-family: var(--font);
+      padding: 7px 18px; font-size: 11.5px; font-weight: 700;
+      color: var(--text-3); cursor: pointer; border-radius: 6px;
+      border: none; background: none; font-family: var(--font);
+      letter-spacing: .3px; transition: color .15s, background .15s;
     }
-    .hof-tab.active { color: #ffd700; border-bottom-color: #ffd700; }
+    .hof-tab.active { color: #1a0a00; background: linear-gradient(135deg, #ffd700, #b8860b); }
+    .hof-overlay-actions { display: flex; align-items: center; gap: 8px; margin-left: auto; }
+    .hof-add-moment {
+      padding: 7px 15px; background: rgba(88,101,242,.1);
+      border: 1.5px dashed rgba(88,101,242,.35); border-radius: 7px;
+      color: var(--accent); font-size: 11px; font-weight: 700;
+      cursor: pointer; font-family: var(--font); transition: background .15s; white-space: nowrap;
+    }
+    .hof-add-moment:hover { background: rgba(88,101,242,.2); }
+    .hof-share-btn {
+      padding: 7px 15px;
+      background: linear-gradient(135deg, rgba(255,215,0,.14), rgba(255,215,0,.07));
+      border: 1px solid rgba(255,215,0,.28); border-radius: 7px;
+      color: #ffd700; font-size: 11px; font-weight: 700; cursor: pointer;
+      font-family: var(--font); display: flex; align-items: center; gap: 5px;
+      transition: background .15s, box-shadow .15s; white-space: nowrap;
+    }
+    .hof-share-btn:hover { background: rgba(255,215,0,.2); box-shadow: 0 0 14px rgba(255,215,0,.2); }
 
-    .hof-event-card {
-      margin: 8px 12px; padding: 10px 12px; border-radius: 10px;
-      background: var(--bg-2); border: 1px solid rgba(255,255,255,.07);
-      position: relative; transition: background .15s, border-color .15s;
+    /* Horizontal timeline canvas */
+    .hof-timeline-container {
+      flex: 1; overflow-x: auto; overflow-y: hidden;
+      scrollbar-width: thin; scrollbar-color: rgba(255,215,0,.3) transparent;
+      position: relative;
     }
-    .hof-event-card:hover { background: var(--bg-3); border-color: rgba(255,255,255,.12); }
-    .hof-event-card.pinned {
-      border-color: rgba(255,215,0,.3);
-      background: linear-gradient(135deg, rgba(255,215,0,.05), var(--bg-2));
+    .hof-timeline-container::-webkit-scrollbar { height: 6px; }
+    .hof-timeline-container::-webkit-scrollbar-track { background: transparent; }
+    .hof-timeline-container::-webkit-scrollbar-thumb { background: rgba(255,215,0,.25); border-radius: 3px; }
+
+    .hof-tl-track {
+      position: relative; height: 100%; min-height: 460px;
+      display: flex; align-items: center;
     }
+    /* Center horizontal timeline line */
+    .hof-tl-line {
+      position: absolute; left: 0; right: 0; top: 50%; transform: translateY(-50%);
+      height: 3px;
+      background: linear-gradient(to right,
+        transparent,
+        rgba(255,215,0,.12) 4%,
+        rgba(255,215,0,.55) 12%,
+        rgba(255,215,0,.65),
+        rgba(255,215,0,.55) 88%,
+        rgba(255,215,0,.12) 96%,
+        transparent);
+      box-shadow: 0 0 14px rgba(255,215,0,.22), 0 0 40px rgba(255,215,0,.07);
+      pointer-events: none; z-index: 0;
+    }
+    /* Month tick marks */
+    .hof-tl-month {
+      position: absolute; display: flex; flex-direction: column;
+      align-items: center; top: 50%; transform: translate(-50%, -50%);
+      z-index: 1; pointer-events: none;
+    }
+    .hof-tl-month-tick {
+      width: 1.5px; height: 16px; background: rgba(255,215,0,.22); flex-shrink: 0;
+    }
+    .hof-tl-month-label {
+      position: absolute; top: calc(50% + 16px); transform: translateX(-50%);
+      white-space: nowrap; font-size: 9px; font-weight: 700;
+      color: rgba(255,215,0,.32); letter-spacing: .6px; text-transform: uppercase;
+    }
+    /* Event nodes */
+    .hof-tl-node {
+      position: absolute; display: flex; align-items: center;
+      transform: translateX(-50%); z-index: 3;
+    }
+    .hof-tl-node.above {
+      flex-direction: column-reverse; /* dot at bottom, connector, card at top */
+      bottom: calc(50% - 7px);
+    }
+    .hof-tl-node.below {
+      flex-direction: column; /* dot at top, connector, card at bottom */
+      top: calc(50% - 7px);
+    }
+    .hof-tl-dot {
+      width: 14px; height: 14px; border-radius: 50%; flex-shrink: 0;
+      background: #ffd700; border: 3px solid rgba(0,0,0,.5);
+      box-shadow: 0 0 10px rgba(255,215,0,.55), 0 0 22px rgba(255,215,0,.2);
+      position: relative; z-index: 2; transition: transform .2s;
+    }
+    .hof-tl-node:hover .hof-tl-dot { transform: scale(1.3); }
+    .hof-tl-dot.viral_post { background: #ff6b6b; box-shadow: 0 0 10px rgba(255,107,107,.65); }
+    .hof-tl-dot.milestone  { background: #a78bfa; box-shadow: 0 0 10px rgba(167,139,250,.65); }
+    .hof-tl-dot.manual     { background: var(--accent); box-shadow: 0 0 10px rgba(88,101,242,.65); }
+    .hof-tl-connector {
+      width: 1.5px; height: 72px; flex-shrink: 0;
+      background: linear-gradient(to bottom, rgba(255,215,0,.5), rgba(255,215,0,.08));
+    }
+    .hof-tl-node.below .hof-tl-connector {
+      background: linear-gradient(to top, rgba(255,215,0,.5), rgba(255,215,0,.08));
+    }
+    /* Timeline event card */
+    .hof-tl-card {
+      width: 188px; border-radius: 12px; padding: 13px 15px;
+      background: rgba(16,10,22,.93);
+      border: 1px solid rgba(255,215,0,.13);
+      box-shadow: 0 8px 36px rgba(0,0,0,.6), 0 0 0 1px rgba(255,255,255,.04);
+      backdrop-filter: blur(10px);
+      transition: transform .2s, box-shadow .2s, border-color .2s;
+    }
+    .hof-tl-node:hover .hof-tl-card {
+      transform: translateY(-3px); border-color: rgba(255,215,0,.32);
+      box-shadow: 0 14px 44px rgba(0,0,0,.7), 0 0 22px rgba(255,215,0,.1);
+    }
+    .hof-tl-card.pinned { border-color: rgba(255,215,0,.32); }
     .hof-event-type {
-      font-size: 9px; font-weight: 800; text-transform: uppercase; letter-spacing: .6px;
-      margin-bottom: 4px;
+      font-size: 9px; font-weight: 800; text-transform: uppercase;
+      letter-spacing: .7px; margin-bottom: 5px;
     }
     .hof-event-type.tournament { color: #ffd700; }
     .hof-event-type.viral_post { color: #ff6b6b; }
     .hof-event-type.milestone  { color: #a78bfa; }
     .hof-event-type.manual     { color: var(--accent); }
     .hof-event-title {
-      font-size: 12.5px; font-weight: 700; color: var(--text-1);
-      line-height: 1.3; margin-bottom: 3px;
+      font-size: 12.5px; font-weight: 700; color: #fff;
+      line-height: 1.3; margin-bottom: 4px;
     }
     .hof-event-desc {
-      font-size: 11px; color: var(--text-3); line-height: 1.4;
+      font-size: 10.5px; color: rgba(255,255,255,.48); line-height: 1.4;
       overflow: hidden; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical;
+      margin-bottom: 4px;
     }
-    .hof-event-date {
-      font-size: 10px; color: var(--text-3); margin-top: 5px; opacity: .7;
-    }
-    .hof-event-actions {
-      display: flex; gap: 4px; margin-top: 7px;
-    }
+    .hof-event-date { font-size: 9.5px; color: rgba(255,255,255,.28); }
+    .hof-event-actions { display: flex; gap: 4px; margin-top: 9px; flex-wrap: wrap; }
     .hof-event-actions button {
-      font-size: 10px; font-weight: 700; padding: 3px 8px; border-radius: 5px;
-      border: 1px solid rgba(255,255,255,.1); background: var(--bg-3);
-      color: var(--text-3); cursor: pointer; font-family: var(--font);
+      font-size: 9.5px; font-weight: 700; padding: 3px 8px; border-radius: 5px;
+      border: 1px solid rgba(255,255,255,.1); background: rgba(255,255,255,.05);
+      color: rgba(255,255,255,.5); cursor: pointer; font-family: var(--font);
       transition: background .1s, color .1s, border-color .1s;
     }
     .hof-event-actions .pin-btn { color: #ffd700; border-color: rgba(255,215,0,.3); }
     .hof-event-actions .pin-btn:hover { background: rgba(255,215,0,.12); }
     .hof-event-actions .del-btn:hover { background: rgba(237,66,69,.15); color: var(--danger); border-color: rgba(237,66,69,.3); }
-    .hof-empty {
-      padding: 28px 16px; text-align: center;
-      color: var(--text-3); font-size: 12px; line-height: 1.6;
+    /* Empty timeline state */
+    .hof-tl-empty {
+      position: absolute; left: 50%; top: 50%; transform: translate(-50%, -50%);
+      text-align: center; color: var(--text-3); z-index: 2; pointer-events: none;
     }
-    .hof-empty .hof-empty-crown { font-size: 32px; margin-bottom: 8px; opacity: .5; }
-    .hof-add-moment {
-      margin: 10px 12px 4px; padding: 8px 12px;
-      background: rgba(88,101,242,.08); border: 1.5px dashed rgba(88,101,242,.3);
-      border-radius: 8px; color: var(--accent); font-size: 11px; font-weight: 700;
-      cursor: pointer; text-align: center; transition: background .15s;
-      font-family: var(--font); width: calc(100% - 24px); box-sizing: border-box;
-    }
-    .hof-add-moment:hover { background: rgba(88,101,242,.16); }
-    .hof-share-btn {
-      margin: 8px 12px 12px; padding: 9px 12px;
-      background: linear-gradient(135deg, rgba(255,215,0,.12), rgba(255,215,0,.06));
-      border: 1px solid rgba(255,215,0,.25); border-radius: 8px;
-      color: #ffd700; font-size: 11px; font-weight: 700; cursor: pointer;
-      font-family: var(--font); width: calc(100% - 24px); box-sizing: border-box;
-      display: flex; align-items: center; justify-content: center; gap: 6px;
-      transition: background .15s, box-shadow .15s;
-    }
-    .hof-share-btn:hover {
-      background: linear-gradient(135deg, rgba(255,215,0,.2), rgba(255,215,0,.1));
-      box-shadow: 0 0 12px rgba(255,215,0,.2);
-    }
+    .hof-tl-empty .hof-empty-crown { font-size: 40px; margin-bottom: 12px; opacity: .35; }
+    .hof-tl-empty p { font-size: 13px; line-height: 1.7; }
+    .hof-tl-empty small { font-size: 11px; opacity: .6; }
+    /* HOF add moment modal */
     .hof-add-modal-overlay {
       display: none; position: fixed; inset: 0; z-index: 10000;
-      background: rgba(0,0,0,.75); align-items: center; justify-content: center;
+      background: rgba(0,0,0,.82); align-items: center; justify-content: center;
     }
     .hof-add-modal-overlay.open { display: flex; }
     .hof-add-modal {
-      background: var(--bg-1); border-radius: 12px; padding: 24px;
-      width: min(380px, 90vw); box-shadow: 0 24px 64px rgba(0,0,0,.6);
+      background: var(--bg-1); border-radius: 14px; padding: 26px;
+      width: min(400px, 90vw); box-shadow: 0 28px 70px rgba(0,0,0,.75);
+      border: 1px solid rgba(255,215,0,.14);
       display: flex; flex-direction: column; gap: 14px;
     }
     .hof-add-modal h3 { font-size: 16px; font-weight: 800; color: #ffd700; }
@@ -5351,46 +5477,195 @@
         <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.3" stroke-linecap="round" stroke-linejoin="round"><path d="M16 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="8.5" cy="7" r="4"/><line x1="20" y1="8" x2="20" y2="14"/><line x1="23" y1="11" x2="17" y2="11"/></svg>
         Invite
       </button>
-      <button class="lir-hof-btn" id="lirHofBtn" onclick="toggleHofPanel()">
-        👑 Hall of Fame
-      </button>
     </div>
   </div>
   <div class="lir-scroll">
-    <!-- ── Upcoming Events (default view) ── -->
-    <div id="lirEventsView">
-      <div class="lir-section">
-        <div class="lir-section-title">
-          <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.3" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
-          Upcoming
-          <span class="count-badge" id="lirEventCount">0</span>
-        </div>
-        <div id="lirEventsList">
-          <div class="lir-empty">No upcoming events.</div>
-        </div>
+    <!-- ── Upcoming Events ── -->
+    <div class="lir-section">
+      <div class="lir-section-title">
+        <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.3" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+        Upcoming
+        <span class="count-badge" id="lirEventCount">0</span>
       </div>
-      <div class="lir-decor">
-        <div class="lir-decor-glyph">◈</div>
-        <div class="lir-decor-text">Your home for play.<br>Bring the feed back anytime.</div>
+      <div id="lirEventsList">
+        <div class="lir-empty">No upcoming events.</div>
+      </div>
+    </div>
+    <div class="lir-decor">
+      <div class="lir-decor-glyph">◈</div>
+      <div class="lir-decor-text">Your home for play.<br>Bring the feed back anytime.</div>
+    </div>
+  </div>
+  <!-- ── Hall of Fame Footer Button ── -->
+  <div id="lirHofFooter">
+    <button id="lirHofBtn" onclick="toggleHofPanel()">
+      <svg width="19" height="14" viewBox="0 0 280 195" fill="none" xmlns="http://www.w3.org/2000/svg">
+        <polygon points="15,145 35,52 88,98 140,8 192,98 245,52 265,145" fill="rgba(184,134,11,.55)" stroke="#FFD700" stroke-width="8" stroke-linejoin="round"/>
+        <rect x="15" y="143" width="250" height="30" rx="4" fill="url(#hb)" opacity=".9"/>
+        <defs><linearGradient id="hb" x1="0" y1="0" x2="1" y2="0"><stop offset="0%" stop-color="#7a5c00"/><stop offset="50%" stop-color="#FFD700"/><stop offset="100%" stop-color="#7a5c00"/></linearGradient></defs>
+        <circle cx="140" cy="8"  r="13" fill="#CC3333" stroke="#FFD700" stroke-width="4"/>
+        <circle cx="35"  cy="52" r="9"  fill="#3366CC" stroke="#FFD700" stroke-width="3"/>
+        <circle cx="265" cy="52" r="9"  fill="#3366CC" stroke="#FFD700" stroke-width="3"/>
+        <circle cx="88"  cy="98" r="8"  fill="#229955" stroke="#FFD700" stroke-width="3"/>
+        <circle cx="192" cy="98" r="8"  fill="#229955" stroke="#FFD700" stroke-width="3"/>
+        <circle cx="140" cy="125" r="11" fill="#CC3333" stroke="#FFD700" stroke-width="3"/>
+      </svg>
+      HALL OF FAME
+    </button>
+  </div>
+</div>
+
+<!-- ── Hall of Fame — Full-screen Overlay ── -->
+<div id="hofOverlay">
+
+  <!-- Header: Crown Logo + Title + Lobby Name + Close -->
+  <div class="hof-overlay-header">
+    <div class="hof-logo-area">
+      <!-- Majestic Crown SVG -->
+      <svg class="hof-logo-svg" width="80" height="64" viewBox="0 0 280 220" fill="none" xmlns="http://www.w3.org/2000/svg">
+        <defs>
+          <linearGradient id="crownBody" x1="0%" y1="0%" x2="100%" y2="100%">
+            <stop offset="0%"   stop-color="#6B0000"/>
+            <stop offset="40%"  stop-color="#A01020"/>
+            <stop offset="70%"  stop-color="#8B0000"/>
+            <stop offset="100%" stop-color="#550010"/>
+          </linearGradient>
+          <linearGradient id="goldBrim" x1="0%" y1="0%" x2="100%" y2="0%">
+            <stop offset="0%"   stop-color="#7a5c00"/>
+            <stop offset="25%"  stop-color="#FFD700"/>
+            <stop offset="50%"  stop-color="#FFE566"/>
+            <stop offset="75%"  stop-color="#FFD700"/>
+            <stop offset="100%" stop-color="#7a5c00"/>
+          </linearGradient>
+          <linearGradient id="goldOutline" x1="0%" y1="0%" x2="0%" y2="100%">
+            <stop offset="0%"   stop-color="#FFE566"/>
+            <stop offset="50%"  stop-color="#FFD700"/>
+            <stop offset="100%" stop-color="#B8860B"/>
+          </linearGradient>
+          <radialGradient id="ruby" cx="40%" cy="30%" r="65%">
+            <stop offset="0%"   stop-color="#FF6666"/>
+            <stop offset="60%"  stop-color="#CC1111"/>
+            <stop offset="100%" stop-color="#7B0000"/>
+          </radialGradient>
+          <radialGradient id="sapphire" cx="40%" cy="30%" r="65%">
+            <stop offset="0%"   stop-color="#66AAFF"/>
+            <stop offset="60%"  stop-color="#1144CC"/>
+            <stop offset="100%" stop-color="#000066"/>
+          </radialGradient>
+          <radialGradient id="emerald" cx="40%" cy="30%" r="65%">
+            <stop offset="0%"   stop-color="#55FF99"/>
+            <stop offset="60%"  stop-color="#119944"/>
+            <stop offset="100%" stop-color="#005522"/>
+          </radialGradient>
+          <filter id="gemGlow" x="-50%" y="-50%" width="200%" height="200%">
+            <feGaussianBlur stdDeviation="2.5" result="blur"/>
+            <feMerge><feMergeNode in="blur"/><feMergeNode in="SourceGraphic"/></feMerge>
+          </filter>
+          <filter id="crownGlow" x="-10%" y="-10%" width="120%" height="120%">
+            <feGaussianBlur stdDeviation="4" result="blur"/>
+            <feMerge><feMergeNode in="blur"/><feMergeNode in="SourceGraphic"/></feMerge>
+          </filter>
+        </defs>
+
+        <!-- Crown body shadow -->
+        <polygon points="18,152 36,52 88,102 140,8 192,102 244,52 262,152"
+          fill="rgba(0,0,0,.45)" transform="translate(3,5)"/>
+
+        <!-- Crown body -->
+        <polygon points="18,152 36,52 88,102 140,8 192,102 244,52 262,152"
+          fill="url(#crownBody)" stroke="url(#goldOutline)" stroke-width="4.5"
+          stroke-linejoin="round" filter="url(#crownGlow)"/>
+
+        <!-- Inner velvet shading lines -->
+        <line x1="88"  y1="102" x2="80"  y2="152" stroke="rgba(255,215,0,.12)" stroke-width="1.5"/>
+        <line x1="140" y1="8"   x2="140" y2="152" stroke="rgba(255,215,0,.1)"  stroke-width="1.5"/>
+        <line x1="192" y1="102" x2="200" y2="152" stroke="rgba(255,215,0,.12)" stroke-width="1.5"/>
+
+        <!-- Velvet highlights (subtle diagonal sheen) -->
+        <polygon points="140,8 192,102 180,102"
+          fill="rgba(255,255,255,.04)"/>
+        <polygon points="18,152 36,52 50,80"
+          fill="rgba(255,255,255,.03)"/>
+
+        <!-- Gold brim band -->
+        <rect x="18" y="150" width="244" height="32" rx="5"
+          fill="url(#goldBrim)" stroke="rgba(255,215,0,.5)" stroke-width="1.5"/>
+
+        <!-- Band inner shadow -->
+        <rect x="18" y="150" width="244" height="8" rx="5"
+          fill="rgba(0,0,0,.18)"/>
+
+        <!-- Pearls along top of brim -->
+        <circle cx="30"  cy="153" r="5" fill="#F0E8D0" stroke="rgba(255,215,0,.6)" stroke-width="1"/>
+        <circle cx="51"  cy="153" r="5" fill="#F0E8D0" stroke="rgba(255,215,0,.6)" stroke-width="1"/>
+        <circle cx="72"  cy="153" r="5" fill="#F0E8D0" stroke="rgba(255,215,0,.6)" stroke-width="1"/>
+        <circle cx="93"  cy="153" r="5" fill="#F0E8D0" stroke="rgba(255,215,0,.6)" stroke-width="1"/>
+        <circle cx="114" cy="153" r="5" fill="#F0E8D0" stroke="rgba(255,215,0,.6)" stroke-width="1"/>
+        <circle cx="140" cy="153" r="6" fill="#FFF8F0" stroke="#FFD700" stroke-width="1.5"/>
+        <circle cx="166" cy="153" r="5" fill="#F0E8D0" stroke="rgba(255,215,0,.6)" stroke-width="1"/>
+        <circle cx="187" cy="153" r="5" fill="#F0E8D0" stroke="rgba(255,215,0,.6)" stroke-width="1"/>
+        <circle cx="208" cy="153" r="5" fill="#F0E8D0" stroke="rgba(255,215,0,.6)" stroke-width="1"/>
+        <circle cx="229" cy="153" r="5" fill="#F0E8D0" stroke="rgba(255,215,0,.6)" stroke-width="1"/>
+        <circle cx="250" cy="153" r="5" fill="#F0E8D0" stroke="rgba(255,215,0,.6)" stroke-width="1"/>
+
+        <!-- Center large ruby at top peak -->
+        <circle cx="140" cy="8" r="13" fill="url(#ruby)" stroke="#FFD700" stroke-width="3" filter="url(#gemGlow)"/>
+        <circle cx="137" cy="5" r="4"  fill="rgba(255,255,255,.35)"/>
+
+        <!-- Outer peak sapphires -->
+        <circle cx="36"  cy="52" r="10" fill="url(#sapphire)" stroke="#FFD700" stroke-width="2.5" filter="url(#gemGlow)"/>
+        <circle cx="34"  cy="49" r="3"  fill="rgba(255,255,255,.3)"/>
+        <circle cx="244" cy="52" r="10" fill="url(#sapphire)" stroke="#FFD700" stroke-width="2.5" filter="url(#gemGlow)"/>
+        <circle cx="242" cy="49" r="3"  fill="rgba(255,255,255,.3)"/>
+
+        <!-- Inner peak emeralds -->
+        <circle cx="88"  cy="102" r="9"  fill="url(#emerald)" stroke="#FFD700" stroke-width="2" filter="url(#gemGlow)"/>
+        <circle cx="86"  cy="99"  r="2.5" fill="rgba(255,255,255,.3)"/>
+        <circle cx="192" cy="102" r="9"  fill="url(#emerald)" stroke="#FFD700" stroke-width="2" filter="url(#gemGlow)"/>
+        <circle cx="190" cy="99"  r="2.5" fill="rgba(255,255,255,.3)"/>
+
+        <!-- Center medallion ruby on brim -->
+        <circle cx="140" cy="168" r="12" fill="url(#ruby)" stroke="#FFD700" stroke-width="2.5" filter="url(#gemGlow)"/>
+        <!-- Star facet on medallion -->
+        <polygon points="140,160 141.5,166 148,166 143,170 145,176 140,172 135,176 137,170 132,166 138.5,166"
+          fill="rgba(255,215,0,.7)"/>
+        <circle cx="138" cy="163" r="3" fill="rgba(255,255,255,.35)"/>
+
+        <!-- Decorative gold dots on brim sides -->
+        <circle cx="48"  cy="169" r="3" fill="rgba(255,215,0,.5)"/>
+        <circle cx="232" cy="169" r="3" fill="rgba(255,215,0,.5)"/>
+        <circle cx="78"  cy="169" r="2" fill="rgba(255,215,0,.35)"/>
+        <circle cx="202" cy="169" r="2" fill="rgba(255,215,0,.35)"/>
+      </svg>
+
+      <div class="hof-logo-text">
+        <div class="hof-logo-title">Hall of Fame</div>
+        <div class="hof-logo-subtitle">Glory Lives Here</div>
       </div>
     </div>
 
-    <!-- ── Hall of Fame Panel ── -->
-    <div id="lirHofPanel">
-      <div class="hof-tabs">
-        <button class="hof-tab active" id="hofTabTimeline" onclick="setHofTab('timeline')">⏳ Timeline</button>
-        <button class="hof-tab" id="hofTabHof" onclick="setHofTab('hof')">👑 Hall of Fame</button>
-      </div>
-      <div id="hofEventsList">
-        <div class="hof-empty"><div class="hof-empty-crown">👑</div>No moments captured yet.<br><span style="font-size:10.5px">Win tournaments or go viral!</span></div>
-      </div>
-      <!-- Admin controls rendered by JS -->
+    <div class="hof-lobby-name-badge" id="hofOverlayLobbyName">Lobby</div>
+    <button class="hof-close-btn" onclick="toggleHofPanel()">✕</button>
+  </div>
+
+  <!-- Toolbar: Tabs + Admin Actions -->
+  <div class="hof-overlay-toolbar">
+    <div class="hof-tabs">
+      <button class="hof-tab active" id="hofTabTimeline" onclick="setHofTab('timeline')">⏳ Timeline</button>
+      <button class="hof-tab" id="hofTabHof" onclick="setHofTab('hof')">👑 Hall of Fame</button>
+    </div>
+    <div class="hof-overlay-actions">
       <div id="hofAdminControls"></div>
-      <button class="hof-share-btn" id="hofShareBtn" onclick="exportBestOfMonth()">
-        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 12v8a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-8"/><polyline points="16 6 12 2 8 6"/><line x1="12" y1="2" x2="12" y2="15"/></svg>
-        Best of the Month
+      <button class="hof-share-btn" onclick="exportBestOfMonth()">
+        <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 12v8a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-8"/><polyline points="16 6 12 2 8 6"/><line x1="12" y1="2" x2="12" y2="15"/></svg>
+        Best of Month
       </button>
     </div>
+  </div>
+
+  <!-- Horizontal scrolling timeline -->
+  <div class="hof-timeline-container" id="hofTimelineContainer">
+    <!-- Populated by JS -->
   </div>
 </div>
 
@@ -12480,22 +12755,16 @@ function updateLobbyInfoRail() {
     document.body.classList.add("lobby-selected");
   } else {
     document.body.classList.remove("lobby-selected");
-    // Reset HOF panel when no lobby selected
+    // Reset HOF overlay when no lobby selected
     _hofOpen = false;
-    document.getElementById('lirHofPanel')?.classList.remove('open');
-    const ev = document.getElementById('lirEventsView');
-    if (ev) ev.style.display = '';
-    document.getElementById('lirHofBtn')?.classList.remove('active');
+    document.getElementById('hofOverlay')?.classList.remove('open');
     return;
   }
 
   // Reset HOF if switching to a different lobby
   if (_hofOpen && window._hofServerId && window._hofServerId !== selectedServer.id) {
     _hofOpen = false; _hofEvents = [];
-    document.getElementById('lirHofPanel')?.classList.remove('open');
-    const ev = document.getElementById('lirEventsView');
-    if (ev) ev.style.display = '';
-    document.getElementById('lirHofBtn')?.classList.remove('active');
+    document.getElementById('hofOverlay')?.classList.remove('open');
   }
   window._hofServerId = selectedServer.id;
 
@@ -12572,24 +12841,21 @@ function updateLobbyInfoRail() {
 window.updateLobbyInfoRail = updateLobbyInfoRail;
 
 // ── Hall of Fame ─────────────────────────────────────────────────
-let _hofOpen = false;
-let _hofTab  = 'timeline';   // 'timeline' | 'hof'
+let _hofOpen   = false;
+let _hofTab    = 'timeline'; // 'timeline' | 'hof'
 let _hofEvents = [];
 
+// ── Open / close the full-screen overlay ──────────────────────────────────────
 function toggleHofPanel() {
   _hofOpen = !_hofOpen;
-  const panel     = document.getElementById('lirHofPanel');
-  const eventsView = document.getElementById('lirEventsView');
-  const btn       = document.getElementById('lirHofBtn');
+  const overlay = document.getElementById('hofOverlay');
   if (_hofOpen) {
-    panel.classList.add('open');
-    eventsView.style.display = 'none';
-    btn.classList.add('active');
+    overlay.classList.add('open');
+    const badge = document.getElementById('hofOverlayLobbyName');
+    if (badge && selectedServer) badge.textContent = selectedServer.name;
     loadHofEvents();
   } else {
-    panel.classList.remove('open');
-    eventsView.style.display = '';
-    btn.classList.remove('active');
+    overlay.classList.remove('open');
   }
 }
 
@@ -12612,45 +12878,117 @@ async function loadHofEvents() {
   }
 }
 
+// ── Render horizontal timeline ────────────────────────────────────────────────
 function renderHofEvents() {
-  const el = document.getElementById('hofEventsList');
-  if (!el) return;
+  const container = document.getElementById('hofTimelineContainer');
+  if (!container) return;
 
   const canManage = myServerRole === 'owner' || myServerRole === 'moderator';
+  let events = _hofEvents;
+  if (_hofTab === 'hof') events = _hofEvents.filter(e => e.pinned);
 
-  let filtered = _hofEvents;
-  if (_hofTab === 'hof') {
-    filtered = _hofEvents.filter(e => e.pinned);
-  }
-
-  if (!filtered.length) {
+  if (!events.length) {
     const emptyMsg = _hofTab === 'hof'
-      ? '<div class="hof-empty"><div class="hof-empty-crown">👑</div>No pinned moments yet.<br><span style="font-size:10.5px">Pin events from the Timeline tab.</span></div>'
-      : '<div class="hof-empty"><div class="hof-empty-crown">👑</div>No moments captured yet.<br><span style="font-size:10.5px">Win tournaments or go viral to appear here!</span></div>';
-    el.innerHTML = emptyMsg;
+      ? 'No pinned moments yet.<br><small>Pin events from the Timeline tab.</small>'
+      : 'No moments captured yet.<br><small>Win tournaments or go viral to appear here!</small>';
+    container.innerHTML = `
+      <div class="hof-tl-track" style="min-width:100%">
+        <div class="hof-tl-line"></div>
+        <div class="hof-tl-empty">
+          <div class="hof-empty-crown">👑</div>
+          <p>${emptyMsg}</p>
+        </div>
+      </div>`;
     return;
   }
 
-  const typeLabels = { tournament:'🏆 Tournament', viral_post:'🔥 Viral Post', milestone:'🌟 Milestone', manual:'📌 Moment' };
-  const TYPE_CLASSES = { tournament:'tournament', viral_post:'viral_post', milestone:'milestone', manual:'manual' };
+  // Sort ascending (oldest → newest = left → right)
+  const sorted = [...events].sort((a, b) => new Date(a.captured_at) - new Date(b.captured_at));
 
-  el.innerHTML = filtered.map(ev => {
-    const date = new Date(ev.captured_at).toLocaleDateString('en-GB', { day:'numeric', month:'short', year:'numeric' });
+  const TRACK_PAD  = 140; // px padding on each side
+  const NODE_MIN   = 230; // minimum px between adjacent nodes
+  const viewW      = Math.max(container.clientWidth || window.innerWidth, 900);
+  const trackWidth = Math.max(viewW, TRACK_PAD * 2 + sorted.length * NODE_MIN);
+
+  // Time range
+  const firstMs = new Date(sorted[0].captured_at).getTime();
+  const lastMs  = new Date(sorted[sorted.length - 1].captured_at).getTime();
+  const spanMs  = Math.max(lastMs - firstMs, 1);
+  const usableW = trackWidth - TRACK_PAD * 2;
+
+  // X position helper
+  const xFor = ms => TRACK_PAD + ((ms - firstMs) / spanMs) * usableW;
+
+  // Month tick marks
+  const tickStart = new Date(firstMs); tickStart.setDate(1); tickStart.setHours(0,0,0,0);
+  const monthTicks = [];
+  const d = new Date(tickStart);
+  while (d.getTime() <= lastMs + 1) {
+    monthTicks.push({ x: xFor(d.getTime()), label: d.toLocaleString('default', { month: 'short', year: '2-digit' }) });
+    d.setMonth(d.getMonth() + 1);
+  }
+
+  const typeLabels = { tournament:'🏆 Tournament', viral_post:'🔥 Viral Post', milestone:'🌟 Milestone', manual:'📌 Moment' };
+  const typeClass  = t => ({ tournament:'tournament', viral_post:'viral_post', milestone:'milestone', manual:'manual' }[t] || 'manual');
+
+  const ticksHtml = monthTicks.map(t => `
+    <div class="hof-tl-month" style="left:${t.x}px">
+      <div class="hof-tl-month-tick"></div>
+      <div class="hof-tl-month-label">${t.label}</div>
+    </div>`).join('');
+
+  // Spread events with minimum gap to avoid overlap
+  const positions = [];
+  sorted.forEach((ev, i) => {
+    let x = sorted.length === 1 ? trackWidth / 2 : xFor(new Date(ev.captured_at).getTime());
+    // Enforce minimum distance from previous node
+    if (i > 0) x = Math.max(x, positions[i - 1] + NODE_MIN);
+    positions.push(x);
+  });
+
+  const nodesHtml = sorted.map((ev, i) => {
+    const x     = positions[i];
+    const above = i % 2 === 0;
+    const tc    = typeClass(ev.type);
+    const date  = new Date(ev.captured_at).toLocaleDateString('en-GB', { day:'numeric', month:'short', year:'numeric' });
     const adminBtns = canManage ? `
       <div class="hof-event-actions">
-        <button class="pin-btn" onclick="hofTogglePin(${ev.id})" title="${ev.pinned?'Unpin':'Pin to Hall of Fame'}">
-          ${ev.pinned ? '📌 Unpin' : '📌 Pin'}
-        </button>
-        <button class="del-btn" onclick="hofDeleteEvent(${ev.id})">✕ Remove</button>
+        <button class="pin-btn" onclick="hofTogglePin(${ev.id})">${ev.pinned ? '📌 Unpin' : '📌 Pin'}</button>
+        <button class="del-btn" onclick="hofDeleteEvent(${ev.id})">✕</button>
       </div>` : '';
-    return `<div class="hof-event-card${ev.pinned?' pinned':''}" data-hof-id="${ev.id}">
-      <div class="hof-event-type ${TYPE_CLASSES[ev.type]||'manual'}">${typeLabels[ev.type]||ev.type}</div>
-      <div class="hof-event-title">${escapeHtml(ev.title)}</div>
-      ${ev.description ? `<div class="hof-event-desc">${escapeHtml(ev.description)}</div>` : ''}
-      <div class="hof-event-date">${date}</div>
-      ${adminBtns}
-    </div>`;
+
+    const card = `
+      <div class="hof-tl-card${ev.pinned ? ' pinned' : ''}">
+        <div class="hof-event-type ${tc}">${typeLabels[ev.type] || ev.type}</div>
+        <div class="hof-event-title">${escapeHtml(ev.title)}</div>
+        ${ev.description ? `<div class="hof-event-desc">${escapeHtml(ev.description)}</div>` : ''}
+        <div class="hof-event-date">${date}</div>
+        ${adminBtns}
+      </div>`;
+
+    if (above) {
+      // above: card top, connector middle, dot bottom (column-reverse)
+      return `<div class="hof-tl-node above" style="left:${x}px" data-hof-id="${ev.id}">
+        ${card}
+        <div class="hof-tl-connector"></div>
+        <div class="hof-tl-dot ${tc}"></div>
+      </div>`;
+    } else {
+      // below: dot top, connector middle, card bottom (column)
+      return `<div class="hof-tl-node below" style="left:${x}px" data-hof-id="${ev.id}">
+        <div class="hof-tl-dot ${tc}"></div>
+        <div class="hof-tl-connector"></div>
+        ${card}
+      </div>`;
+    }
   }).join('');
+
+  container.innerHTML = `
+    <div class="hof-tl-track" style="min-width:${trackWidth}px">
+      <div class="hof-tl-line"></div>
+      ${ticksHtml}
+      ${nodesHtml}
+    </div>`;
 }
 
 function renderHofAdminControls() {
@@ -12658,7 +12996,7 @@ function renderHofAdminControls() {
   if (!el) return;
   const canManage = myServerRole === 'owner' || myServerRole === 'moderator';
   el.innerHTML = canManage
-    ? `<button class="hof-add-moment" onclick="openHofAddModal()">+ Add a Moment</button>`
+    ? `<button class="hof-add-moment" onclick="openHofAddModal()">+ Add Moment</button>`
     : '';
 }
 
@@ -12717,12 +13055,10 @@ async function hofDeleteEvent(eventId) {
 function exportBestOfMonth() {
   if (!selectedServer) return;
   const now = new Date();
-  const monthName = now.toLocaleString('default', { month: 'long', year: 'numeric' });
+  const monthName  = now.toLocaleString('default', { month: 'long', year: 'numeric' });
   const monthStart = new Date(now.getFullYear(), now.getMonth(), 1).getTime();
-
   const monthEvents = _hofEvents.filter(e => new Date(e.captured_at).getTime() >= monthStart);
-
-  const typeLabels = { tournament:'🏆 Tournament', viral_post:'🔥 Viral Post', milestone:'🌟 Milestone', manual:'📌 Moment' };
+  const typeLabels  = { tournament:'🏆 Tournament', viral_post:'🔥 Viral Post', milestone:'🌟 Milestone', manual:'📌 Moment' };
   const rows = (monthEvents.length ? monthEvents : _hofEvents.slice(0, 10)).map(ev => `
     <div style="background:#1a1a2e;border:1px solid rgba(255,215,0,.2);border-radius:12px;padding:16px 20px;margin-bottom:12px">
       <div style="font-size:10px;font-weight:800;text-transform:uppercase;letter-spacing:.6px;color:#ffd700;margin-bottom:6px">${typeLabels[ev.type]||ev.type}</div>
@@ -12730,51 +13066,34 @@ function exportBestOfMonth() {
       ${ev.description ? `<div style="font-size:12px;color:#aaa;line-height:1.5">${ev.description.replace(/</g,'&lt;')}</div>` : ''}
       <div style="font-size:10px;color:#666;margin-top:8px">${new Date(ev.captured_at).toLocaleDateString('en-GB',{day:'numeric',month:'short',year:'numeric'})}</div>
     </div>`).join('');
-
-  const html = `<!DOCTYPE html>
-<html lang="en">
-<head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width,initial-scale=1">
+  const html = `<!DOCTYPE html><html lang="en"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1">
 <title>${selectedServer.name} — Best of ${monthName}</title>
-<style>
-  * { box-sizing:border-box; margin:0; padding:0; }
-  body { font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif; background:#0d0d1a; color:#fff; min-height:100vh; }
-  .page { max-width:560px; margin:0 auto; padding:48px 20px 60px; }
-  .crown { font-size:48px; text-align:center; margin-bottom:8px; filter:drop-shadow(0 0 20px rgba(255,215,0,.5)); }
-  h1 { text-align:center; font-size:26px; font-weight:900; background:linear-gradient(135deg,#b8860b,#ffd700,#b8860b); -webkit-background-clip:text; -webkit-text-fill-color:transparent; margin-bottom:4px; }
-  .subtitle { text-align:center; color:#666; font-size:13px; margin-bottom:36px; }
-  .footer { text-align:center; color:#444; font-size:11px; margin-top:32px; }
-</style>
-</head>
-<body>
-<div class="page">
-  <div class="crown">👑</div>
-  <h1>${selectedServer.name.replace(/</g,'&lt;')}</h1>
-  <div class="subtitle">Best of ${monthName}</div>
-  ${rows || '<div style="text-align:center;color:#555;padding:40px">No moments this month yet.</div>'}
-  <div class="footer">Generated by LOBBY · ${now.toLocaleDateString('en-GB',{day:'numeric',month:'long',year:'numeric'})}</div>
-</div>
-</body>
-</html>`;
-
+<style>*{box-sizing:border-box;margin:0;padding:0}body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;background:#0d0d1a;color:#fff;min-height:100vh}.page{max-width:560px;margin:0 auto;padding:48px 20px 60px}.crown{font-size:48px;text-align:center;margin-bottom:8px;filter:drop-shadow(0 0 20px rgba(255,215,0,.5))}h1{text-align:center;font-size:26px;font-weight:900;background:linear-gradient(135deg,#b8860b,#ffd700,#b8860b);-webkit-background-clip:text;-webkit-text-fill-color:transparent;margin-bottom:4px}.subtitle{text-align:center;color:#666;font-size:13px;margin-bottom:36px}.footer{text-align:center;color:#444;font-size:11px;margin-top:32px}</style>
+</head><body><div class="page"><div class="crown">👑</div>
+<h1>${selectedServer.name.replace(/</g,'&lt;')}</h1>
+<div class="subtitle">Best of ${monthName}</div>
+${rows || '<div style="text-align:center;color:#555;padding:40px">No moments this month yet.</div>'}
+<div class="footer">Generated by LOBBY · ${now.toLocaleDateString('en-GB',{day:'numeric',month:'long',year:'numeric'})}</div>
+</div></body></html>`;
   const blob = new Blob([html], { type: 'text/html' });
   const url  = URL.createObjectURL(blob);
   const win  = window.open(url, '_blank');
   if (!win) {
     const a = document.createElement('a');
-    a.href = url; a.download = `${selectedServer.name}-best-of-${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,'0')}.html`;
+    a.href = url;
+    a.download = `${selectedServer.name}-best-of-${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,'0')}.html`;
     a.click();
   }
   setTimeout(() => URL.revokeObjectURL(url), 10000);
 }
-window.toggleHofPanel   = toggleHofPanel;
-window.setHofTab        = setHofTab;
-window.hofTogglePin     = hofTogglePin;
-window.hofDeleteEvent   = hofDeleteEvent;
+
+window.toggleHofPanel    = toggleHofPanel;
+window.setHofTab         = setHofTab;
+window.hofTogglePin      = hofTogglePin;
+window.hofDeleteEvent    = hofDeleteEvent;
 window.exportBestOfMonth = exportBestOfMonth;
-window.openHofAddModal  = openHofAddModal;
-window.submitHofMoment  = submitHofMoment;
+window.openHofAddModal   = openHofAddModal;
+window.submitHofMoment   = submitHofMoment;
 
 // Wire up rail action buttons
 (function wireLobbyInfoRailActions() {
