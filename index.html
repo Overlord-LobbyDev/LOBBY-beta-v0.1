@@ -1147,6 +1147,54 @@
     .vc-pip-ctrl.active { color:var(--danger); }
     .vc-pip-ctrl.leave { color:var(--danger); }
     .vc-pip-ctrl.leave:hover { background:rgba(237,66,69,.1); }
+    .vc-pip-ctrl.ns-on { color:#a78bfa; }
+    .vc-pip-ctrl.ns-on:hover { background:rgba(167,139,250,.1); }
+
+    /* Noise suppression strength popover */
+    .vc-ns-popover {
+      display: none; position: absolute; bottom: calc(100% + 8px); left: 50%;
+      transform: translateX(-50%);
+      background: var(--bg-1); border: 1px solid rgba(167,139,250,.3);
+      border-radius: 10px; padding: 12px 14px; width: 180px;
+      box-shadow: 0 8px 32px rgba(0,0,0,.6);
+      z-index: 10;
+    }
+    .vc-ns-popover.open { display: block; }
+    .vc-ns-popover::after {
+      content: ''; position: absolute; bottom: -5px; left: 50%; transform: translateX(-50%);
+      width: 8px; height: 8px; background: var(--bg-1);
+      border-right: 1px solid rgba(167,139,250,.3); border-bottom: 1px solid rgba(167,139,250,.3);
+      transform: translateX(-50%) rotate(45deg);
+    }
+    .vc-ns-label {
+      font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: .6px;
+      color: #a78bfa; margin-bottom: 8px; display: flex; justify-content: space-between;
+    }
+    .vc-ns-strength-row { display: flex; align-items: center; gap: 8px; }
+    .vc-ns-slider {
+      flex: 1; -webkit-appearance: none; height: 4px;
+      background: linear-gradient(to right, #a78bfa var(--pct, 50%), rgba(255,255,255,.1) var(--pct, 50%));
+      border-radius: 2px; outline: none; cursor: pointer;
+    }
+    .vc-ns-slider::-webkit-slider-thumb {
+      -webkit-appearance: none; width: 13px; height: 13px; border-radius: 50%;
+      background: #a78bfa; cursor: pointer;
+      box-shadow: 0 0 6px rgba(167,139,250,.6);
+    }
+    .vc-ns-val {
+      font-size: 11px; font-weight: 700; color: #a78bfa; min-width: 32px; text-align: right;
+    }
+    .vc-ns-modes {
+      display: flex; gap: 4px; margin-top: 8px;
+    }
+    .vc-ns-mode {
+      flex: 1; padding: 4px 0; font-size: 9px; font-weight: 700; text-align: center;
+      border-radius: 5px; border: 1px solid rgba(255,255,255,.08);
+      background: rgba(255,255,255,.04); color: var(--text-3); cursor: pointer;
+      font-family: var(--font); text-transform: uppercase; letter-spacing: .3px;
+      transition: background .1s, color .1s, border-color .1s;
+    }
+    .vc-ns-mode.active { background: rgba(167,139,250,.2); color: #a78bfa; border-color: rgba(167,139,250,.35); }
 
     /* resize handle — bottom-right corner */
     .vc-pip-resize {
@@ -2031,6 +2079,9 @@
 
     .lir-scroll {
       flex:1; min-height:0; overflow-y:auto;
+      /* Reserve space at the bottom for the HOF footer so it doesn't
+         get pushed to the very bottom of the viewport */
+      padding-bottom: 0;
     }
     .lir-scroll::-webkit-scrollbar { width:6px; }
     .lir-scroll::-webkit-scrollbar-track { background:transparent; }
@@ -2073,11 +2124,12 @@
 
     /* ── Hall of Fame ───────────────────────────────────────── */
 
-    /* Sidebar footer HOF button */
+    /* HOF button — flows inside .lir-scroll right after upcoming events */
     #lirHofFooter {
-      flex-shrink: 0; padding: 10px 14px 14px;
+      padding: 12px 14px 16px;
       border-top: 1px solid rgba(255,215,0,.1);
-      background: linear-gradient(to top, rgba(184,134,11,.07), transparent);
+      background: linear-gradient(to bottom, rgba(184,134,11,.05), transparent);
+      margin-top: 4px;
     }
     #lirHofBtn {
       width: 100%; display: flex; align-items: center; justify-content: center;
@@ -2117,7 +2169,17 @@
       background: linear-gradient(160deg, #090508 0%, #110910 40%, #0c0b14 100%);
       flex-direction: column; overflow: hidden;
     }
-    #hofOverlay.open { display: flex; }
+    #hofOverlay.open    { display: flex; animation: hofReveal  .38s cubic-bezier(0.16,1,0.3,1) forwards; }
+    #hofOverlay.closing {                animation: hofConceal .26s cubic-bezier(0.4,0,0.8,1)  forwards; }
+
+    @keyframes hofReveal {
+      from { opacity: 0; transform: translateY(36px) scale(0.97); filter: blur(6px); }
+      to   { opacity: 1; transform: translateY(0)    scale(1);    filter: blur(0);   }
+    }
+    @keyframes hofConceal {
+      from { opacity: 1; transform: translateY(0)    scale(1);    filter: blur(0);   }
+      to   { opacity: 0; transform: translateY(36px) scale(0.97); filter: blur(6px); }
+    }
 
     .hof-overlay-header {
       flex-shrink: 0; display: flex; align-items: center; gap: 18px;
@@ -2138,19 +2200,35 @@
       font-size: 10px; font-weight: 700; letter-spacing: 2px; text-transform: uppercase;
       color: rgba(255,215,0,.4);
     }
+    .hof-lobby-info {
+      display: flex; flex-direction: column; gap: 4px;
+    }
     .hof-lobby-name-badge {
       background: rgba(255,215,0,.09); border: 1px solid rgba(255,215,0,.18);
       border-radius: 6px; padding: 5px 13px;
       font-size: 12px; font-weight: 700; color: rgba(255,215,0,.75); letter-spacing: .4px;
     }
-    .hof-close-btn {
-      margin-left: auto; background: rgba(255,255,255,.05);
-      border: 1px solid rgba(255,255,255,.09); border-radius: 8px;
-      color: var(--text-3); font-size: 16px; cursor: pointer;
-      padding: 6px 12px; font-family: var(--font); line-height: 1;
-      transition: background .15s, color .15s;
+    .hof-founding-date {
+      font-size: 10px; font-weight: 600; color: rgba(255,215,0,.38);
+      letter-spacing: .8px; text-transform: uppercase; padding-left: 2px;
     }
-    .hof-close-btn:hover { background: rgba(237,66,69,.18); color: var(--danger); border-color: rgba(237,66,69,.3); }
+    /* Back button lives in the toolbar row — safe from all window chrome */
+    .hof-close-btn {
+      display: flex; align-items: center; gap: 6px; flex-shrink: 0;
+      background: rgba(255,255,255,.05);
+      border: 1px solid rgba(255,255,255,.1); border-radius: 8px;
+      color: var(--text-2); font-size: 12px; font-weight: 700;
+      cursor: pointer; padding: 7px 14px;
+      font-family: var(--font); letter-spacing: .3px;
+      transition: background .15s, color .15s, border-color .15s;
+    }
+    .hof-close-btn:hover {
+      background: rgba(237,66,69,.15); color: #ff6b6b;
+      border-color: rgba(237,66,69,.3);
+    }
+    .hof-toolbar-divider {
+      width: 1px; height: 20px; background: rgba(255,255,255,.08); flex-shrink: 0;
+    }
 
     .hof-overlay-toolbar {
       flex-shrink: 0; display: flex; align-items: center; gap: 14px;
@@ -5348,6 +5426,33 @@
       <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="3" width="20" height="14" rx="2"/><line x1="8" y1="21" x2="16" y2="21"/><line x1="12" y1="17" x2="12" y2="21"/></svg>
       Share
     </button>
+    <!-- Noise Suppression control -->
+    <div style="position:relative">
+      <button class="vc-pip-ctrl" id="vcPipNS" title="Noise Suppression">
+        <!-- Filter / waves icon -->
+        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M2 12c1.5-3 3.5-4.5 6-4.5s4.5 1.5 6 4.5 3.5 4.5 6 4.5"/>
+          <path d="M2 6c1.5 2 3.5 3 6 3s4.5-1 6-3 3.5-3 6-3" opacity=".4"/>
+          <path d="M2 18c1.5-1.5 3.5-2 6-2s4.5.5 6 2 3.5 2 6 2" opacity=".4"/>
+        </svg>
+        NS
+      </button>
+      <!-- Strength popover — opens when NS is active -->
+      <div class="vc-ns-popover" id="vcNsPopover">
+        <div class="vc-ns-label">
+          <span>Noise Suppression</span>
+          <span id="vcNsValLabel">50%</span>
+        </div>
+        <div class="vc-ns-strength-row">
+          <input class="vc-ns-slider" id="vcNsSlider" type="range" min="0" max="100" value="50" step="1">
+        </div>
+        <div class="vc-ns-modes">
+          <button class="vc-ns-mode" data-ns-preset="25">Light</button>
+          <button class="vc-ns-mode active" data-ns-preset="50">Balanced</button>
+          <button class="vc-ns-mode" data-ns-preset="80">Aggressive</button>
+        </div>
+      </div>
+    </div>
     <button class="vc-pip-ctrl leave" id="vcPipLeave" title="Disconnect">
       <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>
       Leave
@@ -5491,14 +5596,9 @@
         <div class="lir-empty">No upcoming events.</div>
       </div>
     </div>
-    <div class="lir-decor">
-      <div class="lir-decor-glyph">◈</div>
-      <div class="lir-decor-text">Your home for play.<br>Bring the feed back anytime.</div>
-    </div>
-  </div>
-  <!-- ── Hall of Fame Footer Button ── -->
-  <div id="lirHofFooter">
-    <button id="lirHofBtn" onclick="toggleHofPanel()">
+    <!-- ── Hall of Fame Button — inside scroll, flows naturally after events ── -->
+    <div id="lirHofFooter">
+      <button id="lirHofBtn" onclick="toggleHofPanel()">
       <svg width="19" height="14" viewBox="0 0 280 195" fill="none" xmlns="http://www.w3.org/2000/svg">
         <polygon points="15,145 35,52 88,98 140,8 192,98 245,52 265,145" fill="rgba(184,134,11,.55)" stroke="#FFD700" stroke-width="8" stroke-linejoin="round"/>
         <rect x="15" y="143" width="250" height="30" rx="4" fill="url(#hb)" opacity=".9"/>
@@ -5513,7 +5613,8 @@
       HALL OF FAME
     </button>
   </div>
-</div>
+  </div><!-- end .lir-scroll -->
+</div><!-- end #lobbyInfoRail -->
 
 <!-- ── Hall of Fame — Full-screen Overlay ── -->
 <div id="hofOverlay">
@@ -5644,12 +5745,22 @@
       </div>
     </div>
 
-    <div class="hof-lobby-name-badge" id="hofOverlayLobbyName">Lobby</div>
-    <button class="hof-close-btn" onclick="toggleHofPanel()">✕</button>
+    <!-- Lobby info: name + founding date -->
+    <div class="hof-lobby-info">
+      <div class="hof-lobby-name-badge" id="hofOverlayLobbyName">Lobby</div>
+      <div class="hof-founding-date" id="hofOverlayFounded"></div>
+    </div>
+
   </div>
 
-  <!-- Toolbar: Tabs + Admin Actions -->
+  <!-- Toolbar: Back button + Tabs + Admin Actions -->
   <div class="hof-overlay-toolbar">
+    <!-- Back button lives here — safely away from all window chrome -->
+    <button class="hof-close-btn" onclick="toggleHofPanel()">
+      <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 18 9 12 15 6"/></svg>
+      Back
+    </button>
+    <div class="hof-toolbar-divider"></div>
     <div class="hof-tabs">
       <button class="hof-tab active" id="hofTabTimeline" onclick="setHofTab('timeline')">⏳ Timeline</button>
       <button class="hof-tab" id="hofTabHof" onclick="setHofTab('hof')">👑 Hall of Fame</button>
@@ -8204,10 +8315,233 @@ function memberCallTile(member, isInCall) {
   return `<div class="call-tile" id="calltile-${member.id}">${isInCall?`<video id="callvideo-${member.id}" autoplay playsinline ${member.id===me?.id?"muted":""}></video>`:av}<div class="tile-name">${member.username}${isInCall?"":" (not in call)"}</div></div>`;
 }
 
+// ══════════════════════════════════════════════════════════════════════════════
+// NOISE SUPPRESSION ENGINE
+// Architecture: browser-native constraints (echoCancellation / noiseSuppression)
+// as the foundation, then an AudioWorklet noise gate on a dedicated audio thread
+// for variable-strength suppression. The worklet classifies frames as voice vs
+// noise using RMS + smoothed gating and is hot-swappable without re-negotiating
+// WebRTC.
+// ══════════════════════════════════════════════════════════════════════════════
+const NS = {
+  enabled:  JSON.parse(localStorage.getItem('lobby_ns_on')       ?? 'true'),
+  strength: parseInt(localStorage.getItem('lobby_ns_strength')    ?? '50', 10),
+  ctx:      null,   // AudioContext
+  worklet:  null,   // AudioWorkletNode
+  dest:     null,   // MediaStreamAudioDestinationNode
+  rawStream: null,  // original mic stream
+};
+
+// Inline AudioWorklet code — runs on a dedicated audio thread, zero main-thread blocking
+const _NS_WORKLET = `
+class NoiseGateProcessor extends AudioWorkletProcessor {
+  constructor() {
+    super();
+    this._gain    = 1.0;
+    this._thresh  = 0.006; // default 50% strength
+    this._attack  = 0.92;
+    this._release = 0.04;
+    this.port.onmessage = ({ data }) => {
+      if (data.strength !== undefined) {
+        // Map 0-100 → threshold: 0 = ~-80 dBFS (almost off), 100 = ~-26 dBFS (aggressive)
+        const s = Math.max(0, Math.min(100, data.strength));
+        const db = s < 2 ? -100 : -80 + s * 0.54;
+        this._thresh = Math.pow(10, db / 20);
+      }
+    };
+  }
+  process(inputs, outputs) {
+    const inp = inputs[0]?.[0];
+    const out = outputs[0]?.[0];
+    if (!inp || !out) return true;
+    // Frame RMS
+    let sum = 0;
+    for (let i = 0; i < inp.length; i++) sum += inp[i] * inp[i];
+    const rms = Math.sqrt(sum / inp.length);
+    // Smooth gain envelope (fast attack, slow release = natural voice feel)
+    const target = rms >= this._thresh ? 1.0 : 0.0;
+    this._gain += target > this._gain
+      ? (target - this._gain) * this._attack
+      : (target - this._gain) * this._release;
+    for (let i = 0; i < inp.length; i++) out[i] = inp[i] * this._gain;
+    return true;
+  }
+}
+registerProcessor('lobby-noise-gate', NoiseGateProcessor);
+`;
+
+async function nsGetMicStream(wantVideo = false) {
+  // Always request native browser suppression as a foundation layer
+  const audioConstraints = {
+    echoCancellation:  true,
+    noiseSuppression:  true,
+    autoGainControl:   true,
+    channelCount:      1,
+    sampleRate:        48000,
+  };
+  let raw;
+  try {
+    raw = await navigator.mediaDevices.getUserMedia({ audio: audioConstraints, video: wantVideo });
+  } catch {
+    try { raw = await navigator.mediaDevices.getUserMedia({ audio: audioConstraints }); }
+    catch { raw = await navigator.mediaDevices.getUserMedia({ audio: true }); }
+  }
+  NS.rawStream = raw;
+  if (!NS.enabled) return raw;
+  return nsApplyGate(raw);
+}
+
+async function nsApplyGate(rawStream) {
+  // Tear down any previous context
+  if (NS.ctx) { try { NS.ctx.close(); } catch {} }
+  NS.ctx = new AudioContext({ sampleRate: 48000, latencyHint: 'interactive' });
+
+  // Load inline worklet
+  const blob = new Blob([_NS_WORKLET], { type: 'application/javascript' });
+  const url  = URL.createObjectURL(blob);
+  try {
+    await NS.ctx.audioWorklet.addModule(url);
+  } finally {
+    URL.revokeObjectURL(url);
+  }
+
+  const src  = NS.ctx.createMediaStreamSource(rawStream);
+  NS.worklet = new AudioWorkletNode(NS.ctx, 'lobby-noise-gate');
+  NS.dest    = NS.ctx.createMediaStreamDestination();
+
+  src.connect(NS.worklet);
+  NS.worklet.connect(NS.dest);
+
+  // Send initial strength
+  NS.worklet.port.postMessage({ strength: NS.strength });
+
+  // Merge processed audio + original video tracks
+  return new MediaStream([
+    ...NS.dest.stream.getAudioTracks(),
+    ...rawStream.getVideoTracks(),
+  ]);
+}
+
+function nsSetStrength(val) {
+  NS.strength = val;
+  localStorage.setItem('lobby_ns_strength', String(val));
+  NS.worklet?.port.postMessage({ strength: val });
+}
+
+async function nsToggle() {
+  NS.enabled = !NS.enabled;
+  localStorage.setItem('lobby_ns_on', JSON.stringify(NS.enabled));
+  nsUpdateUI();
+  if (!NS.rawStream) return; // not in a call
+  const stream = NS.enabled ? await nsApplyGate(NS.rawStream) : NS.rawStream;
+  await nsReplaceAudioTrack(stream);
+}
+
+async function nsReplaceAudioTrack(stream) {
+  const track = stream.getAudioTracks()[0];
+  if (!track) return;
+  // Group voice channels
+  if (typeof groupPeers !== 'undefined') {
+    for (const pc of Object.values(groupPeers)) {
+      const s = pc.getSenders?.().find(s => s.track?.kind === 'audio');
+      if (s) { try { await s.replaceTrack(track); } catch {} }
+    }
+    if (typeof groupLocalStream !== 'undefined' && groupLocalStream) {
+      groupLocalStream.getAudioTracks().forEach(t => groupLocalStream.removeTrack(t));
+      groupLocalStream.addTrack(track);
+    }
+  }
+  // 1-to-1 DM calls
+  if (typeof callPeer !== 'undefined' && callPeer) {
+    const s = callPeer.getSenders?.().find(s => s.track?.kind === 'audio');
+    if (s) { try { await s.replaceTrack(track); } catch {} }
+    if (typeof callStream !== 'undefined' && callStream) {
+      callStream.getAudioTracks().forEach(t => callStream.removeTrack(t));
+      callStream.addTrack(track);
+    }
+  }
+}
+
+function nsUpdateUI() {
+  const btn      = document.getElementById('vcPipNS');
+  const popover  = document.getElementById('vcNsPopover');
+  if (!btn) return;
+  btn.classList.toggle('ns-on', NS.enabled);
+  btn.title = NS.enabled ? 'Noise Suppression: ON (click to configure)' : 'Noise Suppression: OFF';
+  if (!NS.enabled && popover) popover.classList.remove('open');
+}
+
+// Wire up NS UI once DOM is ready
+(function wireNsUI() {
+  const btn     = document.getElementById('vcPipNS');
+  const popover = document.getElementById('vcNsPopover');
+  const slider  = document.getElementById('vcNsSlider');
+  const valLbl  = document.getElementById('vcNsValLabel');
+  if (!btn || !popover || !slider) return;
+
+  // Restore saved state
+  slider.value = NS.strength;
+  slider.style.setProperty('--pct', NS.strength + '%');
+  if (valLbl) valLbl.textContent = NS.strength + '%';
+  nsUpdateUI();
+
+  // Toggle: click = toggle NS; if already on, toggle the popover instead
+  btn.addEventListener('click', async (e) => {
+    e.stopPropagation();
+    if (!NS.enabled) {
+      await nsToggle(); // enable NS
+      popover.classList.add('open');
+    } else {
+      popover.classList.toggle('open');
+    }
+  });
+
+  // Close popover on outside click
+  document.addEventListener('click', () => popover.classList.remove('open'));
+  popover.addEventListener('click', e => e.stopPropagation());
+
+  // Strength slider
+  slider.addEventListener('input', () => {
+    const v = parseInt(slider.value, 10);
+    slider.style.setProperty('--pct', v + '%');
+    if (valLbl) valLbl.textContent = v + '%';
+    // Update active preset button
+    document.querySelectorAll('.vc-ns-mode').forEach(m => {
+      m.classList.toggle('active', parseInt(m.dataset.nsPreset) === v);
+    });
+    nsSetStrength(v);
+  });
+
+  // Preset buttons
+  document.querySelectorAll('.vc-ns-mode').forEach(m => {
+    m.addEventListener('click', () => {
+      const v = parseInt(m.dataset.nsPreset, 10);
+      slider.value = v;
+      slider.style.setProperty('--pct', v + '%');
+      if (valLbl) valLbl.textContent = v + '%';
+      document.querySelectorAll('.vc-ns-mode').forEach(x => x.classList.remove('active'));
+      m.classList.add('active');
+      nsSetStrength(v);
+    });
+  });
+
+  // Long-press the NS button (300ms) = turn off entirely
+  let _nsHold;
+  btn.addEventListener('mousedown', () => {
+    _nsHold = setTimeout(async () => {
+      if (NS.enabled) { await nsToggle(); showToast('Noise suppression off', 'info'); }
+    }, 300);
+  });
+  btn.addEventListener('mouseup',   () => clearTimeout(_nsHold));
+  btn.addEventListener('mouseleave',() => clearTimeout(_nsHold));
+})();
+
+// ── END NOISE SUPPRESSION ENGINE ──────────────────────────────────────────────
+
 async function joinGroupCall(groupId) {
-  try { groupLocalStream = await navigator.mediaDevices.getUserMedia({ audio:true, video:true }); }
+  try { groupLocalStream = await nsGetMicStream(true); }
   catch(e) {
-    try { groupLocalStream = await navigator.mediaDevices.getUserMedia({ audio:true }); }
+    try { groupLocalStream = await nsGetMicStream(false); }
     catch(e2) { showToast("Could not access microphone","error"); return; }
   }
   groupCallActive = true;
@@ -8658,9 +8992,9 @@ async function startDirectCall(userId, username) {
     return;
   }
 
-  try { callStream = await navigator.mediaDevices.getUserMedia({ audio:true, video:true }); }
+  try { callStream = await nsGetMicStream(true); }
   catch(e) {
-    try { callStream = await navigator.mediaDevices.getUserMedia({ audio:true }); }
+    try { callStream = await nsGetMicStream(false); }
     catch(e2) { showToast("Could not access microphone: "+e2.message,"error"); return; }
   }
   callActive=true; callTargetId=userId; callTargetName=username;
@@ -8754,8 +9088,8 @@ function showIncomingCallModal(fromUsername, fromAvatarUrl, fromPeerId) {
       return;
     }
     try {
-      try { callStream=await navigator.mediaDevices.getUserMedia({ audio:true, video:true }); }
-      catch { callStream=await navigator.mediaDevices.getUserMedia({ audio:true }); }
+      try { callStream=await nsGetMicStream(true); }
+      catch { callStream=await nsGetMicStream(false); }
       callActive=true; callTargetId=peerUserIdFromCallPeerId(fromPeerId); callTargetName=fromUsername;
       try {
         ws.send(JSON.stringify({ type:"call-accept", to:fromPeerId }));
@@ -9286,6 +9620,9 @@ function maybeShowVcPip() {
   });
 
   document.getElementById("vcPipLeave")?.addEventListener("click", leaveVoiceChannel);
+
+  // Reflect saved NS state on load
+  nsUpdateUI();
 })();
 
 function renderVcGrid() {
@@ -12757,14 +13094,21 @@ function updateLobbyInfoRail() {
     document.body.classList.remove("lobby-selected");
     // Reset HOF overlay when no lobby selected
     _hofOpen = false;
-    document.getElementById('hofOverlay')?.classList.remove('open');
+    const _ov = document.getElementById('hofOverlay');
+    if (_ov) { _ov.classList.remove('open','closing'); }
     return;
   }
 
-  // Reset HOF if switching to a different lobby
+  // Reset HOF if switching to a different lobby (instant, no animation)
   if (_hofOpen && window._hofServerId && window._hofServerId !== selectedServer.id) {
     _hofOpen = false; _hofEvents = [];
-    document.getElementById('hofOverlay')?.classList.remove('open');
+    const _ov = document.getElementById('hofOverlay');
+    if (_ov) { _ov.classList.remove('open','closing'); }
+    // Restore feed buttons that may have been hidden
+    const _fb = document.getElementById('feedToggleBtn');
+    const _fr = document.getElementById('feedReopenBtn');
+    if (_fb) _fb.style.display = '';
+    if (_fr) _fr.style.display = '';
   }
   window._hofServerId = selectedServer.id;
 
@@ -12847,15 +13191,39 @@ let _hofEvents = [];
 
 // ── Open / close the full-screen overlay ──────────────────────────────────────
 function toggleHofPanel() {
-  _hofOpen = !_hofOpen;
-  const overlay = document.getElementById('hofOverlay');
-  if (_hofOpen) {
+  const overlay    = document.getElementById('hofOverlay');
+  const feedBtn    = document.getElementById('feedToggleBtn');
+  const feedReopen = document.getElementById('feedReopenBtn');
+
+  if (!_hofOpen) {
+    // ── OPEN ──
+    _hofOpen = true;
+    overlay.classList.remove('closing');
     overlay.classList.add('open');
-    const badge = document.getElementById('hofOverlayLobbyName');
-    if (badge && selectedServer) badge.textContent = selectedServer.name;
+    if (feedBtn)    feedBtn.style.display    = 'none';
+    if (feedReopen) feedReopen.style.display = 'none';
+    if (selectedServer) {
+      const badge = document.getElementById('hofOverlayLobbyName');
+      if (badge) badge.textContent = selectedServer.name;
+      const founded = document.getElementById('hofOverlayFounded');
+      if (founded && selectedServer.created_at) {
+        const d = new Date(selectedServer.created_at);
+        founded.textContent = `Founded ${d.toLocaleString('default', { month: 'long', year: 'numeric' })}`;
+      } else if (founded) {
+        founded.textContent = '';
+      }
+    }
     loadHofEvents();
   } else {
-    overlay.classList.remove('open');
+    // ── CLOSE — play exit animation, then hide ──
+    _hofOpen = false;
+    overlay.classList.add('closing');
+    if (feedBtn)    feedBtn.style.display    = '';
+    if (feedReopen) feedReopen.style.display = '';
+    overlay.addEventListener('animationend', function done() {
+      overlay.classList.remove('open', 'closing');
+      overlay.removeEventListener('animationend', done);
+    }, { once: true });
   }
 }
 
