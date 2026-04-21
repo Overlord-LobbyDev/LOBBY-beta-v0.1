@@ -1351,6 +1351,23 @@
     .ss-tag button:hover { opacity:1; }
     .ss-members-list { display:flex; flex-direction:column; gap:6px; }
     .ss-member-row { display:flex; align-items:center; gap:10px; background:var(--bg-2); border-radius:8px; padding:8px 12px; }
+    /* Section reorder rows */
+    .ss-section-row {
+      display:flex; align-items:center; gap:12px;
+      background:var(--bg-2); border:1px solid rgba(255,255,255,.07);
+      border-radius:10px; padding:11px 14px;
+      cursor:default; transition:background .15s, border-color .15s, box-shadow .15s;
+      user-select:none;
+    }
+    .ss-section-row.drag-over { border-color:var(--accent); background:rgba(88,101,242,.08); }
+    .ss-section-row.dragging  { opacity:.4; }
+    .ss-section-grip {
+      cursor:grab; color:var(--text-3); font-size:16px; flex-shrink:0; line-height:1;
+    }
+    .ss-section-grip:active { cursor:grabbing; }
+    .ss-section-icon { font-size:16px; flex-shrink:0; }
+    .ss-section-label { flex:1; font-size:13px; font-weight:600; color:var(--text-1); }
+    .ss-section-hint  { font-size:11px; color:var(--text-3); }
     .ss-member-av { width:32px; height:32px; border-radius:50%; background:var(--accent); display:flex; align-items:center; justify-content:center; font-size:13px; font-weight:700; overflow:hidden; flex-shrink:0; }
     .ss-member-av img { width:100%; height:100%; object-fit:cover; }
     .ss-member-name { flex:1; font-size:13px; font-weight:600; color:var(--text-1); }
@@ -4806,6 +4823,7 @@
       <button class="ss-tab active" onclick="ssSwitchTab('general',this)">General</button>
       <button class="ss-tab" onclick="ssSwitchTab('tags',this)">Tags</button>
       <button class="ss-tab" onclick="ssSwitchTab('roles',this)">Roles & Members</button>
+      <button class="ss-tab" onclick="ssSwitchTab('sections',this)">Sections</button>
     </div>
     <!-- Tab: General -->
     <div class="ss-pane" id="ss-pane-general">
@@ -4885,6 +4903,19 @@
       <p style="font-size:13px;color:var(--text-3);margin-bottom:12px">Grant or revoke moderator access for lobby members.</p>
       <div class="ss-members-list" id="ssMembersList"></div>
       <div class="ss-msg" id="ssRolesMsg"></div>
+    </div>
+
+    <!-- Tab: Sections -->
+    <div class="ss-pane hidden" id="ss-pane-sections">
+      <p style="font-size:13px;color:var(--text-3);margin-bottom:16px">
+        Drag the handles to reorder sidebar sections. This order applies to <strong style="color:var(--text-2)">all members</strong> of this lobby.
+      </p>
+      <div id="ssSectionList" style="display:flex;flex-direction:column;gap:8px"></div>
+      <div class="ss-msg" id="ssSectionsMsg" style="margin-top:12px"></div>
+      <div class="modal-actions" style="margin-top:16px">
+        <button class="btn btn-grey" onclick="closeModal('serverSettingsModal')">Cancel</button>
+        <button class="btn btn-primary" onclick="withLoading(this, () => ssSaveSections())">Save Order</button>
+      </div>
     </div>
   </div>
 </div>
@@ -10585,6 +10616,101 @@ function ssSwitchTab(tab, btn) {
   document.querySelectorAll(".ss-pane").forEach(p => p.classList.add("hidden"));
   btn?.classList.add("active");
   document.getElementById(`ss-pane-${tab}`)?.classList.remove("hidden");
+  if (tab === 'sections') ssInitSections();
+}
+
+// ── Lobby Section Reorder (Settings > Sections tab) ──────────────────────────
+const SS_SECTION_META = {
+  announcements: { icon: '📢', label: 'Announcements', hint: 'Pinned messages from admins' },
+  text:          { icon: '💬', label: 'Text Channels',  hint: 'General chat channels'      },
+  voice:         { icon: '🔊', label: 'Voice Channels', hint: 'Voice & video rooms'         },
+  tournaments:   { icon: '🏆', label: 'Tournaments',    hint: 'Brackets & competitions'     },
+  events:        { icon: '📅', label: 'Events',         hint: 'Scheduled lobby events'      },
+};
+const SS_DEFAULT_ORDER = ['announcements','text','voice','tournaments','events'];
+
+function ssInitSections() {
+  const list = document.getElementById('ssSectionList');
+  if (!list) return;
+
+  // Read current saved order from the selected server object
+  let order = SS_DEFAULT_ORDER;
+  try {
+    const saved = selectedServer?.sidebar_section_order;
+    if (saved) { const p = JSON.parse(saved); if (Array.isArray(p) && p.length) order = p; }
+  } catch {}
+  // Ensure all keys present
+  SS_DEFAULT_ORDER.forEach(k => { if (!order.includes(k)) order.push(k); });
+
+  list.innerHTML = order.map(key => {
+    const m = SS_SECTION_META[key] || { icon:'⚙️', label: key, hint:'' };
+    return `<div class="ss-section-row" draggable="true" data-ss-key="${key}">
+      <span class="ss-section-grip" title="Drag to reorder">⠿</span>
+      <span class="ss-section-icon">${m.icon}</span>
+      <span class="ss-section-label">${m.label}</span>
+      <span class="ss-section-hint">${m.hint}</span>
+    </div>`;
+  }).join('');
+
+  // Wire drag-and-drop on the list
+  let _drag = null;
+  list.querySelectorAll('.ss-section-row').forEach(row => {
+    row.addEventListener('dragstart', e => {
+      _drag = row;
+      setTimeout(() => row.classList.add('dragging'), 0);
+      e.dataTransfer.effectAllowed = 'move';
+    });
+    row.addEventListener('dragend', () => {
+      row.classList.remove('dragging');
+      list.querySelectorAll('.ss-section-row').forEach(r => r.classList.remove('drag-over'));
+      _drag = null;
+    });
+    row.addEventListener('dragover', e => {
+      e.preventDefault();
+      if (!_drag || _drag === row) return;
+      list.querySelectorAll('.ss-section-row').forEach(r => r.classList.remove('drag-over'));
+      row.classList.add('drag-over');
+      // Reorder in DOM
+      const rows = [...list.querySelectorAll('.ss-section-row')];
+      const fromIdx = rows.indexOf(_drag);
+      const toIdx   = rows.indexOf(row);
+      if (fromIdx < toIdx) row.after(_drag);
+      else row.before(_drag);
+    });
+    row.addEventListener('dragleave', () => row.classList.remove('drag-over'));
+    row.addEventListener('drop',      e => { e.preventDefault(); row.classList.remove('drag-over'); });
+  });
+}
+
+async function ssSaveSections() {
+  const list = document.getElementById('ssSectionList');
+  const msg  = document.getElementById('ssSectionsMsg');
+  if (!list || !_ssServerId) return;
+
+  const newOrder = [...list.querySelectorAll('.ss-section-row[data-ss-key]')]
+    .map(r => r.dataset.ssKey);
+
+  try {
+    await api(`/servers/${_ssServerId}/sidebar-order`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ order: newOrder })
+    });
+    // Update local selectedServer cache so sidebar re-renders immediately
+    if (selectedServer && selectedServer.id === _ssServerId) {
+      selectedServer.sidebar_section_order = JSON.stringify(newOrder);
+    }
+    if (_lastServer && _lastServer.id === _ssServerId) {
+      _lastServer.sidebar_section_order = JSON.stringify(newOrder);
+      if (typeof renderChannelList === 'function' && _lastChannels) {
+        renderChannelList(_lastChannels, _lastMembers, _lastServer);
+      }
+    }
+    if (msg) { msg.textContent = '✓ Section order saved!'; msg.className = 'ss-msg success'; }
+    setTimeout(() => { if (msg) { msg.textContent = ''; msg.className = 'ss-msg'; } }, 2500);
+  } catch (e) {
+    if (msg) { msg.textContent = 'Failed to save order.'; msg.className = 'ss-msg error'; }
+  }
 }
 
 function ssPreviewBanner(input) {
