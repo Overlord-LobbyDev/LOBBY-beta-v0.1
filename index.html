@@ -5627,24 +5627,24 @@
         <div class="lir-empty">No upcoming events.</div>
       </div>
     </div>
-    <!-- ── Hall of Fame Button — inside scroll, flows naturally after events ── -->
-    <div id="lirHofFooter">
-      <button id="lirHofBtn" onclick="toggleHofPanel()">
-      <svg width="19" height="14" viewBox="0 0 280 195" fill="none" xmlns="http://www.w3.org/2000/svg">
-        <polygon points="15,145 35,52 88,98 140,8 192,98 245,52 265,145" fill="rgba(184,134,11,.55)" stroke="#FFD700" stroke-width="8" stroke-linejoin="round"/>
-        <rect x="15" y="143" width="250" height="30" rx="4" fill="url(#hb)" opacity=".9"/>
-        <defs><linearGradient id="hb" x1="0" y1="0" x2="1" y2="0"><stop offset="0%" stop-color="#7a5c00"/><stop offset="50%" stop-color="#FFD700"/><stop offset="100%" stop-color="#7a5c00"/></linearGradient></defs>
-        <circle cx="140" cy="8"  r="13" fill="#CC3333" stroke="#FFD700" stroke-width="4"/>
-        <circle cx="35"  cy="52" r="9"  fill="#3366CC" stroke="#FFD700" stroke-width="3"/>
-        <circle cx="265" cy="52" r="9"  fill="#3366CC" stroke="#FFD700" stroke-width="3"/>
-        <circle cx="88"  cy="98" r="8"  fill="#229955" stroke="#FFD700" stroke-width="3"/>
-        <circle cx="192" cy="98" r="8"  fill="#229955" stroke="#FFD700" stroke-width="3"/>
-        <circle cx="140" cy="125" r="11" fill="#CC3333" stroke="#FFD700" stroke-width="3"/>
-      </svg>
-      HALL OF FAME
+  </div><!-- end .lir-scroll -->
+  <!-- ── Hall of Fame Button — pinned at rail bottom, above members bar ── -->
+  <div id="lirHofFooter">
+    <button id="lirHofBtn" onclick="toggleHofPanel()">
+    <svg width="19" height="14" viewBox="0 0 280 195" fill="none" xmlns="http://www.w3.org/2000/svg">
+      <polygon points="15,145 35,52 88,98 140,8 192,98 245,52 265,145" fill="rgba(184,134,11,.55)" stroke="#FFD700" stroke-width="8" stroke-linejoin="round"/>
+      <rect x="15" y="143" width="250" height="30" rx="4" fill="url(#hb2)" opacity=".9"/>
+      <defs><linearGradient id="hb2" x1="0" y1="0" x2="1" y2="0"><stop offset="0%" stop-color="#7a5c00"/><stop offset="50%" stop-color="#FFD700"/><stop offset="100%" stop-color="#7a5c00"/></linearGradient></defs>
+      <circle cx="140" cy="8"  r="13" fill="#CC3333" stroke="#FFD700" stroke-width="4"/>
+      <circle cx="35"  cy="52" r="9"  fill="#3366CC" stroke="#FFD700" stroke-width="3"/>
+      <circle cx="265" cy="52" r="9"  fill="#3366CC" stroke="#FFD700" stroke-width="3"/>
+      <circle cx="88"  cy="98" r="8"  fill="#229955" stroke="#FFD700" stroke-width="3"/>
+      <circle cx="192" cy="98" r="8"  fill="#229955" stroke="#FFD700" stroke-width="3"/>
+      <circle cx="140" cy="125" r="11" fill="#CC3333" stroke="#FFD700" stroke-width="3"/>
+    </svg>
+    HALL OF FAME
     </button>
   </div>
-  </div><!-- end .lir-scroll -->
 </div><!-- end #lobbyInfoRail -->
 
 <!-- ── Hall of Fame — Full-screen Overlay ── -->
@@ -9924,18 +9924,14 @@ function setupVcSignalling() {
       vcChannelMembers[msg.channelId] = msg.members || [];
       if (msg.channelId === vcChannelId) {
         renderVcGrid();
-        // Bug fix: initiate WebRTC to every member already in the channel when we join
+        // Do NOT create offers here — existing members will each send an offer
+        // via their vc-joined handler. Creating offers from both sides simultaneously
+        // causes glare (both PCs in have-local-offer, ontrack never fires).
+        // Pre-create PeerConnections so they're ready to receive incoming offers.
         for (const member of (msg.members || [])) {
           if (member.userId === me?.id) continue;
           const peerId = `u${member.userId}`;
-          if (!vcPeers[peerId]) {
-            const pc = createVcPeerConnection(peerId);
-            pc.createOffer().then(offer => {
-              return pc.setLocalDescription(offer).then(() => {
-                wsSend({ type: "vc-offer", offer: pc.localDescription, to: peerId, channelId: msg.channelId });
-              });
-            }).catch(e => console.error("[vc-members] offer error:", e));
-          }
+          if (!vcPeers[peerId]) createVcPeerConnection(peerId);
         }
       }
       refreshChannelListVc();
@@ -19839,6 +19835,9 @@ setTimeout(() => { updateMyStatusUI(); }, 100);
     if (cc) cc.style.bottom = '';
     var mb = document.querySelector('.members-sidebar');
     if (mb) mb.style.height = '';
+    // Reset lobby info rail bottom so HOF footer returns to viewport bottom
+    var lir = document.getElementById('lobbyInfoRail');
+    if (lir) lir.style.bottom = '';
   };
 
   window.applyMembersResizeStyles = function() {
@@ -19854,6 +19853,9 @@ setTimeout(() => { updateMyStatusUI(); }, 100);
     if (cc) cc.style.bottom = (h - 36) + 'px';
     var tb = document.getElementById('membersToggleBtn');
     if (tb && mb && mb.classList.contains('open')) tb.style.bottom = h + 'px';
+    // Lift lobby info rail so the HOF breaker aligns with the members bar top edge
+    var lir = document.getElementById('lobbyInfoRail');
+    if (lir) lir.style.bottom = h + 'px';
   };
 
   function initResizeHandles() {
