@@ -8649,7 +8649,11 @@
      Tournaments, Queue overlays). Bumped above .lobby-overlay (z 9000). */
   body.drawer-nav #lobbiesNavBtn { display: flex; z-index: 9501; }
 
-  /* LOBBIES horizontal panel — full-width slide-down from header */
+  /* LOBBIES horizontal panel — full-width slide-down from header.
+     Closed state must FULLY clear the viewport (panel + the 72px
+     header offset) so the icons inside don't bleed into the top bar.
+     translateY(-100%) alone wasn't enough — its bottom edge would
+     still sit at y=72, leaving the icons visible in the header zone. */
   #lobbiesDrawerPanel {
     display: none;
     position: fixed; top: 72px; left: 0; right: 0;
@@ -8660,14 +8664,22 @@
     box-shadow: none;
     /* Above .lobby-overlay so the picker can be opened from any page. */
     z-index: 9500;
-    transform: translateY(-80px); /* off-screen above viewport when closed */
+    /* Closed: translate by panel height + the 72px header gap so the
+       whole thing sits entirely above the viewport. */
+    transform: translateY(calc(-100% - 80px));
+    visibility: hidden;
     transition: transform .3s cubic-bezier(0.16,1,0.3,1),
-                box-shadow .3s ease;
+                box-shadow .3s ease,
+                visibility 0s linear .3s;
   }
   body.drawer-nav #lobbiesDrawerPanel { display: block; }
   #lobbiesDrawerPanel.open {
     transform: translateY(0);
+    visibility: visible;
     box-shadow: 0 6px 28px rgba(0,0,0,.4);
+    transition: transform .3s cubic-bezier(0.16,1,0.3,1),
+                box-shadow .3s ease,
+                visibility 0s linear 0s;
   }
   #lobbiesDrawerInner {
     display: flex; align-items: center;
