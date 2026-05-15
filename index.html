@@ -2687,6 +2687,208 @@
     }
 
     /* ──────────────────────────────────────────────────────────
+       LOBBY PROMOTION feed card — premium banner-style post for
+       lobby owners. One promo per lobby per 12 hours (server-enforced).
+       Stands apart from text posts so people scroll naturally to them. */
+    .lp-card {
+      padding: 0; overflow: hidden;
+      background: linear-gradient(180deg,
+        color-mix(in srgb, var(--accent) 8%, var(--bg-2)) 0%,
+        var(--bg-2) 80%);
+      border: 1px solid color-mix(in srgb, var(--accent) 22%, rgba(255,255,255,.06));
+      box-shadow:
+        0 16px 40px rgba(0,0,0,.4),
+        inset 0 1px 0 rgba(255,255,255,.04);
+      transition: transform .25s cubic-bezier(0.22,1,0.36,1),
+                  border-color .2s, box-shadow .25s;
+    }
+    .lp-card:hover {
+      transform: translateY(-2px);
+      border-color: color-mix(in srgb, var(--accent) 50%, rgba(255,255,255,.06));
+      box-shadow: 0 22px 52px rgba(0,0,0,.5),
+                  0 0 0 1px color-mix(in srgb, var(--accent) 30%, transparent);
+    }
+    .lp-poster {
+      display: flex; align-items: center; gap: 10px;
+      padding: 10px 14px;
+      background: rgba(0,0,0,.25);
+      border-bottom: 1px solid rgba(255,255,255,.04);
+    }
+    .lp-poster-eye {
+      font-size: 10px; font-weight: 900; letter-spacing: 1.4px;
+      text-transform: uppercase;
+      padding: 3px 9px; border-radius: 99px;
+      background: linear-gradient(135deg,
+        color-mix(in srgb, var(--accent) 80%, white),
+        var(--accent));
+      color: #fff;
+      box-shadow: 0 4px 12px color-mix(in srgb, var(--accent) 40%, transparent);
+    }
+    .lp-poster-time {
+      font-size: 10.5px; color: var(--text-3); margin-left: 2px;
+    }
+    .lp-delete-btn { margin-left: auto !important; }
+    .lp-banner {
+      position: relative;
+      height: 160px;
+      background-position: center;
+      background-size: cover;
+      display: flex; align-items: flex-end;
+    }
+    .lp-banner::after {
+      content: ''; position: absolute; inset: 0;
+      background: linear-gradient(180deg, transparent 40%, rgba(0,0,0,.7) 100%);
+    }
+    .lp-banner-body {
+      position: relative; z-index: 1;
+      display: flex; align-items: center; gap: 14px;
+      padding: 18px 18px;
+      width: 100%;
+    }
+    .lp-banner-icon {
+      width: 56px; height: 56px; border-radius: 14px;
+      background: rgba(255,255,255,.95);
+      color: #1a1409;
+      display: flex; align-items: center; justify-content: center;
+      font-family: 'Bebas Neue', sans-serif;
+      font-size: 28px; letter-spacing: 1.5px;
+      box-shadow: 0 8px 24px rgba(0,0,0,.5);
+      flex-shrink: 0;
+    }
+    .lp-banner-name {
+      font-family: 'Bebas Neue', sans-serif;
+      font-size: 26px; letter-spacing: 1.5px; line-height: 1;
+      color: #fff;
+      text-shadow: 0 4px 18px rgba(0,0,0,.7);
+    }
+    .lp-stat {
+      display: inline-flex; align-items: center; gap: 6px;
+      margin-top: 6px;
+      font-size: 11.5px; font-weight: 700; color: rgba(255,255,255,.85);
+      text-shadow: 0 2px 8px rgba(0,0,0,.6);
+    }
+    .lp-body {
+      padding: 14px 18px 16px;
+    }
+    .lp-blurb {
+      font-size: 13px; color: var(--text-2); line-height: 1.55;
+      margin-bottom: 10px;
+    }
+    .lp-tags { display: flex; flex-wrap: wrap; gap: 5px; margin-bottom: 12px; }
+    .lp-tag {
+      font-size: 10px; font-weight: 700; letter-spacing: .4px;
+      padding: 3px 9px; border-radius: 99px;
+      background: rgba(255,255,255,.05);
+      border: 1px solid rgba(255,255,255,.06);
+      color: var(--text-3);
+    }
+    .lp-cta {
+      width: 100%;
+      display: inline-flex; align-items: center; justify-content: center; gap: 8px;
+      padding: 11px 18px; border-radius: 12px;
+      background: linear-gradient(135deg, var(--accent), color-mix(in srgb, var(--accent) 60%, #000));
+      border: none; color: #fff;
+      font-family: var(--font); font-weight: 800; font-size: 13px;
+      letter-spacing: .8px; cursor: pointer;
+      box-shadow: 0 8px 22px color-mix(in srgb, var(--accent) 40%, transparent);
+      transition: transform .15s, box-shadow .2s, filter .15s;
+    }
+    .lp-cta:hover { transform: translateY(-1px); filter: brightness(1.1); box-shadow: 0 12px 28px color-mix(in srgb, var(--accent) 60%, transparent); }
+
+    /* "Promote a Lobby" composer button — only visible on the Lobbies feed tab */
+    #feedPromoteBtn {
+      display: none;
+      margin: 8px 16px 0;
+      padding: 10px 14px;
+      border-radius: 10px;
+      background: linear-gradient(135deg,
+        color-mix(in srgb, var(--accent) 18%, transparent),
+        color-mix(in srgb, var(--accent) 4%, transparent));
+      border: 1px dashed color-mix(in srgb, var(--accent) 40%, rgba(255,255,255,.08));
+      color: var(--accent);
+      font-family: var(--font); font-weight: 800; font-size: 12px;
+      letter-spacing: .6px; cursor: pointer;
+      display: flex; align-items: center; justify-content: center; gap: 8px;
+      transition: background .18s, transform .15s, border-color .15s;
+    }
+    body[data-feed-tab="communities"] #feedPromoteBtn { display: flex; }
+    #feedPromoteBtn:hover {
+      background: linear-gradient(135deg,
+        color-mix(in srgb, var(--accent) 30%, transparent),
+        color-mix(in srgb, var(--accent) 12%, transparent));
+      border-color: var(--accent);
+      transform: translateY(-1px);
+    }
+
+    /* Promote-a-lobby modal */
+    .lp-modal {
+      width: min(560px, 92vw); padding: 0; gap: 0;
+      overflow: hidden;
+      background: var(--bg-1);
+    }
+    .lp-modal-head {
+      padding: 20px 24px 14px;
+      background: linear-gradient(135deg,
+        color-mix(in srgb, var(--accent) 14%, var(--bg-2)),
+        var(--bg-2));
+      border-bottom: 1px solid rgba(255,255,255,.06);
+      display: flex; align-items: center; justify-content: space-between;
+    }
+    .lp-modal-eye {
+      font-size: 10.5px; font-weight: 900; letter-spacing: 1.5px;
+      text-transform: uppercase; color: var(--accent);
+    }
+    .lp-modal-title {
+      margin: 4px 0 0;
+      font-family: 'Bebas Neue', sans-serif;
+      font-size: 26px; letter-spacing: 1.8px;
+      color: var(--text-1); line-height: 1;
+    }
+    .lp-modal-body { padding: 18px 24px 8px; }
+    .lp-modal-row { margin-bottom: 14px; }
+    .lp-modal-label {
+      font-size: 10.5px; font-weight: 800; letter-spacing: 1.3px;
+      text-transform: uppercase; color: var(--text-3);
+      display: block; margin-bottom: 6px;
+    }
+    .lp-modal-input,
+    .lp-modal-select,
+    .lp-modal-textarea {
+      width: 100%; box-sizing: border-box;
+      padding: 10px 13px; border-radius: 9px;
+      background: rgba(0,0,0,.25);
+      border: 1px solid rgba(255,255,255,.08);
+      color: var(--text-1);
+      font-family: var(--font); font-size: 13px;
+      outline: none;
+      transition: border-color .15s, box-shadow .2s;
+    }
+    .lp-modal-textarea { min-height: 90px; resize: vertical; }
+    .lp-modal-input:focus,
+    .lp-modal-select:focus,
+    .lp-modal-textarea:focus {
+      border-color: color-mix(in srgb, var(--accent) 60%, transparent);
+      box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent) 16%, transparent);
+    }
+    .lp-cooldown-hint {
+      font-size: 11px; color: var(--text-3);
+      padding: 8px 12px; border-radius: 8px;
+      background: rgba(0,0,0,.2);
+      border: 1px solid rgba(255,255,255,.04);
+      display: flex; align-items: center; gap: 8px;
+    }
+    .lp-cooldown-hint.is-locked {
+      background: rgba(255,180,80,.08);
+      border-color: rgba(255,180,80,.3);
+      color: #ffc77a;
+    }
+    .lp-modal-foot {
+      padding: 14px 24px 20px;
+      display: flex; gap: 10px; justify-content: flex-end;
+      border-top: 1px solid rgba(255,255,255,.04);
+    }
+
+    /* ──────────────────────────────────────────────────────────
        Help & Support page (premium) */
     .hp-hero {
       padding: 32px 40px 18px;
@@ -8574,6 +8776,12 @@
   /* Friends drawer is now globally available — drawer-nav alone, regardless
      of lobby-selected state. (Per "should work on EVERY page" spec.) */
   body.drawer-nav #friendsDrawerPanel { display: block; }
+  /* When the lobby members bar is visible, lift the friends drawer + the
+     chip embedded in it ABOVE the members bar so they never overlap. */
+  body.drawer-nav.members-visible #friendsDrawerPanel,
+  body.drawer-nav.members-visible #friendsDrawerPanel.open ~ #chatUserPanel {
+    bottom: 94px;
+  }
   #friendsDrawerPanel.open {
     transform: translateY(0);
     box-shadow: 0 -6px 28px rgba(0,0,0,.4);
@@ -8665,12 +8873,15 @@
   }
   /* Show profile embedded in the left of the friends bar when it's open.
      Width matches the channel sidebar (280px) so the user-panel reads as a
-     consistent column anywhere it appears. */
-  body.drawer-nav:not(.lobby-selected) #friendsDrawerPanel.open ~ #chatUserPanel {
+     consistent column anywhere it appears.
+     ALSO applies in lobby mode now — the chip docks alongside the friends
+     drawer regardless of which page you're on. */
+  body.drawer-nav:not(.lobby-selected) #friendsDrawerPanel.open ~ #chatUserPanel,
+  body.drawer-nav.lobby-selected #friendsDrawerPanel.open ~ #chatUserPanel {
     display: flex !important;
     position: fixed; left: 0; bottom: 0;
     width: 280px; height: 110px;
-    z-index: 401;
+    z-index: 9502;                 /* above friends panel (9500) so chip overlays */
     background: var(--bg-1);
     border: none;
     border-right: 1px solid rgba(255,255,255,.1);
@@ -9053,6 +9264,44 @@
     <div>
       <div class="tba-pop-title">New Event</div>
       <div class="tba-pop-sub">Schedule a date</div>
+    </div>
+  </div>
+</div>
+
+<!-- ── Promote a Lobby modal — premium banner-post composer ── -->
+<div class="modal-overlay" id="promoteLobbyModal" onclick="if(event.target===this)window.closePromoteLobbyModal()">
+  <div class="modal lp-modal" onclick="event.stopPropagation()">
+    <div class="lp-modal-head">
+      <div>
+        <div class="lp-modal-eye">★ Promote</div>
+        <h2 class="lp-modal-title">Spotlight your lobby</h2>
+      </div>
+      <button class="lc-modal-close" onclick="window.closePromoteLobbyModal()" aria-label="Close">✕</button>
+    </div>
+    <div class="lp-modal-body">
+      <div class="lp-modal-row">
+        <label class="lp-modal-label">Which lobby</label>
+        <select id="lpModalLobby" class="lp-modal-select" onchange="window._lpUpdateCooldownHint()">
+          <option value="">— Pick one of your lobbies —</option>
+        </select>
+      </div>
+      <div class="lp-modal-row">
+        <label class="lp-modal-label">Pitch <span style="font-weight:600;text-transform:none;letter-spacing:.2px;color:var(--text-3)">— max 240 chars</span></label>
+        <textarea id="lpModalBlurb" class="lp-modal-textarea" maxlength="240"
+                  placeholder="What's your lobby about? Who should join? When are you live?"></textarea>
+      </div>
+      <div class="lp-modal-row" id="lpCooldownHintWrap">
+        <div class="lp-cooldown-hint" id="lpCooldownHint">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+          <span id="lpCooldownText">Each lobby can be promoted once every 12 hours.</span>
+        </div>
+      </div>
+    </div>
+    <div class="lp-modal-foot">
+      <button class="q-cta-secondary" onclick="window.closePromoteLobbyModal()">Cancel</button>
+      <button class="lp-cta" id="lpModalPostBtn" style="width:auto;padding:10px 22px" onclick="window.submitLobbyPromotion()">
+        <span>Post promotion →</span>
+      </button>
     </div>
   </div>
 </div>
@@ -10850,6 +11099,13 @@
     <!-- Hide button lives at root level (see #feedToggleBtn near #feedReopenBtn) to
          escape #socialFeed's transform containing block. -->
   </div>
+  <!-- "Promote a Lobby" CTA — only visible on the Lobbies feed tab.
+       Lobby owners click this to broadcast a premium banner-card post
+       to the Lobbies feed. One promo per lobby per 12 hours (server). -->
+  <button id="feedPromoteBtn" type="button" onclick="window.openPromoteLobbyModal()">
+    <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M3 11l18-9v18l-18-9z"/><path d="M11.5 13h0"/></svg>
+    Promote a Lobby — premium banner post
+  </button>
   <div id="feedPosts">
     <div style="text-align:center;padding:40px;color:var(--text-3)">Loading feed…</div>
   </div>
@@ -16674,6 +16930,9 @@ function switchFeedTab(tab) {
   document.getElementById("feedTabFriends").classList.toggle("active",     tab === "friends");
   document.getElementById("feedTabPublic").classList.toggle("active",      tab === "public");
   document.getElementById("feedTabCommunities")?.classList.toggle("active", tab === "communities");
+  // Tag the body so the "Promote a Lobby" CTA shows on the Lobbies tab
+  // (hidden on Friends/Public tabs).
+  document.body.setAttribute('data-feed-tab', tab);
 
   // Lobbies tab: only lobby admins/owners can post
   const composeBox = document.querySelector(".compose-box");
@@ -16873,7 +17132,167 @@ async function refreshPostCommentCounts(posts) {
   // Firing one request per post was causing significant slowdown
 }
 
+// Lobby Promotion posts use a premium banner card instead of the
+// standard text-post layout. Posted via the "Promote a Lobby" button
+// in the Lobbies feed tab (lobby owners only, 12h server-enforced
+// cooldown per lobby).
+function renderLobbyPromoPost(post) {
+  const promo = post.lobby_promo || {};
+  const cover  = promo.cover  || promo.heroHi || '';
+  const initial = (promo.name || '?')[0].toUpperCase();
+  const tags = (promo.tags || []).slice(0, 3);
+  const memberCount = typeof promo.members === 'number'
+    ? `<span class="lp-stat"><span class="dc-online-dot"></span>${(promo.online||0).toLocaleString()} online · ${(promo.members||0).toLocaleString()} members</span>`
+    : '<span class="lp-stat" style="opacity:.7">— online · — members</span>';
+  const time = new Date(post.created_at).toLocaleDateString("en-GB",{ day:"numeric", month:"short" });
+  const blurb = post.content || promo.description || 'A new community ready to grow.';
+  const isMe = feedMe && post.user_id === feedMe.id;
+  const trashIcon = `<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14H6L5 6"/><path d="M10 11v6"/><path d="M14 11v6"/><path d="M9 6V4h6v2"/></svg>`;
+  return `
+    <div class="post-card lp-card" id="post-${post.id}">
+      <div class="lp-poster">
+        <span class="lp-poster-eye">★ Lobby Spotlight</span>
+        <span class="lp-poster-time">Posted ${time} by ${(post.username||'').replace(/</g,'&lt;')}</span>
+        ${isMe ? `<button class="post-delete-btn lp-delete-btn" onclick="deletePost(${post.id})" title="Delete promotion">${trashIcon}</button>` : ''}
+      </div>
+      <div class="lp-banner" style="${cover ? `background:linear-gradient(135deg, rgba(0,0,0,.5), rgba(0,0,0,.1)), url('${cover}') center/cover` : `background:${(promo.fallback||'linear-gradient(135deg,#5865f2,#1a1d3d)')}`}">
+        <div class="lp-banner-body">
+          <div class="lp-banner-icon">${initial}</div>
+          <div style="flex:1;min-width:0">
+            <div class="lp-banner-name">${(promo.name||'').replace(/</g,'&lt;')}</div>
+            ${memberCount}
+          </div>
+        </div>
+      </div>
+      <div class="lp-body">
+        <div class="lp-blurb">${escapeHtml(blurb)}</div>
+        <div class="lp-tags">${tags.map(t => `<span class="lp-tag">${(t||'').replace(/</g,'&lt;')}</span>`).join('')}</div>
+        <button class="lp-cta" onclick="window.lpJoinLobby(${JSON.stringify(promo.lobbyId || promo.id || '')})">
+          <span>Join the lobby</span>
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 18 15 12 9 6"/></svg>
+        </button>
+      </div>
+    </div>`;
+}
+window.lpJoinLobby = function(lobbyId) {
+  if (!lobbyId) return;
+  if (typeof window.discoverJoin === 'function') return window.discoverJoin(lobbyId, '');
+  if (typeof showToast === 'function') showToast('Opening lobby…', 'info');
+};
+
+// ─────────────────────────────────────────────────────────────────────
+// Lobby Promotion composer
+//
+// The user clicks "Promote a Lobby" on the Lobbies feed tab. They pick
+// one of THEIR lobbies (owner-only), write a short pitch, and submit.
+// Server enforces a 12-hour cooldown per lobby — the client also keeps
+// a soft cooldown cache so the button can show a live countdown.
+//
+// Server endpoint:
+//   POST /feed/posts/lobby-promo  { lobbyId, content }
+//                                  → { ok, post } | { error: 'cooldown', secondsRemaining }
+// ─────────────────────────────────────────────────────────────────────
+const LP_COOLDOWN_MS = 12 * 60 * 60 * 1000;        // 12 hours
+window._lpCooldowns = window._lpCooldowns || {};   // { [lobbyId]: timestampOfLastPromo }
+
+window.openPromoteLobbyModal = async function() {
+  const modal = document.getElementById('promoteLobbyModal');
+  const sel   = document.getElementById('lpModalLobby');
+  if (!modal || !sel) return;
+  // Populate with lobbies the user OWNS (server side will re-validate).
+  const ownedLobbies = (typeof _allServers !== 'undefined' && Array.isArray(_allServers))
+    ? _allServers.filter(s =>
+        s.role === 'owner' || s.myRole === 'owner' ||
+        s.owner_id === feedMe?.id || s.created_by === feedMe?.id)
+    : [];
+  if (!ownedLobbies.length) {
+    if (typeof showToast === 'function') showToast('You need to own a lobby to post a promotion.', 'warn');
+    return;
+  }
+  sel.innerHTML = `<option value="">— Pick one of your lobbies —</option>` +
+    ownedLobbies.map(l => `<option value="${l.id}">${(l.name||'').replace(/</g,'&lt;')}</option>`).join('');
+  document.getElementById('lpModalBlurb').value = '';
+  // Pull server-side cooldown info if we have it.
+  try {
+    const r = await api('/me/lobby-promotions/cooldowns').catch(() => null);
+    if (r && typeof r === 'object') {
+      Object.assign(window._lpCooldowns, r);
+    }
+  } catch {}
+  _lpUpdateCooldownHint();
+  modal.classList.add('open');
+};
+window.closePromoteLobbyModal = function() {
+  document.getElementById('promoteLobbyModal')?.classList.remove('open');
+};
+window._lpUpdateCooldownHint = function() {
+  const sel  = document.getElementById('lpModalLobby');
+  const hint = document.getElementById('lpCooldownHint');
+  const txt  = document.getElementById('lpCooldownText');
+  const btn  = document.getElementById('lpModalPostBtn');
+  if (!sel || !hint || !txt || !btn) return;
+  const id = sel.value;
+  if (!id) {
+    hint.classList.remove('is-locked');
+    txt.textContent = 'Each lobby can be promoted once every 12 hours.';
+    btn.style.opacity = '.45';
+    btn.style.pointerEvents = 'none';
+    return;
+  }
+  const last = +(window._lpCooldowns[id] || 0);
+  const remaining = LP_COOLDOWN_MS - (Date.now() - last);
+  if (remaining > 0) {
+    hint.classList.add('is-locked');
+    const h = Math.floor(remaining / 3600000);
+    const m = Math.floor((remaining % 3600000) / 60000);
+    txt.textContent = `Cooldown: this lobby can be promoted again in ${h}h ${m}m.`;
+    btn.style.opacity = '.45';
+    btn.style.pointerEvents = 'none';
+  } else {
+    hint.classList.remove('is-locked');
+    txt.textContent = 'Ready to promote — premium banner card lands in the Lobbies feed.';
+    btn.style.opacity = '';
+    btn.style.pointerEvents = '';
+  }
+};
+window.submitLobbyPromotion = async function() {
+  const sel  = document.getElementById('lpModalLobby');
+  const blurb = document.getElementById('lpModalBlurb');
+  const btn  = document.getElementById('lpModalPostBtn');
+  if (!sel || !blurb) return;
+  const lobbyId = sel.value;
+  const content = blurb.value.trim();
+  if (!lobbyId)  { if (typeof showToast === 'function') showToast('Pick a lobby first.', 'warn'); return; }
+  if (!content)  { if (typeof showToast === 'function') showToast('Add a short pitch.', 'warn'); return; }
+  if (btn) { btn.style.opacity = '.45'; btn.style.pointerEvents = 'none'; btn.querySelector('span').textContent = 'Posting…'; }
+  try {
+    const r = await api('/feed/posts/lobby-promo', {
+      method: 'POST',
+      headers: { 'Content-Type':'application/json' },
+      body: JSON.stringify({ lobbyId, content }),
+    }).catch(() => null);
+    if (r && r.error === 'cooldown') {
+      const h = Math.floor((r.secondsRemaining||0) / 3600);
+      const m = Math.floor(((r.secondsRemaining||0) % 3600) / 60);
+      if (typeof showToast === 'function') showToast(`Cooldown — try again in ${h}h ${m}m.`, 'warn');
+      window._lpCooldowns[lobbyId] = Date.now() - (LP_COOLDOWN_MS - (r.secondsRemaining*1000));
+    } else if (r && (r.ok || r.post)) {
+      window._lpCooldowns[lobbyId] = Date.now();
+      if (typeof showToast === 'function') showToast('Lobby promoted — check the Lobbies feed.', 'success');
+      window.closePromoteLobbyModal();
+      // Switch to the Lobbies feed tab and refresh
+      if (typeof switchFeedTab === 'function') switchFeedTab('communities');
+      if (typeof loadFeed === 'function') loadFeed();
+    } else {
+      if (typeof showToast === 'function') showToast('Could not post promotion (server unreachable).', 'error');
+    }
+  } catch {}
+  if (btn) { btn.style.opacity = ''; btn.style.pointerEvents = ''; btn.querySelector('span').textContent = 'Post promotion →'; }
+};
+
 function renderPost(post) {
+  // Lobby promotion posts get the premium banner card.
+  if (post.kind === 'lobby-promo' || post.lobby_promo) return renderLobbyPromoPost(post);
   const isMe = feedMe && post.user_id===feedMe.id;
   const av = post.avatar_url ? `<img src="${post.avatar_url}" />` : post.username.slice(0,1).toUpperCase();
   const time = new Date(post.created_at).toLocaleDateString("en-GB",{ day:"numeric", month:"short" }) + " · " + new Date(post.created_at).toLocaleTimeString([],{ hour:"2-digit", minute:"2-digit" });
@@ -18825,10 +19244,12 @@ document.getElementById("sidebarBackdrop").addEventListener("click", () => {
 // ── Friends horizontal drawer (drawer-nav mode) ───────────────
 // On open: profile chip animates in 500ms BEFORE the friends list, so
 // the user's identity establishes itself first then the friends slide
-// in beside it. On close: reversed (list out, chip lingers, then both
-// snap closed). The class .friends-drawer-staggered drives the offset
-// transition delays in CSS.
+// in beside it. On close: list fades first, then panel snaps closed.
+// All inline styles are RESET cleanly on every transition so rapid
+// double-clicks never leave the drawer in a broken state.
+let _friendsDrawerBusy = false;
 window.toggleFriendsDrawer = function() {
+  if (_friendsDrawerBusy) return;
   const panel  = document.getElementById("friendsDrawerPanel");
   const inner  = document.getElementById("friendsDrawerInner");
   const btn    = document.getElementById("friendsBottomBar");
@@ -18836,46 +19257,51 @@ window.toggleFriendsDrawer = function() {
   const bd     = document.getElementById("sidebarBackdrop");
   if (!panel) return;
   const isOpen = panel.classList.contains("open");
-
+  _friendsDrawerBusy = true;
+  // Backdrop is shared with other drawers — only show ours when this opens.
+  if (bd && document.body.classList.contains("drawer-nav")) {
+    bd.classList.toggle("visible", !isOpen);
+    if (!isOpen) bd.onclick = () => { window.toggleFriendsDrawer(); bd.onclick = null; };
+  }
   if (!isOpen) {
-    // OPENING — profile chip first, friends list 500ms later
+    // ── OPEN ──
     document.body.classList.add('friends-drawer-staggered');
-    panel.classList.add("open");                  // chip slides up immediately
-    if (btn)  btn.classList.add("open");
+    panel.classList.add("open");
+    if (btn)  { btn.classList.add("open"); btn.style.bottom = "110px"; }
     if (chev) chev.style.transform = "rotate(180deg)";
-    if (btn)  btn.style.bottom = "110px";
-    // Defer the friends list reveal so the profile chip leads the eye in.
     if (inner) {
-      inner.style.opacity = '0';
+      // Reset to hidden start state
+      inner.style.transition = 'none';
+      inner.style.opacity   = '0';
       inner.style.transform = 'translateX(8px)';
+      // Force reflow then fade in 500ms after the panel slides up
+      void inner.offsetWidth;
       inner.style.transition = 'opacity .35s ease .5s, transform .4s cubic-bezier(0.22,1,0.36,1) .5s';
-      requestAnimationFrame(() => requestAnimationFrame(() => {
-        inner.style.opacity = '1';
-        inner.style.transform = 'translateX(0)';
-      }));
+      inner.style.opacity   = '1';
+      inner.style.transform = 'translateX(0)';
     }
-    // Kick off the friends fetch immediately so it's ready by the time
-    // the list slides in.
     window.renderFriendsDrawer();
+    setTimeout(() => { _friendsDrawerBusy = false; }, 600);
   } else {
-    // CLOSING — list fades out first, then panel slides down
+    // ── CLOSE ──
     if (inner) {
-      inner.style.transition = 'opacity .2s ease, transform .25s cubic-bezier(0.55,0,0.55,0.2)';
-      inner.style.opacity = '0';
+      inner.style.transition = 'opacity .15s ease, transform .2s cubic-bezier(0.55,0,0.55,0.2)';
+      inner.style.opacity   = '0';
       inner.style.transform = 'translateX(8px)';
     }
     setTimeout(() => {
       panel.classList.remove("open");
-      if (btn)  btn.classList.remove("open");
+      if (btn)  { btn.classList.remove("open"); btn.style.bottom = ""; }
       if (chev) chev.style.transform = "";
-      if (btn)  btn.style.bottom = "0";
       document.body.classList.remove('friends-drawer-staggered');
-    }, 180);
-  }
-
-  if (bd && document.body.classList.contains("drawer-nav")) {
-    bd.classList.toggle("visible", !isOpen);
-    if (!isOpen) bd.onclick = () => { window.toggleFriendsDrawer(); bd.onclick = null; };
+      // Strip inline styles so the next open animates from a known baseline.
+      if (inner) {
+        inner.style.transition = '';
+        inner.style.opacity   = '';
+        inner.style.transform = '';
+      }
+      _friendsDrawerBusy = false;
+    }, 220);
   }
 };
 
@@ -19899,8 +20325,14 @@ window.storeBuy = function(id) {
 // Each lobby links to a real game header image (Steam CDN) where possible,
 // with a `fallback` gradient + initial glyph for branded titles that
 // aren't on Steam. `badge` is optional: 'trending' | 'featured' | 'live' | 'fresh'.
+//
+// IMPORTANT: members/online stats are intentionally NOT hardcoded here.
+// The card renderer shows "—" for absent stats and only displays real
+// numbers when the server returns them via /lobbies/public. The seed
+// script at backend/seed-discover-lobbies.js creates these as real
+// lobbies owned by Overlord (#1226) so the numbers become honest.
 const DISCOVER_LOBBIES = [
-  { id:'spotlight-1', name:'Tekken Pro Circuit', tag:'fighting', members:1284, online:284,
+  { id:'spotlight-1', name:'Tekken Pro Circuit', tag:'fighting',
     spotlight:true, badge:'featured', kind:'lobby',
     desc:'Where the Tekken 8 pros warm up. Daily ranked rooms, weekly $500 throwdowns, frame-data nerds welcome.',
     tags:['Fighting','Competitive','Verified'],
@@ -19908,61 +20340,61 @@ const DISCOVER_LOBBIES = [
     heroHi:'https://cdn.cloudflare.steamstatic.com/steam/apps/1778820/library_hero.jpg',
     fallback:'linear-gradient(135deg,#5e0c14 0%,#1a0309 100%)', initial:'T' },
 
-  { id:'demo-1',  name:'CS2 Premier Hub',     tag:'shooter',  members:8421, online:1240, badge:'trending',
+  { id:'demo-1',  name:'CS2 Premier Hub',     tag:'shooter', badge:'trending',
     tags:['Shooter','Ranked'],
     cover:'https://cdn.cloudflare.steamstatic.com/steam/apps/730/header.jpg',
     heroHi:'https://cdn.cloudflare.steamstatic.com/steam/apps/730/library_hero.jpg',
     fallback:'linear-gradient(135deg,#d68f1e 0%,#1a1a1a 100%)', initial:'CS' },
 
-  { id:'demo-2',  name:'Apex Squads',         tag:'shooter',  members:3104, online:412,  badge:'live',
+  { id:'demo-2',  name:'Apex Squads',         tag:'shooter', badge:'live',
     tags:['Shooter','Battle Royale'],
     cover:'https://cdn.cloudflare.steamstatic.com/steam/apps/1172470/header.jpg',
     heroHi:'https://cdn.cloudflare.steamstatic.com/steam/apps/1172470/library_hero.jpg',
     fallback:'linear-gradient(135deg,#da292a 0%,#1a0606 100%)', initial:'A' },
 
-  { id:'demo-3',  name:'Street Fighter Salty',tag:'fighting', members:2105, online:188,
+  { id:'demo-3',  name:'Street Fighter Salty',tag:'fighting',
     tags:['Fighting','Casual'],
     cover:'https://cdn.cloudflare.steamstatic.com/steam/apps/1364780/header.jpg',
     heroHi:'https://cdn.cloudflare.steamstatic.com/steam/apps/1364780/library_hero.jpg',
     fallback:'linear-gradient(135deg,#ffba00 0%,#5a1300 100%)', initial:'SF' },
 
-  { id:'demo-4',  name:'Rocket League 3v3',   tag:'shooter',  members:1862, online:226,  badge:'fresh',
+  { id:'demo-4',  name:'Rocket League 3v3',   tag:'shooter', badge:'fresh',
     tags:['Sports','Arcade'],
     cover:'https://cdn.cloudflare.steamstatic.com/steam/apps/252950/header.jpg',
     heroHi:'https://cdn.cloudflare.steamstatic.com/steam/apps/252950/library_hero.jpg',
     fallback:'linear-gradient(135deg,#0091ff 0%,#001b3d 100%)', initial:'RL' },
 
-  { id:'demo-5',  name:'Valorant Ranked Hub', tag:'shooter',  members:932,  online:108,  badge:'trending',
+  { id:'demo-5',  name:'Valorant Ranked Hub', tag:'shooter', badge:'trending',
     tags:['Shooter','Ranked'],
     cover:'', fallback:'linear-gradient(135deg,#ff4655 0%,#0f1923 100%)', initial:'V' },
 
-  { id:'demo-6',  name:'Smash Bros Weekly',   tag:'fighting', members:612,  online:74,
+  { id:'demo-6',  name:'Smash Bros Weekly',   tag:'fighting',
     tags:['Fighting','Tournaments'],
     cover:'', fallback:'linear-gradient(135deg,#ff3b3b 0%,#1d0808 100%)', initial:'★' },
 
-  { id:'demo-7',  name:'League of Legends LCQ',tag:'strategy',members:548,  online:62,
+  { id:'demo-7',  name:'League of Legends LCQ',tag:'strategy',
     tags:['MOBA','Competitive'],
     cover:'', fallback:'linear-gradient(135deg,#c89b3c 0%,#0a1428 100%)', initial:'L' },
 
-  { id:'demo-8',  name:'StarCraft GMs',       tag:'strategy', members:248,  online:31,
+  { id:'demo-8',  name:'StarCraft GMs',       tag:'strategy',
     tags:['Strategy','RTS'],
     cover:'', fallback:'linear-gradient(135deg,#3aa6ff 0%,#08183d 100%)', initial:'SC' },
 
-  { id:'demo-9',  name:'Indie Game Night',    tag:'indie',    members:187,  online:24,   badge:'fresh',
+  { id:'demo-9',  name:'Indie Game Night',    tag:'indie', badge:'fresh',
     tags:['Indie','Co-op'],
     cover:'', fallback:'linear-gradient(135deg,#9b59ff 0%,#1a073d 100%)', initial:'I' },
 
-  { id:'demo-10', name:'Couch Co-op Chill',   tag:'casual',   members:145,  online:18,
+  { id:'demo-10', name:'Couch Co-op Chill',   tag:'casual',
     tags:['Casual','Chill'],
     cover:'', fallback:'linear-gradient(135deg,#5865f2 0%,#1a1d3d 100%)', initial:'CC' },
 
-  { id:'demo-11', name:'EA FC Pro Clubs',     tag:'shooter',  members:1102, online:140,
+  { id:'demo-11', name:'EA FC Pro Clubs',     tag:'shooter',
     tags:['Sports','Pro Clubs'],
     cover:'https://cdn.cloudflare.steamstatic.com/steam/apps/2669320/header.jpg',
     heroHi:'https://cdn.cloudflare.steamstatic.com/steam/apps/2669320/library_hero.jpg',
     fallback:'linear-gradient(135deg,#00d762 0%,#012b14 100%)', initial:'FC' },
 
-  { id:'demo-12', name:'Warzone Trio Grind',  tag:'shooter',  members:962,  online:118,
+  { id:'demo-12', name:'Warzone Trio Grind',  tag:'shooter',
     tags:['Shooter','Battle Royale'],
     cover:'https://cdn.cloudflare.steamstatic.com/steam/apps/1938090/header.jpg',
     heroHi:'https://cdn.cloudflare.steamstatic.com/steam/apps/1938090/library_hero.jpg',
@@ -20246,17 +20678,26 @@ function _dcSlideHtml(it, isActive) {
         <span class="dc-slide-typebadge tournament">★ Tournament</span>
       </div>`;
   }
+  // Honest stats — only render real numbers when the server marked
+  // this lobby as real (it.isReal === true from /lobbies/public).
+  const hasOnline  = it.isReal && typeof it.online  === 'number';
+  const hasMembers = it.isReal && typeof it.members === 'number';
+  const onlineTxt  = hasOnline  ? `${it.online}` : '—';
+  const membersTxt = hasMembers ? `${(it.members).toLocaleString()}` : '—';
+  const desc = it.desc || (hasMembers
+    ? `${(it.members).toLocaleString()} members · live activity right now`
+    : 'A new community ready to grow — be one of the first.');
   return `
     <div class="dc-slide${isActive ? ' active' : ''}${isEditorial ? ' editorial' : ''}" style="--dc-slide-bg:${bg}">
       ${editorialBadge}
       <div class="dc-spotlight-info">
         <div class="dc-spotlight-tag">★ ${isEditorial ? 'Spotlight Lobby' : 'Featured Lobby'}</div>
         <div class="dc-spotlight-name">${(it.name||'').replace(/</g,'&lt;')}</div>
-        <div class="dc-spotlight-desc">${it.desc || `${it.members||0} members · live activity right now`}</div>
+        <div class="dc-spotlight-desc">${desc}</div>
         <div class="dc-spotlight-meta">
-          <span style="display:inline-flex;align-items:center;gap:6px"><span class="dc-online-dot"></span>${it.online||0} online</span>
+          <span style="display:inline-flex;align-items:center;gap:6px"><span class="dc-online-dot"></span>${onlineTxt} online</span>
           <span>·</span>
-          <span>${(it.members||0).toLocaleString()} members</span>
+          <span>${membersTxt} members</span>
         </div>
         <button class="dc-spotlight-cta" onclick="event.stopPropagation();window.discoverJoin('${it.id}', ${JSON.stringify(it.name).replace(/"/g,'&quot;')})">Join lobby →</button>
       </div>
@@ -20270,6 +20711,14 @@ function _dcLobbyCardHtml(l) {
     : '';
   const badge = l.badge ? `<span class="dc-card-badge ${l.badge}">${l.badge}</span>` : '';
   const tagsHtml = (l.tags || []).slice(0, 3).map(t => `<span class="dc-card-tag">${t}</span>`).join('');
+  // Honest stats — only render numbers when the server has actually
+  // returned them (l.isReal === true). Otherwise show an em-dash so the
+  // UI never lies about how many people are in a placeholder lobby.
+  const hasOnline  = l.isReal && typeof l.online  === 'number';
+  const hasMembers = l.isReal && typeof l.members === 'number';
+  const onlineTxt  = hasOnline  ? `${(l.online).toLocaleString()} online`  : '— online';
+  const membersTxt = hasMembers ? `${(l.members).toLocaleString()}`         : '—';
+  const onlineCls  = hasOnline  ? '' : ' is-empty';
   return `
     <div class="dc-card"
          style="--dc-fallback:${l.fallback}"
@@ -20283,9 +20732,9 @@ function _dcLobbyCardHtml(l) {
       </div>
       <div class="dc-card-info">
         <div class="dc-card-name">${(l.name||'').replace(/</g,'&lt;')}</div>
-        <div class="dc-card-meta">
-          <span class="dc-card-meta-item"><span class="dc-online-dot"></span>${(l.online||0).toLocaleString()} online</span>
-          <span class="dc-card-meta-item">👥 ${(l.members||0).toLocaleString()}</span>
+        <div class="dc-card-meta${onlineCls}">
+          <span class="dc-card-meta-item"><span class="dc-online-dot"></span>${onlineTxt}</span>
+          <span class="dc-card-meta-item">👥 ${membersTxt}</span>
         </div>
         <div class="dc-card-tags">${tagsHtml}</div>
         <div class="dc-card-join">Join lobby →</div>
@@ -22130,36 +22579,46 @@ setInterval(() => { try { window.updateGsInboxBadge(); } catch{} }, 4000);
 // The LOBBIES ▼ pill always drops the lobby picker — both on home and inside
 // a lobby. Channels for the current lobby are reached via the left-edge
 // channel-sidebar toggle (#channelEdgeTab), not via this pill.
+let _lobbiesDrawerBusy = false;
 window.toggleLobbiesDrawer = function() {
-  // If the user is inside a lobby and the channel sidebar is open, slide it
-  // away first so the lobby picker has the full stage — they're about to
-  // switch contexts and the two overlapping at once is visually noisy.
-  if (document.body.classList.contains("sidebar-open") &&
-      document.body.classList.contains("lobby-selected")) {
-    toggleChatSidebar();
-  }
+  if (_lobbiesDrawerBusy) return;
   const panel = document.getElementById("lobbiesDrawerPanel");
   const btn   = document.getElementById("lobbiesNavBtn");
   const chev  = document.getElementById("lobbiesDrawerChevron");
   const bd    = document.getElementById("sidebarBackdrop");
   if (!panel) return;
-
-  // Close friends drawer first if it's open
-  const friendsPanel = document.getElementById("friendsDrawerPanel");
-  if (friendsPanel && friendsPanel.classList.contains("open")) {
-    window.toggleFriendsDrawer();
-  }
-
   const isOpen = panel.classList.contains("open");
-  panel.classList.toggle("open", !isOpen);
-  if (btn)  btn.classList.toggle("open", !isOpen);
-  if (chev) chev.style.transform = isOpen ? "" : "rotate(180deg)";
-  if (bd && document.body.classList.contains("drawer-nav")) {
-    bd.classList.toggle("visible", !isOpen);
-    if (!isOpen) bd.onclick = () => { window.toggleLobbiesDrawer(); bd.onclick = null; };
+
+  if (!isOpen) {
+    _lobbiesDrawerBusy = true;
+    // Close any sibling drawer / sidebar that would visually conflict
+    if (document.body.classList.contains("sidebar-open") &&
+        document.body.classList.contains("lobby-selected")) {
+      toggleChatSidebar();
+    }
+    const friendsPanel = document.getElementById("friendsDrawerPanel");
+    if (friendsPanel && friendsPanel.classList.contains("open")) {
+      window.toggleFriendsDrawer();
+    }
+    panel.classList.add("open");
+    if (btn)  { btn.classList.add("open"); btn.style.top = (72 + 80) + "px"; }
+    if (chev) chev.style.transform = "rotate(180deg)";
+    if (bd && document.body.classList.contains("drawer-nav")) {
+      bd.classList.add("visible");
+      bd.onclick = () => { window.toggleLobbiesDrawer(); bd.onclick = null; };
+    }
+    setTimeout(() => { _lobbiesDrawerBusy = false; }, 320);
+  } else {
+    _lobbiesDrawerBusy = true;
+    panel.classList.remove("open");
+    if (btn)  { btn.classList.remove("open"); btn.style.top = "72px"; }
+    if (chev) chev.style.transform = "";
+    if (bd && document.body.classList.contains("drawer-nav")) {
+      bd.classList.remove("visible");
+      bd.onclick = null;
+    }
+    setTimeout(() => { _lobbiesDrawerBusy = false; }, 320);
   }
-  // Move pill down when panel is open (panel height = 80px)
-  if (btn) btn.style.top = isOpen ? "72px" : (72 + 80) + "px";
 };
 
 window.renderFriendsDrawer = async function() {
