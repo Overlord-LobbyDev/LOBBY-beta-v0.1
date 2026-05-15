@@ -96,6 +96,113 @@
     .empty .empty-icon { font-size:40px; margin-bottom:12px; }
     ::-webkit-scrollbar { width:6px; }
     ::-webkit-scrollbar-thumb { background:var(--bg-3); border-radius:3px; }
+
+    /* ── Commerce admin sections — premium finance dashboard ── */
+    .finance-lock-banner {
+      display:flex; align-items:center; gap:14px;
+      padding:18px 22px;
+      background:linear-gradient(135deg, rgba(255,200,60,.08), rgba(255,200,60,.02));
+      border:1px solid rgba(255,200,60,.25);
+      border-radius:14px;
+      margin-bottom:20px;
+    }
+    .flb-icon {
+      width:40px; height:40px; flex-shrink:0;
+      background:rgba(255,200,60,.16);
+      border-radius:10px;
+      display:flex; align-items:center; justify-content:center;
+      font-size:18px;
+    }
+    .flb-title { font-size:14px; font-weight:800; color:var(--text-1); }
+    .flb-sub { font-size:12px; color:var(--text-3); margin-top:3px; line-height:1.45; max-width:560px; }
+
+    .fin-stats-row {
+      display:grid; grid-template-columns:repeat(4,1fr); gap:14px; margin-bottom:24px;
+    }
+    .fin-stat-card {
+      background:var(--bg-1); border:1px solid rgba(255,255,255,.04);
+      border-radius:14px; padding:18px;
+      position:relative; overflow:hidden;
+    }
+    .fin-stat-card::before {
+      content:''; position:absolute; inset:0;
+      background:linear-gradient(135deg, transparent 0%, rgba(255,255,255,.02) 100%);
+      pointer-events:none;
+    }
+    .fin-stat-revenue {
+      background:linear-gradient(135deg, rgba(255,193,7,.12), rgba(255,140,0,.04)),
+                  var(--bg-1);
+      border-color:rgba(255,193,7,.25);
+    }
+    .fin-stat-eyebrow {
+      font-size:10.5px; font-weight:800; letter-spacing:1.3px;
+      text-transform:uppercase; color:var(--text-3);
+    }
+    .fin-stat-value {
+      font-family:'Bebas Neue', sans-serif;
+      font-size:34px; letter-spacing:1px;
+      color:var(--text-1); margin:6px 0 4px; line-height:1;
+    }
+    .fin-stat-sub { font-size:11px; color:var(--text-3); }
+    .fin-stat-delta { font-weight:800; color:var(--text-2); }
+    .fin-stat-delta.up   { color:#3ba55d; }
+    .fin-stat-delta.down { color:#ed4245; }
+
+    .fin-section {
+      margin-bottom:28px;
+      background:var(--bg-1); border:1px solid rgba(255,255,255,.04);
+      border-radius:14px; padding:20px;
+    }
+    .fin-section-head { margin-bottom:14px; }
+    .fin-section-head h3 {
+      margin:0; font-size:14px; font-weight:800; color:var(--text-1);
+    }
+    .fin-section-sub {
+      font-size:11.5px; color:var(--text-3); margin-top:3px; line-height:1.45;
+    }
+    .grant-row {
+      display:flex; gap:8px; flex-wrap:wrap; align-items:center;
+    }
+    .grant-row input, .grant-row select {
+      padding:9px 12px; background:var(--bg-2);
+      border:1px solid rgba(255,255,255,.1); border-radius:8px;
+      color:var(--text-1); font-size:13px; min-width:0;
+    }
+    .grant-row select { cursor:pointer; }
+    .grant-row select:focus, .grant-row input:focus {
+      outline:none; border-color:var(--accent);
+    }
+
+    .feat-preview {
+      width:100%; aspect-ratio:21/9;
+      border-radius:14px;
+      background:linear-gradient(135deg, var(--bg-3), var(--bg-2));
+      border:1px solid rgba(255,255,255,.06);
+      display:flex; align-items:flex-end;
+      padding:16px;
+      position:relative; overflow:hidden;
+      background-size:cover; background-position:center;
+    }
+    .feat-preview-overlay {
+      position:absolute; inset:0;
+      background:linear-gradient(180deg, transparent 30%, rgba(0,0,0,.7) 100%);
+    }
+    .feat-preview-inner {
+      position:relative; z-index:1;
+      color:#fff;
+    }
+    .feat-preview-headline {
+      font-family:'Bebas Neue', sans-serif;
+      font-size:24px; letter-spacing:1.5px;
+      text-shadow:0 2px 12px rgba(0,0,0,.6);
+    }
+    .feat-preview-tag {
+      display:inline-block;
+      font-size:10px; font-weight:900; letter-spacing:1.5px;
+      padding:3px 9px; border-radius:99px;
+      background:rgba(255,215,0,.95); color:#1a1409;
+      margin-bottom:8px;
+    }
   </style>
   <script>
   // ── Apply saved theme on load ────────────────────────────────
@@ -181,6 +288,11 @@
     <button class="nav-item" data-view="servers"><span class="icon">🏠</span> Servers</button>
     <button class="nav-item" data-view="announcements"><span class="icon">📢</span> Announcements</button>
     <button class="nav-item" data-view="profanity"><span class="icon">🚫</span> Profanity Filter</button>
+    <div class="nav-section" style="margin-top:14px">Commerce <span style="font-size:9px;font-weight:800;letter-spacing:1.2px;padding:1px 6px;border-radius:99px;background:rgba(255,200,60,.18);color:#ffd33d;margin-left:6px">RESTRICTED</span></div>
+    <button class="nav-item" data-view="finance"><span class="icon">💰</span> Finance</button>
+    <button class="nav-item" data-view="store"><span class="icon">🎁</span> Store &amp; Cosmetics</button>
+    <button class="nav-item" data-view="transactions"><span class="icon">🧾</span> Transactions</button>
+    <button class="nav-item" data-view="featured"><span class="icon">✨</span> Featured Curation</button>
   </div>
   <div class="sidebar-bottom">
     <div class="admin-avatar" id="sidebarAvatar">A</div>
@@ -293,6 +405,235 @@
         <div id="pfMsg" style="font-size:12px;margin-bottom:12px;min-height:16px"></div>
         <div id="pfWordList" style="display:flex;flex-wrap:wrap;gap:8px">
           <span style="color:var(--text-3);font-size:13px">Loading…</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- ──────────────────────────────────────────────────────────────
+         Commerce sections — Finance / Store / Transactions / Featured
+         All gated by `requireFinancePermission()` AND a step-up auth
+         re-prompt before any mutating action. NEVER trust the client
+         flag alone — the server must enforce the same gates.
+         ────────────────────────────────────────────────────────────── -->
+
+    <!-- Finance View -->
+    <div id="view-finance" style="display:none">
+      <div class="finance-lock-banner" id="financeLockBanner">
+        <div class="flb-icon">🔐</div>
+        <div style="flex:1">
+          <div class="flb-title">Step-up authentication required</div>
+          <div class="flb-sub">Re-enter your password to view revenue, transactions, or grant cosmetics. Your session token doesn't include finance scopes by default.</div>
+        </div>
+        <button class="btn btn-blue" onclick="financeStepUp()">Authenticate</button>
+      </div>
+      <div id="financeBody" style="display:none">
+        <div class="fin-stats-row">
+          <div class="fin-stat-card fin-stat-revenue">
+            <div class="fin-stat-eyebrow">Today</div>
+            <div class="fin-stat-value" id="finRevToday">—</div>
+            <div class="fin-stat-sub"><span id="finRevTodayDelta" class="fin-stat-delta">—</span> vs yesterday</div>
+          </div>
+          <div class="fin-stat-card">
+            <div class="fin-stat-eyebrow">Month-to-date</div>
+            <div class="fin-stat-value" id="finRevMtd">—</div>
+            <div class="fin-stat-sub"><span id="finRevMtdDelta" class="fin-stat-delta">—</span> vs last month</div>
+          </div>
+          <div class="fin-stat-card">
+            <div class="fin-stat-eyebrow">LC Sold (today)</div>
+            <div class="fin-stat-value" id="finLcSold">—</div>
+            <div class="fin-stat-sub">Paid coins only — bonuses excluded</div>
+          </div>
+          <div class="fin-stat-card">
+            <div class="fin-stat-eyebrow">Refunds (30d)</div>
+            <div class="fin-stat-value" id="finRefunds">—</div>
+            <div class="fin-stat-sub"><span id="finRefundRate" class="fin-stat-delta">—</span> refund rate</div>
+          </div>
+        </div>
+        <div class="fin-section">
+          <div class="fin-section-head">
+            <h3>Top SKUs (7 days)</h3>
+            <div class="fin-section-sub">Best-selling cosmetics by paid LC volume</div>
+          </div>
+          <div class="table-wrap">
+            <table>
+              <thead><tr><th>Product</th><th>Tier</th><th>Units</th><th>LC Earned</th><th>Avg / day</th></tr></thead>
+              <tbody id="finTopSkusBody"><tr><td colspan="5"><div class="empty"><p>Loading…</p></div></td></tr></tbody>
+            </table>
+          </div>
+        </div>
+        <div class="fin-section">
+          <div class="fin-section-head">
+            <h3>Recent Payouts</h3>
+            <div class="fin-section-sub">Provider settlements landing in connected bank accounts</div>
+          </div>
+          <div class="table-wrap">
+            <table>
+              <thead><tr><th>Date</th><th>Provider</th><th>Gross</th><th>Fees</th><th>Net</th><th>Status</th></tr></thead>
+              <tbody id="finPayoutsBody"><tr><td colspan="6"><div class="empty"><p>Loading…</p></div></td></tr></tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Store & Cosmetics View -->
+    <div id="view-store" style="display:none">
+      <div class="finance-lock-banner" id="storeLockBanner">
+        <div class="flb-icon">🔐</div>
+        <div style="flex:1">
+          <div class="flb-title">Step-up authentication required</div>
+          <div class="flb-sub">Re-enter your password to grant or revoke cosmetics for users.</div>
+        </div>
+        <button class="btn btn-blue" onclick="financeStepUp()">Authenticate</button>
+      </div>
+      <div id="storeBody" style="display:none">
+        <div class="fin-section">
+          <div class="fin-section-head">
+            <h3>Look up a user's ownership</h3>
+            <div class="fin-section-sub">Find a user, see what they own and what's equipped, grant or revoke.</div>
+          </div>
+          <div class="toolbar" style="margin-bottom:14px">
+            <div class="search-wrap" style="flex:1">
+              <span class="search-icon">🔍</span>
+              <input type="text" id="storeUserSearch" placeholder="Search users by name, email, or ID…" />
+            </div>
+            <button class="btn btn-grey" onclick="storeLookupUser()">Look up</button>
+          </div>
+          <div id="storeUserResult" style="background:var(--bg-1);border-radius:12px;padding:18px;border:1px solid rgba(255,255,255,.07);display:none">
+            <div id="storeUserResultBody"></div>
+          </div>
+        </div>
+        <div class="fin-section">
+          <div class="fin-section-head">
+            <h3>Grant a cosmetic</h3>
+            <div class="fin-section-sub">Manual grants are audited and ALWAYS appear in the user's audit log. Reason is required.</div>
+          </div>
+          <div class="grant-row">
+            <input type="text" id="grantUserId" placeholder="User ID" style="flex:0 0 220px">
+            <select id="grantProductId" style="flex:1">
+              <option value="">— Select a cosmetic —</option>
+            </select>
+            <input type="text" id="grantReason" placeholder="Reason (e.g. customer support, contest prize)…" style="flex:1">
+            <button class="btn btn-blue" onclick="storeGrantCosmetic()">Grant</button>
+          </div>
+          <div id="grantMsg" style="margin-top:10px;font-size:12px;min-height:16px"></div>
+        </div>
+        <div class="fin-section">
+          <div class="fin-section-head">
+            <h3>Audit log (last 50 grants/revokes)</h3>
+          </div>
+          <div class="table-wrap">
+            <table>
+              <thead><tr><th>When</th><th>Admin</th><th>Action</th><th>User</th><th>Item</th><th>Reason</th></tr></thead>
+              <tbody id="storeAuditBody"><tr><td colspan="6"><div class="empty"><p>—</p></div></td></tr></tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Transactions View -->
+    <div id="view-transactions" style="display:none">
+      <div class="finance-lock-banner" id="txnLockBanner">
+        <div class="flb-icon">🔐</div>
+        <div style="flex:1">
+          <div class="flb-title">Step-up authentication required</div>
+          <div class="flb-sub">Re-enter your password to view transaction details and process refunds.</div>
+        </div>
+        <button class="btn btn-blue" onclick="financeStepUp()">Authenticate</button>
+      </div>
+      <div id="txnBody" style="display:none">
+        <div class="toolbar" style="margin-bottom:16px">
+          <div class="search-wrap" style="flex:1">
+            <span class="search-icon">🔍</span>
+            <input type="text" id="txnSearch" placeholder="Search by transaction ID, user, email…" />
+          </div>
+          <select class="filter" id="txnStatusFilter">
+            <option value="all">All statuses</option>
+            <option value="succeeded">Succeeded</option>
+            <option value="pending">Pending</option>
+            <option value="failed">Failed</option>
+            <option value="refunded">Refunded</option>
+            <option value="disputed">Disputed</option>
+          </select>
+          <select class="filter" id="txnProviderFilter">
+            <option value="all">All providers</option>
+            <option value="stripe">Stripe</option>
+            <option value="paddle">Paddle</option>
+            <option value="lemon">Lemon Squeezy</option>
+            <option value="iap_apple">Apple IAP</option>
+            <option value="iap_google">Google IAP</option>
+          </select>
+          <button class="btn btn-grey" onclick="loadTransactions()">↻ Refresh</button>
+        </div>
+        <div class="table-wrap">
+          <table>
+            <thead>
+              <tr><th>Txn ID</th><th>User</th><th>Provider</th><th>Pack</th><th>Amount</th><th>LC</th><th>Status</th><th>When</th><th></th></tr>
+            </thead>
+            <tbody id="txnTableBody"><tr><td colspan="9"><div class="empty"><p>Authenticate above to load.</p></div></td></tr></tbody>
+          </table>
+        </div>
+        <div style="display:flex;gap:8px;margin-top:12px;align-items:center" id="txnPagination"></div>
+      </div>
+    </div>
+
+    <!-- Featured Curation View -->
+    <div id="view-featured" style="display:none">
+      <div class="finance-lock-banner" id="featuredLockBanner">
+        <div class="flb-icon">🔐</div>
+        <div style="flex:1">
+          <div class="flb-title">Step-up authentication required</div>
+          <div class="flb-sub">The Featured slot is shown to every user on Discover — changes are live immediately.</div>
+        </div>
+        <button class="btn btn-blue" onclick="financeStepUp()">Authenticate</button>
+      </div>
+      <div id="featuredBody" style="display:none">
+        <div class="fin-section">
+          <div class="fin-section-head">
+            <h3>LOBBY Featured slot</h3>
+            <div class="fin-section-sub">First card in every user's Discover carousel. Set this for big tournament drops, season launches, or community spotlights.</div>
+          </div>
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:18px">
+            <div>
+              <div style="margin-bottom:10px">
+                <label style="font-size:11px;color:var(--text-3);font-weight:700;letter-spacing:.5px;text-transform:uppercase">Kind</label>
+                <select id="featKind" style="width:100%;padding:8px 12px;background:var(--bg-2);border:1px solid rgba(255,255,255,.1);border-radius:8px;color:var(--text-1);font-size:13px;margin-top:4px">
+                  <option value="tournament">Tournament</option>
+                  <option value="lobby">Lobby</option>
+                  <option value="announcement">Announcement</option>
+                </select>
+              </div>
+              <div style="margin-bottom:10px">
+                <label style="font-size:11px;color:var(--text-3);font-weight:700;letter-spacing:.5px;text-transform:uppercase">Target ID</label>
+                <input id="featTargetId" type="text" placeholder="Tournament / lobby ID" style="width:100%;padding:8px 12px;background:var(--bg-2);border:1px solid rgba(255,255,255,.1);border-radius:8px;color:var(--text-1);font-size:13px;margin-top:4px">
+              </div>
+              <div style="margin-bottom:10px">
+                <label style="font-size:11px;color:var(--text-3);font-weight:700;letter-spacing:.5px;text-transform:uppercase">Headline</label>
+                <input id="featHeadline" type="text" maxlength="80" placeholder="e.g. WEEKEND THROWDOWN — $500 prize" style="width:100%;padding:8px 12px;background:var(--bg-2);border:1px solid rgba(255,255,255,.1);border-radius:8px;color:var(--text-1);font-size:13px;margin-top:4px">
+              </div>
+              <div style="margin-bottom:10px">
+                <label style="font-size:11px;color:var(--text-3);font-weight:700;letter-spacing:.5px;text-transform:uppercase">Hero image URL</label>
+                <input id="featHero" type="url" placeholder="https://…/hero.jpg" style="width:100%;padding:8px 12px;background:var(--bg-2);border:1px solid rgba(255,255,255,.1);border-radius:8px;color:var(--text-1);font-size:13px;margin-top:4px">
+              </div>
+              <div style="margin-bottom:10px">
+                <label style="font-size:11px;color:var(--text-3);font-weight:700;letter-spacing:.5px;text-transform:uppercase">Live window (UTC)</label>
+                <div style="display:flex;gap:8px;margin-top:4px">
+                  <input id="featStart" type="datetime-local" style="flex:1;padding:8px 12px;background:var(--bg-2);border:1px solid rgba(255,255,255,.1);border-radius:8px;color:var(--text-1);font-size:13px">
+                  <input id="featEnd" type="datetime-local" style="flex:1;padding:8px 12px;background:var(--bg-2);border:1px solid rgba(255,255,255,.1);border-radius:8px;color:var(--text-1);font-size:13px">
+                </div>
+              </div>
+              <div style="display:flex;gap:8px;margin-top:14px">
+                <button class="btn btn-blue" onclick="featuredSave()">Publish</button>
+                <button class="btn btn-grey" onclick="featuredClear()">Clear featured slot</button>
+              </div>
+              <div id="featMsg" style="margin-top:10px;font-size:12px;min-height:16px"></div>
+            </div>
+            <div>
+              <label style="font-size:11px;color:var(--text-3);font-weight:700;letter-spacing:.5px;text-transform:uppercase;display:block;margin-bottom:8px">Live preview</label>
+              <div id="featPreview" class="feat-preview"></div>
+            </div>
+          </div>
         </div>
       </div>
     </div>
@@ -498,6 +839,10 @@ document.querySelectorAll(".nav-item[data-view]").forEach(btn => {
       servers: "🏠 All Servers",
       announcements: "📢 Announcements",
       profanity: "🚫 Profanity Filter",
+      finance: "💰 Finance",
+      store: "🎁 Store & Cosmetics",
+      transactions: "🧾 Transactions",
+      featured: "✨ Featured Curation",
     };
     const filters = { all:"all", banned:"banned", admin:"admin" };
     document.getElementById("viewTitle").textContent = titles[view] || view;
@@ -513,6 +858,18 @@ document.querySelectorAll(".nav-item[data-view]").forEach(btn => {
     } else if (view === "profanity") {
       showPanelView("view-profanity");
       loadProfanityWords();
+    } else if (view === "finance") {
+      showPanelView("view-finance");
+      if (window._financeUnlocked) loadFinance();
+    } else if (view === "store") {
+      showPanelView("view-store");
+      if (window._financeUnlocked) loadStoreAdmin();
+    } else if (view === "transactions") {
+      showPanelView("view-transactions");
+      if (window._financeUnlocked) loadTransactions();
+    } else if (view === "featured") {
+      showPanelView("view-featured");
+      if (window._financeUnlocked) loadFeatured();
     } else {
       showUserTableView();
       if (filters[view]) document.getElementById("filterSelect").value = filters[view];
@@ -520,6 +877,353 @@ document.querySelectorAll(".nav-item[data-view]").forEach(btn => {
     }
   });
 });
+
+// ─────────────────────────────────────────────────────────────────────
+// Commerce admin — Finance / Store / Transactions / Featured
+//
+// Every commerce action requires step-up authentication. The default
+// admin JWT does NOT include the `finance` scope; the user must re-enter
+// their password to acquire a short-lived (15 min) finance token. The
+// server is the only authority — UI gating here is purely UX. ALL
+// mutations must be re-validated server-side using the finance scope on
+// the inbound token.
+// ─────────────────────────────────────────────────────────────────────
+window._financeUnlocked = false;
+window._financeToken = null;        // never persisted to localStorage
+window._financeTokenExpiresAt = 0;
+
+function _financeIsValid() {
+  return !!window._financeToken && Date.now() < window._financeTokenExpiresAt;
+}
+async function financeStepUp() {
+  const password = prompt(
+    'Step-up authentication required.\n' +
+    'Re-enter your admin password to access financial data.\n\n' +
+    'This grants a short-lived (15 min) finance token tied to this session only.'
+  );
+  if (!password) return;
+  try {
+    const r = await fetch(`${AUTH_URL}/admin/auth/finance-step-up`, {
+      method: 'POST',
+      headers: { ...auth(), 'Content-Type':'application/json' },
+      body: JSON.stringify({ password }),
+    });
+    const data = await r.json();
+    if (!r.ok || !data.token) {
+      showToast(data.error || 'Authentication failed', 'error');
+      return;
+    }
+    window._financeToken = data.token;
+    window._financeTokenExpiresAt = Date.now() + (data.expiresInSeconds || 900) * 1000;
+    window._financeUnlocked = true;
+    // Reveal the bodies of all commerce panels
+    ['financeLockBanner','storeLockBanner','txnLockBanner','featuredLockBanner'].forEach(id => {
+      const el = document.getElementById(id); if (el) el.style.display = 'none';
+    });
+    ['financeBody','storeBody','txnBody','featuredBody'].forEach(id => {
+      const el = document.getElementById(id); if (el) el.style.display = '';
+    });
+    showToast('Finance access unlocked for 15 min', 'success');
+    // Refresh the currently visible commerce panel
+    const active = document.querySelector('.nav-item.active')?.dataset?.view;
+    if (active === 'finance')       loadFinance();
+    else if (active === 'store')    loadStoreAdmin();
+    else if (active === 'transactions') loadTransactions();
+    else if (active === 'featured') loadFeatured();
+  } catch (e) {
+    showToast('Step-up failed: ' + (e.message||'network'), 'error');
+  }
+}
+function _finHeaders() {
+  return { ...auth(), 'X-Finance-Token': window._financeToken || '', 'Content-Type':'application/json' };
+}
+
+// ── Finance dashboard ──
+async function loadFinance() {
+  if (!_financeIsValid()) return financeStepUp();
+  try {
+    const r = await fetch(`${AUTH_URL}/admin/finance/summary`, { headers: _finHeaders() });
+    if (!r.ok) throw new Error((await r.json()).error || 'failed');
+    const d = await r.json();
+    document.getElementById('finRevToday').textContent = `$${(d.revenueTodayUSD||0).toLocaleString(undefined,{minimumFractionDigits:2,maximumFractionDigits:2})}`;
+    document.getElementById('finRevMtd').textContent   = `$${(d.revenueMTDUSD||0).toLocaleString(undefined,{minimumFractionDigits:2,maximumFractionDigits:2})}`;
+    document.getElementById('finLcSold').textContent   = (d.lcSoldToday||0).toLocaleString();
+    document.getElementById('finRefunds').textContent  = `$${(d.refunds30dUSD||0).toLocaleString(undefined,{minimumFractionDigits:2,maximumFractionDigits:2})}`;
+    const setDelta = (id, pct) => {
+      const el = document.getElementById(id);
+      if (!el || pct == null) { if (el) el.textContent = '—'; return; }
+      el.textContent = (pct >= 0 ? '+' : '') + pct.toFixed(1) + '%';
+      el.className = 'fin-stat-delta ' + (pct >= 0 ? 'up' : 'down');
+    };
+    setDelta('finRevTodayDelta', d.revenueTodayDeltaPct);
+    setDelta('finRevMtdDelta',   d.revenueMTDDeltaPct);
+    document.getElementById('finRefundRate').textContent = ((d.refundRatePct||0).toFixed(2)) + '%';
+    // Top SKUs
+    const skuTbody = document.getElementById('finTopSkusBody');
+    if (skuTbody) {
+      const rows = (d.topSkus||[]).map(s => `
+        <tr>
+          <td>${s.name||'—'}</td>
+          <td>${s.tier||'—'}</td>
+          <td>${(s.units||0).toLocaleString()}</td>
+          <td>${(s.lcEarned||0).toLocaleString()} LC</td>
+          <td>${Math.round((s.units||0)/7).toLocaleString()}</td>
+        </tr>`).join('');
+      skuTbody.innerHTML = rows || `<tr><td colspan="5"><div class="empty"><p>No sales in this window yet.</p></div></td></tr>`;
+    }
+    // Payouts
+    const poTbody = document.getElementById('finPayoutsBody');
+    if (poTbody) {
+      const rows = (d.payouts||[]).map(p => `
+        <tr>
+          <td>${new Date(p.date).toLocaleDateString()}</td>
+          <td>${(p.provider||'').toUpperCase()}</td>
+          <td>$${(p.grossUSD||0).toLocaleString(undefined,{minimumFractionDigits:2})}</td>
+          <td>$${(p.feesUSD||0).toLocaleString(undefined,{minimumFractionDigits:2})}</td>
+          <td>$${(p.netUSD||0).toLocaleString(undefined,{minimumFractionDigits:2})}</td>
+          <td>${p.status||'pending'}</td>
+        </tr>`).join('');
+      poTbody.innerHTML = rows || `<tr><td colspan="6"><div class="empty"><p>No payouts yet.</p></div></td></tr>`;
+    }
+  } catch (e) {
+    showToast('Could not load finance: ' + (e.message||'network'), 'error');
+  }
+}
+
+// ── Store admin: ownership lookup, grant, revoke, audit log ──
+async function loadStoreAdmin() {
+  if (!_financeIsValid()) return financeStepUp();
+  // Populate product list for the grant form
+  try {
+    const r = await fetch(`${AUTH_URL}/admin/store/products`, { headers: _finHeaders() });
+    if (r.ok) {
+      const products = await r.json();
+      const sel = document.getElementById('grantProductId');
+      if (sel && Array.isArray(products)) {
+        sel.innerHTML = `<option value="">— Select a cosmetic —</option>` +
+          products.map(p => `<option value="${p.id}">${p.name} (${p.tier})</option>`).join('');
+      }
+    }
+  } catch {}
+  // Audit log
+  try {
+    const r = await fetch(`${AUTH_URL}/admin/store/audit?limit=50`, { headers: _finHeaders() });
+    if (r.ok) {
+      const log = await r.json();
+      const tbody = document.getElementById('storeAuditBody');
+      if (tbody) {
+        tbody.innerHTML = (log||[]).map(e => `
+          <tr>
+            <td>${new Date(e.at).toLocaleString()}</td>
+            <td>${e.adminUsername||e.adminId||'—'}</td>
+            <td><span style="color:${e.action==='grant' ? '#3ba55d' : '#ed4245'};font-weight:700">${e.action||'—'}</span></td>
+            <td>${e.userUsername||e.userId||'—'}</td>
+            <td>${e.productName||e.productId||'—'}</td>
+            <td>${(e.reason||'').replace(/</g,'&lt;')}</td>
+          </tr>`).join('') || `<tr><td colspan="6"><div class="empty"><p>No audit entries yet.</p></div></td></tr>`;
+      }
+    }
+  } catch {}
+}
+async function storeLookupUser() {
+  if (!_financeIsValid()) return financeStepUp();
+  const q = document.getElementById('storeUserSearch').value.trim();
+  if (!q) return;
+  try {
+    const r = await fetch(`${AUTH_URL}/admin/store/lookup-user?q=${encodeURIComponent(q)}`, { headers: _finHeaders() });
+    if (!r.ok) throw new Error((await r.json()).error || 'failed');
+    const d = await r.json();
+    const box = document.getElementById('storeUserResult');
+    box.style.display = '';
+    const body = document.getElementById('storeUserResultBody');
+    body.innerHTML = `
+      <div style="display:flex;align-items:center;gap:14px;margin-bottom:14px">
+        <div style="width:42px;height:42px;border-radius:10px;background:var(--accent);display:flex;align-items:center;justify-content:center;color:#fff;font-weight:800;font-size:18px">${(d.username||'?').charAt(0).toUpperCase()}</div>
+        <div>
+          <div style="font-size:14px;font-weight:800;color:var(--text-1)">${d.username||'—'} <span style="font-size:11px;color:var(--text-3);font-weight:400">#${d.id||'—'}</span></div>
+          <div style="font-size:11.5px;color:var(--text-3)">Wallet: ${(d.lcBalance||0).toLocaleString()} LC</div>
+        </div>
+        <button class="btn btn-grey" style="margin-left:auto" onclick="document.getElementById('grantUserId').value='${d.id}';showToast('User ID prefilled in grant form','success')">Use in grant →</button>
+      </div>
+      <div style="font-size:11px;font-weight:800;color:var(--text-3);letter-spacing:.5px;text-transform:uppercase;margin-bottom:6px">Owned (${(d.owned||[]).length})</div>
+      <div style="display:flex;flex-wrap:wrap;gap:6px">
+        ${(d.owned||[]).map(o => `<span style="font-size:11px;padding:4px 9px;border-radius:99px;background:var(--bg-2);color:var(--text-2);border:1px solid rgba(255,255,255,.06)">${o.name||o.id} <button onclick="storeRevoke(${d.id}, '${o.id}')" style="background:none;border:none;color:#ed4245;cursor:pointer;font-weight:800;margin-left:4px">×</button></span>`).join('') || '<span style="color:var(--text-3);font-size:12px">None owned yet.</span>'}
+      </div>
+    `;
+  } catch (e) {
+    showToast('Lookup failed: ' + (e.message||'network'), 'error');
+  }
+}
+async function storeGrantCosmetic() {
+  if (!_financeIsValid()) return financeStepUp();
+  const userId = document.getElementById('grantUserId').value.trim();
+  const productId = document.getElementById('grantProductId').value;
+  const reason = document.getElementById('grantReason').value.trim();
+  if (!userId || !productId || !reason) {
+    document.getElementById('grantMsg').textContent = 'User ID, product, and reason all required.';
+    document.getElementById('grantMsg').style.color = '#ed4245';
+    return;
+  }
+  try {
+    const r = await fetch(`${AUTH_URL}/admin/store/grant`, {
+      method: 'POST', headers: _finHeaders(),
+      body: JSON.stringify({ userId, productId, reason }),
+    });
+    const d = await r.json();
+    if (!r.ok) throw new Error(d.error || 'failed');
+    document.getElementById('grantMsg').textContent = `✓ Granted "${d.productName}" to ${d.username || userId}.`;
+    document.getElementById('grantMsg').style.color = '#3ba55d';
+    document.getElementById('grantReason').value = '';
+    loadStoreAdmin();
+  } catch (e) {
+    document.getElementById('grantMsg').textContent = 'Grant failed: ' + (e.message||'network');
+    document.getElementById('grantMsg').style.color = '#ed4245';
+  }
+}
+async function storeRevoke(userId, productId) {
+  if (!_financeIsValid()) return financeStepUp();
+  const reason = prompt('Reason for revoking? (required, appears in audit log and is shown to the user if they appeal)');
+  if (!reason || !reason.trim()) return;
+  try {
+    const r = await fetch(`${AUTH_URL}/admin/store/revoke`, {
+      method: 'POST', headers: _finHeaders(),
+      body: JSON.stringify({ userId, productId, reason: reason.trim() }),
+    });
+    const d = await r.json();
+    if (!r.ok) throw new Error(d.error || 'failed');
+    showToast('Item revoked', 'success');
+    storeLookupUser();
+    loadStoreAdmin();
+  } catch (e) {
+    showToast('Revoke failed: ' + (e.message||'network'), 'error');
+  }
+}
+
+// ── Transactions ──
+async function loadTransactions() {
+  if (!_financeIsValid()) return financeStepUp();
+  const q = document.getElementById('txnSearch')?.value.trim() || '';
+  const status = document.getElementById('txnStatusFilter')?.value || 'all';
+  const provider = document.getElementById('txnProviderFilter')?.value || 'all';
+  const url = `${AUTH_URL}/admin/finance/transactions?q=${encodeURIComponent(q)}&status=${status}&provider=${provider}&limit=50`;
+  try {
+    const r = await fetch(url, { headers: _finHeaders() });
+    if (!r.ok) throw new Error((await r.json()).error || 'failed');
+    const rows = await r.json();
+    const tbody = document.getElementById('txnTableBody');
+    if (!tbody) return;
+    tbody.innerHTML = (rows||[]).map(t => `
+      <tr>
+        <td style="font-family:ui-monospace,monospace;font-size:11px">${t.id}</td>
+        <td>${t.username||t.userId||'—'}</td>
+        <td>${(t.provider||'').toUpperCase()}</td>
+        <td>${t.packLabel||'—'}</td>
+        <td>$${(t.amountUSD||0).toLocaleString(undefined,{minimumFractionDigits:2})}</td>
+        <td>${(t.lcCredited||0).toLocaleString()} LC</td>
+        <td><span style="font-size:10px;font-weight:800;letter-spacing:.5px;padding:3px 8px;border-radius:99px;background:rgba(255,255,255,.06);color:${t.status==='succeeded'?'#3ba55d':(t.status==='failed'||t.status==='refunded'?'#ed4245':'#faa61a')}">${(t.status||'').toUpperCase()}</span></td>
+        <td>${new Date(t.createdAt).toLocaleString()}</td>
+        <td>${t.status==='succeeded' ? `<button class="btn btn-grey" style="padding:4px 10px;font-size:11px" onclick="txnRefund('${t.id}')">Refund</button>` : ''}</td>
+      </tr>`).join('') || `<tr><td colspan="9"><div class="empty"><p>No transactions match.</p></div></td></tr>`;
+  } catch (e) {
+    showToast('Could not load transactions: ' + (e.message||'network'), 'error');
+  }
+}
+async function txnRefund(txnId) {
+  if (!_financeIsValid()) return financeStepUp();
+  const reason = prompt('Refund reason? (logged for audit + sent to the user)');
+  if (!reason || !reason.trim()) return;
+  if (!confirm('Refund this transaction? This cannot be undone.')) return;
+  try {
+    const r = await fetch(`${AUTH_URL}/admin/finance/refund`, {
+      method: 'POST', headers: _finHeaders(),
+      body: JSON.stringify({ txnId, reason: reason.trim() }),
+    });
+    const d = await r.json();
+    if (!r.ok) throw new Error(d.error || 'failed');
+    showToast('Refund processed', 'success');
+    loadTransactions();
+  } catch (e) {
+    showToast('Refund failed: ' + (e.message||'network'), 'error');
+  }
+}
+
+// ── Featured curation ──
+async function loadFeatured() {
+  if (!_financeIsValid()) return financeStepUp();
+  try {
+    const r = await fetch(`${AUTH_URL}/admin/featured`, { headers: _finHeaders() });
+    if (r.ok) {
+      const d = await r.json();
+      if (d) {
+        document.getElementById('featKind').value      = d.kind || 'tournament';
+        document.getElementById('featTargetId').value  = d.targetId || '';
+        document.getElementById('featHeadline').value  = d.headline || '';
+        document.getElementById('featHero').value      = d.hero || '';
+        if (d.startsAt) document.getElementById('featStart').value = new Date(d.startsAt).toISOString().slice(0,16);
+        if (d.endsAt)   document.getElementById('featEnd').value   = new Date(d.endsAt).toISOString().slice(0,16);
+        _featRenderPreview();
+      }
+    }
+  } catch {}
+  // Wire live preview on every input change
+  ['featKind','featTargetId','featHeadline','featHero','featStart','featEnd'].forEach(id => {
+    const el = document.getElementById(id);
+    if (el && !el._featWired) { el._featWired = true; el.addEventListener('input', _featRenderPreview); el.addEventListener('change', _featRenderPreview); }
+  });
+}
+function _featRenderPreview() {
+  const headline = document.getElementById('featHeadline').value || '—';
+  const kind = document.getElementById('featKind').value || 'tournament';
+  const hero = document.getElementById('featHero').value || '';
+  const pv = document.getElementById('featPreview');
+  pv.style.background = hero
+    ? `linear-gradient(135deg, rgba(20,20,30,.45), rgba(20,20,30,.05)), url('${hero}') center/cover`
+    : `linear-gradient(135deg, var(--bg-3), var(--bg-2))`;
+  pv.innerHTML = `
+    <div class="feat-preview-overlay"></div>
+    <div class="feat-preview-inner">
+      <div class="feat-preview-tag">✨ LOBBY FEATURED · ${kind.toUpperCase()}</div>
+      <div class="feat-preview-headline">${headline.replace(/</g,'&lt;')}</div>
+    </div>
+  `;
+}
+async function featuredSave() {
+  if (!_financeIsValid()) return financeStepUp();
+  const body = {
+    kind:      document.getElementById('featKind').value,
+    targetId:  document.getElementById('featTargetId').value.trim(),
+    headline:  document.getElementById('featHeadline').value.trim(),
+    hero:      document.getElementById('featHero').value.trim(),
+    startsAt:  document.getElementById('featStart').value ? new Date(document.getElementById('featStart').value).toISOString() : null,
+    endsAt:    document.getElementById('featEnd').value ? new Date(document.getElementById('featEnd').value).toISOString() : null,
+  };
+  try {
+    const r = await fetch(`${AUTH_URL}/admin/featured`, {
+      method: 'PUT', headers: _finHeaders(),
+      body: JSON.stringify(body),
+    });
+    const d = await r.json();
+    if (!r.ok) throw new Error(d.error || 'failed');
+    document.getElementById('featMsg').textContent = '✓ Live on Discover for all users.';
+    document.getElementById('featMsg').style.color = '#3ba55d';
+  } catch (e) {
+    document.getElementById('featMsg').textContent = 'Save failed: ' + (e.message||'network');
+    document.getElementById('featMsg').style.color = '#ed4245';
+  }
+}
+async function featuredClear() {
+  if (!_financeIsValid()) return financeStepUp();
+  if (!confirm('Clear the featured slot? Discover will fall back to the recommendation engine.')) return;
+  try {
+    const r = await fetch(`${AUTH_URL}/admin/featured`, { method:'DELETE', headers: _finHeaders() });
+    if (!r.ok) throw new Error((await r.json()).error||'failed');
+    document.getElementById('featMsg').textContent = '✓ Featured slot cleared.';
+    document.getElementById('featMsg').style.color = '#3ba55d';
+  } catch (e) {
+    document.getElementById('featMsg').textContent = 'Clear failed: ' + (e.message||'network');
+    document.getElementById('featMsg').style.color = '#ed4245';
+  }
+}
 
 function openBanModal(id, username) {
   actionTarget = { id, username };

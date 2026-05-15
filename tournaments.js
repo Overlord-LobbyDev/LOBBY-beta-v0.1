@@ -221,6 +221,11 @@ function displayTournaments(tournaments) {
         window._updateTournamentBadge(tournaments);
     }
 
+    // Also refresh the right-rail tournament section if it's visible
+    if (typeof window._lirLoadTournaments === 'function' && currentLobbyId) {
+        window._lirLoadTournaments(currentLobbyId);
+    }
+
     if (tournaments.length === 0) {
         container.innerHTML = '<p style="color: #7a8591; text-align: center; padding: 2rem;">No tournaments yet. Create one to get started!</p>';
         return;
