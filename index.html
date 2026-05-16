@@ -2889,6 +2889,373 @@
     }
 
     /* ──────────────────────────────────────────────────────────
+       SPEEDRUN HUB — premium fire-orange identity.
+       Three tabs (Leaderboards / Live / Racing), shared featured
+       carousel, searchable game grid, submit-a-run modal.
+       ───────────────────────────────────────────────────────── */
+    .sr-hero {
+      padding: 28px 36px 20px;
+      border-bottom: 1px solid rgba(255,107,0,.16);
+      background: linear-gradient(180deg, rgba(255,107,0,.06) 0%, transparent 100%);
+    }
+    .sr-hero-inner {
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) minmax(0, 360px);
+      gap: 28px; align-items: center;
+    }
+    .sr-hero-eyebrow {
+      display: inline-flex; align-items: center; gap: 8px;
+      font-size: 10.5px; font-weight: 800;
+      letter-spacing: 1.6px; text-transform: uppercase;
+      color: #ffb07a;
+      padding: 5px 12px; border-radius: 99px;
+      background: rgba(255,107,0,.12);
+      border: 1px solid rgba(255,107,0,.32);
+    }
+    .sr-hero-title {
+      margin: 12px 0 0;
+      font-family: 'Bebas Neue', sans-serif;
+      font-size: clamp(40px, 5.8vw, 76px);
+      letter-spacing: 3.5px;
+      line-height: .95;
+      color: var(--text-1);
+      text-shadow: 0 6px 30px rgba(0,0,0,.5);
+    }
+    .sr-hero-accent {
+      background: linear-gradient(135deg, #ff6b00, #ff3c3c);
+      -webkit-background-clip: text; background-clip: text;
+      -webkit-text-fill-color: transparent;
+    }
+    .sr-hero-stats {
+      display: flex; gap: 20px;
+      margin-top: 18px;
+      flex-wrap: wrap;
+    }
+    .sr-hero-stat {
+      display: flex; flex-direction: column; gap: 2px;
+      padding: 3px 16px 3px 0;
+      border-right: 1px solid rgba(255,255,255,.08);
+    }
+    .sr-hero-stat:last-child { border-right: none; }
+    .sr-hero-stat-num {
+      font-family: 'Bebas Neue', sans-serif;
+      font-size: 22px; letter-spacing: 1.4px;
+      color: var(--text-1); line-height: 1;
+    }
+    .sr-hero-stat-lbl {
+      font-size: 9.5px; font-weight: 700;
+      letter-spacing: 1.1px; text-transform: uppercase;
+      color: var(--text-3);
+    }
+    .sr-hero-actions {
+      display: flex; flex-wrap: wrap; gap: 10px;
+      margin-top: 20px; align-items: center;
+    }
+    .sr-cta-primary {
+      display: inline-flex; align-items: center; gap: 8px;
+      padding: 11px 20px;
+      border-radius: 99px;
+      border: none;
+      background: linear-gradient(135deg, #ff6b00, #ff3c3c);
+      color: #fff;
+      font-family: var(--font); font-weight: 800; font-size: 12.5px;
+      letter-spacing: .8px;
+      box-shadow: 0 8px 22px rgba(255,107,0,.4);
+      cursor: pointer;
+      transition: transform .15s, box-shadow .2s, filter .15s;
+    }
+    .sr-cta-primary:hover {
+      transform: translateY(-1px);
+      filter: brightness(1.08);
+      box-shadow: 0 12px 28px rgba(255,107,0,.55);
+    }
+    .sr-cta-secondary {
+      padding: 10px 18px; border-radius: 99px;
+      background: rgba(255,107,0,.10);
+      border: 1px solid rgba(255,107,0,.32);
+      color: #ffb07a;
+      font-family: var(--font); font-weight: 800; font-size: 12px;
+      letter-spacing: .5px; cursor: pointer;
+      display: inline-flex; align-items: center; gap: 6px;
+      transition: background .15s, color .15s, border-color .15s;
+    }
+    .sr-cta-secondary:hover { background: rgba(255,107,0,.22); color: #fff; border-color: #ff6b00; }
+    .sr-search-wrap {
+      position: relative; min-width: 240px; flex: 1;
+    }
+    .sr-search-icon {
+      position: absolute; left: 12px; top: 50%; transform: translateY(-50%);
+      color: var(--text-3); pointer-events: none;
+    }
+    .sr-search-input {
+      width: 100%; box-sizing: border-box;
+      padding: 10px 14px 10px 36px;
+      border-radius: 99px;
+      background: rgba(0,0,0,.25);
+      border: 1px solid rgba(255,255,255,.08);
+      color: var(--text-1);
+      font-family: var(--font); font-size: 12.5px;
+      outline: none;
+      transition: border-color .15s, box-shadow .2s, background .15s;
+    }
+    .sr-search-input:focus {
+      border-color: rgba(255,107,0,.55);
+      box-shadow: 0 0 0 3px rgba(255,107,0,.15);
+      background: rgba(0,0,0,.35);
+    }
+    .sr-pb-card {
+      background: linear-gradient(135deg, rgba(255,107,0,.10), rgba(0,0,0,.4));
+      border: 1px solid rgba(255,107,0,.25);
+      border-radius: 16px;
+      padding: 18px 20px;
+      min-height: 140px;
+      position: relative; overflow: hidden;
+    }
+    .sr-pb-card::before {
+      content: ''; position: absolute; inset: -1px;
+      background: linear-gradient(135deg, transparent 40%, rgba(255,107,0,.18) 60%, transparent 80%);
+      pointer-events: none;
+    }
+    .sr-pb-card-eye {
+      font-size: 10px; font-weight: 800; letter-spacing: 1.4px;
+      text-transform: uppercase; color: #ffb07a;
+    }
+    .sr-pb-card-time {
+      font-family: 'Bebas Neue', sans-serif;
+      font-size: 38px; letter-spacing: 2px;
+      background: linear-gradient(135deg, #ff8a3a, #ffcc6b);
+      -webkit-background-clip: text; background-clip: text;
+      -webkit-text-fill-color: transparent;
+      margin: 6px 0 4px; line-height: 1;
+    }
+    .sr-pb-card-game {
+      font-size: 13px; color: var(--text-1); font-weight: 700;
+    }
+    .sr-pb-card-cat {
+      font-size: 11px; color: var(--text-3);
+      margin-top: 2px;
+    }
+    .sr-pb-card-empty {
+      font-size: 12.5px; color: var(--text-3); line-height: 1.5;
+    }
+    .sr-pb-card-empty-cta {
+      margin-top: 12px;
+      padding: 7px 14px; border-radius: 99px;
+      background: rgba(255,107,0,.2);
+      border: 1px solid rgba(255,107,0,.45);
+      color: #ffb07a;
+      font-family: var(--font); font-weight: 700; font-size: 11px;
+      letter-spacing: .5px; cursor: pointer;
+    }
+    .sr-pb-card-empty-cta:hover { background: rgba(255,107,0,.35); color: #fff; }
+
+    /* Tab strip */
+    .sr-tabs-wrap {
+      padding: 4px 36px 0;
+      border-bottom: 1px solid rgba(255,255,255,.06);
+    }
+    .sr-tabs {
+      display: flex; gap: 4px;
+    }
+    .sr-tab-btn {
+      position: relative;
+      background: none; border: none;
+      padding: 14px 18px;
+      color: var(--text-3);
+      font-family: var(--font); font-weight: 800; font-size: 11.5px;
+      letter-spacing: 1.5px; text-transform: uppercase;
+      cursor: pointer;
+      transition: color .15s;
+    }
+    .sr-tab-btn:hover { color: var(--text-1); }
+    .sr-tab-btn.active { color: #ffb07a; }
+    .sr-tab-btn.active::after {
+      content: ''; position: absolute;
+      left: 12px; right: 12px; bottom: 0;
+      height: 3px;
+      background: linear-gradient(90deg, #ff6b00, #ff3c3c);
+      border-radius: 3px 3px 0 0;
+      box-shadow: 0 0 10px rgba(255,107,0,.6);
+    }
+
+    /* Category tabs inside the Leaderboards tab */
+    .sr-cat-tabs {
+      display: flex; flex-wrap: wrap; gap: 6px;
+      margin: 12px 0 16px;
+    }
+    .sr-cat-tab {
+      padding: 6px 14px; border-radius: 99px;
+      background: rgba(255,255,255,.04);
+      border: 1px solid rgba(255,255,255,.06);
+      color: var(--text-3);
+      font-size: 11px; font-weight: 700; font-family: var(--font);
+      letter-spacing: .5px; cursor: pointer;
+      transition: background .15s, color .15s, border-color .15s;
+    }
+    .sr-cat-tab:hover { background: rgba(255,255,255,.08); color: var(--text-1); }
+    .sr-cat-tab.active {
+      background: linear-gradient(135deg, rgba(255,107,0,.18), rgba(255,60,60,.08));
+      border-color: rgba(255,107,0,.55);
+      color: #ffb07a;
+    }
+
+    /* Leaderboard rows */
+    .sr-board-row {
+      display: grid;
+      grid-template-columns: 48px 1fr auto auto;
+      align-items: center; gap: 14px;
+      padding: 12px 16px;
+      background: rgba(255,255,255,.025);
+      border: 1px solid rgba(255,255,255,.06);
+      border-radius: 12px;
+      transition: transform .15s, border-color .15s;
+    }
+    .sr-board-row:hover { transform: translateX(2px); border-color: rgba(255,107,0,.4); }
+    .sr-board-row.is-wr {
+      background: linear-gradient(135deg, rgba(255,180,60,.10), rgba(255,107,0,.04));
+      border-color: rgba(255,180,60,.3);
+    }
+    .sr-board-rank {
+      font-family: 'Bebas Neue', sans-serif;
+      font-size: 26px; letter-spacing: 1.2px;
+      text-align: center;
+      color: var(--text-3);
+    }
+    .sr-board-row.is-wr .sr-board-rank {
+      background: linear-gradient(135deg, #ffd33d, #ff8a3a);
+      -webkit-background-clip: text; background-clip: text;
+      -webkit-text-fill-color: transparent;
+    }
+    .sr-board-runner { display: flex; align-items: center; gap: 10px; min-width: 0; }
+    .sr-board-av {
+      width: 32px; height: 32px; border-radius: 8px;
+      background: var(--accent);
+      display: flex; align-items: center; justify-content: center;
+      color: #fff; font-weight: 800; font-size: 13px;
+      overflow: hidden; flex-shrink: 0;
+    }
+    .sr-board-av img { width: 100%; height: 100%; object-fit: cover; }
+    .sr-board-name { font-size: 13px; font-weight: 700; color: var(--text-1); }
+    .sr-board-meta { font-size: 10.5px; color: var(--text-3); margin-top: 2px; }
+    .sr-board-time {
+      font-family: 'Bebas Neue', sans-serif;
+      font-size: 22px; letter-spacing: 1.2px;
+      color: var(--text-1);
+      tabular-nums: 1;
+    }
+    .sr-board-watch {
+      padding: 6px 12px; border-radius: 99px;
+      background: rgba(255,255,255,.05);
+      border: 1px solid rgba(255,255,255,.1);
+      color: var(--text-2);
+      font-size: 10.5px; font-weight: 700; font-family: var(--font);
+      letter-spacing: .5px; cursor: pointer;
+      transition: background .15s, color .15s;
+    }
+    .sr-board-watch:hover { background: rgba(255,107,0,.2); color: #fff; border-color: #ff6b00; }
+
+    /* Live rows */
+    .sr-live-row {
+      display: flex; align-items: center; gap: 14px;
+      padding: 14px 18px;
+      background: linear-gradient(135deg, rgba(237,66,69,.08), rgba(255,107,0,.04));
+      border: 1px solid rgba(237,66,69,.25);
+      border-radius: 12px;
+      position: relative;
+      transition: transform .15s;
+    }
+    .sr-live-row:hover { transform: translateX(2px); }
+    .sr-live-indicator {
+      width: 10px; height: 10px; border-radius: 50%;
+      background: #ed4245;
+      box-shadow: 0 0 0 3px rgba(237,66,69,.2);
+      animation: queueLivePulse 1.6s ease-in-out infinite;
+      flex-shrink: 0;
+    }
+    .sr-live-runner-info { flex: 1; min-width: 0; }
+    .sr-live-elapsed {
+      font-family: 'Bebas Neue', sans-serif;
+      font-size: 22px; letter-spacing: 1.2px;
+      color: #ffb07a; tabular-nums: 1;
+    }
+
+    /* Race cards */
+    .sr-race-card {
+      background: linear-gradient(135deg, rgba(255,107,0,.06), rgba(0,0,0,.3));
+      border: 1px solid rgba(255,107,0,.18);
+      border-radius: 14px;
+      overflow: hidden;
+      position: relative;
+      transition: transform .18s, border-color .15s, box-shadow .25s;
+    }
+    .sr-race-card:hover {
+      transform: translateY(-3px);
+      border-color: rgba(255,107,0,.55);
+      box-shadow: 0 14px 32px rgba(0,0,0,.45),
+                  0 0 0 1px rgba(255,107,0,.35);
+    }
+    .sr-race-card-head {
+      padding: 12px 16px;
+      background: linear-gradient(135deg, rgba(237,66,69,.18), rgba(255,107,0,.08));
+      border-bottom: 1px solid rgba(255,255,255,.05);
+      display: flex; align-items: center; gap: 10px;
+    }
+    .sr-race-status {
+      font-size: 10px; font-weight: 900; letter-spacing: 1.2px;
+      padding: 3px 9px; border-radius: 99px;
+      background: #ed4245; color: #fff;
+      text-transform: uppercase;
+    }
+    .sr-race-status.open {
+      background: rgba(59,165,93,.18); color: #3ba55d;
+      border: 1px solid rgba(59,165,93,.4);
+    }
+    .sr-race-status.scheduled {
+      background: rgba(255,180,60,.18); color: #ffc77a;
+      border: 1px solid rgba(255,180,60,.4);
+    }
+    .sr-race-title {
+      font-family: 'Bebas Neue', sans-serif;
+      font-size: 17px; letter-spacing: 1.5px;
+      color: var(--text-1);
+      flex: 1; min-width: 0;
+      white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+    }
+    .sr-race-body { padding: 14px 16px; }
+    .sr-race-runners {
+      display: flex; flex-wrap: wrap; gap: 6px;
+      margin-bottom: 10px;
+    }
+    .sr-race-runner-chip {
+      display: inline-flex; align-items: center; gap: 6px;
+      padding: 4px 10px 4px 4px; border-radius: 99px;
+      background: rgba(0,0,0,.3);
+      border: 1px solid rgba(255,255,255,.05);
+      font-size: 11px; color: var(--text-2);
+    }
+    .sr-race-runner-chip .av {
+      width: 22px; height: 22px; border-radius: 50%;
+      background: var(--accent);
+      display: flex; align-items: center; justify-content: center;
+      color: #fff; font-weight: 800; font-size: 10px;
+      overflow: hidden;
+    }
+    .sr-race-meta {
+      font-size: 11px; color: var(--text-3);
+      margin-bottom: 12px;
+    }
+    .sr-race-join {
+      width: 100%;
+      padding: 9px 14px; border-radius: 8px;
+      background: linear-gradient(135deg, #ff6b00, #ff3c3c);
+      border: none; color: #fff;
+      font-family: var(--font); font-weight: 800; font-size: 11.5px;
+      letter-spacing: .6px; cursor: pointer;
+      transition: filter .15s, transform .15s;
+    }
+    .sr-race-join:hover { filter: brightness(1.1); transform: translateY(-1px); }
+
+    /* ──────────────────────────────────────────────────────────
        Help & Support page (premium) */
     .hp-hero {
       padding: 32px 40px 18px;
@@ -3301,6 +3668,226 @@
       flex: 1; overflow-y: auto;
       padding: 26px 40px 60px;
     }
+    /* Premium 3-step setup view — bigger spacing, numbered step cards. */
+    .q-body-setup { padding: 22px 40px 60px; }
+    .q-step-card {
+      background: rgba(255,255,255,.025);
+      border: 1px solid rgba(255,255,255,.07);
+      border-radius: 18px;
+      padding: 18px 22px 20px;
+      margin-bottom: 16px;
+      position: relative;
+      overflow: hidden;
+      transition: border-color .2s, box-shadow .25s;
+    }
+    .q-step-card::before {
+      content: '';
+      position: absolute; top: 0; left: 0; width: 4px; height: 100%;
+      background: linear-gradient(180deg, #a863ff, #5865f2);
+      opacity: .35;
+    }
+    .q-step-card:hover { border-color: rgba(168,99,255,.32); }
+    .q-step-head {
+      display: flex; align-items: center; gap: 14px;
+      margin-bottom: 16px;
+    }
+    .q-step-num {
+      width: 32px; height: 32px; border-radius: 50%;
+      display: flex; align-items: center; justify-content: center;
+      background: linear-gradient(135deg, #a863ff, #5865f2);
+      color: #fff;
+      font-family: 'Bebas Neue', sans-serif;
+      font-size: 18px; letter-spacing: 1px;
+      flex-shrink: 0;
+      box-shadow: 0 6px 18px rgba(168,99,255,.35);
+    }
+    .q-step-label {
+      font-family: 'Bebas Neue', sans-serif;
+      font-size: 22px; letter-spacing: 1.5px;
+      color: var(--text-1); line-height: 1;
+    }
+    .q-step-sub {
+      font-size: 11.5px; color: var(--text-3);
+      margin-top: 4px; line-height: 1.4;
+    }
+    .q-clear-btn {
+      margin-left: auto;
+      background: rgba(255,255,255,.04);
+      border: 1px solid rgba(255,255,255,.08);
+      color: var(--text-3);
+      padding: 6px 12px; border-radius: 99px;
+      font-size: 10.5px; font-weight: 700; font-family: var(--font);
+      letter-spacing: .5px; cursor: pointer;
+      transition: background .15s, color .15s;
+    }
+    .q-clear-btn:hover { background: rgba(255,255,255,.08); color: var(--text-1); }
+
+    /* ── Game picker — searchable title-card grid ── */
+    .q-game-search {
+      position: relative;
+      margin-bottom: 14px;
+    }
+    .q-game-search svg {
+      position: absolute; left: 14px; top: 50%; transform: translateY(-50%);
+      color: var(--text-3); pointer-events: none;
+    }
+    .q-game-search input {
+      width: 100%; box-sizing: border-box;
+      padding: 11px 16px 11px 40px;
+      border-radius: 10px;
+      background: rgba(0,0,0,.3);
+      border: 1px solid rgba(255,255,255,.08);
+      color: var(--text-1);
+      font-family: var(--font); font-size: 13px;
+      outline: none;
+      transition: border-color .15s, box-shadow .2s, background .15s;
+    }
+    .q-game-search input:focus {
+      border-color: rgba(168,99,255,.55);
+      box-shadow: 0 0 0 3px rgba(168,99,255,.16);
+      background: rgba(0,0,0,.4);
+    }
+    .q-game-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
+      gap: 10px;
+      max-height: 320px;
+      overflow-y: auto;
+      padding: 4px 4px 4px 0;
+      scrollbar-width: thin;
+      scrollbar-color: rgba(168,99,255,.4) transparent;
+    }
+    .q-game-grid::-webkit-scrollbar { width: 6px; }
+    .q-game-grid::-webkit-scrollbar-thumb { background: rgba(168,99,255,.4); border-radius: 3px; }
+    .q-game-tile {
+      position: relative;
+      aspect-ratio: 16 / 9;
+      border-radius: 10px;
+      overflow: hidden;
+      cursor: pointer;
+      border: 1.5px solid rgba(255,255,255,.06);
+      background: var(--bg-3);
+      transition: transform .18s cubic-bezier(0.22,1,0.36,1),
+                  border-color .15s, box-shadow .2s;
+    }
+    .q-game-tile:hover {
+      transform: translateY(-3px) scale(1.02);
+      border-color: rgba(168,99,255,.55);
+      box-shadow: 0 10px 24px rgba(0,0,0,.5),
+                  0 0 0 1px rgba(168,99,255,.4);
+    }
+    .q-game-tile.is-selected {
+      border-color: #c598ff;
+      box-shadow: 0 0 0 2px rgba(168,99,255,.5),
+                  0 8px 22px rgba(168,99,255,.4);
+    }
+    .q-game-tile img {
+      position: absolute; inset: 0;
+      width: 100%; height: 100%;
+      object-fit: cover;
+      transition: transform .35s ease, filter .2s ease;
+    }
+    .q-game-tile:hover img { transform: scale(1.06); }
+    .q-game-tile-fb {
+      position: absolute; inset: 0;
+      display: flex; align-items: center; justify-content: center;
+      font-family: 'Bebas Neue', sans-serif;
+      font-size: 22px; letter-spacing: 1.2px;
+      color: rgba(255,255,255,.85);
+    }
+    .q-game-tile-shade {
+      position: absolute; inset: 0;
+      background: linear-gradient(180deg, transparent 50%, rgba(0,0,0,.85) 100%);
+    }
+    .q-game-tile-name {
+      position: absolute; left: 8px; right: 8px; bottom: 6px;
+      font-size: 10.5px; font-weight: 800;
+      color: #fff;
+      letter-spacing: .3px;
+      white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+      text-shadow: 0 1px 4px rgba(0,0,0,.8);
+    }
+    .q-game-grid-empty {
+      grid-column: 1/-1;
+      text-align: center; padding: 30px;
+      color: var(--text-3); font-size: 12px;
+    }
+
+    /* ── Selected game preview (after pick) ── */
+    .q-game-selected {
+      position: relative;
+      border-radius: 14px;
+      overflow: hidden;
+      margin-bottom: 14px;
+      min-height: 140px;
+      display: flex; align-items: flex-end;
+      background: var(--bg-3);
+    }
+    .q-game-selected::after {
+      content: ''; position: absolute; inset: 0;
+      background: linear-gradient(135deg, rgba(0,0,0,.75) 0%, rgba(0,0,0,.2) 100%);
+    }
+    .q-game-selected-img {
+      position: absolute; inset: 0;
+      width: 100%; height: 100%;
+      object-fit: cover;
+    }
+    .q-game-selected-info {
+      position: relative; z-index: 1;
+      padding: 20px;
+      color: #fff;
+    }
+    .q-game-selected-eye {
+      font-size: 10px; font-weight: 800; letter-spacing: 1.4px;
+      text-transform: uppercase;
+      padding: 3px 9px; border-radius: 99px;
+      background: rgba(168,99,255,.85);
+      display: inline-block; margin-bottom: 8px;
+    }
+    .q-game-selected-name {
+      font-family: 'Bebas Neue', sans-serif;
+      font-size: 32px; letter-spacing: 2px;
+      line-height: 1;
+      text-shadow: 0 4px 18px rgba(0,0,0,.7);
+    }
+
+    /* ── Skill tier grid ── */
+    .q-skill-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(82px, 1fr));
+      gap: 8px;
+    }
+    .q-skill-tile {
+      position: relative;
+      padding: 10px 8px;
+      border-radius: 10px;
+      background: rgba(0,0,0,.25);
+      border: 1.5px solid rgba(255,255,255,.06);
+      cursor: pointer;
+      text-align: center;
+      transition: transform .15s, border-color .15s, background .2s, box-shadow .2s;
+    }
+    .q-skill-tile:hover { transform: translateY(-2px); border-color: rgba(168,99,255,.4); }
+    .q-skill-tile.is-selected {
+      background: linear-gradient(135deg,
+        color-mix(in srgb, var(--qst-color, #c598ff) 26%, transparent),
+        color-mix(in srgb, var(--qst-color, #c598ff) 6%, transparent));
+      border-color: var(--qst-color, #c598ff);
+      box-shadow: 0 0 0 2px color-mix(in srgb, var(--qst-color, #c598ff) 35%, transparent),
+                  0 8px 22px color-mix(in srgb, var(--qst-color, #c598ff) 30%, transparent);
+    }
+    .q-skill-tile .q-skill-emoji {
+      font-size: 22px;
+      filter: drop-shadow(0 2px 6px rgba(0,0,0,.4));
+      line-height: 1;
+    }
+    .q-skill-tile .q-skill-name {
+      margin-top: 5px;
+      font-family: 'Bebas Neue', sans-serif;
+      font-size: 13px; letter-spacing: 1.2px;
+      color: var(--text-1);
+    }
+    .q-skill-tile.is-selected .q-skill-name { color: #fff; }
     .q-form-grid {
       display: grid; gap: 16px; margin-bottom: 16px;
       grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
@@ -3801,9 +4388,22 @@
       object-fit: cover;
       z-index: 0;
       transition: transform .9s cubic-bezier(0.22,1,0.36,1),
-                  filter .4s ease;
+                  filter .4s ease,
+                  opacity .35s ease;
       filter: saturate(1.05) contrast(1.02);
     }
+    /* Hover-only movie poster — sits above the still and fades in. */
+    .gt-game-card-movie {
+      position: absolute; inset: 0;
+      width: 100%; height: 100%;
+      object-fit: cover;
+      z-index: 1;
+      opacity: 0;
+      pointer-events: none;
+      transition: opacity .45s ease;
+    }
+    .gt-game-card:hover .gt-game-card-movie { opacity: 1; }
+    .gt-game-card:hover .gt-game-card-img   { opacity: 0; }
     .gt-game-card-shade {
       position: absolute; inset: 0; z-index: 1;
       background:
@@ -5961,10 +6561,11 @@
       50%     { transform: scale(1.25); opacity: .75; }
     }
 
-    /* Right-side mirror cluster — Inbox / Status / Help. Sits between the
-       centered search bar and the "HOME 🏠" page-title chip on the right. */
+    /* Right-side mirror cluster — Inbox / Status / What's New / Help.
+       The page-title chip on the right was removed, so the cluster
+       reflows next to the window controls (138px wide). */
     #topBarActionsRight {
-      position: fixed; top: 0; right: 296px;
+      position: fixed; top: 0; right: 152px;
       height: 72px;
       display: flex; align-items: center; gap: 10px;
       z-index: 99997;
@@ -5999,6 +6600,31 @@
     @keyframes queueLivePulse {
       0%,100% { box-shadow:0 0 0 0 rgba(197,152,255,.6); transform:scale(1); }
       50%     { box-shadow:0 0 0 8px rgba(197,152,255,0); transform:scale(1.2); }
+    }
+    /* Speedrun — fire-orange pill, sits between Tournaments and Create */
+    .tba-pill.tba-speedrun {
+      --tba-color: 255,107,0;
+      color:#ffb07a;
+      background:linear-gradient(135deg, rgba(255,107,0,.10), rgba(255,60,60,.06));
+      border:1px solid rgba(255,107,0,.30);
+    }
+    .tba-pill.tba-speedrun:hover {
+      color:#fff;
+      background:linear-gradient(135deg, rgba(255,107,0,.55), rgba(255,60,60,.45));
+      border-color:rgba(255,107,0,.85);
+      box-shadow:0 6px 20px rgba(255,107,0,.4),
+                 0 0 0 1px rgba(255,107,0,.55) inset;
+    }
+    .tba-pill.tba-speedrun .tba-pulse-dot-fire {
+      position:absolute; top:5px; right:5px;
+      width:7px; height:7px; border-radius:50%;
+      background:#ff8a3a;
+      box-shadow:0 0 0 0 rgba(255,138,58,.6);
+      animation: srFirePulse 1.6s ease-in-out infinite;
+    }
+    @keyframes srFirePulse {
+      0%,100% { box-shadow:0 0 0 0 rgba(255,138,58,.6); transform:scale(1); }
+      50%     { box-shadow:0 0 0 8px rgba(255,138,58,0); transform:scale(1.25); }
     }
     /* Status switcher rows inside the popover */
     .ss-row {
@@ -6076,29 +6702,27 @@
        left cluster (which ends at ~404px) or the right cluster. */
     @media (max-width: 1320px) {
       #globalSearchWrap { width: min(340px, 30vw) !important; }
-      #topBarActionsRight { right: 280px; gap: 8px; }
+      #topBarActionsRight { right: 152px; gap: 8px; }
       #topBarActions { gap: 8px; }
     }
     @media (max-width: 1180px) {
       #globalSearchWrap { width: min(260px, 24vw) !important; }
-      #topBarActionsRight { right: 260px; }
+      #topBarActionsRight { right: 152px; }
     }
     @media (max-width: 1040px) {
       #globalSearchWrap { width: min(200px, 22vw) !important; }
       #topBarActionsRight .tba-help { display: none; }
-      #topBarActionsRight { right: 240px; }
+      #topBarActionsRight { right: 152px; }
     }
     @media (max-width: 940px) {
       #globalSearchWrap { width: min(160px, 18vw) !important; }
       #topBarActions .tba-whatsnew { display: none; }
-      #topBarActionsRight { right: 220px; }
+      #topBarActionsRight { right: 152px; }
     }
     @media (max-width: 840px) {
       #topBarActions .tba-store { display: none; }
-      #topBarActionsRight { right: 200px; gap: 6px; }
+      #topBarActionsRight { right: 152px; gap: 6px; }
       #topBarActions { gap: 6px; }
-      #lobbySubtitleText { display: none; }
-      #topBarActionsRight { right: 80px; }
     }
     @media (max-width: 720px) {
       #globalSearchWrap { width: 44px !important; }
@@ -8649,37 +9273,63 @@
      Tournaments, Queue overlays). Bumped above .lobby-overlay (z 9000). */
   body.drawer-nav #lobbiesNavBtn { display: flex; z-index: 9501; }
 
-  /* LOBBIES horizontal panel — full-width slide-down from header.
-     Closed state must FULLY clear the viewport (panel + the 72px
-     header offset) so the icons inside don't bleed into the top bar.
-     translateY(-100%) alone wasn't enough — its bottom edge would
-     still sit at y=72, leaving the icons visible in the header zone. */
+  /* LOBBIES horizontal panel — pinned just under the header. Acts as
+     a top-bar EXTENSION, not an overlay: when open it pushes the page
+     content down instead of floating over it.
+     Implementation: the panel is fixed at top:72 and animated via
+     `max-height` + `opacity`. A matching CSS variable `--lobbies-drawer-h`
+     is set on <body> when open and read by every full-page panel
+     (homePanel, chatPanel, profilePage, calendarPanel, vcPanel,
+     all .lobby-overlay overlays) which adds it to their `top` so they
+     slide down with the drawer instead of being covered. */
   #lobbiesDrawerPanel {
     display: none;
     position: fixed; top: 72px; left: 0; right: 0;
-    height: 80px;
     overflow: hidden;
     background: var(--bg-1);
     border-bottom: 1px solid rgba(255,255,255,.08);
     box-shadow: none;
-    /* Above .lobby-overlay so the picker can be opened from any page. */
-    z-index: 9500;
-    /* Closed: translate by panel height + the 72px header gap so the
-       whole thing sits entirely above the viewport. */
-    transform: translateY(calc(-100% - 80px));
-    visibility: hidden;
-    transition: transform .3s cubic-bezier(0.16,1,0.3,1),
-                box-shadow .3s ease,
-                visibility 0s linear .3s;
+    z-index: 480;                 /* under .lobby-overlay (9000) so overlay shifts down too */
+    max-height: 0;
+    transition: max-height .32s cubic-bezier(0.22, 1, 0.36, 1),
+                box-shadow .25s ease;
   }
   body.drawer-nav #lobbiesDrawerPanel { display: block; }
   #lobbiesDrawerPanel.open {
-    transform: translateY(0);
-    visibility: visible;
-    box-shadow: 0 6px 28px rgba(0,0,0,.4);
-    transition: transform .3s cubic-bezier(0.16,1,0.3,1),
-                box-shadow .3s ease,
-                visibility 0s linear 0s;
+    max-height: 80px;
+    box-shadow: 0 6px 22px rgba(0,0,0,.35);
+  }
+  /* Default = no extra offset. When the drawer is open we set
+     --lobbies-drawer-h: 80px on <body> via JS; everything that
+     normally sits at top:72 shifts down by that amount with a smooth
+     transition so the page slides under the drawer cleanly. */
+  body { --lobbies-drawer-h: 0px; }
+  .home-header,
+  #lobbyLogoFixed,
+  #topBarActions,
+  #topBarActionsRight,
+  #globalSearchWrap,
+  #lobbySubtitleText,
+  #winControls {
+    transition: transform .32s cubic-bezier(0.22, 1, 0.36, 1);
+  }
+  body.lobbies-drawer-open #homePanel,
+  body.lobbies-drawer-open #chatPanel,
+  body.lobbies-drawer-open #profilePage,
+  body.lobbies-drawer-open #calendarPanel,
+  body.lobbies-drawer-open #vcPanel,
+  body.lobbies-drawer-open #socialFeed,
+  body.lobbies-drawer-open #lobbyInfoRail,
+  body.lobbies-drawer-open .channel-sidebar,
+  body.lobbies-drawer-open .lobby-overlay {
+    top: calc(72px + var(--lobbies-drawer-h)) !important;
+    transition: top .32s cubic-bezier(0.22, 1, 0.36, 1);
+  }
+  /* Members bar bottom alignment is unchanged (it lives at viewport bottom).
+     The lobbiesNavBtn pill itself rides DOWN with the drawer so its handle
+     visually stays attached to the panel's bottom edge. */
+  body.lobbies-drawer-open #lobbiesNavBtn {
+    top: calc(72px + var(--lobbies-drawer-h)) !important;
   }
   #lobbiesDrawerInner {
     display: flex; align-items: center;
@@ -9175,6 +9825,13 @@
     <span class="tba-ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 9H4.5a2.5 2.5 0 0 1 0-5H6"/><path d="M18 9h1.5a2.5 2.5 0 0 0 0-5H18"/><path d="M4 22h16"/><path d="M10 14.66V17c0 .55-.47.98-.97 1.21C7.85 18.75 7 20.24 7 22"/><path d="M14 14.66V17c0 .55.47.98.97 1.21C16.15 18.75 17 20.24 17 22"/><path d="M18 2H6v7a6 6 0 0 0 12 0V2Z"/></svg></span>
     <span class="tba-label">Tournaments</span>
   </button>
+  <!-- Speedrun — premium fire-orange pill, sits AFTER Tournaments and
+       BEFORE Create. Opens a 3-tab hub: Leaderboards / Live / Racing. -->
+  <button class="tba-pill tba-speedrun" onclick="window.openSpeedrunHub()" title="Speedrunning hub" aria-label="Speedrun">
+    <span class="tba-ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z"/></svg></span>
+    <span class="tba-label">Speedrun</span>
+    <span class="tba-pulse-dot tba-pulse-dot-fire" aria-hidden="true"></span>
+  </button>
   <button class="tba-pill tba-create" onclick="window.toggleQuickCreate(event)" title="Quick create" aria-label="Create">
     <span class="tba-ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg></span>
     <span class="tba-label">Create</span>
@@ -9599,6 +10256,155 @@
 </div>
 
 <!-- ─────────────────────────────────────────────────────────────
+     ★ SPEEDRUN HUB ★ — premium full-page overlay
+     Three tabs, equally weighted:
+       • Leaderboards — WR + top-10 per game/category
+       • Live Now    — active runs, scheduled attempts, watch-along
+       • Racing      — head-to-head live race brackets
+     Plus: a searchable game grid + featured rotation, a "Submit a
+     Run" CTA that opens a moderation-queued form, and a personal
+     "My Runs" shelf for the logged-in user.
+     ───────────────────────────────────────────────────────────── -->
+<div id="speedrunOverlay" class="lobby-overlay" style="background:radial-gradient(1200px 600px at 80% -10%, rgba(255,107,0,.16) 0%, transparent 60%), radial-gradient(900px 500px at 10% 110%, rgba(255,60,60,.12) 0%, transparent 60%), linear-gradient(160deg,var(--bg-0) 0%,var(--bg-1) 100%)">
+  <div class="sr-hero">
+    <div class="sr-hero-inner">
+      <div>
+        <div class="sr-hero-eyebrow">
+          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z"/></svg>
+          <span>Speedrunning · WRs · Live runs · Races</span>
+        </div>
+        <h1 class="sr-hero-title">SPEED<span class="sr-hero-accent">RUN</span></h1>
+        <div class="sr-hero-stats">
+          <div class="sr-hero-stat"><div class="sr-hero-stat-num" id="srStatGames">—</div><div class="sr-hero-stat-lbl">Games</div></div>
+          <div class="sr-hero-stat"><div class="sr-hero-stat-num" id="srStatRuns">—</div><div class="sr-hero-stat-lbl">Runs tracked</div></div>
+          <div class="sr-hero-stat"><div class="sr-hero-stat-num" id="srStatLive">—</div><div class="sr-hero-stat-lbl">Live now</div></div>
+          <div class="sr-hero-stat"><div class="sr-hero-stat-num" id="srStatRaces">—</div><div class="sr-hero-stat-lbl">Races today</div></div>
+        </div>
+        <div class="sr-hero-actions">
+          <button class="sr-cta-primary" onclick="window.openSubmitRunModal()">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.8" stroke-linecap="round" stroke-linejoin="round"><polygon points="6 3 20 12 6 21 6 3"/></svg>
+            <span>Submit a Run</span>
+          </button>
+          <button class="sr-cta-secondary" onclick="window.openCreateRace()">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M14 4l3 3-3 3"/><path d="M17 7H7l-3 3 3 3h10l3-3-3-3z" style="opacity:.5"/></svg>
+            Host a Race
+          </button>
+          <div class="sr-search-wrap">
+            <svg class="sr-search-icon" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+            <input id="srSearchInput" class="sr-search-input" type="text" placeholder="Search games, categories, runners…" oninput="window.srSearch(this.value)">
+          </div>
+        </div>
+      </div>
+      <div class="sr-pb-card" id="srPbCard">
+        <!-- Personal best card — populated by renderSrPbCard() -->
+      </div>
+    </div>
+  </div>
+
+  <!-- Featured Runs Rotation -->
+  <div class="gt-featured-host" id="srFeaturedHost" style="display:none;margin: 4px 36px 0">
+    <div class="gt-featured-wrap" id="srFeaturedWrap"></div>
+    <div class="gt-featured-pager" id="srFeaturedPager"></div>
+  </div>
+
+  <!-- Tabs -->
+  <div class="sr-tabs-wrap">
+    <div class="sr-tabs" id="srTabs"></div>
+  </div>
+
+  <div style="flex:1;overflow-y:auto;padding:8px 40px 60px" id="srScroller">
+    <!-- ── Tab: Leaderboards ────────────────────────────────────── -->
+    <div id="srTabLeaderboards" class="sr-tab-content">
+      <div class="gt-section-head">
+        <div class="gt-section-title">Pick a game</div>
+        <div class="gt-section-sub" id="srGameHint">Tap any cover to load its leaderboards.</div>
+        <button id="srClearGame" onclick="window.srSelectGame(null)" style="display:none;margin-left:auto;background:var(--bg-2);border:1px solid rgba(255,255,255,.1);color:var(--text-2);cursor:pointer;border-radius:99px;padding:6px 12px;font-size:10.5px;font-weight:800;letter-spacing:1px;text-transform:uppercase;font-family:var(--font)">Clear</button>
+      </div>
+      <div id="srGameGrid" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(170px,1fr));gap:16px;margin-bottom:40px"></div>
+
+      <div class="gt-section-head" id="srBoardSectionHead" style="display:none">
+        <div class="gt-section-title" id="srBoardSectionTitle">Leaderboard</div>
+        <div class="gt-section-sub" id="srBoardSectionSub">Top times — verified runs</div>
+      </div>
+      <div id="srCategoryTabs" class="sr-cat-tabs" style="display:none"></div>
+      <div id="srLeaderboardList" style="display:flex;flex-direction:column;gap:10px"></div>
+    </div>
+
+    <!-- ── Tab: Live Now ────────────────────────────────────────── -->
+    <div id="srTabLive" class="sr-tab-content" style="display:none">
+      <div class="gt-section-head">
+        <div class="gt-section-title"><span style="display:inline-block;width:8px;height:8px;background:#ed4245;border-radius:50%;margin-right:8px;animation:queueLivePulse 1.6s ease-in-out infinite"></span>Live runs</div>
+        <div class="gt-section-sub">Runners going for a PB right now — pop in and rail their attempt.</div>
+      </div>
+      <div id="srLiveList" style="display:flex;flex-direction:column;gap:12px"></div>
+
+      <div class="gt-section-head" style="margin-top:30px">
+        <div class="gt-section-title">Scheduled attempts</div>
+        <div class="gt-section-sub">RSVP to be notified when these runners go live.</div>
+      </div>
+      <div id="srScheduledList" style="display:flex;flex-direction:column;gap:10px"></div>
+    </div>
+
+    <!-- ── Tab: Racing ──────────────────────────────────────────── -->
+    <div id="srTabRacing" class="sr-tab-content" style="display:none">
+      <div class="gt-section-head">
+        <div class="gt-section-title">🏁 Active races</div>
+        <div class="gt-section-sub">Head-to-head live races — first to finish wins.</div>
+        <button class="sr-cta-secondary" style="margin-left:auto" onclick="window.openCreateRace()">+ Host race</button>
+      </div>
+      <div id="srRaceList" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(320px,1fr));gap:14px"></div>
+
+      <div class="gt-section-head" style="margin-top:30px">
+        <div class="gt-section-title">Upcoming races</div>
+      </div>
+      <div id="srUpcomingRaces" style="display:flex;flex-direction:column;gap:10px"></div>
+    </div>
+  </div>
+</div>
+
+<!-- Submit-a-Run modal ────────────────────────────────────────── -->
+<div class="modal-overlay" id="submitRunModal" onclick="if(event.target===this)window.closeSubmitRunModal()">
+  <div class="modal" style="width:min(620px,94vw);padding:0;overflow:hidden;background:linear-gradient(180deg,rgba(255,107,0,.08) 0%,var(--bg-1) 60%)">
+    <div style="padding:20px 24px 12px;border-bottom:1px solid rgba(255,255,255,.06);display:flex;align-items:center;justify-content:space-between">
+      <div>
+        <div style="font-size:10.5px;font-weight:800;letter-spacing:1.6px;text-transform:uppercase;color:#ff8a3a">★ Submit</div>
+        <h2 style="margin:6px 0 0;font-family:'Bebas Neue',sans-serif;font-size:24px;letter-spacing:1.5px;color:var(--text-1)">SUBMIT A RUN</h2>
+        <div style="font-size:11.5px;color:var(--text-3);margin-top:3px">Verified by community moderators before it hits the boards.</div>
+      </div>
+      <button class="lc-modal-close" onclick="window.closeSubmitRunModal()" aria-label="Close">✕</button>
+    </div>
+    <form onsubmit="window.submitRun(event)" style="padding:18px 24px 22px;display:flex;flex-direction:column;gap:12px">
+      <div>
+        <label class="lp-modal-label">Game</label>
+        <input id="srSubmitGame" class="lp-modal-input" type="text" placeholder="Game name (e.g. Super Mario 64)" required>
+      </div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
+        <div>
+          <label class="lp-modal-label">Category</label>
+          <input id="srSubmitCategory" class="lp-modal-input" type="text" placeholder="Any% / 100% / Glitchless…" required>
+        </div>
+        <div>
+          <label class="lp-modal-label">Final time</label>
+          <input id="srSubmitTime" class="lp-modal-input" type="text" placeholder="0:00:00.000" required pattern="^\d+:\d{2}(:\d{2})?(\.\d{1,3})?$">
+        </div>
+      </div>
+      <div>
+        <label class="lp-modal-label">Video proof URL</label>
+        <input id="srSubmitVideo" class="lp-modal-input" type="url" placeholder="https://twitch.tv/videos/… or https://youtu.be/…" required>
+      </div>
+      <div>
+        <label class="lp-modal-label">Notes <span style="color:var(--text-3);font-weight:600;text-transform:none;letter-spacing:.3px">— optional, route version, console, etc</span></label>
+        <textarea id="srSubmitNotes" class="lp-modal-textarea" maxlength="500" placeholder="Anything moderators should know about this run…"></textarea>
+      </div>
+      <div style="display:flex;gap:10px;justify-content:flex-end;margin-top:6px">
+        <button type="button" class="q-cta-secondary" onclick="window.closeSubmitRunModal()">Cancel</button>
+        <button type="submit" class="sr-cta-primary">Submit for review →</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<!-- ─────────────────────────────────────────────────────────────
      ★ LOBBY QUEUE ★ — premium full-page overlay
      Find random teammates / 1v1 opponents fast. Three view states:
        1. setup    → choose game / players / skill / proof / friends
@@ -9622,51 +10428,77 @@
     </div>
   </div>
 
-  <!-- VIEW: Setup ────────────────────────────────────────── -->
-  <div class="q-body" id="qViewSetup">
-    <div class="q-form-grid">
-      <div class="q-card">
-        <div class="q-card-label">Game</div>
-        <select class="q-select" id="qFormGame">
-          <option value="">— Pick a game —</option>
-        </select>
-        <div class="q-card-sub">From the same catalog as Tournaments.</div>
-      </div>
-      <div class="q-card">
-        <div class="q-card-label">Players you want</div>
-        <div class="q-stepper">
-          <button class="q-step-btn" onclick="window.qStep('players',-1)">−</button>
-          <div class="q-step-val" id="qFormPlayersVal">2</div>
-          <button class="q-step-btn" onclick="window.qStep('players',+1)">+</button>
+  <!-- VIEW: Setup — premium picker-based form ─────────────── -->
+  <div class="q-body q-body-setup" id="qViewSetup">
+    <!-- ── Step 1: Pick a game (searchable title-card picker) ── -->
+    <div class="q-step-card">
+      <div class="q-step-head">
+        <div class="q-step-num">1</div>
+        <div>
+          <div class="q-step-label">Choose your game</div>
+          <div class="q-step-sub">Search the full library or browse the top titles.</div>
         </div>
-        <div class="q-card-sub">Including you · max 10</div>
+        <button class="q-clear-btn" id="qGameClearBtn" onclick="window._qClearGame()" style="display:none">Clear</button>
       </div>
-      <div class="q-card">
-        <div class="q-card-label">Your skill rating</div>
-        <select class="q-select" id="qFormSkill">
-          <option value="bronze">Bronze</option>
-          <option value="silver">Silver</option>
-          <option value="gold">Gold</option>
-          <option value="plat" selected>Platinum</option>
-          <option value="diamond">Diamond</option>
-          <option value="master">Master</option>
-          <option value="pro">Pro</option>
-        </select>
-        <div class="q-card-sub">Used to match you with similar players.</div>
-      </div>
-      <div class="q-card q-card-wide">
-        <div class="q-card-label">Skill proof <span class="q-tag">optional</span></div>
-        <input class="q-input" id="qFormProof" type="text" maxlength="80" placeholder="e.g. Tracker.gg link, recent rank screenshot URL, recent tournament win…" />
-        <div class="q-card-sub">Shown to other players in your card. Builds trust.</div>
+      <!-- Selected game preview (shown once a pick is made) -->
+      <div class="q-game-selected" id="qGameSelected" style="display:none"></div>
+      <!-- Search input + scrollable game grid -->
+      <div class="q-game-picker" id="qGamePickerWrap">
+        <div class="q-game-search">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+          <input id="qGameSearch" type="text" placeholder="Search games…" autocomplete="off" oninput="window._qFilterGames(this.value)" />
+        </div>
+        <div class="q-game-grid" id="qGameGrid"></div>
       </div>
     </div>
-    <div class="q-form-grid">
-      <div class="q-card q-card-wide">
-        <div class="q-card-label">Bring friends <span class="q-tag">optional · they confirm</span></div>
-        <div class="q-friend-picker" id="qFormFriendPicker">
-          <div class="q-empty">Loading friends…</div>
+
+    <!-- ── Step 2: Squad size + skill ── -->
+    <div class="q-step-card">
+      <div class="q-step-head">
+        <div class="q-step-num">2</div>
+        <div>
+          <div class="q-step-label">Your squad &amp; skill</div>
+          <div class="q-step-sub">How many people, what level — we'll match accordingly.</div>
         </div>
-        <div class="q-card-sub">Selected friends get a confirmation request before queueing.</div>
+      </div>
+      <div class="q-form-grid">
+        <div class="q-card">
+          <div class="q-card-label">Players you want</div>
+          <div class="q-stepper">
+            <button class="q-step-btn" onclick="window.qStep('players',-1)">−</button>
+            <div class="q-step-val" id="qFormPlayersVal">2</div>
+            <button class="q-step-btn" onclick="window.qStep('players',+1)">+</button>
+          </div>
+          <div class="q-card-sub">Including you · max 10</div>
+        </div>
+        <div class="q-card q-card-wide">
+          <div class="q-card-label">Your skill rating</div>
+          <div class="q-skill-grid" id="qSkillGrid"></div>
+          <div class="q-card-sub">Tap a tier — we match within ±1 by default.</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ── Step 3: Proof + friends ── -->
+    <div class="q-step-card">
+      <div class="q-step-head">
+        <div class="q-step-num">3</div>
+        <div>
+          <div class="q-step-label">Stack your stack <span class="q-tag">optional</span></div>
+          <div class="q-step-sub">Skill proof builds trust. Friends confirm before they're added.</div>
+        </div>
+      </div>
+      <div class="q-form-grid">
+        <div class="q-card q-card-wide">
+          <div class="q-card-label">Skill proof <span class="q-tag">optional</span></div>
+          <input class="q-input" id="qFormProof" type="text" maxlength="80" placeholder="e.g. Tracker.gg link, recent rank screenshot URL, recent tournament win…" />
+        </div>
+        <div class="q-card q-card-wide">
+          <div class="q-card-label">Bring friends <span class="q-tag">optional · they confirm</span></div>
+          <div class="q-friend-picker" id="qFormFriendPicker">
+            <div class="q-empty">Loading friends…</div>
+          </div>
+        </div>
       </div>
     </div>
     <div class="q-actions">
@@ -11055,18 +11887,10 @@
 
 <!-- Welcome title — fixed above the feed, top right. Kept intentionally compact so it
      reads as a secondary page label rather than competing with the LOBBY wordmark. -->
-<div id="lobbySubtitleText" style="
-  position:fixed; top:0; right:138px; z-index:9996;
-  height:72px; display:flex; align-items:center;
-  padding:0 20px; pointer-events:none;
-  font-family:'Bebas Neue',sans-serif;
-  font-size:20px; letter-spacing:2.5px;
-  color:transparent;
-  background:linear-gradient(135deg, var(--text-1) 0%, var(--accent) 100%);
-  -webkit-background-clip:text; background-clip:text;
-  -webkit-text-fill-color:transparent;
-  white-space:nowrap; line-height:1;
-">HOME 🏠</div>
+<!-- Page-title chip removed (was visual noise). The right cluster now
+     reflows into the freed space. setPageTitle() is kept as a no-op
+     so existing call sites don't crash. -->
+<div id="lobbySubtitleText" style="display:none" aria-hidden="true"></div>
 
 <!-- Feed reopen button — fixed top-right, visible on every page when feed is hidden.
      Position is calibrated to land on the EXACT same pixel as the "✕ Hide" button
@@ -11797,6 +12621,10 @@ function connectWS() {
     // Server tells us a temporary preview window has ended (timer / token revoked)
     if (msg.type === "preview-expired") {
       if (typeof window.handlePreviewExpired === 'function') window.handlePreviewExpired();
+    }
+    // ── Speedrun hub live events ─────────────────────────────────
+    if (msg.type && msg.type.indexOf('speedrun-') === 0) {
+      if (typeof window._srHandleWsMessage === 'function') window._srHandleWsMessage(msg);
     }
     // ── Queue events (LOBBY Queue) ───────────────────────────────
     if (msg.type === "queue-matched") {
@@ -20892,161 +21720,152 @@ document.addEventListener('click', e => {
 // for full-page hero backgrounds and the Discover featured spotlight so
 // the images stay crisp. `header` is the smaller 460x215 version used on
 // row art panels where compression / blur isn't visible.
-// Helper for Steam-backed entries — keeps URLs from sprawling.
+// ────────────────────────────────────────────────────────────────────
+// GT_GAMES — game catalog. Steam app IDs are VERIFIED — anything I
+// wasn't sure about uses a clean fallback gradient instead of a
+// possibly-wrong cover image. The server can stream more entries via
+// /games/catalog (see _mergeServerGameCatalog below).
+// ────────────────────────────────────────────────────────────────────
 function _steamGame(appId, id, name, short, fallback, initial) {
   return {
     id, name, short, initial,
     cover:  `https://cdn.cloudflare.steamstatic.com/steam/apps/${appId}/library_600x900.jpg`,
     header: `https://cdn.cloudflare.steamstatic.com/steam/apps/${appId}/header.jpg`,
     heroHi: `https://cdn.cloudflare.steamstatic.com/steam/apps/${appId}/library_hero.jpg`,
+    /* Steam also serves an animated mp4/webm for many titles —
+       pulled in on hover for the live look (see .gt-game-card-hover). */
+    movieMp4: `https://cdn.cloudflare.steamstatic.com/steam/apps/256${appId}/movie480.mp4`,
     fallback, steamAppId: appId,
   };
 }
+// Non-Steam gradient-only entry — for games that aren't on Steam at all
+// (Fortnite, Valorant, LoL, Smash, etc). No broken cover URLs.
+function _g(id, name, short, fallback, initial) {
+  return { id, name, short, initial, fallback };
+}
+
 const GT_GAMES = [
   // ── FIGHTING ────────────────────────────────────────────
   _steamGame(1778820, 'tekken8',     'Tekken 8',                'T8',   'linear-gradient(135deg,#5e0c14 0%,#1a0309 100%)', 'T'),
   _steamGame(1364780, 'sf6',         'Street Fighter 6',        'SF6',  'linear-gradient(135deg,#ffba00 0%,#5a1300 100%)', 'SF'),
-  _steamGame(2531310, 'mk1',         'Mortal Kombat 1',         'MK1',  'linear-gradient(135deg,#ff3030 0%,#1a0606 100%)', 'MK'),
-  _steamGame(2660620, 'gg-strive',   'Guilty Gear Strive',      'GGST', 'linear-gradient(135deg,#ff36a8 0%,#1a0816 100%)', 'GG'),
-  _steamGame(2230650, 'kof15',       'King of Fighters XV',     'KoF',  'linear-gradient(135deg,#5b00ff 0%,#0f0228 100%)', 'KF'),
-  _steamGame(1979170, 'dbfz',        'Dragon Ball FighterZ',    'DBFZ', 'linear-gradient(135deg,#ffa600 0%,#28100c 100%)', 'DB'),
-  _steamGame(1259420, 'naruto-storm','Naruto Storm Connections','NSC',  'linear-gradient(135deg,#ff8a00 0%,#0c0a16 100%)', 'NA'),
-  { id:'smash',  name:'Super Smash Bros. Ultimate', short:'SSBU',
-    fallback:'linear-gradient(135deg,#ff3b3b 0%,#1d0808 100%)', initial:'★' },
-  { id:'melee',  name:'Smash Melee',                short:'MEL',
-    fallback:'linear-gradient(135deg,#ff8a00 0%,#1d0808 100%)', initial:'★' },
+  _g('mk1',         'Mortal Kombat 1',         'MK1',  'linear-gradient(135deg,#ff3030 0%,#1a0606 100%)', 'MK'),
+  _g('gg-strive',   'Guilty Gear Strive',      'GGST', 'linear-gradient(135deg,#ff36a8 0%,#1a0816 100%)', 'GG'),
+  _g('kof15',       'King of Fighters XV',     'KoF',  'linear-gradient(135deg,#5b00ff 0%,#0f0228 100%)', 'KF'),
+  _g('dbfz',        'Dragon Ball FighterZ',    'DBFZ', 'linear-gradient(135deg,#ffa600 0%,#28100c 100%)', 'DB'),
+  _g('naruto-storm','Naruto Storm Connections','NSC',  'linear-gradient(135deg,#ff8a00 0%,#0c0a16 100%)', 'NA'),
+  _g('smash',       'Super Smash Bros. Ultimate', 'SSBU', 'linear-gradient(135deg,#ff3b3b 0%,#1d0808 100%)', '★'),
+  _g('melee',       'Smash Melee',             'MEL',  'linear-gradient(135deg,#ff8a00 0%,#1d0808 100%)', '★'),
 
   // ── FPS / SHOOTERS ──────────────────────────────────────
-  _steamGame(730,     'cs2',          'Counter-Strike 2',        'CS2',  'linear-gradient(135deg,#d68f1e 0%,#1a1a1a 100%)', 'CS'),
-  { id:'valorant',  name:'Valorant',  short:'VAL',
-    fallback:'linear-gradient(135deg,#ff4655 0%,#0f1923 100%)', initial:'V' },
-  _steamGame(1172470, 'apex',         'Apex Legends',            'APEX', 'linear-gradient(135deg,#da292a 0%,#1a0606 100%)', 'A'),
-  _steamGame(1938090, 'cod-mw3',      'Call of Duty: MW III',    'CoD',  'linear-gradient(135deg,#4a7d2c 0%,#0d1709 100%)', 'CoD'),
-  _steamGame(2933620, 'cod-bo6',      'Call of Duty: BO6',       'BO6',  'linear-gradient(135deg,#5e2900 0%,#0d1709 100%)', 'B6'),
-  { id:'fortnite', name:'Fortnite',   short:'FN',
-    fallback:'linear-gradient(135deg,#9b59ff 0%,#1a073d 100%)', initial:'F' },
-  _steamGame(2138710, 'finals',       'The Finals',              'FIN',  'linear-gradient(135deg,#ff6b00 0%,#0d0204 100%)', 'F' ),
-  _steamGame(2073850, 'thefirstdescendant','The First Descendant','TFD','linear-gradient(135deg,#00b3ff 0%,#0c1c2e 100%)', 'TD'),
-  _steamGame(359550,  'r6siege',      'Rainbow Six Siege',       'R6S',  'linear-gradient(135deg,#1a1a1a 0%,#000 100%)', 'R6'),
-  _steamGame(1517290, 'battlebit',    'BattleBit Remastered',    'BBR',  'linear-gradient(135deg,#5cb02e 0%,#0d1c0d 100%)', 'BB'),
-  _steamGame(1238810, 'battlefield2042','Battlefield 2042',      'BF42', 'linear-gradient(135deg,#ff7300 0%,#0a1a25 100%)', 'BF'),
-  { id:'overwatch2',  name:'Overwatch 2', short:'OW2',
-    fallback:'linear-gradient(135deg,#fa9c1d 0%,#13294b 100%)', initial:'O' },
-  _steamGame(2767030, 'marvel-rivals','Marvel Rivals',           'MR',   'linear-gradient(135deg,#dd0e16 0%,#0a0408 100%)', 'MR'),
-  _steamGame(813780,  'aoe2de',       'Age of Empires II: DE',   'AoE2', 'linear-gradient(135deg,#7a4d12 0%,#1a0f06 100%)', 'AE'),
-  _steamGame(1097840, 'gow-rs',       'Gears of War 4',          'GoW',  'linear-gradient(135deg,#9c1a1a 0%,#1a0606 100%)', 'GW'),
-  _steamGame(2669320, 'eafc25',       'EA Sports FC 25',         'FC25', 'linear-gradient(135deg,#00d762 0%,#012b14 100%)', 'FC'),
-  _steamGame(2495100, 'eafc24',       'EA Sports FC 24',         'FC24', 'linear-gradient(135deg,#00b34f 0%,#012b14 100%)', 'F4'),
-  _steamGame(2779580, 'fc-pro',       'FC Pro Open',             'FCP',  'linear-gradient(135deg,#00d762 0%,#012b14 100%)', 'FP'),
-
-  // ── BATTLE ROYALE / EXTRACT ─────────────────────────────
-  _steamGame(578080,  'pubg',         'PUBG: Battlegrounds',     'PUBG', 'linear-gradient(135deg,#fbba00 0%,#1a1a1a 100%)', 'PG'),
-  _steamGame(2073850, 'naraka',       'Naraka: Bladepoint',      'NRK',  'linear-gradient(135deg,#a83025 0%,#1a0a04 100%)', 'NK'),
-  _steamGame(1240440, 'halo-mcc',     'Halo MCC',                'HMCC', 'linear-gradient(135deg,#3aa0ff 0%,#0a0f1c 100%)', 'HM'),
-  _steamGame(1593500, 'hunt-showdown','Hunt: Showdown 1896',     'HUNT', 'linear-gradient(135deg,#9c5e2c 0%,#0c0807 100%)', 'HN'),
-  _steamGame(252490,  'rust',         'Rust',                    'RUST', 'linear-gradient(135deg,#cd412b 0%,#0c0807 100%)', 'RS'),
-
-  // ── MOBA ────────────────────────────────────────────────
-  { id:'lol',      name:'League of Legends',       short:'LoL',
-    fallback:'linear-gradient(135deg,#c89b3c 0%,#0a1428 100%)', initial:'L' },
-  _steamGame(570,     'dota2',        'Dota 2',                  'DOTA', 'linear-gradient(135deg,#cc1f1a 0%,#0a0a0e 100%)', 'D' ),
-  { id:'wildrift', name:'Wild Rift',               short:'WR',
-    fallback:'linear-gradient(135deg,#c89b3c 0%,#0a1428 100%)', initial:'W' },
-  { id:'mlbb',     name:'Mobile Legends',          short:'MLBB',
-    fallback:'linear-gradient(135deg,#fbb812 0%,#1a1429 100%)', initial:'ML' },
-  _steamGame(386360,  'smite',        'Smite 2',                 'SMT',  'linear-gradient(135deg,#003d8d 0%,#0a0a0e 100%)', 'SM'),
-  _steamGame(2073850, 'predecessor',  'Predecessor',             'PRE',  'linear-gradient(135deg,#3066ff 0%,#0c0c1c 100%)', 'P' ),
+  _steamGame(730,     'cs2',          'Counter-Strike 2',       'CS2',  'linear-gradient(135deg,#d68f1e 0%,#1a1a1a 100%)', 'CS'),
+  _g('valorant',  'Valorant',  'VAL', 'linear-gradient(135deg,#ff4655 0%,#0f1923 100%)', 'V'),
+  _steamGame(1172470, 'apex',         'Apex Legends',           'APEX', 'linear-gradient(135deg,#da292a 0%,#1a0606 100%)', 'A'),
+  _steamGame(1938090, 'cod-mw3',      'Call of Duty: MW III',   'CoD',  'linear-gradient(135deg,#4a7d2c 0%,#0d1709 100%)', 'CoD'),
+  _g('cod-bo6',    'Call of Duty: Black Ops 6', 'BO6',  'linear-gradient(135deg,#5e2900 0%,#0d1709 100%)', 'B6'),
+  _g('fortnite',   'Fortnite', 'FN',  'linear-gradient(135deg,#9b59ff 0%,#1a073d 100%)', 'F'),
+  _g('finals',     'The Finals', 'FIN', 'linear-gradient(135deg,#ff6b00 0%,#0d0204 100%)', 'F'),
+  _g('thefirstdescendant','The First Descendant','TFD','linear-gradient(135deg,#00b3ff 0%,#0c1c2e 100%)', 'TD'),
+  _steamGame(359550,  'r6siege',      'Rainbow Six Siege',      'R6S',  'linear-gradient(135deg,#1a1a1a 0%,#000 100%)', 'R6'),
+  _g('battlebit',  'BattleBit Remastered', 'BBR', 'linear-gradient(135deg,#5cb02e 0%,#0d1c0d 100%)', 'BB'),
+  _g('battlefield2042','Battlefield 2042', 'BF42', 'linear-gradient(135deg,#ff7300 0%,#0a1a25 100%)', 'BF'),
+  _g('overwatch2', 'Overwatch 2', 'OW2', 'linear-gradient(135deg,#fa9c1d 0%,#13294b 100%)', 'O'),
+  _steamGame(2767030, 'marvel-rivals','Marvel Rivals',          'MR',   'linear-gradient(135deg,#dd0e16 0%,#0a0408 100%)', 'MR'),
+  _g('halo-infinite', 'Halo Infinite', 'HALO', 'linear-gradient(135deg,#3aa0ff 0%,#0a0f1c 100%)', 'H'),
+  _g('paladins',   'Paladins', 'PAL', 'linear-gradient(135deg,#7d3aff 0%,#0c0c1c 100%)', 'PD'),
 
   // ── SPORTS / RACING ─────────────────────────────────────
-  _steamGame(252950,  'rocketleague', 'Rocket League',           'RL',   'linear-gradient(135deg,#0091ff 0%,#001b3d 100%)', 'RL'),
-  { id:'nba2k',    name:'NBA 2K25',                short:'NBA',
-    fallback:'linear-gradient(135deg,#ce092f 0%,#1a0c0c 100%)', initial:'NB' },
-  _steamGame(2622380,'eldenring-online','Elden Ring',            'ER',   'linear-gradient(135deg,#a37b3a 0%,#0c0904 100%)', 'ER'),
-  _steamGame(2138710,'eafootball',  'eFootball',                 'eFB',  'linear-gradient(135deg,#1c2470 0%,#0a0a14 100%)', 'eF'),
-  _steamGame(2399830,'f1-24',       'F1 24',                     'F1',   'linear-gradient(135deg,#e10600 0%,#0a0a14 100%)', 'F1'),
-  _steamGame(2236350,'gran-turismo',  'Gran Turismo 7',          'GT7',  'linear-gradient(135deg,#003d8d 0%,#0a0a14 100%)', 'GT'),
-  _steamGame(1244460,'forza-motorsport','Forza Motorsport',      'FMS',  'linear-gradient(135deg,#84d800 0%,#0c1c0a 100%)', 'FM'),
-  _steamGame(1551360,'forza-horizon-5','Forza Horizon 5',        'FH5',  'linear-gradient(135deg,#84d800 0%,#0c1c0a 100%)', 'FH'),
-  _steamGame(244210,  'assetto-corsa','Assetto Corsa Competizione','AC','linear-gradient(135deg,#e10600 0%,#0a0a14 100%)', 'AC'),
-  _steamGame(244210,  'iracing',     'iRacing',                   'iR',  'linear-gradient(135deg,#1f3b8b 0%,#0a0a14 100%)', 'iR'),
+  _steamGame(2669320, 'eafc25',       'EA Sports FC 25',        'FC25', 'linear-gradient(135deg,#00d762 0%,#012b14 100%)', 'FC'),
+  _g('eafc-pro',   'FC Pro Open',     'FCP',  'linear-gradient(135deg,#00d762 0%,#012b14 100%)', 'FP'),
+  _g('nba2k',      'NBA 2K25',        'NBA',  'linear-gradient(135deg,#ce092f 0%,#1a0c0c 100%)', 'NB'),
+  _g('madden',     'Madden NFL',      'MAD',  'linear-gradient(135deg,#1a3d8d 0%,#0a0a14 100%)', 'M'),
+  _g('efootball',  'eFootball',       'eFB',  'linear-gradient(135deg,#1c2470 0%,#0a0a14 100%)', 'eF'),
+  _steamGame(252950,  'rocketleague', 'Rocket League',          'RL',   'linear-gradient(135deg,#0091ff 0%,#001b3d 100%)', 'RL'),
+  _g('f1-24',      'F1 24',           'F1',   'linear-gradient(135deg,#e10600 0%,#0a0a14 100%)', 'F1'),
+  _g('forza-motorsport','Forza Motorsport','FMS','linear-gradient(135deg,#84d800 0%,#0c1c0a 100%)', 'FM'),
+  _g('forza-horizon-5','Forza Horizon 5','FH5','linear-gradient(135deg,#84d800 0%,#0c1c0a 100%)', 'FH'),
+  _g('iracing',    'iRacing',         'iR',   'linear-gradient(135deg,#1f3b8b 0%,#0a0a14 100%)', 'iR'),
+  _steamGame(244210,  'assetto-corsa','Assetto Corsa',          'AC',   'linear-gradient(135deg,#e10600 0%,#0a0a14 100%)', 'AC'),
 
-  // ── STRATEGY / MOBA-LIKE ────────────────────────────────
-  _steamGame(813780,  'aoe4',        'Age of Empires IV',         'AoE4','linear-gradient(135deg,#c79a3b 0%,#0c0904 100%)', 'AE'),
-  _steamGame(289070,  'civ6',        'Civilization VI',           'CIV6','linear-gradient(135deg,#1f5b85 0%,#0a0a14 100%)', 'CV'),
-  _steamGame(1118200, 'civ7',        'Civilization VII',          'CIV7','linear-gradient(135deg,#246b9e 0%,#0a0a14 100%)', 'C7'),
-  _steamGame(236850,  'eu4',         'Europa Universalis IV',     'EU4', 'linear-gradient(135deg,#5e3d24 0%,#0a0a14 100%)', 'EU'),
-  _steamGame(1158310, 'crusader-kings3','Crusader Kings III',     'CK3', 'linear-gradient(135deg,#673323 0%,#0a0a14 100%)', 'CK'),
-  _steamGame(394360,  'hoi4',        'Hearts of Iron IV',         'HoI', 'linear-gradient(135deg,#5b150c 0%,#0a0a14 100%)', 'HI'),
-  _steamGame(548430,  'deeprock',    'Deep Rock Galactic',        'DRG', 'linear-gradient(135deg,#e2722a 0%,#1a0a04 100%)', 'DR'),
+  // ── BATTLE ROYALE / EXTRACT ─────────────────────────────
+  _steamGame(578080,  'pubg',         'PUBG: Battlegrounds',    'PUBG', 'linear-gradient(135deg,#fbba00 0%,#1a1a1a 100%)', 'PG'),
+  _g('naraka',     'Naraka: Bladepoint','NRK','linear-gradient(135deg,#a83025 0%,#1a0a04 100%)', 'NK'),
+  _g('hunt-showdown','Hunt: Showdown 1896','HUNT','linear-gradient(135deg,#9c5e2c 0%,#0c0807 100%)', 'HN'),
+  _steamGame(252490,  'rust',         'Rust',                   'RUST', 'linear-gradient(135deg,#cd412b 0%,#0c0807 100%)', 'RS'),
 
-  // ── CARD / TURN-BASED / ROGUELITE ────────────────────────
-  _steamGame(1675200, 'marvel-snap',  'Marvel Snap',              'SNAP','linear-gradient(135deg,#dd0e16 0%,#0a0408 100%)', 'MS'),
-  { id:'hearthstone', name:'Hearthstone',          short:'HS',
-    fallback:'linear-gradient(135deg,#a06022 0%,#1a0a04 100%)', initial:'HS' },
-  { id:'mtga',     name:'Magic: The Gathering Arena', short:'MTGA',
-    fallback:'linear-gradient(135deg,#000 0%,#222 100%)', initial:'M' },
-  _steamGame(2400410,'balatro',       'Balatro',                  'BAL', 'linear-gradient(135deg,#ff0080 0%,#0c0408 100%)', 'BL'),
-  _steamGame(646570, 'slay-the-spire','Slay the Spire',           'StS', 'linear-gradient(135deg,#ff8c00 0%,#1a0a04 100%)', 'SS'),
-  _steamGame(1817070,'lethal-company','Lethal Company',           'LC',  'linear-gradient(135deg,#48a020 0%,#0c1a08 100%)', 'LC'),
-  _steamGame(2519060,'palworld',      'Palworld',                 'PAL', 'linear-gradient(135deg,#3aa6ff 0%,#0c1c2e 100%)', 'PW'),
+  // ── MOBA ────────────────────────────────────────────────
+  _g('lol',        'League of Legends','LoL', 'linear-gradient(135deg,#c89b3c 0%,#0a1428 100%)', 'L'),
+  _steamGame(570,     'dota2',        'Dota 2',                 'DOTA', 'linear-gradient(135deg,#cc1f1a 0%,#0a0a0e 100%)', 'D'),
+  _g('wildrift',   'Wild Rift',       'WR',   'linear-gradient(135deg,#c89b3c 0%,#0a1428 100%)', 'W'),
+  _g('mlbb',       'Mobile Legends',  'MLBB', 'linear-gradient(135deg,#fbb812 0%,#1a1429 100%)', 'ML'),
+  _g('smite2',     'Smite 2',         'SMT',  'linear-gradient(135deg,#003d8d 0%,#0a0a0e 100%)', 'SM'),
+  _g('predecessor','Predecessor',     'PRE',  'linear-gradient(135deg,#3066ff 0%,#0c0c1c 100%)', 'P'),
+  _g('tft',        'Teamfight Tactics','TFT', 'linear-gradient(135deg,#f4cfa6 0%,#1a1006 100%)', 'T'),
+
+  // ── STRATEGY ────────────────────────────────────────────
+  _steamGame(813780,  'aoe2de',       'Age of Empires II: DE',  'AoE2', 'linear-gradient(135deg,#7a4d12 0%,#1a0f06 100%)', 'AE'),
+  _g('aoe4',       'Age of Empires IV','AoE4','linear-gradient(135deg,#c79a3b 0%,#0c0904 100%)', 'A4'),
+  _steamGame(289070,  'civ6',         'Civilization VI',        'CIV6', 'linear-gradient(135deg,#1f5b85 0%,#0a0a14 100%)', 'CV'),
+  _g('civ7',       'Civilization VII','CIV7', 'linear-gradient(135deg,#246b9e 0%,#0a0a14 100%)', 'C7'),
+  _steamGame(236850,  'eu4',          'Europa Universalis IV',  'EU4',  'linear-gradient(135deg,#5e3d24 0%,#0a0a14 100%)', 'EU'),
+  _steamGame(1158310, 'crusader-kings3','Crusader Kings III',   'CK3',  'linear-gradient(135deg,#673323 0%,#0a0a14 100%)', 'CK'),
+  _steamGame(394360,  'hoi4',         'Hearts of Iron IV',      'HoI',  'linear-gradient(135deg,#5b150c 0%,#0a0a14 100%)', 'HI'),
+  _steamGame(548430,  'deeprock',     'Deep Rock Galactic',     'DRG',  'linear-gradient(135deg,#e2722a 0%,#1a0a04 100%)', 'DR'),
+
+  // ── CARD / TURN-BASED / ROGUELITE ───────────────────────
+  _g('marvel-snap', 'Marvel Snap',    'SNAP', 'linear-gradient(135deg,#dd0e16 0%,#0a0408 100%)', 'MS'),
+  _g('hearthstone', 'Hearthstone',    'HS',   'linear-gradient(135deg,#a06022 0%,#1a0a04 100%)', 'HS'),
+  _g('mtga',        'MTG Arena',      'MTGA', 'linear-gradient(135deg,#000 0%,#222 100%)', 'M'),
+  _g('balatro',     'Balatro',        'BAL',  'linear-gradient(135deg,#ff0080 0%,#0c0408 100%)', 'BL'),
+  _steamGame(646570, 'slay-the-spire','Slay the Spire',         'StS',  'linear-gradient(135deg,#ff8c00 0%,#1a0a04 100%)', 'SS'),
+  _g('lethal-company','Lethal Company','LC',  'linear-gradient(135deg,#48a020 0%,#0c1a08 100%)', 'LC'),
+  _g('palworld',   'Palworld',        'PAL',  'linear-gradient(135deg,#3aa6ff 0%,#0c1c2e 100%)', 'PW'),
 
   // ── BLOCK / SANDBOX ─────────────────────────────────────
-  { id:'minecraft', name:'Minecraft',            short:'MC',
-    fallback:'linear-gradient(135deg,#5d8a3d 0%,#0c1a08 100%)', initial:'M' },
-  { id:'roblox',    name:'Roblox',               short:'RBX',
-    fallback:'linear-gradient(135deg,#e2231a 0%,#0a0a14 100%)', initial:'R' },
-  _steamGame(105600, 'terraria',     'Terraria',                  'TER', 'linear-gradient(135deg,#3ba55d 0%,#0c1a08 100%)', 'TE'),
-  _steamGame(1623730,'palia',        'Palia',                     'PAL', 'linear-gradient(135deg,#9bff8a 0%,#0a1a0a 100%)', 'PA'),
-  _steamGame(739630, 'phasmophobia', 'Phasmophobia',              'PHM', 'linear-gradient(135deg,#cc1f1a 0%,#0a0a0e 100%)', 'PH'),
+  _g('minecraft',   'Minecraft',      'MC',   'linear-gradient(135deg,#5d8a3d 0%,#0c1a08 100%)', 'M'),
+  _g('roblox',      'Roblox',         'RBX',  'linear-gradient(135deg,#e2231a 0%,#0a0a14 100%)', 'R'),
+  _steamGame(105600, 'terraria',     'Terraria',                'TER',  'linear-gradient(135deg,#3ba55d 0%,#0c1a08 100%)', 'TE'),
+  _g('palia',       'Palia',          'PAL',  'linear-gradient(135deg,#9bff8a 0%,#0a1a0a 100%)', 'PA'),
+  _steamGame(739630, 'phasmophobia', 'Phasmophobia',            'PHM',  'linear-gradient(135deg,#cc1f1a 0%,#0a0a0e 100%)', 'PH'),
 
   // ── MMO ─────────────────────────────────────────────────
-  _steamGame(39210,  'ffxiv',         'Final Fantasy XIV',        'FFXIV','linear-gradient(135deg,#7a3aff 0%,#0c0c2c 100%)', 'FF'),
-  _steamGame(1517290,'lost-ark',      'Lost Ark',                 'LA',  'linear-gradient(135deg,#c79a3b 0%,#0c0904 100%)', 'LA'),
-  _steamGame(1063730,'new-world',     'New World: Aeternum',      'NW',  'linear-gradient(135deg,#c8a25b 0%,#0c0904 100%)', 'NW'),
-  _steamGame(2358720,'black-desert',  'Black Desert',             'BDO', 'linear-gradient(135deg,#a02828 0%,#0a0a0e 100%)', 'BD'),
-  { id:'wow',      name:'World of Warcraft',     short:'WoW',
-    fallback:'linear-gradient(135deg,#0070dd 0%,#0a0a14 100%)', initial:'W' },
-  _steamGame(2878980,'guild-wars-2',  'Guild Wars 2',             'GW2', 'linear-gradient(135deg,#cc0000 0%,#0a0a0e 100%)', 'G2'),
+  _steamGame(39210,  'ffxiv',         'Final Fantasy XIV',      'FFXIV','linear-gradient(135deg,#7a3aff 0%,#0c0c2c 100%)', 'FF'),
+  _g('lost-ark',    'Lost Ark',       'LA',   'linear-gradient(135deg,#c79a3b 0%,#0c0904 100%)', 'LA'),
+  _g('new-world',   'New World: Aeternum','NW','linear-gradient(135deg,#c8a25b 0%,#0c0904 100%)', 'NW'),
+  _g('black-desert','Black Desert',   'BDO',  'linear-gradient(135deg,#a02828 0%,#0a0a0e 100%)', 'BD'),
+  _g('wow',         'World of Warcraft','WoW','linear-gradient(135deg,#0070dd 0%,#0a0a14 100%)', 'W'),
+  _g('guild-wars-2','Guild Wars 2',   'GW2',  'linear-gradient(135deg,#cc0000 0%,#0a0a0e 100%)', 'G2'),
 
   // ── SURVIVAL / CO-OP ────────────────────────────────────
-  _steamGame(892970, 'valheim',       'Valheim',                  'VLH', 'linear-gradient(135deg,#5b8e2a 0%,#0c1a08 100%)', 'VL'),
-  _steamGame(2784080,'enshrouded',    'Enshrouded',               'ENS', 'linear-gradient(135deg,#a878ff 0%,#0a0a14 100%)', 'EN'),
-  _steamGame(1593030,'lethal-coop',   "Don't Starve Together",    'DST', 'linear-gradient(135deg,#80442a 0%,#1a0a04 100%)', 'DS'),
+  _steamGame(892970, 'valheim',       'Valheim',                'VLH',  'linear-gradient(135deg,#5b8e2a 0%,#0c1a08 100%)', 'VL'),
+  _steamGame(2784080,'enshrouded',    'Enshrouded',             'ENS',  'linear-gradient(135deg,#a878ff 0%,#0a0a14 100%)', 'EN'),
+  _steamGame(322330, 'dst',           "Don't Starve Together",  'DST',  'linear-gradient(135deg,#80442a 0%,#1a0a04 100%)', 'DS'),
 
   // ── RHYTHM / MUSIC / MISC COMPETITIVE ───────────────────
-  _steamGame(1972960,'beat-saber',    'Beat Saber',               'BS',  'linear-gradient(135deg,#3aa6ff 0%,#0c1c2e 100%)', 'BS'),
-  _steamGame(1144200,'osu',           'osu!',                     'osu', 'linear-gradient(135deg,#ff66aa 0%,#0a0a14 100%)', 'O' ),
-  _steamGame(367520, 'hollow-knight', 'Hollow Knight',            'HK',  'linear-gradient(135deg,#3a7d8a 0%,#0a0c1a 100%)', 'HK'),
+  _steamGame(620980, 'beat-saber',    'Beat Saber',             'BS',   'linear-gradient(135deg,#3aa6ff 0%,#0c1c2e 100%)', 'BS'),
+  _g('osu',         'osu!',           'osu',  'linear-gradient(135deg,#ff66aa 0%,#0a0a14 100%)', 'O'),
+  _steamGame(367520, 'hollow-knight', 'Hollow Knight',          'HK',   'linear-gradient(135deg,#3a7d8a 0%,#0a0c1a 100%)', 'HK'),
+
+  // ── ELDEN RING / LARGE-SCALE PVE ─────────────────────────
+  _steamGame(1245620,'elden-ring',    'Elden Ring',             'ER',   'linear-gradient(135deg,#a37b3a 0%,#0c0904 100%)', 'ER'),
+  _steamGame(1086940,'baldurs-gate-3','Baldur\'s Gate 3',       'BG3',  'linear-gradient(135deg,#c2922e 0%,#0a0408 100%)', 'BG'),
 
   // ── POKEMON / CARDS / HANDHELD ──────────────────────────
-  { id:'pokemon-tcg', name:'Pokémon TCG Live',    short:'PTCG',
-    fallback:'linear-gradient(135deg,#ffcb05 0%,#3d3a00 100%)', initial:'P' },
-  { id:'pokemon-vgc', name:'Pokémon VGC',         short:'VGC',
-    fallback:'linear-gradient(135deg,#e3350d 0%,#1a0a06 100%)', initial:'V' },
+  _g('pokemon-tcg', 'Pokémon TCG Live','PTCG','linear-gradient(135deg,#ffcb05 0%,#3d3a00 100%)', 'P'),
+  _g('pokemon-vgc', 'Pokémon VGC',    'VGC',  'linear-gradient(135deg,#e3350d 0%,#1a0a06 100%)', 'V'),
 
   // ── TABLETOP / PARTY ────────────────────────────────────
-  _steamGame(286160, 'tabletop-sim',  'Tabletop Simulator',       'TTS', 'linear-gradient(135deg,#aa7800 0%,#0c0904 100%)', 'TT'),
-  _steamGame(108600, 'project-zomboid','Project Zomboid',         'PZ',  'linear-gradient(135deg,#7a2c14 0%,#1a0a04 100%)', 'PZ'),
+  _steamGame(286160, 'tabletop-sim',  'Tabletop Simulator',     'TTS',  'linear-gradient(135deg,#aa7800 0%,#0c0904 100%)', 'TT'),
+  _steamGame(108600, 'project-zomboid','Project Zomboid',       'PZ',   'linear-gradient(135deg,#7a2c14 0%,#1a0a04 100%)', 'PZ'),
 
   // ── CHESS / CLASSICS ────────────────────────────────────
-  { id:'chess',     name:'Chess.com',             short:'CHS',
-    fallback:'linear-gradient(135deg,#000 0%,#444 100%)', initial:'♚' },
-  { id:'lichess',   name:'Lichess',               short:'LCS',
-    fallback:'linear-gradient(135deg,#222 0%,#666 100%)', initial:'♕' },
+  _g('chess',       'Chess.com',      'CHS',  'linear-gradient(135deg,#000 0%,#444 100%)', '♚'),
+  _g('lichess',     'Lichess',        'LCS',  'linear-gradient(135deg,#222 0%,#666 100%)', '♕'),
 
   // ── HORROR / ASYMMETRIC ─────────────────────────────────
-  _steamGame(381210, 'dbd',           'Dead by Daylight',         'DBD', 'linear-gradient(135deg,#5b0c0c 0%,#0a0408 100%)', 'DB'),
-
-  // ── STRATEGY / AUTOBATTLER ──────────────────────────────
-  { id:'tft',     name:'Teamfight Tactics',       short:'TFT',
-    fallback:'linear-gradient(135deg,#f4cfa6 0%,#1a1006 100%)', initial:'T' },
-
-  // ── LIFE-SIM / ASYMMETRIC NEW ───────────────────────────
-  _steamGame(1086940,'baldurs-gate-3','Baldur\'s Gate 3',         'BG3', 'linear-gradient(135deg,#c2922e 0%,#0a0408 100%)', 'BG'),
+  _steamGame(381210, 'dbd',           'Dead by Daylight',       'DBD',  'linear-gradient(135deg,#5b0c0c 0%,#0a0408 100%)', 'DB'),
 
   // ── FALLBACK ────────────────────────────────────────────
-  { id:'other',     name:'Other Games',           short:'•••',
-    fallback:'linear-gradient(135deg,#5865f2 0%,#1a1d3d 100%)', initial:'⌘' },
+  _g('other',       'Other Games',    '•••',  'linear-gradient(135deg,#5865f2 0%,#1a1d3d 100%)', '⌘'),
 ];
 // Server merge — when /games/catalog returns the curated top-1000,
 // dedupe by id and append. Lets us scale far past this seed list
@@ -21087,6 +21906,15 @@ function _gtCardInner(g, activeCount, liveCount) {
   const img = g.cover
     ? `<img class="gt-game-card-img" src="${g.cover}" alt="" loading="lazy" onerror="this.style.display='none'">`
     : '';
+  // Hover-activated movie poster — Steam serves a 480p mp4 for most
+  // games at /steam/apps/256<appId>/movie480.mp4. Loaded only on
+  // pointerenter so idle CPU stays at zero. Falls back silently if
+  // the title has no trailer or it 404s.
+  const movie = g.movieMp4
+    ? `<video class="gt-game-card-movie" muted loop playsinline preload="none"
+              data-src="${g.movieMp4}" aria-hidden="true"
+              onerror="this.remove()"></video>`
+    : '';
   const live = liveCount > 0
     ? `<span class="gt-game-card-badge">Live</span>`
     : '';
@@ -21096,6 +21924,7 @@ function _gtCardInner(g, activeCount, liveCount) {
     : 'No events yet';
   return `
     ${img}
+    ${movie}
     <div class="gt-game-card-glyph">${g.initial || g.short || '?'}</div>
     <div class="gt-game-card-shade"></div>
     <div class="gt-game-card-sheen"></div>
@@ -21109,6 +21938,26 @@ function _gtCardInner(g, activeCount, liveCount) {
     </div>
   `;
 }
+// Lazy-load + play the hover movie ONLY when the cursor enters the card.
+// Pause + reset on leave to keep idle CPU/network at zero. Delegated to
+// the document so it works even when game cards are re-rendered.
+document.addEventListener('pointerenter', (ev) => {
+  const card = ev.target.closest && ev.target.closest('.gt-game-card');
+  if (!card) return;
+  const vid = card.querySelector('.gt-game-card-movie');
+  if (!vid) return;
+  if (!vid.src && vid.dataset.src) vid.src = vid.dataset.src;
+  // Tiny delay so a quick mouse-over doesn't trigger a network spike
+  vid._playT = setTimeout(() => { vid.play().catch(()=>{}); }, 220);
+}, true);
+document.addEventListener('pointerleave', (ev) => {
+  const card = ev.target.closest && ev.target.closest('.gt-game-card');
+  if (!card) return;
+  const vid = card.querySelector('.gt-game-card-movie');
+  if (!vid) return;
+  if (vid._playT) { clearTimeout(vid._playT); vid._playT = null; }
+  try { vid.pause(); vid.currentTime = 0; } catch {}
+}, true);
 
 let _gtSelectedGame = null;
 let _gtRowsCache = [];
@@ -21155,6 +22004,761 @@ window.openGlobalTournaments = function() {
 window.closeGlobalTournaments = function() {
   window.hideOverlay('globalTournamentsOverlay');
   _gtStopFeatured();
+};
+
+// ─────────────────────────────────────────────────────────────────────
+// SR — speedrun.com live client (CORS-open public API)
+//
+// • Direct fetch — Electron renderer + speedrun.com's CORS = no proxy needed.
+// • Stale-while-revalidate cache: first hit fetches, subsequent hits inside
+//   the TTL return cached + silently refetch in the background.
+// • Single in-flight request per URL (dedupe).
+// • Bridges speedrun.com's nested shape to a flat shape our renderers like.
+// ─────────────────────────────────────────────────────────────────────
+const SR_API = 'https://www.speedrun.com/api/v1';
+const SR_CACHE_TTL_MS = 5 * 60 * 1000;        // 5 minutes
+window._srCache    = window._srCache    || new Map();    // url → { data, fetchedAt }
+window._srInflight = window._srInflight || new Map();    // url → Promise
+
+function _srKey(path) { return SR_API + path; }
+async function srFetch(path, { forceFresh = false } = {}) {
+  const url   = _srKey(path);
+  const now   = Date.now();
+  const entry = window._srCache.get(url);
+  const fresh = entry && (now - entry.fetchedAt) < SR_CACHE_TTL_MS;
+  // Hot cache, fresh → return immediately, no network.
+  if (fresh && !forceFresh) return entry.data;
+  // Cold OR stale → kick off (or join) a fetch.
+  if (!window._srInflight.has(url)) {
+    const p = fetch(url, { headers: { 'Accept': 'application/json' }})
+      .then(r => r.ok ? r.json() : Promise.reject(new Error('HTTP ' + r.status)))
+      .then(data => { window._srCache.set(url, { data, fetchedAt: Date.now() }); return data; })
+      .finally(() => window._srInflight.delete(url));
+    window._srInflight.set(url, p);
+  }
+  // Stale cache → return it instantly, swallow background refresh errors.
+  if (entry && !forceFresh) { window._srInflight.get(url).catch(()=>{}); return entry.data; }
+  return window._srInflight.get(url);
+}
+
+// Format speedrun.com primary_t (seconds, float) → "H:MM:SS.mmm"
+function srFmtTime(seconds) {
+  if (seconds == null || isNaN(seconds)) return '—';
+  const s = Math.abs(seconds);
+  const h = Math.floor(s / 3600);
+  const m = Math.floor((s % 3600) / 60);
+  const sec = s % 60;
+  const ms  = Math.round((sec - Math.floor(sec)) * 1000);
+  const sint = Math.floor(sec);
+  const parts = [];
+  if (h)              parts.push(h);
+  parts.push(h ? String(m).padStart(2,'0') : m);
+  parts.push(String(sint).padStart(2,'0'));
+  let out = parts.join(':');
+  if (ms) out += '.' + String(ms).padStart(3,'0').replace(/0+$/, '');
+  return out;
+}
+
+// Resolve player names from an embedded `players` payload.
+// speedrun.com returns players as a mix of {rel:"user", names:{international}} and {rel:"guest", name}.
+function srPlayerName(player) {
+  if (!player) return 'Unknown';
+  if (player.rel === 'guest') return player.name || 'Guest';
+  return (player.names && (player.names.international || player.names.japanese)) || player.name || 'Unknown';
+}
+function srPlayerAvatar(player) {
+  return (player && player.assets && player.assets.image && player.assets.image.uri) || null;
+}
+
+// Pick the best Steam-or-derived cover for a speedrun.com game.
+// speedrun.com gives us `assets.cover-large.uri` etc.
+function srGameCover(g) {
+  const a = (g && g.assets) || {};
+  const cover = (a['cover-large'] && a['cover-large'].uri)
+             || (a['cover-medium'] && a['cover-medium'].uri)
+             || (a['cover-small']  && a['cover-small'].uri)
+             || (a['cover-tiny']   && a['cover-tiny'].uri)
+             || (a['background']   && a['background'].uri)
+             || '';
+  return cover;
+}
+
+// ─────────────────────────────────────────────────────────────────────
+// SPEEDRUN HUB — premium full-page overlay
+//
+// Three peer tabs: Leaderboards / Live Now / Racing.
+//
+// Data sources (server-proxied — never hit speedrun.com directly from
+// the client, the proxy caches + rate-limits):
+//   GET  /speedrun/games?q=                 → game catalog (paged)
+//   GET  /speedrun/games/:id/categories     → categories for a game
+//   GET  /speedrun/games/:id/leaderboard?category=  → top runs
+//   GET  /speedrun/live                     → live attempts now
+//   GET  /speedrun/scheduled                → upcoming attempts (RSVP)
+//   GET  /speedrun/races                    → active + upcoming races
+//   GET  /speedrun/featured                 → curated spotlight runs
+//   GET  /speedrun/stats                    → hub-wide counters
+//   GET  /me/speedrun/pb                    → user's personal best card
+//   POST /speedrun/submit                   → submit a run for review
+//   POST /speedrun/races                    → host a race
+//   POST /speedrun/races/:id/join           → join a race
+// ─────────────────────────────────────────────────────────────────────
+const SR_TABS = [
+  { id:'leaderboards', label:'Leaderboards' },
+  { id:'live',         label:'Live Now' },
+  { id:'racing',       label:'Racing' },
+];
+let _srState = {
+  activeTab: 'leaderboards',
+  selectedGameId: null,
+  selectedCategory: null,
+  catalog: [],        // merged GT_GAMES + /speedrun/games
+  categories: {},     // gameId → [{id, name}]
+  featured: [],
+  featuredIdx: 0,
+  featuredTimer: null,
+};
+
+window.openSpeedrunHub = function() {
+  if (typeof window.showOverlay !== 'function') return;
+  window.showOverlay('speedrunOverlay', () => {
+    _srRenderTabs();
+    _srShowTab(_srState.activeTab);
+    _srLoadStats();
+    _srLoadFeatured();
+    _srLoadGameCatalog();
+    _srLoadPbCard();
+    if (typeof _wireOverlayShrinkOnScroll === 'function') _wireOverlayShrinkOnScroll('speedrunOverlay');
+  });
+};
+window.closeSpeedrunHub = function() {
+  if (_srState.featuredTimer) { clearInterval(_srState.featuredTimer); _srState.featuredTimer = null; }
+  if (typeof window.hideOverlay === 'function') window.hideOverlay('speedrunOverlay');
+};
+
+function _srRenderTabs() {
+  const host = document.getElementById('srTabs');
+  if (!host) return;
+  host.innerHTML = SR_TABS.map(t => `
+    <button class="sr-tab-btn${t.id === _srState.activeTab ? ' active' : ''}"
+            onclick="window.srSwitchTab('${t.id}')">
+      ${t.label}
+    </button>`).join('');
+}
+window.srSwitchTab = function(id) {
+  _srState.activeTab = id;
+  _srRenderTabs();
+  _srShowTab(id);
+};
+function _srShowTab(id) {
+  document.getElementById('srTabLeaderboards').style.display = id === 'leaderboards' ? '' : 'none';
+  document.getElementById('srTabLive').style.display         = id === 'live'         ? '' : 'none';
+  document.getElementById('srTabRacing').style.display       = id === 'racing'       ? '' : 'none';
+  if (id === 'live')   _srLoadLive();
+  if (id === 'racing') _srLoadRaces();
+}
+
+// ── Stats counters ────────────────────────────────────────
+async function _srLoadStats() {
+  try {
+    const r = await api('/speedrun/stats').catch(() => null);
+    if (r && typeof r === 'object') {
+      document.getElementById('srStatGames').textContent = (r.games||0).toLocaleString();
+      document.getElementById('srStatRuns').textContent  = (r.runs||0).toLocaleString();
+      document.getElementById('srStatLive').textContent  = (r.live||0).toLocaleString();
+      document.getElementById('srStatRaces').textContent = (r.racesToday||0).toLocaleString();
+      return;
+    }
+  } catch {}
+  // Honest fallback — render zeros, not fabricated numbers.
+  ['srStatGames','srStatRuns','srStatLive','srStatRaces'].forEach(id => {
+    const el = document.getElementById(id); if (el) el.textContent = '0';
+  });
+}
+
+// ── Featured runs rotation ─────────────────────────────────
+async function _srLoadFeatured() {
+  let feat = [];
+  try {
+    const r = await api('/speedrun/featured').catch(() => null);
+    if (Array.isArray(r) && r.length) feat = r;
+  } catch {}
+  _srState.featured = feat.slice(0, 5);
+  const host = document.getElementById('srFeaturedHost');
+  if (!host) return;
+  if (!_srState.featured.length) { host.style.display = 'none'; return; }
+  host.style.display = '';
+  const wrap = document.getElementById('srFeaturedWrap');
+  const pager = document.getElementById('srFeaturedPager');
+  wrap.innerHTML = _srState.featured.map((it, i) => {
+    const bg = it.hero
+      ? `url('${it.hero}') center/cover`
+      : `linear-gradient(135deg, #ff6b00 0%, #ff3c3c 100%)`;
+    return `
+      <div class="gt-featured-slide${i===0?' active':''}" style="--gtf-bg:${bg}">
+        <div class="gt-featured-info">
+          <div class="gt-featured-tag" style="background:linear-gradient(135deg,#ff8a3a,#ff3c3c);color:#fff">★ FEATURED RUN</div>
+          <div class="gt-featured-name">${(it.title||'').replace(/</g,'&lt;')}</div>
+          <div class="gt-featured-meta">${(it.game||'').replace(/</g,'&lt;')} · ${(it.category||'').replace(/</g,'&lt;')} · ${it.time||'—'} · ${(it.runner||'').replace(/</g,'&lt;')}</div>
+          <button class="gt-featured-cta" onclick="window.srWatchRun('${it.id}')">Watch run →</button>
+        </div>
+      </div>`;
+  }).join('');
+  pager.innerHTML = _srState.featured.map((_, i) => `
+    <div class="gt-featured-pager-bar${i===0?' active':''}" onclick="_srFeatGoto(${i})">
+      <span class="fill"></span>
+    </div>`).join('');
+  _srState.featuredIdx = 0;
+  _srStartFeatured();
+  host.onmouseenter = _srStopFeatured;
+  host.onmouseleave = _srStartFeatured;
+}
+function _srStartFeatured() {
+  if (_srState.featuredTimer) clearInterval(_srState.featuredTimer);
+  if (!_srState.featured.length) return;
+  _srState.featuredTimer = setInterval(() => {
+    _srState.featuredIdx = (_srState.featuredIdx + 1) % _srState.featured.length;
+    _srFeatApply();
+  }, 7000);
+}
+function _srStopFeatured() {
+  if (_srState.featuredTimer) { clearInterval(_srState.featuredTimer); _srState.featuredTimer = null; }
+}
+window._srFeatGoto = function(i) {
+  _srState.featuredIdx = i;
+  _srFeatApply();
+  _srStartFeatured();
+};
+function _srFeatApply() {
+  document.querySelectorAll('#srFeaturedWrap .gt-featured-slide').forEach((el, i) => {
+    el.classList.toggle('active', i === _srState.featuredIdx);
+  });
+  document.querySelectorAll('#srFeaturedPager .gt-featured-pager-bar').forEach((el, i) => {
+    el.classList.remove('active');
+    void el.offsetWidth;
+    if (i === _srState.featuredIdx) el.classList.add('active');
+  });
+}
+
+// ── Game catalog — LIVE from speedrun.com, paginated ──────────
+// Catalog state stored on _srState. First page is loaded eagerly on
+// hub open; subsequent pages stream in as the user scrolls or
+// searches. speedrun.com `_bulk=true` returns lightweight rows
+// (id, names, abbreviation) so we can hold thousands cheaply.
+const SR_PAGE_SIZE = 200;
+_srState.catalog       = [];           // accumulated games
+_srState.catalogOffset = 0;            // next offset to fetch
+_srState.catalogAllLoaded = false;
+_srState.catalogQuery  = '';
+_srState.catalogLoading = false;
+_srState.includePending = false;       // verified-only by default
+
+async function _srLoadGameCatalog() {
+  if (_srState.catalogAllLoaded || _srState.catalogLoading) {
+    _srRenderGameGrid(_srState.catalogQuery);
+    return;
+  }
+  _srState.catalogLoading = true;
+  _srRenderGameGrid(_srState.catalogQuery);    // surface "loading" hint
+  try {
+    const offset = _srState.catalogOffset;
+    const data = await srFetch(`/games?_bulk=true&max=${SR_PAGE_SIZE}&offset=${offset}&orderby=name`);
+    const games = Array.isArray(data && data.data) ? data.data : [];
+    if (!games.length) { _srState.catalogAllLoaded = true; }
+    else {
+      // Bulk endpoint returns minimal fields — that's fine for the grid.
+      // Cover art will be lazy-loaded by srSelectGame() when the user
+      // clicks (full game fetch with `?embed=assets`).
+      const seen = new Set(_srState.catalog.map(g => g.id));
+      games.forEach(g => {
+        if (seen.has(g.id)) return;
+        _srState.catalog.push({
+          id: g.id,
+          name: (g.names && g.names.international) || g.abbreviation || g.id,
+          short: (g.abbreviation || '').toUpperCase().slice(0, 6) || (g.names?.international || '').slice(0,3).toUpperCase(),
+          cover: '', header: '', heroHi: '',     // filled in by srSelectGame
+          fallback: `linear-gradient(135deg, hsl(${(g.id.charCodeAt(0)*37) % 360}, 55%, 28%) 0%, #0c0408 100%)`,
+          initial: ((g.names?.international || g.id)[0] || '?').toUpperCase(),
+        });
+      });
+      _srState.catalogOffset += games.length;
+      // speedrun.com `pagination.size` < `max` means we're at the end.
+      if ((data.pagination && data.pagination.size < SR_PAGE_SIZE) || games.length < SR_PAGE_SIZE) {
+        _srState.catalogAllLoaded = true;
+      }
+    }
+  } catch (e) {
+    // Network/rate-limited — fall back to the bundled GT_GAMES so the grid
+    // is never empty, with a small "live data unavailable" notice.
+    if (!_srState.catalog.length && typeof GT_GAMES !== 'undefined') {
+      _srState.catalog = GT_GAMES.slice().filter(g => g.id !== 'other');
+      _srState.catalogAllLoaded = true;
+      _srState._fallbackMode = true;
+    }
+  } finally {
+    _srState.catalogLoading = false;
+    _srRenderGameGrid(_srState.catalogQuery);
+  }
+}
+
+function _srFilterCatalog(q) {
+  const query = (q||'').toLowerCase().trim();
+  if (!query) return _srState.catalog;
+  return _srState.catalog.filter(g =>
+    (g.name||'').toLowerCase().includes(query) ||
+    (g.id||'').toLowerCase().includes(query) ||
+    (g.short||'').toLowerCase().includes(query));
+}
+
+function _srRenderGameGrid(query) {
+  const grid = document.getElementById('srGameGrid');
+  if (!grid) return;
+  _srState.catalogQuery = query || '';
+  const filtered = _srFilterCatalog(query);
+  if (!filtered.length) {
+    grid.innerHTML = `<div style="grid-column:1/-1;color:var(--text-3);font-size:12px;padding:30px;text-align:center">
+      ${_srState.catalogLoading ? 'Loading games…' : `No games match "${query||''}"`}
+    </div>`;
+    return;
+  }
+  const showCount = 240;       // virtualise — render the first 240 cards
+  const html = filtered.slice(0, showCount).map(g => {
+    const isActive = g.id === _srState.selectedGameId;
+    return `
+      <div class="gt-game-card${isActive ? ' active' : ''}"
+           style="--gt-fallback:${g.fallback}"
+           onclick="window.srSelectGame('${g.id}')">
+        ${_gtCardInner(g, 0, 0)}
+      </div>`;
+  }).join('');
+  const moreNote = filtered.length > showCount
+    ? `<div style="grid-column:1/-1;text-align:center;padding:12px;color:var(--text-3);font-size:11.5px">Showing first ${showCount} of ${filtered.length.toLocaleString()} matches — refine search to narrow.</div>`
+    : '';
+  const loadMore = (!_srState.catalogAllLoaded && !query)
+    ? `<button onclick="window.srLoadMoreGames()" style="grid-column:1/-1;padding:14px;border-radius:12px;background:rgba(255,107,0,.10);border:1px solid rgba(255,107,0,.32);color:#ffb07a;font-family:var(--font);font-weight:800;font-size:12px;letter-spacing:.6px;cursor:pointer">
+        ${_srState.catalogLoading ? 'Loading…' : `Load more games (${_srState.catalog.length.toLocaleString()} of 30K+ loaded)`}
+      </button>`
+    : '';
+  const fb = _srState._fallbackMode
+    ? `<div style="grid-column:1/-1;background:rgba(255,180,80,.08);border:1px solid rgba(255,180,80,.3);color:#ffc77a;padding:10px 14px;border-radius:10px;font-size:11.5px">Live speedrun.com data unavailable — showing offline catalog. Connection will retry on next hub open.</div>`
+    : '';
+  grid.innerHTML = fb + html + moreNote + loadMore;
+}
+window.srLoadMoreGames = function() { _srLoadGameCatalog(); };
+window.srSearch = function(q) {
+  if (_srState.activeTab !== 'leaderboards') window.srSwitchTab('leaderboards');
+  _srRenderGameGrid(q);
+};
+
+window.srSelectGame = async function(id) {
+  _srState.selectedGameId = id;
+  _srState.selectedCategory = null;
+  _srState.selectedVariables = {};
+  document.getElementById('srClearGame').style.display = id ? '' : 'none';
+  document.getElementById('srBoardSectionHead').style.display = id ? '' : 'none';
+  document.getElementById('srCategoryTabs').style.display = id ? '' : 'none';
+  _srRenderGameGrid(_srState.catalogQuery);
+  if (!id) {
+    document.getElementById('srLeaderboardList').innerHTML = '';
+    return;
+  }
+  const list = document.getElementById('srLeaderboardList');
+  list.innerHTML = `<div style="text-align:center;color:var(--text-3);padding:30px;font-size:12px">Loading game…</div>`;
+  // Pull the FULL game record (with embedded categories + variables + assets)
+  let game = null;
+  try {
+    const r = await srFetch(`/games/${encodeURIComponent(id)}?embed=categories,variables`);
+    game = r && r.data;
+  } catch (e) { /* fall through */ }
+  if (!game) {
+    list.innerHTML = `<div style="text-align:center;color:var(--text-3);padding:40px;font-size:12.5px;background:var(--bg-2);border-radius:12px;border:1px dashed rgba(255,255,255,.06)">Could not load this game from speedrun.com (rate limit or network).</div>`;
+    return;
+  }
+  // Cache art + categories back into the catalog row for next render.
+  const row = _srState.catalog.find(g => g.id === id);
+  if (row) {
+    row.cover = srGameCover(game) || row.cover;
+    row.heroHi = srGameCover(game) || row.heroHi;
+    row.name = (game.names && game.names.international) || row.name;
+  }
+  document.getElementById('srBoardSectionTitle').textContent = (game.names && game.names.international) || id;
+  const cats = (game.categories && game.categories.data) || [];
+  // Speedrun.com has per-game `per-game` (e.g. Any%) AND `per-level` categories.
+  // Boards default to per-game only — per-level is hidden under a tiny toggle.
+  const perGame = cats.filter(c => c.type === 'per-game');
+  _srState.categories[id] = perGame;
+  _srState.variablesByGame = _srState.variablesByGame || {};
+  _srState.variablesByGame[id] = (game.variables && game.variables.data) || [];
+  if (!perGame.length) {
+    list.innerHTML = `<div style="text-align:center;color:var(--text-3);padding:40px;font-size:12.5px;background:var(--bg-2);border-radius:12px;border:1px dashed rgba(255,255,255,.06)">This game has no full-game categories — only level-by-level.</div>`;
+    return;
+  }
+  const catHost = document.getElementById('srCategoryTabs');
+  catHost.innerHTML = `
+    ${perGame.map((c, i) => `
+      <button class="sr-cat-tab${i === 0 ? ' active' : ''}" data-cat="${c.id}" onclick="window.srSelectCategory('${c.id}')">
+        ${(c.name||'').replace(/</g,'&lt;')}
+      </button>`).join('')}
+    <label class="sr-cat-tab" style="display:inline-flex;align-items:center;gap:6px;margin-left:auto;cursor:pointer;background:rgba(255,255,255,.03)">
+      <input type="checkbox" id="srPendingToggle" onchange="window.srTogglePending(this.checked)" style="accent-color:#ff8a3a">
+      <span>Show pending</span>
+    </label>`;
+  document.getElementById('srPendingToggle').checked = _srState.includePending;
+  window.srSelectCategory(perGame[0].id);
+};
+
+window.srTogglePending = function(checked) {
+  _srState.includePending = !!checked;
+  if (_srState.selectedCategory) window.srSelectCategory(_srState.selectedCategory);
+};
+
+window.srSelectCategory = async function(catId) {
+  _srState.selectedCategory = catId;
+  document.querySelectorAll('#srCategoryTabs .sr-cat-tab').forEach(b => {
+    if (b.dataset && b.dataset.cat) b.classList.toggle('active', b.dataset.cat === catId);
+  });
+  const list = document.getElementById('srLeaderboardList');
+  list.innerHTML = `<div style="text-align:center;color:var(--text-3);padding:30px;font-size:12px">Loading leaderboard…</div>`;
+  // Render the variables (sub-filters) for this category, if any.
+  _srRenderVariables(catId);
+  // Build the leaderboard URL with any selected variable picks.
+  const varParts = Object.entries(_srState.selectedVariables || {})
+    .map(([vid, val]) => `var-${encodeURIComponent(vid)}=${encodeURIComponent(val)}`)
+    .join('&');
+  const top = _srState.includePending ? '' : '&top=50';
+  const url = `/leaderboards/${encodeURIComponent(_srState.selectedGameId)}/category/${encodeURIComponent(catId)}?embed=players,platforms,regions${top ? top : '&top=50'}${varParts ? '&' + varParts : ''}`;
+  let board = null;
+  try {
+    const r = await srFetch(url);
+    board = r && r.data;
+  } catch {}
+  if (!board || !Array.isArray(board.runs) || !board.runs.length) {
+    list.innerHTML = `<div style="text-align:center;color:var(--text-3);padding:40px;font-size:12.5px;background:var(--bg-2);border-radius:12px;border:1px dashed rgba(255,255,255,.06)">No runs on this board yet${_srState.selectedVariables && Object.keys(_srState.selectedVariables).length ? ' for the current filters' : ''}.</div>`;
+    return;
+  }
+  // Build a quick lookup from embedded players/platforms/regions.
+  const playersById = {};
+  (board.players && board.players.data || []).forEach(p => {
+    if (p.id) playersById[p.id] = p;
+  });
+  const platformsById = {};
+  (board.platforms && board.platforms.data || []).forEach(p => { platformsById[p.id] = p.name; });
+  const regionsById = {};
+  (board.regions && board.regions.data || []).forEach(r => { regionsById[r.id] = r.name; });
+
+  list.innerHTML = board.runs.map(({ place, run }) => {
+    const rank = place;
+    // A run can have multiple players (co-op); render the first + "+N".
+    const playerObjs = (run.players || []).map(p => {
+      if (p.rel === 'user' && playersById[p.id]) return playersById[p.id];
+      return p;
+    });
+    const primary = playerObjs[0] || {};
+    const name    = srPlayerName(primary);
+    const avUrl   = srPlayerAvatar(primary);
+    const more    = playerObjs.length > 1 ? ` +${playerObjs.length - 1}` : '';
+    const av      = avUrl ? `<img src="${avUrl}"/>` : (name[0]||'?').toUpperCase();
+    const time    = srFmtTime(run.times && run.times.primary_t);
+    const plat    = (run.system && (platformsById[run.system.platform] || '')) || '';
+    const reg     = (run.system && (regionsById[run.system.region]   || '')) || '';
+    const meta    = [plat, reg].filter(Boolean).join(' · ') || '—';
+    const verifyDate = (run.status && run.status['verify-date']) ? new Date(run.status['verify-date']).toLocaleDateString() : '';
+    const isPending = run.status && run.status.status !== 'verified';
+    const watchUrl = (run.videos && run.videos.links && run.videos.links[0] && run.videos.links[0].uri) || run.weblink || '';
+    return `
+      <div class="sr-board-row${rank === 1 ? ' is-wr' : ''}${isPending ? ' is-pending' : ''}">
+        <div class="sr-board-rank">${rank === 1 ? '🏆' : '#' + rank}</div>
+        <div class="sr-board-runner">
+          <div class="sr-board-av">${av}</div>
+          <div>
+            <div class="sr-board-name">${name.replace(/</g,'&lt;')}${more}${isPending ? ' <span style="font-size:9.5px;font-weight:800;letter-spacing:.5px;padding:2px 6px;border-radius:4px;background:rgba(255,180,80,.18);color:#ffc77a;margin-left:4px">PENDING</span>' : ''}</div>
+            <div class="sr-board-meta">${meta} · ${verifyDate ? 'verified ' + verifyDate : 'pending review'}</div>
+          </div>
+        </div>
+        <div class="sr-board-time">${time}</div>
+        <button class="sr-board-watch" onclick="window.srOpenExternal('${watchUrl}')">${watchUrl ? 'Watch ▸' : '—'}</button>
+      </div>`;
+  }).join('');
+};
+
+// Render variable (sub-filter) chips for the selected category.
+function _srRenderVariables(catId) {
+  const head = document.getElementById('srBoardSectionHead');
+  if (!head) return;
+  // Remove any prior strip
+  head.querySelectorAll('.sr-var-strip').forEach(el => el.remove());
+  const allVars = (_srState.variablesByGame && _srState.variablesByGame[_srState.selectedGameId]) || [];
+  // Only variables that apply to THIS category (or are global) AND are sub-categories /
+  // user-defined filters. speedrun.com flag: `category` field; `null` = global.
+  const vars = allVars.filter(v =>
+    (!v.category || v.category === catId) && v['is-subcategory']
+  );
+  if (!vars.length) return;
+  // Reset selection when the category changes (sub-cats often have a default value).
+  _srState.selectedVariables = {};
+  vars.forEach(v => {
+    const def = v.values && v.values.default;
+    if (def) _srState.selectedVariables[v.id] = def;
+  });
+  const strip = document.createElement('div');
+  strip.className = 'sr-var-strip';
+  strip.style.cssText = 'display:flex;flex-direction:column;gap:8px;margin-top:12px;width:100%';
+  strip.innerHTML = vars.map(v => {
+    const choices = v.values && v.values.values ? Object.entries(v.values.values) : [];
+    return `
+      <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">
+        <span style="font-size:10.5px;font-weight:800;letter-spacing:1.2px;color:var(--text-3);text-transform:uppercase;min-width:70px">${(v.name||'').replace(/</g,'&lt;')}</span>
+        ${choices.map(([valId, valData]) => `
+          <button class="sr-cat-tab${_srState.selectedVariables[v.id] === valId ? ' active' : ''}"
+                  data-var="${v.id}" data-val="${valId}"
+                  onclick="window.srSetVariable('${v.id}','${valId}')">
+            ${((valData.label||'')||'').replace(/</g,'&lt;')}
+          </button>`).join('')}
+      </div>`;
+  }).join('');
+  head.appendChild(strip);
+}
+window.srSetVariable = function(varId, valId) {
+  _srState.selectedVariables = _srState.selectedVariables || {};
+  _srState.selectedVariables[varId] = valId;
+  if (_srState.selectedCategory) window.srSelectCategory(_srState.selectedCategory);
+};
+window.srOpenExternal = function(url) {
+  if (!url) return;
+  try {
+    if (window.api && typeof window.api.openExternal === 'function') window.api.openExternal(url);
+    else window.open(url, '_blank', 'noopener');
+  } catch { window.open(url, '_blank', 'noopener'); }
+};
+
+// ── Live Now tab ─────────────────────────────────────────────
+async function _srLoadLive() {
+  const live = document.getElementById('srLiveList');
+  const sched = document.getElementById('srScheduledList');
+  if (!live || !sched) return;
+  live.innerHTML  = `<div style="text-align:center;color:var(--text-3);padding:30px;font-size:12px">Loading live attempts…</div>`;
+  sched.innerHTML = `<div style="text-align:center;color:var(--text-3);padding:30px;font-size:12px">Loading…</div>`;
+  let now = [], upcoming = [];
+  try {
+    const [l, s] = await Promise.all([
+      api('/speedrun/live').catch(() => null),
+      api('/speedrun/scheduled').catch(() => null),
+    ]);
+    if (Array.isArray(l)) now = l;
+    if (Array.isArray(s)) upcoming = s;
+  } catch {}
+  if (!now.length) {
+    live.innerHTML = `<div style="text-align:center;color:var(--text-3);padding:40px;font-size:12.5px;background:var(--bg-2);border-radius:12px;border:1px dashed rgba(255,255,255,.06)">No live runs right now. <a href="#" onclick="event.preventDefault();window.openSubmitRunModal()" style="color:#ffb07a;text-decoration:none">Submit your own →</a></div>`;
+  } else {
+    live.innerHTML = now.map(r => {
+      const initial = (r.runner || '?')[0].toUpperCase();
+      const av = r.runnerAvatar ? `<img src="${r.runnerAvatar}"/>` : initial;
+      const elapsedSec = Math.max(0, Math.floor((Date.now() - (r.startedAt||Date.now())) / 1000));
+      const eh = Math.floor(elapsedSec/3600), em = Math.floor((elapsedSec%3600)/60), es = elapsedSec%60;
+      const elapsed = (eh ? eh+':' : '') + String(em).padStart(2,'0') + ':' + String(es).padStart(2,'0');
+      return `
+        <div class="sr-live-row">
+          <div class="sr-live-indicator"></div>
+          <div class="sr-board-av">${av}</div>
+          <div class="sr-live-runner-info">
+            <div style="font-size:13.5px;font-weight:800;color:var(--text-1)">${(r.runner||'Unknown').replace(/</g,'&lt;')}</div>
+            <div style="font-size:11.5px;color:var(--text-3);margin-top:2px">${(r.game||'').replace(/</g,'&lt;')} · ${(r.category||'').replace(/</g,'&lt;')}${r.attemptCount ? ' · attempt #'+r.attemptCount : ''}</div>
+          </div>
+          <div style="text-align:right">
+            <div class="sr-live-elapsed">${elapsed}</div>
+            <div style="font-size:10px;color:var(--text-3);margin-top:2px">${r.viewerCount||0} watching</div>
+          </div>
+          <button class="sr-board-watch" onclick="window.srWatchRun('${r.id||''}')">Watch live →</button>
+        </div>`;
+    }).join('');
+  }
+  if (!upcoming.length) {
+    sched.innerHTML = `<div style="text-align:center;color:var(--text-3);padding:30px;font-size:12.5px;background:var(--bg-2);border-radius:12px;border:1px dashed rgba(255,255,255,.06)">No scheduled attempts yet.</div>`;
+  } else {
+    sched.innerHTML = upcoming.map(r => {
+      const when = r.scheduledFor ? new Date(r.scheduledFor) : null;
+      const whenStr = when ? when.toLocaleString(undefined, { weekday:'short', hour:'numeric', minute:'2-digit' }) : '—';
+      return `
+        <div class="sr-board-row">
+          <div class="sr-board-rank" style="font-size:14px;color:#ffb07a">${whenStr}</div>
+          <div class="sr-board-runner">
+            <div class="sr-board-av">${(r.runner||'?')[0].toUpperCase()}</div>
+            <div>
+              <div class="sr-board-name">${(r.runner||'').replace(/</g,'&lt;')}</div>
+              <div class="sr-board-meta">${(r.game||'').replace(/</g,'&lt;')} · ${(r.category||'').replace(/</g,'&lt;')}</div>
+            </div>
+          </div>
+          <div style="font-size:11px;color:var(--text-3)">${r.rsvpCount||0} RSVP'd</div>
+          <button class="sr-board-watch" onclick="window.srRsvpRun('${r.id||''}')">RSVP</button>
+        </div>`;
+    }).join('');
+  }
+}
+
+// ── Racing tab ────────────────────────────────────────────
+async function _srLoadRaces() {
+  const live = document.getElementById('srRaceList');
+  const up   = document.getElementById('srUpcomingRaces');
+  if (!live || !up) return;
+  live.innerHTML = `<div style="grid-column:1/-1;text-align:center;color:var(--text-3);padding:30px;font-size:12px">Loading races…</div>`;
+  up.innerHTML = '';
+  let active = [], upcoming = [];
+  try {
+    const r = await api('/speedrun/races').catch(() => null);
+    if (r && typeof r === 'object') {
+      active   = Array.isArray(r.active)   ? r.active   : [];
+      upcoming = Array.isArray(r.upcoming) ? r.upcoming : [];
+    }
+  } catch {}
+  if (!active.length) {
+    live.innerHTML = `<div style="grid-column:1/-1;text-align:center;color:var(--text-3);padding:40px;font-size:12.5px;background:var(--bg-2);border-radius:12px;border:1px dashed rgba(255,255,255,.06)">No live races right now. <a href="#" onclick="event.preventDefault();window.openCreateRace()" style="color:#ffb07a;text-decoration:none">Host one →</a></div>`;
+  } else {
+    live.innerHTML = active.map(_srRaceCardHtml).join('');
+  }
+  if (upcoming.length) up.innerHTML = upcoming.map(_srRaceRowHtml).join('');
+  else up.innerHTML = `<div style="text-align:center;color:var(--text-3);padding:24px;font-size:12px">No upcoming races scheduled.</div>`;
+}
+function _srRaceCardHtml(race) {
+  const statusKey = (race.status||'open').toLowerCase();
+  const runners = (race.runners || []).slice(0, 6);
+  const moreCount = (race.runners||[]).length - runners.length;
+  return `
+    <div class="sr-race-card" onclick="window.srOpenRace('${race.id}')">
+      <div class="sr-race-card-head">
+        <span class="sr-race-status ${statusKey === 'live' ? '' : statusKey}">${(race.status||'OPEN').toUpperCase()}</span>
+        <div class="sr-race-title">${(race.title||race.game||'Race').replace(/</g,'&lt;')}</div>
+      </div>
+      <div class="sr-race-body">
+        <div class="sr-race-runners">
+          ${runners.map(r => `
+            <span class="sr-race-runner-chip">
+              <span class="av">${(r.username||'?')[0].toUpperCase()}</span>
+              ${(r.username||'').replace(/</g,'&lt;')}
+            </span>`).join('')}
+          ${moreCount > 0 ? `<span class="sr-race-runner-chip">+${moreCount} more</span>` : ''}
+        </div>
+        <div class="sr-race-meta">${(race.game||'').replace(/</g,'&lt;')} · ${(race.category||'').replace(/</g,'&lt;')}${race.prize ? ' · 💰 ' + race.prize : ''}</div>
+        <button class="sr-race-join" onclick="event.stopPropagation();window.srJoinRace('${race.id}')">${statusKey === 'live' ? 'Spectate' : 'Join race'}</button>
+      </div>
+    </div>`;
+}
+function _srRaceRowHtml(race) {
+  const when = race.scheduledFor ? new Date(race.scheduledFor).toLocaleString(undefined, { weekday:'short', hour:'numeric', minute:'2-digit' }) : 'TBD';
+  return `
+    <div class="sr-board-row">
+      <div class="sr-board-rank" style="font-size:14px;color:#ffb07a">${when}</div>
+      <div class="sr-board-runner">
+        <div>
+          <div class="sr-board-name">${(race.title||race.game||'Race').replace(/</g,'&lt;')}</div>
+          <div class="sr-board-meta">${(race.game||'').replace(/</g,'&lt;')} · ${(race.category||'').replace(/</g,'&lt;')} · ${(race.runners||[]).length} runners</div>
+        </div>
+      </div>
+      <div style="font-size:11px;color:var(--text-3)">${race.prize || ''}</div>
+      <button class="sr-board-watch" onclick="window.srJoinRace('${race.id}')">Join</button>
+    </div>`;
+}
+
+// ── Personal Best card (hero right) ──────────────────────────
+async function _srLoadPbCard() {
+  const host = document.getElementById('srPbCard');
+  if (!host) return;
+  let pb = null;
+  try {
+    const r = await api('/me/speedrun/pb').catch(() => null);
+    if (r && r.time) pb = r;
+  } catch {}
+  if (!pb) {
+    host.innerHTML = `
+      <div class="sr-pb-card-eye">YOUR PB</div>
+      <div class="sr-pb-card-empty">
+        Submit your first run to claim a spot on the leaderboard. All runs are mod-verified before they go live.
+      </div>
+      <button class="sr-pb-card-empty-cta" onclick="window.openSubmitRunModal()">Submit a Run →</button>`;
+    return;
+  }
+  host.innerHTML = `
+    <div class="sr-pb-card-eye">YOUR PB · ${pb.category||''}</div>
+    <div class="sr-pb-card-time">${pb.time}</div>
+    <div class="sr-pb-card-game">${(pb.game||'').replace(/</g,'&lt;')}</div>
+    <div class="sr-pb-card-cat">Rank ${pb.rank ? '#'+pb.rank : '—'} · ${pb.verifiedAt ? 'verified ' + new Date(pb.verifiedAt).toLocaleDateString() : 'pending review'}</div>`;
+}
+
+// ── Action handlers ──────────────────────────────────────────
+window.srWatchRun = function(runId) {
+  if (!runId) return;
+  if (typeof showToast === 'function') showToast('Opening run viewer…', 'info');
+  // TODO: route to per-run viewer overlay when the server endpoint lands.
+};
+window.srRsvpRun = async function(runId) {
+  if (!runId) return;
+  try { await api(`/speedrun/scheduled/${encodeURIComponent(runId)}/rsvp`, { method: 'POST' }).catch(()=>{}); } catch {}
+  if (typeof showToast === 'function') showToast('You\'ll get a notification when this attempt goes live.', 'success');
+};
+window.openSubmitRunModal = function() {
+  document.getElementById('submitRunModal')?.classList.add('open');
+  setTimeout(() => document.getElementById('srSubmitGame')?.focus(), 80);
+};
+window.closeSubmitRunModal = function() {
+  document.getElementById('submitRunModal')?.classList.remove('open');
+};
+window.submitRun = async function(ev) {
+  if (ev) ev.preventDefault();
+  const payload = {
+    game:     document.getElementById('srSubmitGame').value.trim(),
+    category: document.getElementById('srSubmitCategory').value.trim(),
+    time:     document.getElementById('srSubmitTime').value.trim(),
+    videoUrl: document.getElementById('srSubmitVideo').value.trim(),
+    notes:    document.getElementById('srSubmitNotes').value.trim(),
+  };
+  try {
+    const r = await api('/speedrun/submit', {
+      method: 'POST', headers: { 'Content-Type':'application/json' },
+      body: JSON.stringify(payload),
+    }).catch(() => null);
+    if (r && r.id) {
+      if (typeof showToast === 'function') showToast(`Run submitted — mod queue position #${r.queuePosition||'—'}. We'll notify you when reviewed.`, 'success');
+    } else {
+      if (typeof showToast === 'function') showToast('Submitted for review.', 'success');
+    }
+    window.closeSubmitRunModal();
+  } catch {
+    if (typeof showToast === 'function') showToast('Could not submit — try again.', 'error');
+  }
+};
+window.openCreateRace = function() {
+  // Reuse the existing tournament create modal flow for now — pre-populated
+  // with race-specific fields. Server distinguishes by `format: 'race'`.
+  if (typeof showToast === 'function') showToast('Race host form coming up (uses /speedrun/races POST).', 'info');
+  // TODO: dedicated race-creation modal.
+};
+window.srJoinRace = async function(raceId) {
+  if (!raceId) return;
+  try {
+    const r = await api(`/speedrun/races/${encodeURIComponent(raceId)}/join`, { method: 'POST' }).catch(() => null);
+    if (r && r.ok) {
+      if (typeof showToast === 'function') showToast('You\'re in the race! Lobby opening…', 'success');
+    } else {
+      if (typeof showToast === 'function') showToast('Race join failed.', 'error');
+    }
+  } catch {}
+};
+window.srOpenRace = function(raceId) { window.srJoinRace(raceId); };
+
+// WebSocket hooks — server pushes when races start / runs go live.
+window._srHandleWsMessage = function(msg) {
+  if (!msg || !msg.type) return;
+  if (msg.type === 'speedrun-live-started' || msg.type === 'speedrun-live-ended') {
+    if (_srState.activeTab === 'live') _srLoadLive();
+    _srLoadStats();
+  }
+  if (msg.type === 'speedrun-race-started' || msg.type === 'speedrun-race-finished') {
+    if (_srState.activeTab === 'racing') _srLoadRaces();
+    _srLoadStats();
+  }
+  if (msg.type === 'speedrun-pb-verified' && typeof showToast === 'function') {
+    showToast('✓ Your run was verified! Check the leaderboard.', 'success');
+    _srLoadPbCard();
+  }
 };
 
 // ─────────────────────────────────────────────────────────────────────
@@ -21482,16 +23086,107 @@ function _qShowView(name) {
   if (target) target.style.display = '';
 }
 
+// ── Searchable title-card game picker ─────────────────────────
+// Replaces the old <select> with a premium grid of game tiles.
+// Live search filters by name / id / short. Selecting a tile fills
+// the "selected game" preview banner above the picker and hides the
+// grid behind a clean clear button.
 function _qPopulateGameOptions() {
-  const sel = document.getElementById('qFormGame');
-  if (!sel) return;
-  // Pull from the same game catalog as Tournaments so titles stay consistent.
-  const games = (typeof GT_GAMES !== 'undefined' && Array.isArray(GT_GAMES)) ? GT_GAMES : [];
-  sel.innerHTML = `<option value="">— Pick a game —</option>` +
-    games.map(g => `<option value="${g.id}">${g.name}</option>`).join('');
-  if (_qState.game) sel.value = _qState.game;
-  sel.onchange = () => { _qState.game = sel.value; };
+  _qRenderGameGrid('');
+  _qRenderSelectedGame();
+  _qPopulateSkillTiles();
 }
+function _qRenderGameGrid(query) {
+  const grid = document.getElementById('qGameGrid');
+  if (!grid) return;
+  const games = (typeof GT_GAMES !== 'undefined' && Array.isArray(GT_GAMES)) ? GT_GAMES : [];
+  const q = (query||'').toLowerCase().trim();
+  const filtered = q
+    ? games.filter(g =>
+        (g.name||'').toLowerCase().includes(q) ||
+        (g.id||'').toLowerCase().includes(q) ||
+        (g.short||'').toLowerCase().includes(q))
+    : games.filter(g => g.id !== 'other');
+  if (!filtered.length) {
+    grid.innerHTML = `<div class="q-game-grid-empty">No games match "${q}"</div>`;
+    return;
+  }
+  grid.innerHTML = filtered.map(g => {
+    const sel = g.id === _qState.game ? ' is-selected' : '';
+    const cover = g.header || g.cover;
+    const art = cover
+      ? `<img src="${cover}" alt="" loading="lazy" onerror="this.style.display='none'">`
+      : `<div class="q-game-tile-fb" style="background:${g.fallback||'var(--bg-3)'}">${g.initial || g.short || '?'}</div>`;
+    return `
+      <div class="q-game-tile${sel}" data-game="${g.id}" onclick="window._qSelectGame('${g.id}')">
+        ${art}
+        <div class="q-game-tile-shade"></div>
+        <div class="q-game-tile-name">${(g.name||'').replace(/</g,'&lt;')}</div>
+      </div>`;
+  }).join('');
+}
+window._qFilterGames = function(q) { _qRenderGameGrid(q); };
+window._qSelectGame = function(id) {
+  _qState.game = id;
+  _qRenderGameGrid(document.getElementById('qGameSearch')?.value || '');
+  _qRenderSelectedGame();
+};
+window._qClearGame = function() {
+  _qState.game = '';
+  _qRenderSelectedGame();
+  _qRenderGameGrid('');
+};
+function _qRenderSelectedGame() {
+  const host = document.getElementById('qGameSelected');
+  const pickerWrap = document.getElementById('qGamePickerWrap');
+  const clearBtn = document.getElementById('qGameClearBtn');
+  if (!host) return;
+  if (!_qState.game) {
+    host.style.display = 'none';
+    if (pickerWrap) pickerWrap.style.display = '';
+    if (clearBtn)   clearBtn.style.display = 'none';
+    return;
+  }
+  const g = (typeof GT_GAMES !== 'undefined') ? GT_GAMES.find(x => x.id === _qState.game) : null;
+  if (!g) return;
+  const cover = g.heroHi || g.header || '';
+  host.innerHTML = `
+    ${cover ? `<img class="q-game-selected-img" src="${cover}" alt="" onerror="this.style.display='none'">` : `<div class="q-game-tile-fb" style="position:absolute;inset:0;background:${g.fallback||'var(--bg-3)'}">${g.initial || g.short || '?'}</div>`}
+    <div class="q-game-selected-info">
+      <div class="q-game-selected-eye">★ Queuing for</div>
+      <div class="q-game-selected-name">${(g.name||'').replace(/</g,'&lt;')}</div>
+    </div>`;
+  host.style.display = '';
+  if (pickerWrap) pickerWrap.style.display = 'none';
+  if (clearBtn)   clearBtn.style.display = '';
+}
+
+// ── Skill tier picker ────────────────────────────────────────
+const Q_SKILL_TIERS = [
+  { id:'bronze',  name:'Bronze',   emoji:'🥉', color:'#c97a3a' },
+  { id:'silver',  name:'Silver',   emoji:'🥈', color:'#c0c8d2' },
+  { id:'gold',    name:'Gold',     emoji:'🥇', color:'#ffcc33' },
+  { id:'plat',    name:'Platinum', emoji:'💠', color:'#58d9ff' },
+  { id:'diamond', name:'Diamond',  emoji:'💎', color:'#a8e5ff' },
+  { id:'master',  name:'Master',   emoji:'👑', color:'#c598ff' },
+  { id:'pro',     name:'Pro',      emoji:'⚡', color:'#ff5d8a' },
+];
+function _qPopulateSkillTiles() {
+  const host = document.getElementById('qSkillGrid');
+  if (!host) return;
+  host.innerHTML = Q_SKILL_TIERS.map(t => {
+    const sel = t.id === _qState.skill ? ' is-selected' : '';
+    return `
+      <div class="q-skill-tile${sel}" data-skill="${t.id}" style="--qst-color:${t.color}" onclick="window._qSelectSkill('${t.id}')">
+        <div class="q-skill-emoji">${t.emoji}</div>
+        <div class="q-skill-name">${t.name}</div>
+      </div>`;
+  }).join('');
+}
+window._qSelectSkill = function(id) {
+  _qState.skill = id;
+  _qPopulateSkillTiles();
+};
 
 async function _qLoadFriends() {
   const host = document.getElementById('qFormFriendPicker');
@@ -21540,14 +23235,14 @@ window.qStep = function(field, delta) {
 };
 
 window.qBeginSearch = async function() {
-  // Snapshot the form state.
-  _qState.game   = document.getElementById('qFormGame').value;
-  _qState.skill  = document.getElementById('qFormSkill').value;
-  _qState.proof  = document.getElementById('qFormProof').value.trim();
+  // Game + skill are set by the tile pickers (_qSelectGame / _qSelectSkill)
+  // — they already live in _qState. Only the proof text still uses an input.
+  _qState.proof = document.getElementById('qFormProof')?.value.trim() || '';
   if (!_qState.game) {
     if (typeof showToast === 'function') showToast('Pick a game first.', 'warn');
     return;
   }
+  if (!_qState.skill) _qState.skill = 'plat';
   _qShowView('searching');
   _qState.searchStarted = Date.now();
   _qState.searchTipIdx = 0;
@@ -22588,49 +24283,44 @@ setTimeout(() => { try { window.updateGsearchStatusIndicator(); window.updateGsI
 setInterval(() => { try { window.updateGsInboxBadge(); } catch{} }, 4000);
 
 // ── Lobbies horizontal drawer (drawer-nav mode) ───────────────
-// The LOBBIES ▼ pill always drops the lobby picker — both on home and inside
-// a lobby. Channels for the current lobby are reached via the left-edge
+// The LOBBIES ▼ pill always drops the lobby picker — both on home and
+// inside a lobby. The drawer is now a TOP-BAR EXTENSION rather than an
+// overlay: when open it pushes the page content down by adding
+// `lobbies-drawer-open` to <body> + setting the
+// `--lobbies-drawer-h` CSS variable. Every full-page panel reads it
+// and shifts with a smooth transition.
+//
+// Channels for the current lobby are reached via the left-edge
 // channel-sidebar toggle (#channelEdgeTab), not via this pill.
+const LOBBIES_DRAWER_HEIGHT = 80;
 let _lobbiesDrawerBusy = false;
 window.toggleLobbiesDrawer = function() {
   if (_lobbiesDrawerBusy) return;
   const panel = document.getElementById("lobbiesDrawerPanel");
   const btn   = document.getElementById("lobbiesNavBtn");
   const chev  = document.getElementById("lobbiesDrawerChevron");
-  const bd    = document.getElementById("sidebarBackdrop");
   if (!panel) return;
   const isOpen = panel.classList.contains("open");
-
+  _lobbiesDrawerBusy = true;
   if (!isOpen) {
-    _lobbiesDrawerBusy = true;
-    // Close any sibling drawer / sidebar that would visually conflict
-    if (document.body.classList.contains("sidebar-open") &&
-        document.body.classList.contains("lobby-selected")) {
-      toggleChatSidebar();
-    }
+    // Close any sibling drawer / sidebar that would visually conflict.
     const friendsPanel = document.getElementById("friendsDrawerPanel");
     if (friendsPanel && friendsPanel.classList.contains("open")) {
       window.toggleFriendsDrawer();
     }
     panel.classList.add("open");
-    if (btn)  { btn.classList.add("open"); btn.style.top = (72 + 80) + "px"; }
+    document.body.classList.add("lobbies-drawer-open");
+    document.body.style.setProperty("--lobbies-drawer-h", LOBBIES_DRAWER_HEIGHT + "px");
+    if (btn)  btn.classList.add("open");
     if (chev) chev.style.transform = "rotate(180deg)";
-    if (bd && document.body.classList.contains("drawer-nav")) {
-      bd.classList.add("visible");
-      bd.onclick = () => { window.toggleLobbiesDrawer(); bd.onclick = null; };
-    }
-    setTimeout(() => { _lobbiesDrawerBusy = false; }, 320);
   } else {
-    _lobbiesDrawerBusy = true;
     panel.classList.remove("open");
-    if (btn)  { btn.classList.remove("open"); btn.style.top = "72px"; }
+    document.body.classList.remove("lobbies-drawer-open");
+    document.body.style.setProperty("--lobbies-drawer-h", "0px");
+    if (btn)  btn.classList.remove("open");
     if (chev) chev.style.transform = "";
-    if (bd && document.body.classList.contains("drawer-nav")) {
-      bd.classList.remove("visible");
-      bd.onclick = null;
-    }
-    setTimeout(() => { _lobbiesDrawerBusy = false; }, 320);
   }
+  setTimeout(() => { _lobbiesDrawerBusy = false; }, 340);
 };
 
 window.renderFriendsDrawer = async function() {
