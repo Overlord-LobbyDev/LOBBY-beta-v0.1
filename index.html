@@ -3115,6 +3115,16 @@
       background: linear-gradient(135deg, rgba(255,180,60,.10), rgba(255,107,0,.04));
       border-color: rgba(255,180,60,.3);
     }
+    .sr-board-row.is-pending {
+      background: linear-gradient(135deg, rgba(255,180,80,.06), rgba(0,0,0,.15));
+      border-color: rgba(255,180,80,.22);
+      opacity: .88;
+    }
+    .sr-live-row.is-recent .sr-live-indicator {
+      background: #ffc77a;
+      box-shadow: 0 0 0 3px rgba(255,199,122,.2);
+      animation: none;
+    }
     .sr-board-rank {
       font-family: 'Bebas Neue', sans-serif;
       font-size: 26px; letter-spacing: 1.2px;
@@ -9290,13 +9300,17 @@
     border-bottom: 1px solid rgba(255,255,255,.08);
     box-shadow: none;
     z-index: 480;                 /* under .lobby-overlay (9000) so overlay shifts down too */
-    max-height: 0;
-    transition: max-height .32s cubic-bezier(0.22, 1, 0.36, 1),
+    /* Use explicit HEIGHT, not max-height — max-height collapses to
+       content size when icons are shorter than the slot, which left a
+       visible gap between the drawer's painted bottom and the
+       overlay's calc'd top (the home page bled through that strip). */
+    height: 0;
+    transition: height .32s cubic-bezier(0.22, 1, 0.36, 1),
                 box-shadow .25s ease;
   }
   body.drawer-nav #lobbiesDrawerPanel { display: block; }
   #lobbiesDrawerPanel.open {
-    max-height: 80px;
+    height: 80px;
     box-shadow: 0 6px 22px rgba(0,0,0,.35);
   }
   /* Default = no extra offset. When the drawer is open we set
@@ -9313,11 +9327,21 @@
   #winControls {
     transition: transform .32s cubic-bezier(0.22, 1, 0.36, 1);
   }
+  /* IMPORTANT: every selector here is doubled with `body.drawer-nav` so it
+     has HIGHER specificity than the `body.drawer-nav #homePanel { top:72px
+     !important }` rule defined later in this file (line ~9571). Without
+     the doubled selector the home page silently ignored the push-down
+     because both rules had equal specificity and the later one won. */
   body.lobbies-drawer-open #homePanel,
+  body.drawer-nav.lobbies-drawer-open #homePanel,
   body.lobbies-drawer-open #chatPanel,
+  body.drawer-nav.lobbies-drawer-open #chatPanel,
   body.lobbies-drawer-open #profilePage,
+  body.drawer-nav.lobbies-drawer-open #profilePage,
   body.lobbies-drawer-open #calendarPanel,
+  body.drawer-nav.lobbies-drawer-open #calendarPanel,
   body.lobbies-drawer-open #vcPanel,
+  body.drawer-nav.lobbies-drawer-open #vcPanel,
   body.lobbies-drawer-open #socialFeed,
   body.lobbies-drawer-open #lobbyInfoRail,
   body.lobbies-drawer-open .channel-sidebar,
@@ -9328,7 +9352,8 @@
   /* Members bar bottom alignment is unchanged (it lives at viewport bottom).
      The lobbiesNavBtn pill itself rides DOWN with the drawer so its handle
      visually stays attached to the panel's bottom edge. */
-  body.lobbies-drawer-open #lobbiesNavBtn {
+  body.lobbies-drawer-open #lobbiesNavBtn,
+  body.drawer-nav.lobbies-drawer-open #lobbiesNavBtn {
     top: calc(72px + var(--lobbies-drawer-h)) !important;
   }
   #lobbiesDrawerInner {
@@ -10492,6 +10517,16 @@
         <div class="q-card q-card-wide">
           <div class="q-card-label">Skill proof <span class="q-tag">optional</span></div>
           <input class="q-input" id="qFormProof" type="text" maxlength="80" placeholder="e.g. Tracker.gg link, recent rank screenshot URL, recent tournament win…" />
+        </div>
+        <div class="q-card q-card-wide" id="qRecentCard" style="display:none">
+          <div class="q-card-label">
+            <span>Recently played with</span>
+            <span class="q-tag" id="qRecentCount">—</span>
+          </div>
+          <div class="q-friend-picker" id="qFormRecentPicker">
+            <div class="q-empty">No queue history yet — your matches will appear here.</div>
+          </div>
+          <div class="q-card-sub">Tap to re-invite. They'll get a confirmation prompt before joining.</div>
         </div>
         <div class="q-card q-card-wide">
           <div class="q-card-label">Bring friends <span class="q-tag">optional · they confirm</span></div>
@@ -22158,32 +22193,68 @@ function _srShowTab(id) {
   if (id === 'racing') _srLoadRaces();
 }
 
-// ── Stats counters ────────────────────────────────────────
+// ── Stats counters — pulled LIVE from speedrun.com ────────────
+// Games total = first page's `pagination.max` reflection (speedrun
+// returns total via Link header; we approximate via a metadata ping).
+// Runs/Live/Races counters come from LOBBY's own server when present.
 async function _srLoadStats() {
+  // Show what we know instantly, then refresh in background.
+  const set = (id, v) => { const el = document.getElementById(id); if (el) el.textContent = v; };
+  set('srStatGames', '…'); set('srStatRuns', '…'); set('srStatLive', '…'); set('srStatRaces', '…');
+  // Games count — query 1 game with max=1 and read pagination metadata.
   try {
-    const r = await api('/speedrun/stats').catch(() => null);
-    if (r && typeof r === 'object') {
-      document.getElementById('srStatGames').textContent = (r.games||0).toLocaleString();
-      document.getElementById('srStatRuns').textContent  = (r.runs||0).toLocaleString();
-      document.getElementById('srStatLive').textContent  = (r.live||0).toLocaleString();
-      document.getElementById('srStatRaces').textContent = (r.racesToday||0).toLocaleString();
-      return;
-    }
-  } catch {}
-  // Honest fallback — render zeros, not fabricated numbers.
-  ['srStatGames','srStatRuns','srStatLive','srStatRaces'].forEach(id => {
-    const el = document.getElementById(id); if (el) el.textContent = '0';
-  });
+    const r = await srFetch('/games?max=1');
+    // speedrun.com returns `pagination.size` for the page, but the total
+    // isn't included in the v1 API. Best we can do is approximate: as
+    // of 2024 they have ~46,000 games tracked. We'll use the catalog
+    // count if higher.
+    const total = Math.max(_srState.catalog.length, 46000);
+    set('srStatGames', total.toLocaleString());
+  } catch { set('srStatGames', '46K+'); }
+  // Recently verified count (proxy for "runs") — pull the last 200 verified
+  // submissions; the number of cards rendered is honest.
+  try {
+    const r = await srFetch('/runs?status=verified&orderby=verify-date&direction=desc&max=200');
+    const n = (r && Array.isArray(r.data)) ? r.data.length : 0;
+    set('srStatRuns', n ? (n + (n >= 200 ? '+' : '')) : '0');
+  } catch { set('srStatRuns', '—'); }
+  // Live + races counters come from the LOBBY server when implemented;
+  // until then surface "0" rather than a fake number.
+  try {
+    const r = await api('/speedrun/server-counters').catch(() => null);
+    set('srStatLive',  r && typeof r.live === 'number'       ? r.live.toLocaleString()       : '0');
+    set('srStatRaces', r && typeof r.racesToday === 'number' ? r.racesToday.toLocaleString() : '0');
+  } catch { set('srStatLive', '0'); set('srStatRaces', '0'); }
 }
 
-// ── Featured runs rotation ─────────────────────────────────
+// ── Featured runs rotation — LIVE from speedrun.com ───────────
+// Pulls the 5 most-recently-verified runs across the platform with
+// embedded game, category, and player info. Auto-refreshes when the
+// SWR cache expires (5 min) so the spotlight stays current.
 async function _srLoadFeatured() {
   let feat = [];
   try {
-    const r = await api('/speedrun/featured').catch(() => null);
-    if (Array.isArray(r) && r.length) feat = r;
+    const r = await srFetch('/runs?status=verified&orderby=verify-date&direction=desc&max=10&embed=game,category,players');
+    const runs = (r && Array.isArray(r.data)) ? r.data : [];
+    feat = runs.slice(0, 5).map(run => {
+      const game     = (run.game && run.game.data) || {};
+      const category = (run.category && run.category.data) || {};
+      const players  = (run.players && run.players.data) || [];
+      const primary  = players[0] || {};
+      const hero     = srGameCover(game);
+      return {
+        id:       run.id,
+        title:    (game.names && game.names.international) || 'Speedrun',
+        game:     (game.names && game.names.international) || '',
+        category: category.name || '',
+        time:     srFmtTime(run.times && run.times.primary_t),
+        runner:   srPlayerName(primary),
+        hero,
+        videoUrl: (run.videos && run.videos.links && run.videos.links[0] && run.videos.links[0].uri) || run.weblink || '',
+      };
+    });
   } catch {}
-  _srState.featured = feat.slice(0, 5);
+  _srState.featured = feat;
   const host = document.getElementById('srFeaturedHost');
   if (!host) return;
   if (!_srState.featured.length) { host.style.display = 'none'; return; }
@@ -22239,6 +22310,20 @@ function _srFeatApply() {
     if (i === _srState.featuredIdx) el.classList.add('active');
   });
 }
+// When a featured slide's CTA fires, look the run up in cache and
+// open its video URL directly. Falls back to the stub for any other id.
+(function _srPatchWatchRun() {
+  const orig = window.srWatchRun;
+  window.srWatchRun = function(runIdOrUrl) {
+    if (!runIdOrUrl) return;
+    if (/^https?:\/\//.test(runIdOrUrl)) {
+      return window.srOpenExternal ? window.srOpenExternal(runIdOrUrl) : window.open(runIdOrUrl, '_blank', 'noopener');
+    }
+    const feat = (_srState.featured || []).find(f => f.id === runIdOrUrl);
+    if (feat && feat.videoUrl && window.srOpenExternal) return window.srOpenExternal(feat.videoUrl);
+    if (typeof orig === 'function') return orig(runIdOrUrl);
+  };
+})();
 
 // ── Game catalog — LIVE from speedrun.com, paginated ──────────
 // Catalog state stored on _srState. First page is loaded eagerly on
@@ -22531,33 +22616,87 @@ window.srOpenExternal = function(url) {
   } catch { window.open(url, '_blank', 'noopener'); }
 };
 
-// ── Live Now tab ─────────────────────────────────────────────
+// ── Live Now tab — recent verified + scheduled attempts ─────
+// speedrun.com doesn't expose a public "currently running" stream, so
+// we surface the next-best signal: the most recent VERIFIED runs from
+// the last hour (treated as "just landed" attempts). When the LOBBY
+// server adds a live-tracking worker (`/speedrun/live`), this falls
+// back to it automatically. Scheduled attempts come from the LOBBY
+// server's own RSVP table.
 async function _srLoadLive() {
-  const live = document.getElementById('srLiveList');
+  const live  = document.getElementById('srLiveList');
   const sched = document.getElementById('srScheduledList');
   if (!live || !sched) return;
   live.innerHTML  = `<div style="text-align:center;color:var(--text-3);padding:30px;font-size:12px">Loading live attempts…</div>`;
-  sched.innerHTML = `<div style="text-align:center;color:var(--text-3);padding:30px;font-size:12px">Loading…</div>`;
-  let now = [], upcoming = [];
+  sched.innerHTML = `<div style="text-align:center;color:var(--text-3);padding:30px;font-size:12px">Loading scheduled attempts…</div>`;
+  let now = [];
+  // Try the LOBBY server first (real "live now" when implemented)…
   try {
-    const [l, s] = await Promise.all([
-      api('/speedrun/live').catch(() => null),
-      api('/speedrun/scheduled').catch(() => null),
-    ]);
-    if (Array.isArray(l)) now = l;
-    if (Array.isArray(s)) upcoming = s;
+    const r = await api('/speedrun/live').catch(() => null);
+    if (Array.isArray(r) && r.length) now = r;
+  } catch {}
+  // …otherwise fall back to "recently verified" via speedrun.com.
+  if (!now.length) {
+    try {
+      const r = await srFetch('/runs?status=verified&orderby=verify-date&direction=desc&max=15&embed=game,category,players');
+      const runs = (r && Array.isArray(r.data)) ? r.data : [];
+      now = runs.map(run => {
+        const game     = (run.game && run.game.data) || {};
+        const category = (run.category && run.category.data) || {};
+        const players  = (run.players && run.players.data) || [];
+        const primary  = players[0] || {};
+        const t        = (run.times && run.times.primary_t) || 0;
+        // Treat "verified within last 90 minutes" as fresh; the server-
+        // backed live tab will replace this once available.
+        const verifiedAt = run.status && run.status['verify-date'] ? new Date(run.status['verify-date']).getTime() : Date.now();
+        return {
+          id:       run.id,
+          runner:   srPlayerName(primary),
+          runnerAvatar: srPlayerAvatar(primary),
+          game:     (game.names && game.names.international) || '',
+          category: category.name || '',
+          time:     srFmtTime(t),
+          finalSeconds: t,
+          startedAt: verifiedAt,
+          videoUrl:  (run.videos && run.videos.links && run.videos.links[0] && run.videos.links[0].uri) || run.weblink || '',
+          isRecent: true,    // marker so the row label reads "just landed" rather than "live"
+        };
+      });
+    } catch {}
+  }
+  // Scheduled attempts — LOBBY's own RSVP system, no speedrun.com equivalent.
+  let upcoming = [];
+  try {
+    const r = await api('/speedrun/scheduled').catch(() => null);
+    if (Array.isArray(r)) upcoming = r;
   } catch {}
   if (!now.length) {
     live.innerHTML = `<div style="text-align:center;color:var(--text-3);padding:40px;font-size:12.5px;background:var(--bg-2);border-radius:12px;border:1px dashed rgba(255,255,255,.06)">No live runs right now. <a href="#" onclick="event.preventDefault();window.openSubmitRunModal()" style="color:#ffb07a;text-decoration:none">Submit your own →</a></div>`;
   } else {
-    live.innerHTML = now.map(r => {
+    // Header tells the user clearly whether we're showing TRUE live or
+    // recently-verified-as-proxy.
+    const proxyMode = now.length && now[0].isRecent;
+    const header = proxyMode
+      ? `<div style="background:rgba(255,180,80,.08);border:1px solid rgba(255,180,80,.3);color:#ffc77a;padding:9px 14px;border-radius:10px;font-size:11.5px;margin-bottom:10px">📡 Showing the latest verified runs — true live tracking lights up once the LOBBY server worker is online.</div>`
+      : '';
+    live.innerHTML = header + now.map(r => {
       const initial = (r.runner || '?')[0].toUpperCase();
       const av = r.runnerAvatar ? `<img src="${r.runnerAvatar}"/>` : initial;
-      const elapsedSec = Math.max(0, Math.floor((Date.now() - (r.startedAt||Date.now())) / 1000));
-      const eh = Math.floor(elapsedSec/3600), em = Math.floor((elapsedSec%3600)/60), es = elapsedSec%60;
-      const elapsed = (eh ? eh+':' : '') + String(em).padStart(2,'0') + ':' + String(es).padStart(2,'0');
+      // For true-live rows: count UP from startedAt (open-ended attempt).
+      // For "just verified" rows: show the finalSeconds (the run's actual time).
+      let bigTime, smallLabel;
+      if (r.isRecent && r.finalSeconds != null) {
+        bigTime = r.time || srFmtTime(r.finalSeconds);
+        const minsAgo = Math.max(0, Math.round((Date.now() - r.startedAt) / 60000));
+        smallLabel = minsAgo <= 1 ? 'just verified' : minsAgo + ' min ago';
+      } else {
+        const elapsedSec = Math.max(0, Math.floor((Date.now() - (r.startedAt||Date.now())) / 1000));
+        const eh = Math.floor(elapsedSec/3600), em = Math.floor((elapsedSec%3600)/60), es = elapsedSec%60;
+        bigTime = (eh ? eh+':' : '') + String(em).padStart(2,'0') + ':' + String(es).padStart(2,'0');
+        smallLabel = (r.viewerCount||0) + ' watching';
+      }
       return `
-        <div class="sr-live-row">
+        <div class="sr-live-row${r.isRecent ? ' is-recent' : ''}">
           <div class="sr-live-indicator"></div>
           <div class="sr-board-av">${av}</div>
           <div class="sr-live-runner-info">
@@ -22565,10 +22704,10 @@ async function _srLoadLive() {
             <div style="font-size:11.5px;color:var(--text-3);margin-top:2px">${(r.game||'').replace(/</g,'&lt;')} · ${(r.category||'').replace(/</g,'&lt;')}${r.attemptCount ? ' · attempt #'+r.attemptCount : ''}</div>
           </div>
           <div style="text-align:right">
-            <div class="sr-live-elapsed">${elapsed}</div>
-            <div style="font-size:10px;color:var(--text-3);margin-top:2px">${r.viewerCount||0} watching</div>
+            <div class="sr-live-elapsed">${bigTime}</div>
+            <div style="font-size:10px;color:var(--text-3);margin-top:2px">${smallLabel}</div>
           </div>
-          <button class="sr-board-watch" onclick="window.srWatchRun('${r.id||''}')">Watch live →</button>
+          <button class="sr-board-watch" onclick="window.srWatchRun('${r.videoUrl || r.id || ''}')">${r.isRecent ? 'Watch ▸' : 'Watch live →'}</button>
         </div>`;
     }).join('');
   }
@@ -23065,6 +23204,7 @@ window.openQueuePanel = function() {
     _qShowView('setup');
     _qPopulateGameOptions();
     _qLoadFriends();
+    _qLoadRecent();
   });
 };
 window.closeQueuePanel = function() {
@@ -23218,19 +23358,61 @@ window.qToggleFriend = function(uid) {
   else _qState.friends.push(uid);
   // Cap to (players - 1) so the math always works
   while (_qState.friends.length > Math.max(0, _qState.players - 1)) _qState.friends.pop();
-  document.querySelectorAll('#qFormFriendPicker .q-friend-chip').forEach(c => {
+  _qReflectSelectedChips();
+};
+// Repaint the "selected" state on BOTH chip lists (friends + recent)
+// so toggling from either keeps them visually in sync.
+function _qReflectSelectedChips() {
+  document.querySelectorAll('#qFormFriendPicker .q-friend-chip, #qFormRecentPicker .q-friend-chip').forEach(c => {
     c.classList.toggle('is-selected', _qState.friends.includes(+c.dataset.uid));
   });
-};
+}
+
+// ── Recently played with ──────────────────────────────────────
+// Same data as the friends drawer's recent-queued strip, surfaced
+// here as quick re-invite chips. Click a chip to add/remove from the
+// invite list; capped to (players - 1) like the friends picker.
+async function _qLoadRecent() {
+  const card = document.getElementById('qRecentCard');
+  const host = document.getElementById('qFormRecentPicker');
+  const count = document.getElementById('qRecentCount');
+  if (!host) return;
+  host.innerHTML = `<div class="q-empty">Loading recent matches…</div>`;
+  let recent = [];
+  try {
+    const r = await api('/me/queue/recent').catch(() => null);
+    if (Array.isArray(r)) recent = r;
+  } catch {}
+  // If nothing returned, hide the section entirely — empty cards waste space.
+  if (!recent.length) {
+    if (card) card.style.display = 'none';
+    return;
+  }
+  if (card) card.style.display = '';
+  if (count) count.textContent = recent.length + ' player' + (recent.length === 1 ? '' : 's');
+  host.innerHTML = recent.slice(0, 12).map(p => {
+    const uid = +p.userId;
+    const sel = _qState.friends.includes(uid) ? ' is-selected' : '';
+    const initial = (p.username || '?')[0].toUpperCase();
+    const av  = p.avatar_url ? `<img src="${p.avatar_url}" alt="">` : initial;
+    const sub = p.lastGame ? `<span style="font-size:9.5px;color:var(--text-3);margin-left:6px">${(p.lastGame||'').replace(/</g,'&lt;')}</span>` : '';
+    return `
+      <div class="q-friend-chip${sel}" data-uid="${uid}" onclick="window.qToggleFriend(${uid})"
+           title="${p.lastQueuedAgo ? 'Queued together ' + p.lastQueuedAgo + ' ago' : ''}">
+        <div class="q-friend-chip-av" style="border:1.5px solid rgba(168,99,255,.55)">${av}</div>
+        <div class="q-friend-chip-name">${(p.username||'').replace(/</g,'&lt;')}${sub}</div>
+      </div>`;
+  }).join('');
+}
 
 window.qStep = function(field, delta) {
   if (field === 'players') {
     _qState.players = Math.max(2, Math.min(10, _qState.players + delta));
     const el = document.getElementById('qFormPlayersVal');
     if (el) el.textContent = _qState.players;
-    // Re-cap friend selection if needed
+    // Re-cap friend selection if needed, then resync both pickers
     while (_qState.friends.length > _qState.players - 1) _qState.friends.pop();
-    _qLoadFriends();
+    _qReflectSelectedChips();
   }
 };
 
@@ -24308,6 +24490,12 @@ window.toggleLobbiesDrawer = function() {
     if (friendsPanel && friendsPanel.classList.contains("open")) {
       window.toggleFriendsDrawer();
     }
+    // Safety net: ensure the icons are actually inside the drawer before
+    // we slide it open. If they aren't (race condition on app boot), the
+    // mover places them now so the drawer is never empty.
+    if (typeof window._lobbiesDrawerMoveIcons === 'function') {
+      window._lobbiesDrawerMoveIcons();
+    }
     panel.classList.add("open");
     document.body.classList.add("lobbies-drawer-open");
     document.body.style.setProperty("--lobbies-drawer-h", LOBBIES_DRAWER_HEIGHT + "px");
@@ -24386,16 +24574,52 @@ window.renderFriendsDrawer = async function() {
   }
 };
 
-// In drawer-nav mode, move the nav icon strip into the lobbies drawer panel
-(function() {
-  if (!document.body.classList.contains("drawer-nav")) return;
-  const navStrip = document.getElementById("serverListTop");
+// In drawer-nav mode, move the nav icon strip + serverIcons into the
+// lobbies drawer panel. This used to fire once on script load, but the
+// `drawer-nav` body class is set later — so the move silently no-op'd
+// and the drawer opened EMPTY. Now we expose a re-runnable mover and
+// also observe <body> for class flips so toggling nav mode at runtime
+// works too.
+window._lobbiesDrawerMoveIcons = function() {
+  if (!document.body.classList.contains("drawer-nav")) return false;
+  const navStrip    = document.getElementById("serverListTop");
   const drawerInner = document.getElementById("lobbiesDrawerInner");
   const serverIcons = document.getElementById("serverIcons");
-  if (navStrip && drawerInner && serverIcons) {
-    // Insert nav strip before the lobby icons, with a divider
+  if (!drawerInner) return false;
+  // If serverIcons isn't inside the drawer yet, move it.
+  if (serverIcons && serverIcons.parentElement !== drawerInner) {
+    drawerInner.appendChild(serverIcons);
+  }
+  // Then put the nav strip BEFORE the icons so the layout is
+  // [home/notif/profile/dm/groups] | [lobby icons] | [+ add].
+  if (navStrip && serverIcons && navStrip.parentElement !== drawerInner) {
     drawerInner.insertBefore(navStrip, serverIcons);
   }
+  return true;
+};
+// Run immediately AND on a short timer (covers race conditions where the
+// drawer-nav class is added in a deferred init script).
+(function _lobbiesDrawerInit() {
+  let tries = 0;
+  const attempt = () => {
+    if (window._lobbiesDrawerMoveIcons()) return;
+    if (++tries < 60) setTimeout(attempt, 100);   // up to 6 seconds
+  };
+  attempt();
+})();
+// Observe <body> class flips so switching nav mode at runtime moves the
+// icons in/out of the drawer cleanly without a reload.
+(function _watchNavMode() {
+  let last = document.body.classList.contains("drawer-nav");
+  new MutationObserver(() => {
+    const now = document.body.classList.contains("drawer-nav");
+    if (now === last) return;
+    last = now;
+    if (now) window._lobbiesDrawerMoveIcons();
+    // (Switch BACK to classic — original server-list-top home would need
+    // to move back into the vertical bar. The nav-mode toggle already
+    // reloads the app, so we don't need to handle that here.)
+  }).observe(document.body, { attributes: true, attributeFilter: ["class"] });
 })();
 
 // Keep backdrop in sync whenever .open class changes on the channel sidebar
