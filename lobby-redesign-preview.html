@@ -1,0 +1,2154 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<title>LOBBY — Coliseum Redesign Preview</title>
+<link rel="preload" href="https://fonts.googleapis.com/css2?family=Bebas+Neue&display=swap" as="style" onload="this.onload=null;this.rel='stylesheet'">
+<noscript><link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bebas+Neue&display=swap"></noscript>
+<style>
+/* ─────────────────────────────────────────────────────────────────
+   THE COLISEUM — premium lobby UI preview
+   Single-file mockup. Uses your existing tokens (--accent, --bg-*,
+   Bebas Neue, gg sans stack) so the same look ports straight into
+   index.html. Theme swatches up top let you scrub through accents.
+   ───────────────────────────────────────────────────────────────── */
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+:root{
+  --bg-0:#141820; --bg-1:#202630; --bg-2:#2c3440; --bg-3:#384250;
+  --accent:#f9a8d4; --accent-h:#f472b6; --danger:#ed4245;
+  --green:#23a55a; --yellow:#f0b232;
+  --text-1:#fdf2f8; --text-2:#fce7f3; --text-3:#fbcfe8;
+  --gold-1:#FFE566; --gold-2:#FFD700; --gold-3:#7a5c00;
+  --font:"gg sans","Noto Sans",Whitney,Helvetica Neue,Helvetica,Arial,sans-serif;
+  --ease-out-expo:cubic-bezier(0.22,1,0.36,1);
+  --ease-back:cubic-bezier(0.34,1.4,0.64,1);
+}
+[data-theme="midnight"]{--bg-0:#0a0a0f;--bg-1:#111118;--bg-2:#1a1a24;--bg-3:#22222f;--accent:#7c3aed;--accent-h:#6d28d9;--text-1:#f0f0ff;--text-2:#a0a0c0;--text-3:#606080}
+[data-theme="forest"] {--bg-0:#0d1a0f;--bg-1:#142018;--bg-2:#1a2d1f;--bg-3:#213828;--accent:#16a34a;--accent-h:#15803d;--text-1:#ecfdf5;--text-2:#86efac;--text-3:#4ade80}
+[data-theme="ocean"]  {--bg-0:#030d1a;--bg-1:#071828;--bg-2:#0c2236;--bg-3:#112c44;--accent:#0ea5e9;--accent-h:#0284c7;--text-1:#f0f9ff;--text-2:#7dd3fc;--text-3:#38bdf8}
+[data-theme="sunset"] {--bg-0:#1a0a0a;--bg-1:#2a1010;--bg-2:#381818;--bg-3:#442020;--accent:#f97316;--accent-h:#ea580c;--text-1:#fff7ed;--text-2:#fdba74;--text-3:#fb923c}
+[data-theme="rose"]   {--bg-0:#1a0a10;--bg-1:#2a1020;--bg-2:#38182c;--bg-3:#442038;--accent:#e11d48;--accent-h:#be123c;--text-1:#fff1f2;--text-2:#fda4af;--text-3:#fb7185}
+
+html,body{height:100%;}
+body{
+  font-family:var(--font);
+  color:var(--text-1);
+  background:var(--bg-0);
+  overflow-x:hidden;
+  font-size:14px;
+  line-height:1.45;
+  -webkit-font-smoothing:antialiased;
+}
+
+/* ── Ambient lighting layer — drifts behind everything for depth */
+.amb{position:fixed;inset:0;z-index:0;pointer-events:none;overflow:hidden}
+.amb::before{
+  content:'';position:absolute;width:1200px;height:1200px;
+  left:-300px;top:-400px;
+  background:radial-gradient(circle,color-mix(in srgb,var(--accent) 28%, transparent) 0%,transparent 65%);
+  filter:blur(50px); animation:drift1 28s ease-in-out infinite alternate;
+}
+.amb::after{
+  content:'';position:absolute;width:900px;height:900px;
+  right:-200px;bottom:-300px;
+  background:radial-gradient(circle,color-mix(in srgb,var(--accent) 22%, transparent) 0%,transparent 65%);
+  filter:blur(50px); animation:drift2 36s ease-in-out infinite alternate;
+}
+@keyframes drift1{from{transform:translate(0,0)}to{transform:translate(120px,80px)}}
+@keyframes drift2{from{transform:translate(0,0)}to{transform:translate(-100px,-60px)}}
+
+/* Faint grid texture overlay — appears across the whole canvas, masked toward edges */
+.grid-texture{
+  position:fixed;inset:0;z-index:1;pointer-events:none;
+  background-image:
+    linear-gradient(rgba(255,255,255,.018) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(255,255,255,.018) 1px, transparent 1px);
+  background-size:32px 32px;
+  mask-image:radial-gradient(ellipse 80% 60% at 50% 40%, #000 30%, transparent 90%);
+  -webkit-mask-image:radial-gradient(ellipse 80% 60% at 50% 40%, #000 30%, transparent 90%);
+}
+
+/* ── App shell ── No sidebar. Just an open canvas. ── */
+.app{
+  position:relative;z-index:2;
+  min-height:100vh;
+}
+
+/* ── Main canvas ── */
+.canvas{
+  padding:96px 32px 120px;
+  display:flex;flex-direction:column;gap:22px;
+  max-width:1640px;width:100%;margin:0 auto;
+}
+
+/* ── The Crest — floating top-center lobby switcher ── */
+.crest-wrap{
+  position:fixed;top:18px;left:50%;transform:translateX(-50%);
+  z-index:40;
+  display:flex;align-items:center;gap:10px;
+}
+.crest{
+  display:inline-flex;align-items:center;gap:14px;
+  padding:8px 8px 8px 8px;
+  border-radius:99px;
+  background:rgba(0,0,0,.55);backdrop-filter:blur(18px);
+  border:1px solid rgba(255,255,255,.08);
+  cursor:pointer;
+  box-shadow:0 14px 36px rgba(0,0,0,.45);
+  transition:border-color .2s, transform .2s, background .2s;
+}
+.crest:hover{border-color:color-mix(in srgb,var(--accent) 50%, transparent);transform:translateY(-1px);background:rgba(0,0,0,.65)}
+.crest-emblem{
+  width:34px;height:34px;border-radius:50%;
+  background:linear-gradient(135deg,var(--accent),color-mix(in srgb,var(--accent) 40%,#000));
+  display:flex;align-items:center;justify-content:center;
+  color:#fff;font-family:'Bebas Neue',sans-serif;font-size:15px;letter-spacing:.5px;
+  box-shadow:0 0 0 2px rgba(255,255,255,.1) inset, 0 0 14px color-mix(in srgb,var(--accent) 40%, transparent);
+}
+.crest-text{
+  display:flex;flex-direction:column;gap:1px;padding-right:6px;
+}
+.crest-eyebrow{
+  font-size:8.5px;font-weight:900;letter-spacing:1.6px;text-transform:uppercase;
+  color:var(--text-3);line-height:1;
+}
+.crest-name{
+  font-family:'Bebas Neue',sans-serif;font-size:15px;letter-spacing:1.2px;color:#fff;line-height:1;margin-top:2px;
+}
+.crest-chev{
+  margin-right:8px;color:var(--text-3);
+  transition:transform .2s, color .2s;
+}
+.crest:hover .crest-chev{color:var(--text-1)}
+.crest.open .crest-chev{transform:rotate(180deg)}
+
+/* Coliseum-return chip (separate floating button) */
+.coliseum-return{
+  display:inline-flex;align-items:center;gap:7px;
+  padding:9px 14px 9px 12px;border-radius:99px;cursor:pointer;
+  background:linear-gradient(135deg,var(--accent),color-mix(in srgb,var(--accent) 55%,#000));
+  border:none;color:#fff;
+  font-family:var(--font);font-size:10px;font-weight:900;letter-spacing:1.4px;text-transform:uppercase;
+  box-shadow:0 1px 0 rgba(255,255,255,.25) inset, 0 8px 22px color-mix(in srgb,var(--accent) 45%, transparent);
+  transition:transform .2s, filter .2s;
+  opacity:.85;
+}
+.coliseum-return:hover{transform:translateY(-1px);filter:brightness(1.12);opacity:1}
+.coliseum-return svg{width:11px;height:11px}
+
+/* Lobby switcher overlay — full-screen, opens from Crest */
+.switcher{
+  position:fixed;inset:0;z-index:80;
+  display:none;align-items:center;justify-content:center;
+  background:rgba(0,0,0,.65);backdrop-filter:blur(20px);
+  padding:40px;
+}
+.switcher.open{display:flex}
+.switcher-inner{
+  width:min(960px, 100%);
+  display:flex;flex-direction:column;gap:18px;
+}
+.switcher-eyebrow{
+  font-size:10.5px;font-weight:900;letter-spacing:2.4px;text-transform:uppercase;
+  color:color-mix(in srgb,var(--accent) 85%, white);text-align:center;
+}
+.switcher-title{
+  font-family:'Bebas Neue',sans-serif;font-size:54px;letter-spacing:3px;color:#fff;text-align:center;line-height:.95;
+}
+.switcher-search-wrap{position:relative;max-width:520px;margin:8px auto 6px;width:100%}
+.switcher-search{
+  width:100%;padding:14px 18px 14px 46px;border-radius:99px;
+  background:rgba(0,0,0,.5);border:1px solid rgba(255,255,255,.1);
+  color:#fff;font-family:var(--font);font-size:14px;outline:none;
+  transition:border-color .2s, box-shadow .2s;
+}
+.switcher-search:focus{
+  border-color:color-mix(in srgb,var(--accent) 60%, transparent);
+  box-shadow:0 0 0 3px color-mix(in srgb,var(--accent) 22%, transparent);
+}
+.switcher-search-ico{
+  position:absolute;left:18px;top:50%;transform:translateY(-50%);color:var(--text-3);
+}
+
+.switcher-grid{
+  display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:14px;
+  max-height:60vh;overflow-y:auto;padding:6px;
+}
+.switcher-card{
+  position:relative;overflow:hidden;
+  border-radius:18px;padding:18px 16px;cursor:pointer;
+  background:linear-gradient(180deg, rgba(30,32,42,.85), rgba(15,17,25,.9));
+  border:1px solid rgba(255,255,255,.07);
+  display:flex;flex-direction:column;gap:10px;align-items:center;text-align:center;
+  transition:transform .25s var(--ease-out-expo), border-color .2s, box-shadow .2s;
+}
+.switcher-card:hover{
+  transform:translateY(-3px);
+  border-color:color-mix(in srgb,var(--accent) 55%, transparent);
+  box-shadow:0 12px 28px rgba(0,0,0,.5), 0 0 22px color-mix(in srgb,var(--accent) 22%, transparent);
+}
+.switcher-card.active{
+  border-color:color-mix(in srgb,var(--accent) 80%, transparent);
+  background:linear-gradient(180deg, color-mix(in srgb,var(--accent) 14%, rgba(30,32,42,.85)), rgba(15,17,25,.9));
+  box-shadow:0 0 26px color-mix(in srgb,var(--accent) 30%, transparent);
+}
+.switcher-card .em{
+  width:54px;height:54px;border-radius:16px;
+  display:flex;align-items:center;justify-content:center;
+  color:#fff;font-family:'Bebas Neue',sans-serif;font-size:24px;letter-spacing:1px;
+  box-shadow:0 0 0 1px rgba(255,255,255,.1) inset;
+}
+.switcher-card .nm{font-size:13px;font-weight:800;color:#fff;line-height:1.2}
+.switcher-card .mt{
+  display:flex;gap:8px;font-size:10px;color:var(--text-3);
+}
+.switcher-card .mt b{color:color-mix(in srgb,var(--accent) 90%, white);font-weight:800}
+.switcher-card .pulse-tag{
+  font-size:8px;font-weight:900;letter-spacing:1.2px;
+  padding:2px 7px;border-radius:99px;
+  background:rgba(237,66,69,.18);color:#ff7b7d;border:1px solid rgba(237,66,69,.45);
+  display:inline-flex;align-items:center;gap:5px;
+}
+.switcher-card .pulse-tag .d{width:5px;height:5px;border-radius:50%;background:#ff5050;box-shadow:0 0 8px #ff5050;animation:pulse-live 1.4s ease-in-out infinite}
+.switcher-add{
+  display:inline-flex;align-items:center;justify-content:center;gap:7px;
+  margin:6px auto 0;
+  padding:10px 18px;border-radius:99px;cursor:pointer;
+  background:rgba(255,255,255,.04);border:1px dashed rgba(255,255,255,.18);
+  color:var(--text-2);font-family:var(--font);font-size:10.5px;font-weight:900;letter-spacing:1.4px;text-transform:uppercase;
+  transition:background .2s, color .2s, border-color .2s;
+}
+.switcher-add:hover{background:rgba(255,255,255,.08);color:var(--text-1);border-color:rgba(255,255,255,.32)}
+
+.switcher-close{
+  position:absolute;top:24px;right:28px;
+  width:44px;height:44px;border-radius:50%;cursor:pointer;
+  background:rgba(0,0,0,.55);backdrop-filter:blur(10px);
+  border:1px solid rgba(255,255,255,.1);color:var(--text-1);
+  display:flex;align-items:center;justify-content:center;
+  transition:background .2s, border-color .2s;
+}
+.switcher-close:hover{background:rgba(255,255,255,.08);border-color:rgba(255,255,255,.25)}
+
+/* ── Floating user Sigil — bottom right ── */
+.sigil{
+  position:fixed;bottom:22px;right:22px;z-index:40;
+  display:flex;align-items:center;gap:10px;
+  padding:8px 16px 8px 8px;border-radius:99px;cursor:pointer;
+  background:rgba(0,0,0,.55);backdrop-filter:blur(18px);
+  border:1px solid rgba(255,255,255,.08);
+  box-shadow:0 14px 36px rgba(0,0,0,.45);
+  transition:border-color .2s, transform .2s, background .2s;
+}
+.sigil:hover{border-color:color-mix(in srgb,var(--accent) 55%, transparent);transform:translateY(-1px);background:rgba(0,0,0,.7)}
+.sigil-av-wrap{position:relative}
+.sigil-av{
+  width:38px;height:38px;border-radius:50%;
+  background:linear-gradient(135deg,#c084fc,#7c3aed);
+  display:flex;align-items:center;justify-content:center;
+  color:#fff;font-family:'Bebas Neue',sans-serif;font-size:16px;letter-spacing:.5px;
+  border:2px solid rgba(0,0,0,.7);
+  box-shadow:0 0 0 2px color-mix(in srgb,var(--accent) 50%, transparent);
+}
+.sigil-dot{
+  position:absolute;right:-2px;bottom:-2px;
+  width:13px;height:13px;border-radius:50%;
+  background:#23a55a;border:2.5px solid rgba(10,10,15,1);
+}
+.sigil-text{display:flex;flex-direction:column;gap:1px}
+.sigil-name{font-size:12.5px;font-weight:800;color:#fff;line-height:1}
+.sigil-status{font-size:10px;color:var(--text-3);margin-top:2px;display:flex;align-items:center;gap:5px;line-height:1}
+.sigil-status .sd{width:5px;height:5px;border-radius:50%;background:#23a55a}
+
+/* ── Lobby identity strip — wide, cinematic header ── */
+.identity{
+  position:relative;overflow:hidden;
+  border-radius:24px;
+  padding:26px 32px 24px;
+  background:
+    linear-gradient(180deg, rgba(0,0,0,.15) 0%, rgba(0,0,0,.55) 100%),
+    var(--lobby-banner-bg, linear-gradient(135deg, #2a2d3a 0%, #0e1018 100%));
+  border:1px solid rgba(255,255,255,.06);
+  box-shadow:0 18px 40px rgba(0,0,0,.4), 0 1px 0 rgba(255,255,255,.06) inset;
+  isolation:isolate;
+}
+.identity::before{
+  content:'';position:absolute;inset:0;
+  background:
+    radial-gradient(900px 320px at 80% 50%, color-mix(in srgb,var(--accent) 26%, transparent) 0%, transparent 60%);
+  z-index:0;pointer-events:none;
+}
+.identity::after{
+  content:'';position:absolute;inset:0;
+  background-image:
+    linear-gradient(rgba(255,255,255,.022) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(255,255,255,.022) 1px, transparent 1px);
+  background-size:28px 28px;
+  mask-image:radial-gradient(ellipse at 70% 50%, #000 30%, transparent 80%);
+  -webkit-mask-image:radial-gradient(ellipse at 70% 50%, #000 30%, transparent 80%);
+  z-index:0;pointer-events:none;
+}
+.identity-inner{position:relative;z-index:1;display:flex;align-items:center;gap:22px;flex-wrap:wrap}
+.ident-emblem{
+  width:96px;height:96px;border-radius:24px;flex-shrink:0;
+  background:linear-gradient(135deg, var(--accent), color-mix(in srgb,var(--accent) 40%, #000));
+  display:flex;align-items:center;justify-content:center;
+  color:#fff;font-family:'Bebas Neue',sans-serif;font-size:44px;letter-spacing:1.5px;
+  box-shadow:0 12px 40px color-mix(in srgb,var(--accent) 40%, transparent),
+             0 0 0 3px rgba(255,255,255,.06),
+             0 0 0 1px rgba(255,255,255,.18) inset;
+  position:relative;
+}
+.ident-emblem::after{
+  content:'';position:absolute;inset:-8px;border-radius:28px;
+  border:1px dashed color-mix(in srgb,var(--accent) 55%, transparent);
+  opacity:.4;
+  animation:slow-spin 60s linear infinite;
+}
+@keyframes slow-spin{to{transform:rotate(360deg)}}
+
+.ident-meta{flex:1;min-width:240px}
+.ident-eyebrow{
+  display:inline-flex;align-items:center;gap:8px;
+  font-size:10px;font-weight:800;letter-spacing:2px;text-transform:uppercase;
+  color:color-mix(in srgb,var(--accent) 85%, white);
+  padding:4px 10px;border-radius:99px;
+  background:color-mix(in srgb,var(--accent) 16%, transparent);
+  border:1px solid color-mix(in srgb,var(--accent) 40%, transparent);
+}
+.ident-eyebrow .pulse{
+  width:7px;height:7px;border-radius:50%;background:var(--accent);
+  box-shadow:0 0 0 0 color-mix(in srgb,var(--accent) 70%, transparent);
+  animation:pulse 2s ease-in-out infinite;
+}
+@keyframes pulse{
+  0%,100%{box-shadow:0 0 0 0 color-mix(in srgb,var(--accent) 70%, transparent)}
+  50%   {box-shadow:0 0 0 8px transparent}
+}
+.ident-name{
+  margin-top:10px;
+  font-family:'Bebas Neue',sans-serif;
+  font-size:54px;letter-spacing:2.5px;line-height:.95;
+  color:#fff; text-shadow:0 4px 18px rgba(0,0,0,.5);
+}
+.ident-name .accent{
+  background:linear-gradient(135deg, #fff 0%, color-mix(in srgb,var(--accent) 80%, white) 100%);
+  -webkit-background-clip:text;background-clip:text;-webkit-text-fill-color:transparent;
+}
+.ident-motto{
+  margin-top:6px;
+  font-size:13px;color:rgba(255,255,255,.7);
+  max-width:50ch;
+}
+.ident-stats{
+  display:flex;gap:18px;margin-top:14px;flex-wrap:wrap;
+}
+.ident-stat{
+  display:flex;flex-direction:column;gap:2px;
+  padding:6px 14px;border-radius:12px;
+  background:rgba(0,0,0,.35);backdrop-filter:blur(8px);
+  border:1px solid rgba(255,255,255,.06);
+}
+.ident-stat .n{
+  font-family:'Bebas Neue',sans-serif;font-size:22px;letter-spacing:1px;color:#fff;line-height:1;
+}
+.ident-stat .l{
+  font-size:9px;font-weight:800;letter-spacing:1.2px;text-transform:uppercase;
+  color:rgba(255,255,255,.6);margin-top:4px;
+}
+
+.ident-actions{display:flex;gap:8px;align-self:flex-start;flex-wrap:wrap}
+.ident-btn{
+  display:inline-flex;align-items:center;gap:7px;
+  padding:9px 14px;border-radius:99px;cursor:pointer;
+  background:rgba(0,0,0,.45);backdrop-filter:blur(10px);
+  border:1px solid rgba(255,255,255,.1);
+  color:var(--text-1);
+  font-family:var(--font);font-size:11px;font-weight:800;letter-spacing:1.2px;text-transform:uppercase;
+  transition:background .2s, border-color .2s, transform .2s;
+}
+.ident-btn:hover{background:rgba(255,255,255,.1);border-color:rgba(255,255,255,.22);transform:translateY(-1px)}
+.ident-btn svg{width:12px;height:12px}
+.ident-btn.primary{
+  background:linear-gradient(135deg,var(--accent),color-mix(in srgb,var(--accent) 60%,#000));
+  border-color:transparent;color:#fff;
+  box-shadow:0 6px 20px color-mix(in srgb,var(--accent) 45%, transparent),
+             0 1px 0 rgba(255,255,255,.25) inset;
+  position:relative;overflow:hidden;isolation:isolate;
+}
+.ident-btn.primary::before{
+  content:'';position:absolute;inset:0;
+  background:linear-gradient(120deg, transparent 30%, rgba(255,255,255,.22) 50%, transparent 70%);
+  transform:translateX(-130%);transition:transform 1s var(--ease-out-expo);pointer-events:none;
+}
+.ident-btn.primary:hover::before{transform:translateX(130%)}
+
+/* ── Grid layout for the body — Stage hero + Identity (alter ego) pillar ── */
+.row-hero{
+  display:grid;
+  grid-template-columns:minmax(0,1fr) 360px;
+  gap:22px;
+}
+@media (max-width: 1180px){
+  .row-hero{grid-template-columns:1fr}
+}
+
+/* ─────────── THE STAGE — live voice hero ─────────── */
+.stage{
+  position:relative;overflow:hidden;
+  border-radius:24px;
+  padding:28px 32px 26px;
+  min-height:340px;
+  background:
+    linear-gradient(180deg, rgba(0,0,0,.2) 0%, rgba(0,0,0,.55) 100%),
+    radial-gradient(circle at 50% 40%, color-mix(in srgb,var(--accent) 18%, transparent) 0%, transparent 60%),
+    linear-gradient(135deg, rgba(15,18,28,.95), rgba(8,10,18,.95));
+  border:1px solid rgba(255,255,255,.07);
+  box-shadow:0 20px 50px rgba(0,0,0,.5), 0 1px 0 rgba(255,255,255,.06) inset;
+  isolation:isolate;
+  display:flex;flex-direction:column;justify-content:space-between;gap:22px;
+}
+.stage::after{
+  content:'';position:absolute;inset:0;
+  background-image:
+    linear-gradient(rgba(255,255,255,.02) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(255,255,255,.02) 1px, transparent 1px);
+  background-size:24px 24px;
+  mask-image:radial-gradient(ellipse 80% 60% at 50% 50%, #000 30%, transparent 80%);
+  -webkit-mask-image:radial-gradient(ellipse 80% 60% at 50% 50%, #000 30%, transparent 80%);
+  z-index:0; pointer-events:none;
+}
+.stage-head{position:relative;z-index:1;display:flex;align-items:center;justify-content:space-between;gap:14px;flex-wrap:wrap}
+.stage-title-wrap{display:flex;flex-direction:column;gap:6px}
+.stage-eyebrow{
+  display:inline-flex;align-items:center;gap:8px;
+  font-size:10px;font-weight:900;letter-spacing:2.4px;text-transform:uppercase;
+  color:#ff6b6b;
+}
+.stage-eyebrow .live-dot{
+  width:8px;height:8px;border-radius:50%;background:#ff5050;
+  box-shadow:0 0 14px #ff5050;
+  animation:pulse-live 1.4s ease-in-out infinite;
+}
+@keyframes pulse-live{
+  0%,100%{transform:scale(1);opacity:1}
+  50%{transform:scale(1.4);opacity:.6}
+}
+.stage-title{
+  font-family:'Bebas Neue',sans-serif;font-size:36px;letter-spacing:2px;
+  color:#fff;line-height:1;
+}
+.stage-sub{font-size:12px;color:rgba(255,255,255,.6);margin-top:2px}
+.stage-presence{
+  display:flex;align-items:center;gap:18px;font-size:11px;color:rgba(255,255,255,.8);
+}
+.stage-presence b{font-family:'Bebas Neue',sans-serif;font-size:22px;color:#fff;letter-spacing:1px;display:block;line-height:1}
+.stage-presence span{font-size:9px;font-weight:800;letter-spacing:1.2px;text-transform:uppercase;color:rgba(255,255,255,.55);margin-top:2px;display:block}
+
+/* Speaker ring constellation */
+.stage-ring{
+  position:relative;z-index:1;
+  display:flex;flex-wrap:wrap;justify-content:center;align-items:center;
+  gap:22px;padding:8px 0;
+}
+.speaker{
+  display:flex;flex-direction:column;align-items:center;gap:6px;
+}
+.speaker-avatar{
+  position:relative;
+  width:84px;height:84px;border-radius:50%;
+  background:linear-gradient(135deg, #3b82f6, #1e3a8a);
+  display:flex;align-items:center;justify-content:center;
+  color:#fff;font-family:'Bebas Neue',sans-serif;font-size:32px;letter-spacing:1.5px;
+  border:3px solid rgba(0,0,0,.65);
+  box-shadow:0 8px 24px rgba(0,0,0,.5);
+}
+.speaker-avatar.speaking{
+  box-shadow:0 0 0 4px color-mix(in srgb,var(--accent) 70%, transparent),
+             0 0 28px color-mix(in srgb,var(--accent) 65%, transparent),
+             0 8px 28px rgba(0,0,0,.55);
+  animation:speak-pulse 1.8s ease-in-out infinite;
+}
+@keyframes speak-pulse{
+  0%,100%{box-shadow:0 0 0 4px color-mix(in srgb,var(--accent) 70%, transparent),0 0 28px color-mix(in srgb,var(--accent) 50%, transparent),0 8px 28px rgba(0,0,0,.55)}
+  50%   {box-shadow:0 0 0 7px color-mix(in srgb,var(--accent) 40%, transparent),0 0 38px color-mix(in srgb,var(--accent) 75%, transparent),0 8px 28px rgba(0,0,0,.55)}
+}
+.speaker-avatar.muted::before{
+  content:'';position:absolute;inset:-2px;border-radius:50%;
+  background:rgba(0,0,0,.6);
+  z-index:1;
+}
+.speaker-avatar.muted::after{
+  content:'';position:absolute;left:50%;top:50%;
+  width:2px;height:48px;background:#ed4245;
+  transform:translate(-50%,-50%) rotate(35deg);
+  border-radius:2px;z-index:2;
+}
+.speaker-avatar .mic-state{
+  position:absolute;right:-2px;bottom:-2px;
+  width:22px;height:22px;border-radius:50%;
+  background:#1a1a24;display:flex;align-items:center;justify-content:center;
+  border:2px solid rgba(0,0,0,.85);
+  color:#fff;
+}
+.speaker-avatar .mic-state.on{background:var(--green)}
+.speaker-avatar .mic-state.off{background:#ed4245}
+.speaker-name{font-size:11.5px;font-weight:700;color:#fff;max-width:96px;text-align:center;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.speaker-role{
+  font-size:8.5px;font-weight:900;letter-spacing:1.2px;text-transform:uppercase;
+  color:color-mix(in srgb,var(--accent) 85%, white);
+}
+
+/* Listeners — smaller orbs sit lower */
+.listeners{
+  display:flex;align-items:center;justify-content:center;gap:-6px;margin-top:6px;
+}
+.listener-orb{
+  width:34px;height:34px;border-radius:50%;
+  background:linear-gradient(135deg,#475569,#1e293b);
+  border:2px solid rgba(0,0,0,.7);
+  color:#fff;font-size:11px;font-weight:800;
+  display:flex;align-items:center;justify-content:center;
+  margin-left:-8px;flex-shrink:0;
+  transition:transform .2s var(--ease-out-expo);
+}
+.listener-orb:hover{transform:translateY(-3px) scale(1.1);z-index:1}
+.listener-orb:first-child{margin-left:0}
+.listener-more{
+  width:34px;height:34px;border-radius:50%;
+  background:rgba(255,255,255,.05);border:1px dashed rgba(255,255,255,.2);
+  color:rgba(255,255,255,.7);font-size:10px;font-weight:800;
+  display:flex;align-items:center;justify-content:center;margin-left:-8px;
+}
+
+.stage-cta-row{position:relative;z-index:1;display:flex;gap:10px;align-items:center;justify-content:center;flex-wrap:wrap}
+.stage-cta{
+  display:inline-flex;align-items:center;gap:9px;
+  padding:13px 22px;border-radius:99px;cursor:pointer;border:none;
+  font-family:var(--font);font-size:12px;font-weight:900;letter-spacing:1.6px;text-transform:uppercase;color:#fff;
+  background:linear-gradient(135deg,var(--accent),color-mix(in srgb,var(--accent) 55%,#000));
+  box-shadow:0 1px 0 rgba(255,255,255,.25) inset, 0 10px 30px color-mix(in srgb,var(--accent) 50%, transparent);
+  transition:transform .25s var(--ease-out-expo), filter .2s;
+  position:relative;isolation:isolate;overflow:hidden;
+}
+.stage-cta::before{
+  content:'';position:absolute;inset:0;
+  background:linear-gradient(120deg, transparent 30%, rgba(255,255,255,.22) 50%, transparent 70%);
+  transform:translateX(-130%);transition:transform 1s var(--ease-out-expo);pointer-events:none;
+}
+.stage-cta:hover{transform:translateY(-2px);filter:brightness(1.12)}
+.stage-cta:hover::before{transform:translateX(130%)}
+.stage-cta.ghost{
+  background:rgba(0,0,0,.45);backdrop-filter:blur(10px);
+  border:1px solid rgba(255,255,255,.12);color:var(--text-1);
+  box-shadow:none;
+}
+.stage-cta.ghost:hover{background:rgba(255,255,255,.06)}
+
+/* Waveform decoration in the stage background */
+.waveform{
+  position:absolute;left:0;right:0;bottom:80px;height:60px;
+  z-index:0;opacity:.18;pointer-events:none;
+  display:flex;align-items:end;justify-content:center;gap:3px;
+}
+.waveform .bar{
+  width:3px;background:var(--accent);border-radius:2px;
+  animation:wave 1.4s ease-in-out infinite;
+}
+@keyframes wave{
+  0%,100%{height:8px}
+  50%{height:48px}
+}
+
+/* ─────────── ALTER EGO IDENTITY PILLAR (right of stage) ─────────── */
+.identity-card{
+  position:relative;overflow:hidden;
+  border-radius:24px;
+  padding:24px 22px;
+  background:
+    radial-gradient(500px 250px at 50% 0%, color-mix(in srgb,var(--accent) 22%, transparent) 0%, transparent 60%),
+    linear-gradient(180deg, #15161e 0%, #0a0b12 100%);
+  border:1px solid rgba(255,255,255,.06);
+  box-shadow:0 20px 50px rgba(0,0,0,.5), 0 1px 0 rgba(255,255,255,.06) inset;
+  display:flex;flex-direction:column;gap:14px;align-items:center;text-align:center;
+  isolation:isolate;
+}
+.identity-card::after{
+  content:'';position:absolute;inset:0;
+  background-image:
+    linear-gradient(rgba(255,255,255,.022) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(255,255,255,.022) 1px, transparent 1px);
+  background-size:24px 24px;
+  mask-image:radial-gradient(ellipse 80% 60% at 50% 50%, #000 30%, transparent 80%);
+  -webkit-mask-image:radial-gradient(ellipse 80% 60% at 50% 50%, #000 30%, transparent 80%);
+  z-index:0;pointer-events:none;
+}
+.ic-eyebrow{
+  position:relative;z-index:1;
+  display:inline-flex;align-items:center;gap:6px;
+  font-size:9.5px;font-weight:900;letter-spacing:2px;text-transform:uppercase;
+  color:color-mix(in srgb,var(--accent) 90%, white);
+  padding:3px 10px;border-radius:99px;
+  background:color-mix(in srgb,var(--accent) 14%, transparent);
+  border:1px solid color-mix(in srgb,var(--accent) 36%, transparent);
+}
+.ic-avatar-wrap{position:relative;z-index:1;}
+.ic-avatar{
+  width:140px;height:140px;border-radius:50%;
+  background:linear-gradient(135deg,#c084fc,#7c3aed);
+  display:flex;align-items:center;justify-content:center;
+  color:#fff;font-family:'Bebas Neue',sans-serif;font-size:58px;letter-spacing:2px;
+  border:4px solid rgba(0,0,0,.7);
+  box-shadow:0 0 0 3px color-mix(in srgb,var(--accent) 60%, transparent),
+             0 0 50px color-mix(in srgb,var(--accent) 35%, transparent),
+             0 14px 40px rgba(0,0,0,.6);
+}
+.ic-name{
+  position:relative;z-index:1;
+  font-family:'Bebas Neue',sans-serif;font-size:32px;letter-spacing:2px;line-height:1;
+  color:#fff;
+}
+.ic-name .accent{
+  background:linear-gradient(135deg, color-mix(in srgb,var(--accent) 80%, white), #fff);
+  -webkit-background-clip:text;background-clip:text;-webkit-text-fill-color:transparent;
+}
+.ic-handle{position:relative;z-index:1;font-size:11.5px;color:var(--text-3);font-weight:600;letter-spacing:.4px}
+.ic-tier{
+  position:relative;z-index:1;
+  display:inline-flex;align-items:center;gap:8px;
+  padding:5px 12px 5px 7px;border-radius:99px;
+  background:rgba(0,0,0,.55);backdrop-filter:blur(8px);
+  border:1px solid rgba(255,211,61,.5);
+  font-size:10.5px;font-weight:900;letter-spacing:1.5px;text-transform:uppercase;color:#ffd33d;
+}
+.ic-tier .gem{
+  width:18px;height:18px;
+  background:linear-gradient(135deg, #fff3a8, #ffd33d 40%, #b8860b);
+  clip-path:polygon(50% 0%, 90% 25%, 90% 75%, 50% 100%, 10% 75%, 10% 25%);
+  box-shadow:0 0 12px rgba(255,211,61,.65);
+}
+.ic-loadout{
+  position:relative;z-index:1;
+  display:flex;gap:6px;flex-wrap:wrap;justify-content:center;margin-top:4px;
+}
+.ic-slot{
+  width:34px;height:34px;border-radius:10px;
+  background:rgba(255,255,255,.04);border:1px solid rgba(255,255,255,.08);
+  display:flex;align-items:center;justify-content:center;
+  color:var(--text-3);font-size:16px;
+}
+.ic-slot.equipped{
+  background:color-mix(in srgb,var(--accent) 18%, transparent);
+  border-color:color-mix(in srgb,var(--accent) 60%, transparent);
+}
+.ic-cta{
+  position:relative;z-index:1;
+  display:inline-flex;align-items:center;gap:6px;
+  padding:9px 14px;border-radius:99px;cursor:pointer;
+  background:rgba(255,255,255,.04);border:1px solid rgba(255,255,255,.1);
+  color:var(--text-2);font-family:var(--font);font-size:10px;font-weight:800;letter-spacing:1.4px;text-transform:uppercase;
+  transition:background .2s,color .2s,border-color .2s;
+  margin-top:6px;
+}
+.ic-cta:hover{background:rgba(255,255,255,.08);color:var(--text-1);border-color:rgba(255,255,255,.18)}
+
+/* ───────────── FEATURED MOMENT — spotlight hero ───────────── */
+.featured{
+  position:relative;overflow:hidden;
+  border-radius:24px;
+  min-height:280px;
+  background:
+    linear-gradient(115deg, rgba(0,0,0,.7) 0%, rgba(0,0,0,.35) 50%, rgba(0,0,0,.05) 100%),
+    radial-gradient(800px 400px at 100% 50%, rgba(255,211,61,.25) 0%, transparent 65%),
+    linear-gradient(135deg, #2a1d05 0%, #14110a 100%);
+  border:1px solid rgba(255,211,61,.22);
+  box-shadow:0 18px 50px rgba(0,0,0,.55), 0 0 60px rgba(255,211,61,.08);
+  display:grid;grid-template-columns:minmax(0,1.2fr) minmax(0,1fr);
+  isolation:isolate;
+}
+@media (max-width: 900px){.featured{grid-template-columns:1fr}}
+.featured::after{
+  content:'';position:absolute;inset:0;
+  background-image:
+    linear-gradient(rgba(255,211,61,.025) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(255,211,61,.025) 1px, transparent 1px);
+  background-size:32px 32px;
+  mask-image:radial-gradient(ellipse at 100% 50%, #000 30%, transparent 80%);
+  -webkit-mask-image:radial-gradient(ellipse at 100% 50%, #000 30%, transparent 80%);
+  z-index:0;pointer-events:none;
+}
+.featured-meta{
+  position:relative;z-index:1;
+  padding:32px 36px;display:flex;flex-direction:column;justify-content:center;gap:14px;
+}
+.featured-eyebrow{
+  display:inline-flex;align-items:center;gap:7px;
+  font-size:10px;font-weight:900;letter-spacing:2.4px;text-transform:uppercase;
+  color:#ffd33d;width:fit-content;
+  padding:4px 12px;border-radius:99px;
+  background:rgba(255,211,61,.14);border:1px solid rgba(255,211,61,.4);
+}
+.featured-title{
+  font-family:'Bebas Neue',sans-serif;font-size:48px;letter-spacing:2px;line-height:1;color:#fff;
+  text-shadow:0 4px 18px rgba(0,0,0,.6);
+}
+.featured-desc{
+  font-size:13.5px;color:rgba(255,255,255,.82);line-height:1.5;max-width:50ch;
+}
+.featured-author{
+  display:flex;align-items:center;gap:12px;margin-top:6px;
+}
+.featured-author .av{
+  width:42px;height:42px;border-radius:50%;
+  background:linear-gradient(135deg,#fb7185,#9f1239);
+  color:#fff;display:flex;align-items:center;justify-content:center;
+  font-family:'Bebas Neue',sans-serif;font-size:18px;
+  border:2px solid rgba(0,0,0,.6);
+  box-shadow:0 0 0 2px rgba(255,211,61,.45);
+}
+.featured-author .nm{font-size:13px;font-weight:800;color:#fff}
+.featured-author .nm small{display:block;font-size:10.5px;color:rgba(255,211,61,.7);font-weight:600;margin-top:2px;letter-spacing:.3px}
+.featured-stats{
+  display:flex;gap:18px;margin-top:6px;flex-wrap:wrap;
+}
+.featured-stat{display:flex;flex-direction:column;gap:2px}
+.featured-stat .n{
+  font-family:'Bebas Neue',sans-serif;font-size:24px;letter-spacing:.8px;line-height:1;
+  background:linear-gradient(135deg, #fff3a8, #FFD700 50%, #b8860b);
+  -webkit-background-clip:text;background-clip:text;-webkit-text-fill-color:transparent;
+}
+.featured-stat .l{font-size:9px;font-weight:900;letter-spacing:1.3px;text-transform:uppercase;color:rgba(255,211,61,.65);margin-top:4px}
+.featured-actions{display:flex;gap:8px;margin-top:8px;flex-wrap:wrap}
+.featured-cta{
+  display:inline-flex;align-items:center;gap:7px;
+  padding:11px 18px;border-radius:99px;cursor:pointer;border:none;
+  font-family:var(--font);font-size:11px;font-weight:900;letter-spacing:1.4px;text-transform:uppercase;color:#1a0e00;
+  background:linear-gradient(135deg, #fff3a8, #FFD700 40%, #b8860b);
+  box-shadow:0 1px 0 rgba(255,255,255,.5) inset, 0 8px 22px rgba(255,211,61,.4);
+  transition:transform .2s, filter .2s;
+}
+.featured-cta:hover{transform:translateY(-1px);filter:brightness(1.06)}
+.featured-cta.ghost{
+  background:rgba(0,0,0,.45);backdrop-filter:blur(10px);
+  border:1px solid rgba(255,211,61,.35);color:#ffd33d;
+  box-shadow:none;
+}
+.featured-cta.ghost:hover{background:rgba(255,211,61,.1)}
+
+.featured-media{
+  position:relative;overflow:hidden;
+  display:flex;align-items:center;justify-content:center;
+  min-height:280px;
+}
+.featured-media::before{
+  /* "Polaroid" — the moment visualized as a tilted, glowing card */
+  content:'';position:absolute;inset:0;
+  background:
+    radial-gradient(circle at 50% 50%, rgba(255,211,61,.25) 0%, transparent 60%);
+  z-index:0;
+}
+.featured-polaroid{
+  position:relative;z-index:1;
+  width:220px;height:220px;border-radius:18px;
+  background:linear-gradient(135deg, #4d1b00 0%, #1c0a00 100%);
+  border:3px solid #FFD700;
+  display:flex;align-items:center;justify-content:center;
+  transform:rotate(-4deg);
+  box-shadow:
+    0 0 0 1px rgba(0,0,0,.8) inset,
+    0 18px 60px rgba(0,0,0,.7),
+    0 0 80px rgba(255,211,61,.25);
+  font-size:96px;
+}
+.featured-polaroid::after{
+  content:'';position:absolute;inset:0;border-radius:14px;
+  background:linear-gradient(115deg, rgba(255,255,255,.18) 0%, transparent 30%);
+  pointer-events:none;
+}
+.featured-spark{
+  position:absolute;color:#FFD700;font-size:18px;opacity:0;
+  animation:sparkle 3.6s ease-in-out infinite;
+}
+@keyframes sparkle{
+  0%,100%{opacity:0;transform:scale(.4)}
+  50%{opacity:1;transform:scale(1.2)}
+}
+.featured-spark.s1{top:18%;left:28%;animation-delay:0s}
+.featured-spark.s2{top:60%;right:24%;animation-delay:.7s}
+.featured-spark.s3{bottom:18%;left:38%;animation-delay:1.4s;color:#fff3a8}
+.featured-spark.s4{top:30%;right:38%;animation-delay:2.1s;color:#fff}
+
+/* ───────────── QUICK-POST COMPOSER ───────────── */
+.composer{
+  position:relative;overflow:hidden;
+  border-radius:20px;
+  padding:16px 18px;
+  background:linear-gradient(180deg, rgba(30,32,42,.85), rgba(15,17,25,.92));
+  border:1px solid rgba(255,255,255,.07);
+  box-shadow:0 12px 30px rgba(0,0,0,.4);
+  display:flex;align-items:center;gap:14px;
+  isolation:isolate;
+}
+.composer::before{
+  content:'';position:absolute;inset:0;
+  background:radial-gradient(500px 200px at 0% 50%, color-mix(in srgb,var(--accent) 14%, transparent) 0%, transparent 60%);
+  z-index:0;pointer-events:none;
+}
+.composer > *{position:relative;z-index:1}
+.composer-av{
+  width:42px;height:42px;border-radius:50%;flex-shrink:0;
+  background:linear-gradient(135deg,#c084fc,#7c3aed);
+  display:flex;align-items:center;justify-content:center;
+  color:#fff;font-family:'Bebas Neue',sans-serif;font-size:18px;letter-spacing:.5px;
+  border:2px solid rgba(0,0,0,.7);
+  box-shadow:0 0 0 2px color-mix(in srgb,var(--accent) 45%, transparent);
+}
+.composer-input{
+  flex:1;padding:10px 14px;border-radius:99px;
+  background:rgba(0,0,0,.4);border:1px solid rgba(255,255,255,.08);
+  color:#fff;font-family:var(--font);font-size:13px;outline:none;min-width:0;
+  transition:border-color .2s, box-shadow .2s, background .2s;
+}
+.composer-input::placeholder{color:var(--text-3)}
+.composer-input:focus{
+  border-color:color-mix(in srgb,var(--accent) 55%, transparent);
+  background:rgba(0,0,0,.55);
+  box-shadow:0 0 0 3px color-mix(in srgb,var(--accent) 22%, transparent);
+}
+.composer-actions{display:flex;gap:6px;flex-shrink:0}
+.composer-tool{
+  width:36px;height:36px;border-radius:50%;cursor:pointer;
+  background:rgba(255,255,255,.04);border:1px solid rgba(255,255,255,.08);
+  color:var(--text-3);display:flex;align-items:center;justify-content:center;
+  transition:background .2s, color .2s, border-color .2s;
+}
+.composer-tool:hover{background:rgba(255,255,255,.08);color:var(--text-1);border-color:rgba(255,255,255,.18)}
+.composer-tool.accent:hover{
+  background:color-mix(in srgb,var(--accent) 22%, transparent);
+  color:color-mix(in srgb,var(--accent) 95%, white);
+  border-color:color-mix(in srgb,var(--accent) 55%, transparent);
+}
+.composer-post{
+  padding:9px 16px;border-radius:99px;cursor:pointer;border:none;
+  font-family:var(--font);font-size:10.5px;font-weight:900;letter-spacing:1.4px;text-transform:uppercase;color:#fff;
+  background:linear-gradient(135deg,var(--accent),color-mix(in srgb,var(--accent) 55%,#000));
+  box-shadow:0 4px 14px color-mix(in srgb,var(--accent) 40%, transparent);
+  transition:transform .2s, filter .2s;
+  display:inline-flex;align-items:center;gap:6px;
+}
+.composer-post:hover{transform:translateY(-1px);filter:brightness(1.12)}
+
+.composer-channel{
+  display:inline-flex;align-items:center;gap:6px;padding:6px 11px;
+  border-radius:99px;background:rgba(255,255,255,.04);border:1px solid rgba(255,255,255,.08);
+  color:var(--text-2);font-size:10.5px;font-weight:700;cursor:pointer;
+  transition:background .2s, color .2s;
+}
+.composer-channel:hover{background:rgba(255,255,255,.08);color:var(--text-1)}
+.composer-channel svg{width:11px;height:11px}
+
+/* ───────────── HALL OF FAME RIBBON ───────────── */
+.hof-ribbon{
+  position:relative;overflow:hidden;
+  border-radius:22px;
+  background:
+    radial-gradient(800px 240px at 0% 50%, rgba(255,211,61,.15) 0%, transparent 60%),
+    linear-gradient(180deg, rgba(20,16,8,.95), rgba(10,7,2,.95));
+  border:1px solid rgba(255,211,61,.18);
+  box-shadow:0 16px 36px rgba(0,0,0,.45);
+  padding:20px 24px;
+  display:flex;flex-direction:column;gap:14px;
+  isolation:isolate;
+}
+.hof-ribbon::after{
+  content:'';position:absolute;inset:0;
+  background:
+    radial-gradient(circle at 100% 100%, rgba(255,211,61,.1) 0%, transparent 50%);
+  z-index:0;pointer-events:none;
+}
+.hof-head{display:flex;align-items:center;justify-content:space-between;position:relative;z-index:1;gap:14px;flex-wrap:wrap}
+.hof-title-wrap{display:flex;align-items:center;gap:14px}
+.hof-crown{
+  width:50px;height:36px;flex-shrink:0;
+  filter:drop-shadow(0 4px 12px rgba(255,211,61,.5));
+}
+.hof-title{
+  font-family:'Bebas Neue',sans-serif;font-size:28px;letter-spacing:3px;line-height:1;
+  background:linear-gradient(135deg, #fff3a8 0%, #FFD700 40%, #b8860b 80%);
+  -webkit-background-clip:text;background-clip:text;-webkit-text-fill-color:transparent;
+}
+.hof-sub{font-size:11px;color:rgba(255,211,61,.7);margin-top:3px;letter-spacing:.4px}
+.hof-cta{
+  display:inline-flex;align-items:center;gap:6px;
+  padding:9px 16px;border-radius:99px;cursor:pointer;
+  background:linear-gradient(135deg, rgba(255,211,61,.15), rgba(184,134,11,.1));
+  border:1px solid rgba(255,211,61,.4);color:#ffd33d;
+  font-family:var(--font);font-size:10.5px;font-weight:900;letter-spacing:1.4px;text-transform:uppercase;
+  transition:background .2s,border-color .2s,transform .2s;
+}
+.hof-cta:hover{background:linear-gradient(135deg, rgba(255,211,61,.25), rgba(184,134,11,.18));transform:translateY(-1px)}
+
+.hof-track{
+  position:relative;z-index:1;
+  display:flex;gap:14px;
+  overflow-x:auto;
+  padding:6px 4px 12px;
+  scrollbar-width:thin;scrollbar-color:rgba(255,211,61,.3) transparent;
+}
+.hof-track::-webkit-scrollbar{height:7px}
+.hof-track::-webkit-scrollbar-thumb{background:rgba(255,211,61,.3);border-radius:4px}
+.hof-track::-webkit-scrollbar-track{background:transparent}
+
+.hof-card{
+  flex-shrink:0;width:260px;
+  border-radius:16px;overflow:hidden;
+  background:linear-gradient(180deg, rgba(40,30,10,.85), rgba(20,15,5,.85));
+  border:1px solid rgba(255,211,61,.2);
+  display:flex;flex-direction:column;
+  position:relative;cursor:pointer;
+  transition:transform .25s var(--ease-out-expo), border-color .2s, box-shadow .2s;
+}
+.hof-card:hover{
+  transform:translateY(-4px);
+  border-color:rgba(255,211,61,.55);
+  box-shadow:0 16px 36px rgba(0,0,0,.6), 0 0 24px rgba(255,211,61,.18);
+}
+.hof-card-media{
+  height:120px;position:relative;overflow:hidden;
+  background:linear-gradient(135deg, #2a1d0a, #15100a);
+  display:flex;align-items:center;justify-content:center;
+}
+.hof-card-media .hof-emoji{
+  font-size:50px;
+  filter:drop-shadow(0 4px 14px rgba(0,0,0,.6));
+}
+.hof-card-media::after{
+  content:'';position:absolute;inset:0;
+  background:linear-gradient(180deg, transparent 50%, rgba(0,0,0,.6) 100%);
+}
+.hof-tag{
+  position:absolute;top:10px;left:10px;
+  display:inline-flex;align-items:center;gap:5px;
+  padding:3px 8px;border-radius:99px;
+  font-size:9px;font-weight:900;letter-spacing:1.3px;text-transform:uppercase;
+  background:rgba(0,0,0,.65);backdrop-filter:blur(6px);
+  border:1px solid rgba(255,255,255,.12);color:#fff;z-index:1;
+}
+.hof-tag.viral{color:#ff6b6b;border-color:rgba(255,107,107,.5)}
+.hof-tag.milestone{color:#a78bfa;border-color:rgba(167,139,250,.5)}
+.hof-tag.epic{color:#ffd33d;border-color:rgba(255,211,61,.5)}
+.hof-card-body{padding:12px 14px 14px;display:flex;flex-direction:column;gap:6px}
+.hof-card-title{font-size:13px;font-weight:800;color:#fff;line-height:1.3}
+.hof-card-meta{font-size:10.5px;color:rgba(255,211,61,.65);display:flex;align-items:center;gap:8px}
+.hof-card-meta .dot{width:3px;height:3px;background:currentColor;border-radius:50%}
+
+/* ───────────── ROW: Tournament theatre + Member constellation ───────────── */
+.row-mid{
+  display:grid;grid-template-columns:1.4fr 1fr;gap:22px;
+}
+@media (max-width: 1180px){.row-mid{grid-template-columns:1fr}}
+
+/* Tournament Theatre */
+.theatre{
+  position:relative;overflow:hidden;
+  border-radius:22px;
+  background:
+    radial-gradient(800px 280px at 100% 50%, color-mix(in srgb,var(--accent) 18%, transparent) 0%, transparent 60%),
+    linear-gradient(135deg, rgba(20,22,32,.95), rgba(10,12,20,.98));
+  border:1px solid rgba(255,255,255,.07);
+  box-shadow:0 16px 40px rgba(0,0,0,.5);
+  padding:24px 26px 22px;
+  display:flex;flex-direction:column;gap:18px;
+  isolation:isolate;
+}
+.theatre::after{
+  content:'';position:absolute;inset:0;
+  background-image:
+    linear-gradient(rgba(255,255,255,.02) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(255,255,255,.02) 1px, transparent 1px);
+  background-size:32px 32px;
+  mask-image:radial-gradient(ellipse 80% 60% at 80% 50%, #000 30%, transparent 80%);
+  -webkit-mask-image:radial-gradient(ellipse 80% 60% at 80% 50%, #000 30%, transparent 80%);
+  z-index:0;pointer-events:none;
+}
+.theatre-head{position:relative;z-index:1;display:flex;align-items:center;justify-content:space-between;gap:14px;flex-wrap:wrap}
+.theatre-eyebrow{
+  display:inline-flex;align-items:center;gap:7px;
+  font-size:9.5px;font-weight:900;letter-spacing:2px;text-transform:uppercase;
+  color:color-mix(in srgb,var(--accent) 90%, white);
+  padding:3px 10px;border-radius:99px;
+  background:color-mix(in srgb,var(--accent) 14%, transparent);
+  border:1px solid color-mix(in srgb,var(--accent) 36%, transparent);
+}
+.theatre-title{font-family:'Bebas Neue',sans-serif;font-size:30px;letter-spacing:2px;color:#fff;line-height:1;margin-top:8px}
+.theatre-prize{
+  display:flex;flex-direction:column;align-items:end;gap:2px;
+}
+.theatre-prize .lbl{font-size:9px;font-weight:900;letter-spacing:1.5px;text-transform:uppercase;color:rgba(255,211,61,.7)}
+.theatre-prize .amt{
+  font-family:'Bebas Neue',sans-serif;font-size:34px;letter-spacing:1.5px;line-height:1;
+  background:linear-gradient(135deg, #fff3a8, #FFD700 50%, #b8860b);
+  -webkit-background-clip:text;background-clip:text;-webkit-text-fill-color:transparent;
+}
+
+/* Bracket peek — 4 nodes connecting to 2 to 1 */
+.bracket{
+  position:relative;z-index:1;
+  display:grid;grid-template-columns:1fr 1fr 1fr;gap:14px;
+  padding:14px;border-radius:16px;
+  background:rgba(0,0,0,.35);
+  border:1px solid rgba(255,255,255,.05);
+}
+.bracket-col{display:flex;flex-direction:column;gap:10px;justify-content:center}
+.bracket-match{
+  background:rgba(255,255,255,.03);border:1px solid rgba(255,255,255,.06);
+  border-radius:10px;padding:8px 10px;
+  display:flex;flex-direction:column;gap:4px;
+  position:relative;
+}
+.bracket-match.live{
+  border-color:color-mix(in srgb,var(--accent) 50%, transparent);
+  background:color-mix(in srgb,var(--accent) 10%, rgba(0,0,0,.4));
+  box-shadow:0 0 14px color-mix(in srgb,var(--accent) 25%, transparent);
+}
+.bracket-team{
+  display:flex;align-items:center;justify-content:space-between;gap:8px;
+  font-size:11.5px;font-weight:700;color:var(--text-2);
+}
+.bracket-team .av{
+  width:18px;height:18px;border-radius:5px;
+  background:linear-gradient(135deg,#3b82f6,#1d4ed8);
+  display:flex;align-items:center;justify-content:center;
+  color:#fff;font-size:9px;font-weight:800;
+}
+.bracket-team .name{flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.bracket-team .score{
+  font-family:'Bebas Neue',sans-serif;font-size:14px;letter-spacing:.5px;color:#fff;
+}
+.bracket-team.winner{color:#fff}
+.bracket-team.winner .score{color:color-mix(in srgb,var(--accent) 90%, white)}
+.bracket-live-chip{
+  position:absolute;right:-6px;top:-6px;
+  font-size:8px;font-weight:900;letter-spacing:1.2px;
+  padding:2px 6px;border-radius:99px;
+  background:#ed4245;color:#fff;
+  box-shadow:0 0 12px rgba(237,66,69,.5);
+}
+.bracket-trophy{
+  display:flex;align-items:center;justify-content:center;
+  width:100%;height:100%;font-size:34px;
+  filter:drop-shadow(0 4px 14px rgba(255,211,61,.5));
+}
+
+.theatre-foot{position:relative;z-index:1;display:flex;align-items:center;justify-content:space-between;gap:14px;flex-wrap:wrap}
+.theatre-timer{display:flex;flex-direction:column;gap:2px}
+.theatre-timer .lbl{font-size:9px;font-weight:900;letter-spacing:1.4px;text-transform:uppercase;color:var(--text-3)}
+.theatre-timer .val{font-family:'Bebas Neue',sans-serif;font-size:22px;letter-spacing:1px;color:#fff;line-height:1}
+.theatre-actions{display:flex;gap:8px;flex-wrap:wrap}
+.theatre-btn{
+  display:inline-flex;align-items:center;gap:6px;
+  padding:10px 16px;border-radius:99px;cursor:pointer;
+  font-family:var(--font);font-size:10.5px;font-weight:900;letter-spacing:1.4px;text-transform:uppercase;color:#fff;
+  background:linear-gradient(135deg,var(--accent),color-mix(in srgb,var(--accent) 55%,#000));
+  border:none;
+  box-shadow:0 1px 0 rgba(255,255,255,.2) inset, 0 8px 22px color-mix(in srgb,var(--accent) 40%, transparent);
+  transition:transform .2s var(--ease-out-expo),filter .2s;
+}
+.theatre-btn:hover{transform:translateY(-2px);filter:brightness(1.12)}
+.theatre-btn.ghost{background:rgba(255,255,255,.04);color:var(--text-2);border:1px solid rgba(255,255,255,.1);box-shadow:none}
+.theatre-btn.ghost:hover{background:rgba(255,255,255,.08);color:var(--text-1)}
+
+/* ─────────── MEMBER CONSTELLATION ─────────── */
+.constellation{
+  position:relative;overflow:hidden;
+  border-radius:22px;
+  padding:22px 24px;
+  background:linear-gradient(180deg, rgba(20,22,32,.9), rgba(10,12,20,.95));
+  border:1px solid rgba(255,255,255,.07);
+  box-shadow:0 16px 40px rgba(0,0,0,.5);
+  display:flex;flex-direction:column;gap:16px;
+}
+.const-head{display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap}
+.const-title-wrap{display:flex;flex-direction:column;gap:4px}
+.const-eyebrow{
+  display:inline-flex;align-items:center;gap:7px;
+  font-size:9.5px;font-weight:900;letter-spacing:2px;text-transform:uppercase;color:var(--text-3);
+}
+.const-title{font-family:'Bebas Neue',sans-serif;font-size:26px;letter-spacing:1.8px;color:#fff;line-height:1}
+.const-count{
+  display:flex;flex-direction:column;align-items:end;gap:1px;
+}
+.const-count .n{font-family:'Bebas Neue',sans-serif;font-size:24px;letter-spacing:1px;line-height:1;color:#fff}
+.const-count .l{font-size:9px;font-weight:800;letter-spacing:1.2px;text-transform:uppercase;color:var(--text-3);margin-top:3px}
+
+.const-group{display:flex;flex-direction:column;gap:8px}
+.const-group-label{
+  font-size:9.5px;font-weight:900;letter-spacing:1.5px;text-transform:uppercase;color:var(--text-3);
+  display:flex;align-items:center;gap:8px;
+}
+.const-group-label .dash{flex:1;height:1px;background:rgba(255,255,255,.05)}
+.const-group-label .n{color:color-mix(in srgb,var(--accent) 90%, white)}
+.const-orbs{display:flex;flex-wrap:wrap;gap:8px;align-items:center}
+.const-orb{
+  position:relative;
+  width:48px;height:48px;border-radius:50%;
+  background:linear-gradient(135deg,#3b82f6,#1d4ed8);
+  display:flex;align-items:center;justify-content:center;
+  color:#fff;font-weight:800;font-size:14px;
+  border:2px solid rgba(0,0,0,.6);
+  cursor:pointer;
+  transition:transform .25s var(--ease-out-expo);
+}
+.const-orb:hover{transform:translateY(-3px) scale(1.08);z-index:2}
+.const-orb .dot{
+  position:absolute;right:0;bottom:0;
+  width:14px;height:14px;border-radius:50%;
+  background:#23a55a;border:2.5px solid rgba(10,12,20,1);
+}
+.const-orb.away .dot{background:#f0b232}
+.const-orb.dnd .dot{background:#ed4245}
+.const-orb.invisible .dot{background:#80848e}
+.const-orb.in-voice::after{
+  content:'';position:absolute;inset:-4px;border-radius:50%;
+  border:2px solid color-mix(in srgb,var(--accent) 70%, transparent);
+  animation:pulse-ring 2.4s ease-out infinite;
+}
+@keyframes pulse-ring{
+  0%  {transform:scale(1);opacity:1}
+  100%{transform:scale(1.4);opacity:0}
+}
+.const-orb .tt{
+  position:absolute;bottom:calc(100% + 8px);left:50%;transform:translateX(-50%);
+  background:rgba(0,0,0,.92);backdrop-filter:blur(8px);
+  border:1px solid rgba(255,255,255,.08);
+  border-radius:10px;padding:8px 10px;
+  font-size:11px;color:#fff;white-space:nowrap;
+  opacity:0;pointer-events:none;transition:opacity .15s;
+  z-index:5;
+}
+.const-orb:hover .tt{opacity:1}
+
+/* ───────────── LOUNGES (channels reimagined as activity cards) ───────────── */
+.lounges{
+  display:flex;flex-direction:column;gap:14px;
+}
+.lounges-head{display:flex;align-items:center;justify-content:space-between;gap:14px;flex-wrap:wrap}
+.lounges-title-wrap{display:flex;flex-direction:column;gap:4px}
+.lounges-eyebrow{
+  display:inline-flex;align-items:center;gap:7px;
+  font-size:9.5px;font-weight:900;letter-spacing:2px;text-transform:uppercase;color:var(--text-3);
+}
+.lounges-title{font-family:'Bebas Neue',sans-serif;font-size:28px;letter-spacing:2px;color:#fff;line-height:1}
+.lounges-filters{display:flex;gap:6px}
+.lounge-filter{
+  padding:7px 14px;border-radius:99px;cursor:pointer;
+  background:rgba(255,255,255,.04);border:1px solid rgba(255,255,255,.08);
+  color:var(--text-2);font-size:10.5px;font-weight:800;letter-spacing:1.2px;text-transform:uppercase;
+  transition:background .2s,color .2s,border-color .2s;
+}
+.lounge-filter:hover{background:rgba(255,255,255,.08);color:var(--text-1)}
+.lounge-filter.active{
+  background:color-mix(in srgb,var(--accent) 18%, transparent);
+  border-color:color-mix(in srgb,var(--accent) 55%, transparent);
+  color:color-mix(in srgb,var(--accent) 95%, white);
+}
+
+.lounge-grid{
+  display:grid;grid-template-columns:repeat(auto-fit, minmax(280px, 1fr));gap:14px;
+}
+.lounge-card{
+  position:relative;overflow:hidden;
+  border-radius:18px;padding:18px 18px 16px;cursor:pointer;
+  background:linear-gradient(180deg, rgba(30,32,42,.85), rgba(15,17,25,.9));
+  border:1px solid rgba(255,255,255,.07);
+  display:flex;flex-direction:column;gap:12px;
+  transition:transform .25s var(--ease-out-expo), border-color .2s, box-shadow .2s, background .2s;
+  isolation:isolate;
+}
+.lounge-card::before{
+  content:'';position:absolute;inset:0;
+  background:radial-gradient(400px 200px at 100% 0%, color-mix(in srgb,var(--accent) 14%, transparent) 0%, transparent 60%);
+  opacity:0;transition:opacity .25s;z-index:0;pointer-events:none;
+}
+.lounge-card:hover{
+  transform:translateY(-3px);
+  border-color:color-mix(in srgb,var(--accent) 40%, transparent);
+  box-shadow:0 16px 36px rgba(0,0,0,.5), 0 0 24px color-mix(in srgb,var(--accent) 15%, transparent);
+}
+.lounge-card:hover::before{opacity:1}
+.lounge-card.voice.active{
+  border-color:color-mix(in srgb,var(--accent) 60%, transparent);
+  background:linear-gradient(180deg, color-mix(in srgb,var(--accent) 12%, rgba(30,32,42,.85)), rgba(15,17,25,.9));
+  box-shadow:0 0 24px color-mix(in srgb,var(--accent) 25%, transparent);
+}
+
+.lounge-top{position:relative;z-index:1;display:flex;align-items:center;justify-content:space-between;gap:10px}
+.lounge-ico-wrap{display:flex;align-items:center;gap:10px;min-width:0;flex:1}
+.lounge-ico{
+  width:38px;height:38px;border-radius:11px;flex-shrink:0;
+  background:rgba(255,255,255,.05);border:1px solid rgba(255,255,255,.08);
+  display:flex;align-items:center;justify-content:center;
+  color:var(--text-2);
+}
+.lounge-ico svg{width:18px;height:18px}
+.lounge-card.voice .lounge-ico{
+  background:color-mix(in srgb,var(--accent) 18%, transparent);
+  border-color:color-mix(in srgb,var(--accent) 45%, transparent);
+  color:color-mix(in srgb,var(--accent) 95%, white);
+}
+.lounge-name{font-size:14px;font-weight:800;color:var(--text-1);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.lounge-meta{font-size:11px;color:var(--text-3);margin-top:2px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.lounge-live{
+  display:inline-flex;align-items:center;gap:5px;
+  padding:3px 8px;border-radius:99px;
+  background:color-mix(in srgb,var(--accent) 16%, transparent);
+  border:1px solid color-mix(in srgb,var(--accent) 45%, transparent);
+  color:color-mix(in srgb,var(--accent) 95%, white);
+  font-size:9px;font-weight:900;letter-spacing:1.4px;text-transform:uppercase;
+}
+.lounge-live .dot{width:6px;height:6px;border-radius:50%;background:currentColor;box-shadow:0 0 10px currentColor;animation:pulse-live 1.4s ease-in-out infinite}
+
+.lounge-body{position:relative;z-index:1;display:flex;flex-direction:column;gap:10px}
+.lounge-presence{
+  display:flex;align-items:center;gap:8px;
+  font-size:11px;color:var(--text-2);
+}
+.lounge-mini-orbs{display:flex}
+.lounge-mini-orbs .o{
+  width:22px;height:22px;border-radius:50%;
+  background:linear-gradient(135deg,#3b82f6,#1d4ed8);
+  border:2px solid rgba(0,0,0,.7);
+  color:#fff;font-size:9px;font-weight:800;
+  display:flex;align-items:center;justify-content:center;
+  margin-left:-6px;flex-shrink:0;
+}
+.lounge-mini-orbs .o:first-child{margin-left:0}
+.lounge-mini-orbs .more{
+  width:22px;height:22px;border-radius:50%;
+  background:rgba(255,255,255,.05);border:1px dashed rgba(255,255,255,.18);
+  font-size:9px;color:var(--text-3);font-weight:800;
+  display:flex;align-items:center;justify-content:center;margin-left:-6px;
+}
+.lounge-transcript{
+  font-size:11.5px;color:var(--text-3);font-style:italic;line-height:1.4;
+  border-left:2px solid color-mix(in srgb,var(--accent) 50%, transparent);
+  padding:2px 0 2px 10px;
+  display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;
+}
+.lounge-transcript b{color:var(--text-2);font-weight:700;font-style:normal}
+
+.lounge-foot{position:relative;z-index:1;display:flex;align-items:center;justify-content:space-between;gap:8px}
+.lounge-cta{
+  padding:7px 14px;border-radius:99px;cursor:pointer;border:none;
+  font-family:var(--font);font-size:10px;font-weight:900;letter-spacing:1.3px;text-transform:uppercase;color:#fff;
+  background:linear-gradient(135deg,var(--accent),color-mix(in srgb,var(--accent) 55%,#000));
+  box-shadow:0 4px 14px color-mix(in srgb,var(--accent) 40%, transparent);
+  transition:transform .2s;
+}
+.lounge-cta:hover{transform:translateY(-1px)}
+.lounge-cta.ghost{background:rgba(255,255,255,.05);border:1px solid rgba(255,255,255,.08);box-shadow:none;color:var(--text-2)}
+.lounge-cta.ghost:hover{background:rgba(255,255,255,.1);color:var(--text-1)}
+.lounge-stat{font-size:10.5px;color:var(--text-3);font-weight:700}
+
+/* ───────────── CHRONICLE — recent activity feed ───────────── */
+.chronicle{
+  display:grid;grid-template-columns:1.4fr 1fr;gap:22px;
+}
+@media (max-width: 1180px){.chronicle{grid-template-columns:1fr}}
+
+.chronicle-card{
+  border-radius:22px;
+  background:linear-gradient(180deg, rgba(20,22,32,.9), rgba(10,12,20,.95));
+  border:1px solid rgba(255,255,255,.07);
+  padding:22px 24px;
+  display:flex;flex-direction:column;gap:14px;
+  box-shadow:0 14px 36px rgba(0,0,0,.45);
+}
+.chron-head{display:flex;align-items:center;justify-content:space-between;gap:10px}
+.chron-title-wrap{display:flex;flex-direction:column;gap:4px}
+.chron-eyebrow{font-size:9.5px;font-weight:900;letter-spacing:2px;text-transform:uppercase;color:var(--text-3)}
+.chron-title{font-family:'Bebas Neue',sans-serif;font-size:26px;letter-spacing:1.8px;color:#fff;line-height:1}
+.chron-link{
+  font-size:10.5px;font-weight:800;letter-spacing:1.2px;text-transform:uppercase;
+  color:color-mix(in srgb,var(--accent) 85%, white);cursor:pointer;
+}
+.chron-link:hover{color:#fff}
+
+.chron-list{display:flex;flex-direction:column;gap:10px}
+.chron-row{
+  display:flex;align-items:start;gap:12px;padding:10px;
+  border-radius:12px;border:1px solid transparent;
+  transition:background .2s, border-color .2s;
+}
+.chron-row:hover{background:rgba(255,255,255,.025);border-color:rgba(255,255,255,.05)}
+.chron-icon{
+  width:34px;height:34px;border-radius:10px;flex-shrink:0;
+  display:flex;align-items:center;justify-content:center;font-size:16px;
+}
+.chron-icon.join{background:rgba(35,165,90,.15);color:#23a55a}
+.chron-icon.message{background:color-mix(in srgb,var(--accent) 14%, transparent);color:color-mix(in srgb,var(--accent) 90%, white)}
+.chron-icon.tournament{background:rgba(255,211,61,.15);color:#ffd33d}
+.chron-icon.hof{background:rgba(255,211,61,.15);color:#ffd33d}
+.chron-icon.event{background:rgba(88,217,255,.15);color:#67e8f9}
+.chron-body{flex:1;min-width:0}
+.chron-line{font-size:12.5px;color:var(--text-1);line-height:1.4}
+.chron-line b{font-weight:800}
+.chron-line .who{color:color-mix(in srgb,var(--accent) 90%, white);font-weight:800}
+.chron-time{font-size:10.5px;color:var(--text-3);margin-top:3px}
+
+/* ── Calendar/Events column ── */
+.next-events{display:flex;flex-direction:column;gap:10px}
+.next-event-row{
+  display:flex;gap:14px;align-items:center;padding:12px 14px;
+  border-radius:14px;
+  background:rgba(255,255,255,.025);border:1px solid rgba(255,255,255,.06);
+  transition:background .2s, border-color .2s, transform .2s;
+  cursor:pointer;
+}
+.next-event-row:hover{background:rgba(255,255,255,.05);border-color:rgba(255,255,255,.12);transform:translateY(-1px)}
+.ne-date{
+  display:flex;flex-direction:column;align-items:center;justify-content:center;
+  width:56px;height:56px;border-radius:14px;flex-shrink:0;
+  background:color-mix(in srgb,var(--accent) 16%, transparent);
+  border:1px solid color-mix(in srgb,var(--accent) 40%, transparent);
+}
+.ne-date .m{font-size:9px;font-weight:900;letter-spacing:1.2px;text-transform:uppercase;color:color-mix(in srgb,var(--accent) 90%, white)}
+.ne-date .d{font-family:'Bebas Neue',sans-serif;font-size:24px;line-height:1;color:#fff;letter-spacing:.5px}
+.ne-meta{flex:1;min-width:0}
+.ne-title{font-size:13px;font-weight:800;color:var(--text-1);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.ne-time{font-size:11px;color:var(--text-3);margin-top:2px}
+.ne-rsvp{
+  font-size:10px;font-weight:900;letter-spacing:1.3px;text-transform:uppercase;
+  padding:5px 10px;border-radius:99px;
+  background:rgba(35,165,90,.18);color:#23a55a;
+  border:1px solid rgba(35,165,90,.4);
+}
+.ne-rsvp.maybe{background:rgba(240,178,50,.15);color:#f0b232;border-color:rgba(240,178,50,.4)}
+
+/* Theme picker — top right */
+.theme-bar{
+  position:fixed;top:14px;right:14px;z-index:50;
+  display:flex;align-items:center;gap:6px;
+  padding:8px 12px;border-radius:99px;
+  background:rgba(0,0,0,.55);backdrop-filter:blur(14px);
+  border:1px solid rgba(255,255,255,.08);
+}
+.theme-bar .lbl{font-size:9px;font-weight:900;letter-spacing:1.4px;text-transform:uppercase;color:var(--text-3);margin-right:4px}
+.theme-bar .tk{
+  width:22px;height:22px;border-radius:50%;cursor:pointer;
+  border:2px solid transparent;
+  transition:border-color .2s, transform .2s;
+}
+.theme-bar .tk:hover{transform:scale(1.12)}
+.theme-bar .tk.active{border-color:rgba(255,255,255,.7)}
+
+/* Scrollbar styling for all overflowing things */
+::-webkit-scrollbar{width:8px;height:8px}
+::-webkit-scrollbar-thumb{background:rgba(255,255,255,.08);border-radius:4px}
+::-webkit-scrollbar-thumb:hover{background:rgba(255,255,255,.16)}
+::-webkit-scrollbar-track{background:transparent}
+</style>
+</head>
+<body data-theme="">
+
+<!-- Ambient layers -->
+<div class="amb"></div>
+<div class="grid-texture"></div>
+
+<!-- Theme scrubber -->
+<div class="theme-bar">
+  <span class="lbl">Theme</span>
+  <div class="tk active" data-theme=""        style="background:#f9a8d4" title="Default (pink)"></div>
+  <div class="tk"        data-theme="midnight" style="background:#7c3aed" title="Midnight"></div>
+  <div class="tk"        data-theme="forest"   style="background:#16a34a" title="Forest"></div>
+  <div class="tk"        data-theme="ocean"    style="background:#0ea5e9" title="Ocean"></div>
+  <div class="tk"        data-theme="sunset"   style="background:#f97316" title="Sunset"></div>
+  <div class="tk"        data-theme="rose"     style="background:#e11d48" title="Rose"></div>
+</div>
+
+<div class="app">
+
+  <!-- Floating Crest — lobby identity + switcher trigger (top-center) -->
+  <div class="crest-wrap">
+    <div class="crest" id="crestBtn" onclick="document.getElementById('switcherOverlay').classList.add('open');this.classList.add('open')">
+      <div class="crest-emblem">TF</div>
+      <div class="crest-text">
+        <span class="crest-eyebrow">In Lobby</span>
+        <span class="crest-name">THE FORGE</span>
+      </div>
+      <svg class="crest-chev" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"/></svg>
+    </div>
+    <button class="coliseum-return" title="Return to Coliseum home" style="display:none" id="coliseumReturn">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M3 9.5L12 3l9 6.5"/><path d="M5 10v10h14V10"/></svg>
+      Coliseum
+    </button>
+  </div>
+
+  <!-- Floating Sigil — user identity + status (bottom-right) -->
+  <div class="sigil" title="Profile, status & settings">
+    <div class="sigil-av-wrap">
+      <div class="sigil-av">CN</div>
+      <div class="sigil-dot"></div>
+    </div>
+    <div class="sigil-text">
+      <div class="sigil-name">Connor</div>
+      <div class="sigil-status"><span class="sd"></span> Online · Iron Constellation</div>
+    </div>
+  </div>
+
+  <!-- Lobby switcher overlay -->
+  <div class="switcher" id="switcherOverlay">
+    <button class="switcher-close" onclick="document.getElementById('switcherOverlay').classList.remove('open');document.getElementById('crestBtn').classList.remove('open')">
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+    </button>
+    <div class="switcher-inner">
+      <div class="switcher-eyebrow">⊹ Your Lobbies</div>
+      <div class="switcher-title">Choose Your <span style="background:linear-gradient(135deg,var(--accent),color-mix(in srgb,var(--accent) 60%,white));-webkit-background-clip:text;background-clip:text;-webkit-text-fill-color:transparent">Coliseum</span></div>
+      <div class="switcher-search-wrap">
+        <span class="switcher-search-ico">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+        </span>
+        <input class="switcher-search" placeholder="Search lobbies, or jump by name…" />
+      </div>
+      <div class="switcher-grid">
+        <div class="switcher-card active">
+          <div class="em" style="background:linear-gradient(135deg,var(--accent),color-mix(in srgb,var(--accent) 40%,#000))">TF</div>
+          <div class="nm">The Forge</div>
+          <div class="mt"><span><b>12</b> in voice</span><span>·</span><span><b>36</b> online</span></div>
+          <div class="pulse-tag"><span class="d"></span> Live · Stage</div>
+        </div>
+        <div class="switcher-card">
+          <div class="em" style="background:linear-gradient(135deg,#22d3ee,#0c4a6e)">SL</div>
+          <div class="nm">Strategy Lab</div>
+          <div class="mt"><span><b>4</b> in voice</span><span>·</span><span><b>18</b> online</span></div>
+        </div>
+        <div class="switcher-card">
+          <div class="em" style="background:linear-gradient(135deg,#f472b6,#831843)">AD</div>
+          <div class="nm">Anime Den</div>
+          <div class="mt"><span><b>0</b> in voice</span><span>·</span><span><b>52</b> online</span></div>
+        </div>
+        <div class="switcher-card">
+          <div class="em" style="background:linear-gradient(135deg,#a855f7,#581c87)">PC</div>
+          <div class="nm">Pixel Cult</div>
+          <div class="mt"><span><b>2</b> in voice</span><span>·</span><span><b>21</b> online</span></div>
+          <div class="pulse-tag" style="background:rgba(255,211,61,.16);color:#ffd33d;border-color:rgba(255,211,61,.45)"><span class="d" style="background:#ffd33d;box-shadow:0 0 8px #ffd33d"></span> Tournament</div>
+        </div>
+        <div class="switcher-card">
+          <div class="em" style="background:linear-gradient(135deg,#4ade80,#15803d)">RN</div>
+          <div class="nm">Run Club</div>
+          <div class="mt"><span><b>0</b> in voice</span><span>·</span><span><b>7</b> online</span></div>
+        </div>
+        <div class="switcher-card">
+          <div class="em" style="background:linear-gradient(135deg,#fb923c,#9a3412)">WB</div>
+          <div class="nm">Workbench</div>
+          <div class="mt"><span><b>1</b> in voice</span><span>·</span><span><b>11</b> online</span></div>
+        </div>
+      </div>
+      <button class="switcher-add">
+        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+        Create or Join a Lobby
+      </button>
+    </div>
+  </div>
+
+  <!-- Main canvas -->
+  <main class="canvas">
+
+    <!-- Lobby identity strip -->
+    <section class="identity">
+      <div class="identity-inner">
+        <div class="ident-emblem">TF</div>
+        <div class="ident-meta">
+          <div class="ident-eyebrow"><span class="pulse"></span> In Session · Est. Mar 2024</div>
+          <h1 class="ident-name">The <span class="accent">Forge</span></h1>
+          <p class="ident-motto">A craftsman's circle for late-night strategy, raids, and the occasional unhinged karaoke night.</p>
+          <div class="ident-stats">
+            <div class="ident-stat"><div class="n">428</div><div class="l">Members</div></div>
+            <div class="ident-stat"><div class="n">36</div><div class="l">Online</div></div>
+            <div class="ident-stat"><div class="n">12</div><div class="l">In Voice</div></div>
+            <div class="ident-stat"><div class="n">7</div><div class="l">Tournaments</div></div>
+          </div>
+        </div>
+        <div class="ident-actions">
+          <button class="ident-btn">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
+            Calendar
+          </button>
+          <button class="ident-btn">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
+            Settings
+          </button>
+          <button class="ident-btn primary">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M16 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="8.5" cy="7" r="4"/><line x1="20" y1="8" x2="20" y2="14"/><line x1="23" y1="11" x2="17" y2="11"/></svg>
+            Invite
+          </button>
+        </div>
+      </div>
+    </section>
+
+    <!-- Stage + Identity pillar -->
+    <section class="row-hero">
+
+      <!-- THE STAGE -->
+      <div class="stage">
+        <div class="stage-head">
+          <div class="stage-title-wrap">
+            <span class="stage-eyebrow"><span class="live-dot"></span> Live · Main Stage</span>
+            <h2 class="stage-title">Late Night Raids</h2>
+            <div class="stage-sub">Hosted by Vera · Started 1h 24m ago</div>
+          </div>
+          <div class="stage-presence">
+            <div><b>3</b><span>Speaking</span></div>
+            <div><b>7</b><span>Listening</span></div>
+            <div><b>02:14</b><span>Duration</span></div>
+          </div>
+        </div>
+
+        <!-- Waveform underlay -->
+        <div class="waveform">
+          <!-- 60 bars -->
+          <div class="bar" style="animation-delay:-.20s"></div><div class="bar" style="animation-delay:-.50s"></div><div class="bar" style="animation-delay:-.10s"></div><div class="bar" style="animation-delay:-.70s"></div><div class="bar" style="animation-delay:-.30s"></div>
+          <div class="bar" style="animation-delay:-.60s"></div><div class="bar" style="animation-delay:-.40s"></div><div class="bar" style="animation-delay:-.80s"></div><div class="bar" style="animation-delay:-.15s"></div><div class="bar" style="animation-delay:-.55s"></div>
+          <div class="bar" style="animation-delay:-.25s"></div><div class="bar" style="animation-delay:-.65s"></div><div class="bar" style="animation-delay:-.35s"></div><div class="bar" style="animation-delay:-.75s"></div><div class="bar" style="animation-delay:-.05s"></div>
+          <div class="bar" style="animation-delay:-.45s"></div><div class="bar" style="animation-delay:-.85s"></div><div class="bar" style="animation-delay:-.95s"></div><div class="bar" style="animation-delay:-.12s"></div><div class="bar" style="animation-delay:-.42s"></div>
+          <div class="bar" style="animation-delay:-.72s"></div><div class="bar" style="animation-delay:-.22s"></div><div class="bar" style="animation-delay:-.62s"></div><div class="bar" style="animation-delay:-.92s"></div><div class="bar" style="animation-delay:-.32s"></div>
+          <div class="bar" style="animation-delay:-.82s"></div><div class="bar" style="animation-delay:-.18s"></div><div class="bar" style="animation-delay:-.48s"></div><div class="bar" style="animation-delay:-.78s"></div><div class="bar" style="animation-delay:-.28s"></div>
+          <div class="bar" style="animation-delay:-.58s"></div><div class="bar" style="animation-delay:-.88s"></div><div class="bar" style="animation-delay:-.08s"></div><div class="bar" style="animation-delay:-.38s"></div><div class="bar" style="animation-delay:-.68s"></div>
+          <div class="bar" style="animation-delay:-.98s"></div><div class="bar" style="animation-delay:-.14s"></div><div class="bar" style="animation-delay:-.44s"></div><div class="bar" style="animation-delay:-.74s"></div><div class="bar" style="animation-delay:-.24s"></div>
+          <div class="bar" style="animation-delay:-.54s"></div><div class="bar" style="animation-delay:-.84s"></div><div class="bar" style="animation-delay:-.16s"></div><div class="bar" style="animation-delay:-.46s"></div><div class="bar" style="animation-delay:-.76s"></div>
+        </div>
+
+        <!-- Speakers -->
+        <div class="stage-ring">
+          <div class="speaker">
+            <div class="speaker-avatar speaking" style="background:linear-gradient(135deg,#fb7185,#9f1239)">V
+              <div class="mic-state on">
+                <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"/><path d="M19 10v2a7 7 0 0 1-14 0v-2"/><line x1="12" y1="19" x2="12" y2="23"/><line x1="8" y1="23" x2="16" y2="23"/></svg>
+              </div>
+            </div>
+            <div class="speaker-name">Vera</div>
+            <div class="speaker-role">Host</div>
+          </div>
+          <div class="speaker">
+            <div class="speaker-avatar speaking" style="background:linear-gradient(135deg,#60a5fa,#1d4ed8)">K
+              <div class="mic-state on">
+                <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"/><path d="M19 10v2a7 7 0 0 1-14 0v-2"/><line x1="12" y1="19" x2="12" y2="23"/><line x1="8" y1="23" x2="16" y2="23"/></svg>
+              </div>
+            </div>
+            <div class="speaker-name">Kai</div>
+            <div class="speaker-role">Captain</div>
+          </div>
+          <div class="speaker">
+            <div class="speaker-avatar speaking" style="background:linear-gradient(135deg,#4ade80,#15803d)">R
+              <div class="mic-state on">
+                <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"/><path d="M19 10v2a7 7 0 0 1-14 0v-2"/><line x1="12" y1="19" x2="12" y2="23"/><line x1="8" y1="23" x2="16" y2="23"/></svg>
+              </div>
+            </div>
+            <div class="speaker-name">Rin</div>
+            <div class="speaker-role">Strategy</div>
+          </div>
+          <div class="speaker">
+            <div class="speaker-avatar muted" style="background:linear-gradient(135deg,#facc15,#a16207)">M
+              <div class="mic-state off">
+                <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.8" stroke-linecap="round" stroke-linejoin="round"><line x1="1" y1="1" x2="23" y2="23"/><path d="M9 9v3a3 3 0 0 0 5.12 2.12M15 9.34V4a3 3 0 0 0-5.94-.6"/><path d="M17 16.95A7 7 0 0 1 5 12v-2m14 0v2a7 7 0 0 1-.11 1.23"/></svg>
+              </div>
+            </div>
+            <div class="speaker-name">Mira</div>
+            <div class="speaker-role">Muted</div>
+          </div>
+        </div>
+
+        <!-- Listeners orbit -->
+        <div class="listeners">
+          <div class="listener-orb" style="background:linear-gradient(135deg,#c084fc,#5b21b6)">J</div>
+          <div class="listener-orb" style="background:linear-gradient(135deg,#f97316,#9a3412)">A</div>
+          <div class="listener-orb" style="background:linear-gradient(135deg,#22d3ee,#0e7490)">S</div>
+          <div class="listener-orb" style="background:linear-gradient(135deg,#ec4899,#9d174d)">L</div>
+          <div class="listener-orb" style="background:linear-gradient(135deg,#a3e635,#3f6212)">B</div>
+          <div class="listener-orb" style="background:linear-gradient(135deg,#fb7185,#9f1239)">N</div>
+          <div class="listener-more">+1</div>
+        </div>
+
+        <div class="stage-cta-row">
+          <button class="stage-cta">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><polygon points="5 3 19 12 5 21 5 3"/></svg>
+            Join the Stage
+          </button>
+          <button class="stage-cta ghost">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+            View All Voice
+          </button>
+        </div>
+      </div>
+
+      <!-- IDENTITY PILLAR -->
+      <div class="identity-card">
+        <span class="ic-eyebrow">⚡ Alter Ego · This Lobby</span>
+        <div class="ic-avatar-wrap">
+          <div class="ic-avatar">CN</div>
+        </div>
+        <div class="ic-name">Iron <span class="accent">Constellation</span></div>
+        <div class="ic-handle">they/them · @connor</div>
+        <div class="ic-tier"><span class="gem"></span> Forge Knight · Gold IV</div>
+        <div class="ic-loadout">
+          <div class="ic-slot equipped" title="Banner equipped">🛡️</div>
+          <div class="ic-slot equipped" title="Title equipped">📛</div>
+          <div class="ic-slot equipped" title="Emote pack">🎭</div>
+          <div class="ic-slot" title="Empty slot">·</div>
+          <div class="ic-slot" title="Empty slot">·</div>
+          <div class="ic-slot" title="Empty slot">·</div>
+        </div>
+        <button class="ic-cta">Customize Alter Ego →</button>
+      </div>
+    </section>
+
+    <!-- FEATURED MOMENT — spotlight on the single most-loved moment -->
+    <section class="featured">
+      <div class="featured-meta">
+        <span class="featured-eyebrow">★ Moment of the Week</span>
+        <h2 class="featured-title">Vera's overtime ace<br>brought the house down</h2>
+        <p class="featured-desc">A 1-vs-3 clutch with 4 seconds on the clock that flipped the Spring Bracket semifinals. The voice channel exploded. Saved by 38 members so far.</p>
+        <div class="featured-author">
+          <div class="av">V</div>
+          <div class="nm">Vera<small>Forge Captain · Sealed by 38</small></div>
+        </div>
+        <div class="featured-stats">
+          <div class="featured-stat"><div class="n">2.4k</div><div class="l">Reactions</div></div>
+          <div class="featured-stat"><div class="n">38</div><div class="l">Seals</div></div>
+          <div class="featured-stat"><div class="n">142</div><div class="l">Replays</div></div>
+        </div>
+        <div class="featured-actions">
+          <button class="featured-cta">
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><polygon points="5 3 19 12 5 21 5 3"/></svg>
+            Watch the Replay
+          </button>
+          <button class="featured-cta ghost">
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M19 21l-7-5-7 5V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2z"/></svg>
+            Add to My Hall
+          </button>
+        </div>
+      </div>
+      <div class="featured-media">
+        <div class="featured-polaroid">🏆</div>
+        <div class="featured-spark s1">✦</div>
+        <div class="featured-spark s2">✦</div>
+        <div class="featured-spark s3">✦</div>
+        <div class="featured-spark s4">✦</div>
+      </div>
+    </section>
+
+    <!-- HALL OF FAME RIBBON -->
+    <section class="hof-ribbon">
+      <div class="hof-head">
+        <div class="hof-title-wrap">
+          <svg class="hof-crown" viewBox="0 0 280 195" fill="none" xmlns="http://www.w3.org/2000/svg">
+            <defs>
+              <linearGradient id="prevHofBrim" x1="0" y1="0" x2="1" y2="0">
+                <stop offset="0%" stop-color="#7a5c00"/>
+                <stop offset="50%" stop-color="#FFD700"/>
+                <stop offset="100%" stop-color="#7a5c00"/>
+              </linearGradient>
+            </defs>
+            <polygon points="15,145 35,52 88,98 140,8 192,98 245,52 265,145" fill="rgba(184,134,11,.55)" stroke="#FFD700" stroke-width="8" stroke-linejoin="round"/>
+            <rect x="15" y="143" width="250" height="30" rx="4" fill="url(#prevHofBrim)" opacity=".9"/>
+            <circle cx="140" cy="8"  r="13" fill="#CC3333" stroke="#FFD700" stroke-width="4"/>
+            <circle cx="35"  cy="52" r="9"  fill="#3366CC" stroke="#FFD700" stroke-width="3"/>
+            <circle cx="265" cy="52" r="9"  fill="#3366CC" stroke="#FFD700" stroke-width="3"/>
+            <circle cx="88"  cy="98" r="8"  fill="#229955" stroke="#FFD700" stroke-width="3"/>
+            <circle cx="192" cy="98" r="8"  fill="#229955" stroke="#FFD700" stroke-width="3"/>
+            <circle cx="140" cy="125" r="11" fill="#CC3333" stroke="#FFD700" stroke-width="3"/>
+          </svg>
+          <div>
+            <div class="hof-title">Hall of Fame</div>
+            <div class="hof-sub">Moments worth remembering · 42 in the archive</div>
+          </div>
+        </div>
+        <button class="hof-cta">
+          Enter Hall
+          <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 18 15 12 9 6"/></svg>
+        </button>
+      </div>
+
+      <div class="hof-track">
+        <div class="hof-card">
+          <div class="hof-card-media">
+            <span class="hof-tag epic">👑 Legendary</span>
+            <div class="hof-emoji">🏆</div>
+          </div>
+          <div class="hof-card-body">
+            <div class="hof-card-title">Won the Spring Bracket 12–0</div>
+            <div class="hof-card-meta"><span>Vera, Kai</span><span class="dot"></span><span>2 weeks ago</span></div>
+          </div>
+        </div>
+        <div class="hof-card">
+          <div class="hof-card-media" style="background:linear-gradient(135deg,#3b1a3a,#0a0712)">
+            <span class="hof-tag viral">🔥 Viral</span>
+            <div class="hof-emoji">🎤</div>
+          </div>
+          <div class="hof-card-body">
+            <div class="hof-card-title">Karaoke night hit 2.4k reactions</div>
+            <div class="hof-card-meta"><span>Mira</span><span class="dot"></span><span>Apr 12</span></div>
+          </div>
+        </div>
+        <div class="hof-card">
+          <div class="hof-card-media" style="background:linear-gradient(135deg,#0a2d1f,#06140c)">
+            <span class="hof-tag milestone">⭐ Milestone</span>
+            <div class="hof-emoji">🎯</div>
+          </div>
+          <div class="hof-card-body">
+            <div class="hof-card-title">Crossed 400 members</div>
+            <div class="hof-card-meta"><span>The Forge</span><span class="dot"></span><span>Apr 3</span></div>
+          </div>
+        </div>
+        <div class="hof-card">
+          <div class="hof-card-media" style="background:linear-gradient(135deg,#1f0a3d,#0a061a)">
+            <span class="hof-tag epic">👑 Legendary</span>
+            <div class="hof-emoji">⚔️</div>
+          </div>
+          <div class="hof-card-body">
+            <div class="hof-card-title">Rin's 18-kill comeback in OT</div>
+            <div class="hof-card-meta"><span>Rin</span><span class="dot"></span><span>Mar 28</span></div>
+          </div>
+        </div>
+        <div class="hof-card">
+          <div class="hof-card-media" style="background:linear-gradient(135deg,#3d1a0a,#1a060a)">
+            <span class="hof-tag viral">🔥 Viral</span>
+            <div class="hof-emoji">😂</div>
+          </div>
+          <div class="hof-card-body">
+            <div class="hof-card-title">The "wrong button" speedrun fail</div>
+            <div class="hof-card-meta"><span>Kai</span><span class="dot"></span><span>Mar 19</span></div>
+          </div>
+        </div>
+        <div class="hof-card">
+          <div class="hof-card-media" style="background:linear-gradient(135deg,#0a3d2f,#06140c)">
+            <span class="hof-tag milestone">⭐ Milestone</span>
+            <div class="hof-emoji">🏅</div>
+          </div>
+          <div class="hof-card-body">
+            <div class="hof-card-title">First tournament championship</div>
+            <div class="hof-card-meta"><span>The Forge</span><span class="dot"></span><span>Feb 24</span></div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ROW: Tournament theatre + Constellation -->
+    <section class="row-mid">
+
+      <!-- Tournament Theatre -->
+      <div class="theatre">
+        <div class="theatre-head">
+          <div>
+            <span class="theatre-eyebrow"><span class="live-dot" style="width:7px;height:7px;border-radius:50%;background:#ed4245;display:inline-block;box-shadow:0 0 12px #ed4245"></span> Live · Round of 8</span>
+            <h2 class="theatre-title">Spring Showdown V</h2>
+          </div>
+          <div class="theatre-prize">
+            <span class="lbl">Prize Pool</span>
+            <span class="amt">5,000</span>
+          </div>
+        </div>
+
+        <!-- Bracket peek -->
+        <div class="bracket">
+          <div class="bracket-col">
+            <div class="bracket-match">
+              <div class="bracket-team winner"><div class="av">VK</div><div class="name">Vera + Kai</div><div class="score">2</div></div>
+              <div class="bracket-team"><div class="av" style="background:linear-gradient(135deg,#f97316,#9a3412)">MR</div><div class="name">Mira + Rin</div><div class="score">1</div></div>
+            </div>
+            <div class="bracket-match live">
+              <div class="bracket-team"><div class="av" style="background:linear-gradient(135deg,#c084fc,#5b21b6)">SL</div><div class="name">Saika + Lyra</div><div class="score">1</div></div>
+              <div class="bracket-team"><div class="av" style="background:linear-gradient(135deg,#4ade80,#15803d)">BN</div><div class="name">Bex + Nyx</div><div class="score">1</div></div>
+              <div class="bracket-live-chip">LIVE</div>
+            </div>
+          </div>
+          <div class="bracket-col">
+            <div class="bracket-match">
+              <div class="bracket-team winner"><div class="av">VK</div><div class="name">Vera + Kai</div><div class="score">—</div></div>
+              <div class="bracket-team" style="opacity:.5"><div class="av" style="background:#1f2937">?</div><div class="name">TBD</div><div class="score">—</div></div>
+            </div>
+          </div>
+          <div class="bracket-col">
+            <div class="bracket-trophy">🏆</div>
+          </div>
+        </div>
+
+        <div class="theatre-foot">
+          <div style="display:flex;gap:18px;flex-wrap:wrap">
+            <div class="theatre-timer"><span class="lbl">Next Match</span><span class="val">14:32</span></div>
+            <div class="theatre-timer"><span class="lbl">Final In</span><span class="val">3h 12m</span></div>
+            <div class="theatre-timer"><span class="lbl">Format</span><span class="val">2v2 · BO3</span></div>
+          </div>
+          <div class="theatre-actions">
+            <button class="theatre-btn ghost">
+              <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>
+              All Tournaments
+            </button>
+            <button class="theatre-btn">
+              <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><polygon points="5 3 19 12 5 21 5 3"/></svg>
+              Watch Live
+            </button>
+          </div>
+        </div>
+      </div>
+
+      <!-- Member Constellation -->
+      <div class="constellation">
+        <div class="const-head">
+          <div class="const-title-wrap">
+            <span class="const-eyebrow">⊹ Member Constellation</span>
+            <h2 class="const-title">Who's Around</h2>
+          </div>
+          <div class="const-count"><span class="n">36</span><span class="l">Online</span></div>
+        </div>
+
+        <div class="const-group">
+          <div class="const-group-label">In Voice <span class="n">· 12</span><span class="dash"></span></div>
+          <div class="const-orbs">
+            <div class="const-orb in-voice" style="background:linear-gradient(135deg,#fb7185,#9f1239)">V<div class="dot"></div><span class="tt">Vera · Hosting Stage</span></div>
+            <div class="const-orb in-voice" style="background:linear-gradient(135deg,#60a5fa,#1d4ed8)">K<div class="dot"></div><span class="tt">Kai · In Main Stage</span></div>
+            <div class="const-orb in-voice" style="background:linear-gradient(135deg,#4ade80,#15803d)">R<div class="dot"></div><span class="tt">Rin · In Main Stage</span></div>
+            <div class="const-orb in-voice" style="background:linear-gradient(135deg,#facc15,#a16207)">M<div class="dot away"></div><span class="tt">Mira · Muted</span></div>
+            <div class="const-orb in-voice" style="background:linear-gradient(135deg,#c084fc,#5b21b6)">J<div class="dot"></div><span class="tt">Jin · Listening</span></div>
+            <div class="const-orb in-voice" style="background:linear-gradient(135deg,#f97316,#9a3412)">A<div class="dot"></div><span class="tt">Ash · Listening</span></div>
+            <div class="const-orb in-voice" style="background:linear-gradient(135deg,#22d3ee,#0e7490)">S<div class="dot"></div><span class="tt">Sora · Listening</span></div>
+            <div class="const-orb in-voice" style="background:linear-gradient(135deg,#ec4899,#9d174d)">L<div class="dot"></div><span class="tt">Lyra · Listening</span></div>
+          </div>
+        </div>
+
+        <div class="const-group">
+          <div class="const-group-label">Online <span class="n">· 24</span><span class="dash"></span></div>
+          <div class="const-orbs">
+            <div class="const-orb" style="background:linear-gradient(135deg,#a3e635,#3f6212)">B<div class="dot"></div><span class="tt">Bex</span></div>
+            <div class="const-orb" style="background:linear-gradient(135deg,#fb7185,#9f1239)">N<div class="dot"></div><span class="tt">Nyx</span></div>
+            <div class="const-orb" style="background:linear-gradient(135deg,#67e8f9,#0e7490)">T<div class="dot"></div><span class="tt">Tama</span></div>
+            <div class="const-orb away" style="background:linear-gradient(135deg,#f0b232,#a16207)">P<div class="dot"></div><span class="tt">Pia · Away</span></div>
+            <div class="const-orb dnd" style="background:linear-gradient(135deg,#ed4245,#7f1d1d)">D<div class="dot"></div><span class="tt">Don · DND</span></div>
+            <div class="const-orb" style="background:linear-gradient(135deg,#a78bfa,#5b21b6)">E<div class="dot"></div><span class="tt">Echo</span></div>
+            <div class="const-orb" style="background:linear-gradient(135deg,#f472b6,#831843)">Z<div class="dot"></div><span class="tt">Zee</span></div>
+            <div class="const-orb" style="background:linear-gradient(135deg,#4ade80,#15803d)">H<div class="dot"></div><span class="tt">Hex</span></div>
+            <div class="const-orb" style="background:linear-gradient(135deg,#fb923c,#9a3412)">O<div class="dot"></div><span class="tt">Onyx</span></div>
+            <div class="const-orb" style="background:linear-gradient(135deg,#22d3ee,#0e7490)">C<div class="dot"></div><span class="tt">Coda</span></div>
+            <div class="const-orb" style="background:linear-gradient(135deg,#a78bfa,#5b21b6)">+15<span class="tt">View all members</span></div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- LOUNGES (channels reimagined) -->
+    <section class="lounges">
+      <div class="lounges-head">
+        <div class="lounges-title-wrap">
+          <span class="lounges-eyebrow">◇ Lounges &amp; Rooms</span>
+          <h2 class="lounges-title">Where to Drop In</h2>
+        </div>
+        <div class="lounges-filters">
+          <div class="lounge-filter active">All</div>
+          <div class="lounge-filter">Voice</div>
+          <div class="lounge-filter">Text</div>
+          <div class="lounge-filter">Live</div>
+        </div>
+      </div>
+
+      <div class="lounge-grid">
+        <!-- Voice (live) -->
+        <div class="lounge-card voice active">
+          <div class="lounge-top">
+            <div class="lounge-ico-wrap">
+              <div class="lounge-ico">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"/><path d="M19 10v2a7 7 0 0 1-14 0v-2"/><line x1="12" y1="19" x2="12" y2="23"/><line x1="8" y1="23" x2="16" y2="23"/></svg>
+              </div>
+              <div>
+                <div class="lounge-name">Main Stage</div>
+                <div class="lounge-meta">Late Night Raids · 1h 24m</div>
+              </div>
+            </div>
+            <span class="lounge-live"><span class="dot"></span> Live</span>
+          </div>
+          <div class="lounge-body">
+            <div class="lounge-presence">
+              <div class="lounge-mini-orbs">
+                <div class="o" style="background:linear-gradient(135deg,#fb7185,#9f1239)">V</div>
+                <div class="o" style="background:linear-gradient(135deg,#60a5fa,#1d4ed8)">K</div>
+                <div class="o" style="background:linear-gradient(135deg,#4ade80,#15803d)">R</div>
+                <div class="o" style="background:linear-gradient(135deg,#facc15,#a16207)">M</div>
+                <div class="more">+8</div>
+              </div>
+              <span>12 in voice</span>
+            </div>
+          </div>
+          <div class="lounge-foot">
+            <span class="lounge-stat">Hosted by Vera</span>
+            <button class="lounge-cta">Join Voice</button>
+          </div>
+        </div>
+
+        <!-- Voice (quiet) -->
+        <div class="lounge-card voice">
+          <div class="lounge-top">
+            <div class="lounge-ico-wrap">
+              <div class="lounge-ico">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"/><path d="M19 10v2a7 7 0 0 1-14 0v-2"/><line x1="12" y1="19" x2="12" y2="23"/><line x1="8" y1="23" x2="16" y2="23"/></svg>
+              </div>
+              <div>
+                <div class="lounge-name">Chill Voice</div>
+                <div class="lounge-meta">Background tunes · low key</div>
+              </div>
+            </div>
+          </div>
+          <div class="lounge-body">
+            <div class="lounge-presence">
+              <div class="lounge-mini-orbs">
+                <div class="o" style="background:linear-gradient(135deg,#a78bfa,#5b21b6)">E</div>
+                <div class="o" style="background:linear-gradient(135deg,#22d3ee,#0e7490)">T</div>
+              </div>
+              <span>2 in voice</span>
+            </div>
+          </div>
+          <div class="lounge-foot">
+            <span class="lounge-stat">Open · Anytime</span>
+            <button class="lounge-cta ghost">Drop In</button>
+          </div>
+        </div>
+
+        <!-- Text channel -->
+        <div class="lounge-card">
+          <div class="lounge-top">
+            <div class="lounge-ico-wrap">
+              <div class="lounge-ico">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
+              </div>
+              <div>
+                <div class="lounge-name">#general</div>
+                <div class="lounge-meta">The main chat · all welcome</div>
+              </div>
+            </div>
+            <span class="lounge-live" style="background:rgba(35,165,90,.15);border-color:rgba(35,165,90,.4);color:#23a55a"><span class="dot" style="background:#23a55a;box-shadow:0 0 10px #23a55a"></span> 24 new</span>
+          </div>
+          <div class="lounge-body">
+            <div class="lounge-transcript"><b>Kai:</b> "anyone up for a quick set after the bracket wraps?"</div>
+          </div>
+          <div class="lounge-foot">
+            <span class="lounge-stat">Active · last 2m</span>
+            <button class="lounge-cta ghost">Open Chat</button>
+          </div>
+        </div>
+
+        <!-- Text channel — strategy -->
+        <div class="lounge-card">
+          <div class="lounge-top">
+            <div class="lounge-ico-wrap">
+              <div class="lounge-ico">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
+              </div>
+              <div>
+                <div class="lounge-name">#strategy</div>
+                <div class="lounge-meta">Decks, comps, hot takes</div>
+              </div>
+            </div>
+          </div>
+          <div class="lounge-body">
+            <div class="lounge-transcript"><b>Rin:</b> "if we run the double-shield comp vs Saika's team we cap their kit"</div>
+          </div>
+          <div class="lounge-foot">
+            <span class="lounge-stat">3 unread</span>
+            <button class="lounge-cta ghost">Open Chat</button>
+          </div>
+        </div>
+
+        <!-- Text channel — announcements -->
+        <div class="lounge-card">
+          <div class="lounge-top">
+            <div class="lounge-ico-wrap">
+              <div class="lounge-ico" style="color:#ffd33d;background:rgba(255,211,61,.12);border-color:rgba(255,211,61,.32)">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 11l18-5v12L3 14v-3z"/><path d="M11.6 16.8a3 3 0 1 1-5.8-1.6"/></svg>
+              </div>
+              <div>
+                <div class="lounge-name">#announcements</div>
+                <div class="lounge-meta">Pinned by Vera · 2h ago</div>
+              </div>
+            </div>
+          </div>
+          <div class="lounge-body">
+            <div class="lounge-transcript" style="border-color:rgba(255,211,61,.55)"><b>Vera:</b> "Final bracket starts at 9pm sharp — be in voice 10 min before."</div>
+          </div>
+          <div class="lounge-foot">
+            <span class="lounge-stat">📌 Pinned</span>
+            <button class="lounge-cta ghost">Open Chat</button>
+          </div>
+        </div>
+
+        <!-- Voice — workshop -->
+        <div class="lounge-card voice">
+          <div class="lounge-top">
+            <div class="lounge-ico-wrap">
+              <div class="lounge-ico">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"/><path d="M19 10v2a7 7 0 0 1-14 0v-2"/><line x1="12" y1="19" x2="12" y2="23"/><line x1="8" y1="23" x2="16" y2="23"/></svg>
+              </div>
+              <div>
+                <div class="lounge-name">Workshop</div>
+                <div class="lounge-meta">Practice room · screenshare on</div>
+              </div>
+            </div>
+          </div>
+          <div class="lounge-body">
+            <div class="lounge-presence">
+              <div class="lounge-mini-orbs">
+                <div class="o" style="background:linear-gradient(135deg,#f472b6,#831843)">Z</div>
+              </div>
+              <span>1 practicing</span>
+            </div>
+          </div>
+          <div class="lounge-foot">
+            <span class="lounge-stat">Open · Screen Share</span>
+            <button class="lounge-cta ghost">Drop In</button>
+          </div>
+        </div>
+
+      </div>
+    </section>
+
+    <!-- QUICK-POST COMPOSER — drop a status without entering a channel -->
+    <section class="composer">
+      <div class="composer-av">CN</div>
+      <input class="composer-input" placeholder="Drop a thought into The Forge… (use @ to mention, # to tag a channel)" />
+      <button class="composer-channel" title="Posting to #general">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
+        #general
+      </button>
+      <div class="composer-actions">
+        <button class="composer-tool" title="Add image">
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/></svg>
+        </button>
+        <button class="composer-tool" title="Attach">
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M21.44 11.05l-9.19 9.19a6 6 0 0 1-8.49-8.49l9.19-9.19a4 4 0 0 1 5.66 5.66l-9.2 9.19a2 2 0 0 1-2.83-2.83l8.49-8.48"/></svg>
+        </button>
+        <button class="composer-tool accent" title="Add emoji">
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="M8 14s1.5 2 4 2 4-2 4-2"/><line x1="9" y1="9" x2="9.01" y2="9"/><line x1="15" y1="9" x2="15.01" y2="9"/></svg>
+        </button>
+        <button class="composer-post">
+          Post
+          <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg>
+        </button>
+      </div>
+    </section>
+
+    <!-- CHRONICLE — recent activity + upcoming events -->
+    <section class="chronicle">
+      <div class="chronicle-card">
+        <div class="chron-head">
+          <div class="chron-title-wrap">
+            <span class="chron-eyebrow">◌ Chronicle</span>
+            <h2 class="chron-title">Lobby Pulse</h2>
+          </div>
+          <span class="chron-link">View All →</span>
+        </div>
+        <div class="chron-list">
+          <div class="chron-row">
+            <div class="chron-icon hof">👑</div>
+            <div class="chron-body">
+              <div class="chron-line"><b class="who">Vera + Kai</b> sealed a moment for the <b>Hall of Fame</b> — "Won the Spring Bracket 12–0"</div>
+              <div class="chron-time">14 minutes ago</div>
+            </div>
+          </div>
+          <div class="chron-row">
+            <div class="chron-icon tournament">🏆</div>
+            <div class="chron-body">
+              <div class="chron-line"><b>Spring Showdown V</b> · Round of 8 started — <b class="who">Saika + Lyra</b> vs <b class="who">Bex + Nyx</b> is LIVE</div>
+              <div class="chron-time">22 minutes ago</div>
+            </div>
+          </div>
+          <div class="chron-row">
+            <div class="chron-icon join">🎤</div>
+            <div class="chron-body">
+              <div class="chron-line"><b class="who">Mira</b> joined <b>Main Stage</b></div>
+              <div class="chron-time">38 minutes ago</div>
+            </div>
+          </div>
+          <div class="chron-row">
+            <div class="chron-icon message">💬</div>
+            <div class="chron-body">
+              <div class="chron-line">42 reactions on <b class="who">Rin's</b> message in <b>#strategy</b> — "the double-shield comp is criminal"</div>
+              <div class="chron-time">1 hour ago</div>
+            </div>
+          </div>
+          <div class="chron-row">
+            <div class="chron-icon event">📅</div>
+            <div class="chron-body">
+              <div class="chron-line"><b class="who">Connor</b> RSVP'd to <b>Friday Karaoke Night</b></div>
+              <div class="chron-time">2 hours ago</div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="chronicle-card">
+        <div class="chron-head">
+          <div class="chron-title-wrap">
+            <span class="chron-eyebrow">◐ Upcoming</span>
+            <h2 class="chron-title">On the Calendar</h2>
+          </div>
+          <span class="chron-link">Open Calendar →</span>
+        </div>
+        <div class="next-events">
+          <div class="next-event-row">
+            <div class="ne-date"><div class="m">May</div><div class="d">24</div></div>
+            <div class="ne-meta">
+              <div class="ne-title">Spring Showdown V — Finals</div>
+              <div class="ne-time">Tonight · 9:00 PM PST · Main Stage</div>
+            </div>
+            <span class="ne-rsvp">Going</span>
+          </div>
+          <div class="next-event-row">
+            <div class="ne-date"><div class="m">May</div><div class="d">26</div></div>
+            <div class="ne-meta">
+              <div class="ne-title">Friday Karaoke Night</div>
+              <div class="ne-time">Fri · 10:00 PM · Workshop room</div>
+            </div>
+            <span class="ne-rsvp maybe">Maybe</span>
+          </div>
+          <div class="next-event-row">
+            <div class="ne-date"><div class="m">Jun</div><div class="d">02</div></div>
+            <div class="ne-meta">
+              <div class="ne-title">New player welcome circle</div>
+              <div class="ne-time">Sun · 7:00 PM · Chill Voice</div>
+            </div>
+            <span class="ne-rsvp">Going</span>
+          </div>
+          <div class="next-event-row">
+            <div class="ne-date"><div class="m">Jun</div><div class="d">07</div></div>
+            <div class="ne-meta">
+              <div class="ne-title">Strategy clinic with Rin</div>
+              <div class="ne-time">Fri · 8:30 PM · Workshop room</div>
+            </div>
+            <span class="ne-rsvp maybe">Maybe</span>
+          </div>
+        </div>
+      </div>
+    </section>
+
+  </main>
+</div>
+
+<script>
+// Theme picker — wire swatches to data-theme on <body>
+document.querySelectorAll('.theme-bar .tk').forEach(tk=>{
+  tk.addEventListener('click',()=>{
+    document.querySelectorAll('.theme-bar .tk').forEach(t=>t.classList.remove('active'));
+    tk.classList.add('active');
+    const t = tk.getAttribute('data-theme');
+    if(t){ document.body.setAttribute('data-theme', t); }
+    else { document.body.removeAttribute('data-theme'); }
+  });
+});
+
+// Lounge filter scrubber (visual only)
+document.querySelectorAll('.lounge-filter').forEach(f=>{
+  f.addEventListener('click',()=>{
+    document.querySelectorAll('.lounge-filter').forEach(x=>x.classList.remove('active'));
+    f.classList.add('active');
+  });
+});
+</script>
+</body>
+</html>

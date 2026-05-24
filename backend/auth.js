@@ -3808,6 +3808,46 @@ app.delete('/api/events/:id', requireAuth, async (req, res) => {
   }
 });
 
+// ── Ladder Routes (mounted here so they're served by the running auth.js entry point) ───
+// ladder.js expects req.user.id (set by this shim), not req.userId (set by requireAuth above).
+function ladderAuthMiddleware(req, res, next) {
+  try {
+    const token = req.headers.authorization?.split(' ')[1];
+    if (!token) return res.status(401).json({ error: 'No token provided' });
+    const decoded = jwt.verify(token, SECRET);
+    req.user = decoded;
+    next();
+  } catch (err) {
+    return res.status(401).json({ error: 'Invalid token' });
+  }
+}
+
+try {
+  const ladderRoutes = require('./ladder.js');
+  // Mutating verbs always require auth. GETs are public so the leaderboard
+  // can be browsed without login, EXCEPT /me which is always personal.
+  app.use('/api/ladder', (req, res, next) => {
+    if (['POST','PUT','PATCH','DELETE'].includes(req.method)) return ladderAuthMiddleware(req, res, next);
+    if (req.method === 'GET' && req.path === '/me') return ladderAuthMiddleware(req, res, next);
+    // Optional auth on public GETs: decode token if present so personalised features work,
+    // but don't reject the request if it's missing/invalid.
+    const token = req.headers.authorization?.split(' ')[1];
+    if (token) { try { req.user = jwt.verify(token, SECRET); } catch {} }
+    next();
+  });
+  app.use('/api/ladder', ladderRoutes);
+  console.log('[✓] Ladder routes loaded');
+
+  // Season rollover: check once shortly after boot, then every hour.
+  try {
+    const ratingEngine = require('./rating-engine.js');
+    setTimeout(() => { ratingEngine.checkSeasonRollover().catch(e => console.warn('[ladder] initial rollover check:', e.message)); }, 5000);
+    setInterval(() => { ratingEngine.checkSeasonRollover().catch(e => console.warn('[ladder] periodic rollover check:', e.message)); }, 60 * 60 * 1000);
+  } catch (e) { console.warn('[ladder] rollover scheduler not attached:', e.message); }
+} catch (err) {
+  console.warn('[!] Ladder routes not loaded:', err.message);
+}
+
 // Express error-catching middleware (must be last, before listen)
 app.use((err, req, res, next) => {
   console.error(`[EXPRESS ERROR] ${req.method} ${req.url}:`, err);
