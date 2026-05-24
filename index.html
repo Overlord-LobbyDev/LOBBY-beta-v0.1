@@ -2804,7 +2804,7 @@
       color: var(--accent);
       font-family: var(--font); font-weight: 800; font-size: 12px;
       letter-spacing: .6px; cursor: pointer;
-      display: flex; align-items: center; justify-content: center; gap: 8px;
+      align-items: center; justify-content: center; gap: 8px;
       transition: background .18s, transform .15s, border-color .15s;
     }
     body[data-feed-tab="communities"] #feedPromoteBtn { display: flex; }
@@ -8067,6 +8067,7 @@
     /* ════ PREMIUM POST CARDS — v4 ════ */
     .post-card {
       position: relative;
+      flex-shrink: 0;
       background:
         radial-gradient(ellipse 80% 40% at 50% 0%, color-mix(in srgb, var(--accent) 5%, transparent) 0%, transparent 70%),
         linear-gradient(160deg,
@@ -8129,7 +8130,7 @@
       pointer-events: none;
     }
     .post-image {
-      position: absolute; top: 0; left: 0;
+      position: absolute; top: 0; left: 0; right: 0; bottom: 0;
       width: 100%; height: 100%;
       object-fit: cover; cursor: pointer; display: block;
       transition: transform .45s cubic-bezier(.22,1,.36,1), filter .3s;
@@ -15547,7 +15548,7 @@ async function boot() {
   // Restore the saved wallpaper ASAP so there's no flash of plain bg
   // while /me and /profile requests are in flight.
   try { bootAppWallpaper(); } catch (_) {}
-  try { me = await api("/me"); } catch(e) { console.error("Boot failed:", e); return; }
+  try { me = await api("/me"); window.me = me; } catch(e) { console.error("Boot failed:", e); return; }
   if (!me || me.error) {
     document.getElementById("myPanelName").textContent = "Not connected";
     return;
@@ -16269,6 +16270,8 @@ async function selectServer(server) {
 
   const members = await api(`/servers/${server.id}/members`);
   cachedServerMembers = members || [];
+  // Mirror onto window so the Coliseum (separate IIFE) reads real lobby data
+  window.cachedServerMembers = cachedServerMembers;
   const me_member = members.find(m => m.id === me.id);
   myServerRole = me_member?.role || "member";
   const channels = await api(`/servers/${server.id}/channels`);
@@ -39396,6 +39399,10 @@ document.addEventListener("click", () => hideProfileHoverCard());
   // ── Init (called by openLeaderboard) ─────────────────────────
   function init() {
     injectStyles();
+    // Static ladder content — render immediately, independent of any API
+    // so the ranks/ladder always show even with no live data.
+    renderLadderTrack();
+    renderRankRail();
     _state = {
       tab: 'global',
       gameTag: '',
@@ -39472,7 +39479,7 @@ document.addEventListener("click", () => hideProfileHoverCard());
      ============================================================ -->
 <style>
 :root{ --col-ease-out-expo:cubic-bezier(0.22,1,0.36,1); }
-#coliseumRoot{position:fixed;inset:0;z-index:60;display:none;overflow-y:auto;background:var(--bg-0);font-family:var(--font);color:var(--text-1);-webkit-app-region:no-drag}
+#coliseumRoot{position:fixed;top:calc(72px + var(--ph-row-h, 0px));left:0;right:0;bottom:0;z-index:60;display:none;overflow-y:auto;background:var(--bg-0);font-family:var(--font);color:var(--text-1);-webkit-app-region:no-drag}
 body.coliseum-mode #coliseumRoot{display:block}
 body.coliseum-mode .server-list,
 body.coliseum-mode .channel-sidebar,
@@ -39495,15 +39502,15 @@ body.coliseum-mode #vcPanel,
 body.coliseum-mode #calendarPanel,
 body.coliseum-mode #profilePage{display:none !important}
 
-.col-amb{position:fixed;inset:0;z-index:0;pointer-events:none;overflow:hidden}
+.col-amb{position:fixed;top:calc(72px + var(--ph-row-h, 0px));left:0;right:0;bottom:0;z-index:0;pointer-events:none;overflow:hidden}
 .col-amb::before{content:'';position:absolute;width:1200px;height:1200px;left:-300px;top:-400px;background:radial-gradient(circle,color-mix(in srgb,var(--accent) 28%, transparent) 0%,transparent 65%);filter:blur(50px);animation:col-drift1 28s ease-in-out infinite alternate}
 .col-amb::after{content:'';position:absolute;width:900px;height:900px;right:-200px;bottom:-300px;background:radial-gradient(circle,color-mix(in srgb,var(--accent) 22%, transparent) 0%,transparent 65%);filter:blur(50px);animation:col-drift2 36s ease-in-out infinite alternate}
 @keyframes col-drift1{from{transform:translate(0,0)}to{transform:translate(120px,80px)}}
 @keyframes col-drift2{from{transform:translate(0,0)}to{transform:translate(-100px,-60px)}}
-.col-grid-tex{position:fixed;inset:0;z-index:1;pointer-events:none;background-image:linear-gradient(rgba(255,255,255,.018) 1px, transparent 1px),linear-gradient(90deg, rgba(255,255,255,.018) 1px, transparent 1px);background-size:32px 32px;mask-image:radial-gradient(ellipse 80% 60% at 50% 40%, #000 30%, transparent 90%);-webkit-mask-image:radial-gradient(ellipse 80% 60% at 50% 40%, #000 30%, transparent 90%)}
-.col-canvas{position:relative;z-index:2;padding:96px 32px 120px;display:flex;flex-direction:column;gap:22px;max-width:1640px;width:100%;margin:0 auto}
+.col-grid-tex{position:fixed;top:calc(72px + var(--ph-row-h, 0px));left:0;right:0;bottom:0;z-index:1;pointer-events:none;background-image:linear-gradient(rgba(255,255,255,.018) 1px, transparent 1px),linear-gradient(90deg, rgba(255,255,255,.018) 1px, transparent 1px);background-size:32px 32px;mask-image:radial-gradient(ellipse 80% 60% at 50% 40%, #000 30%, transparent 90%);-webkit-mask-image:radial-gradient(ellipse 80% 60% at 50% 40%, #000 30%, transparent 90%)}
+.col-canvas{position:relative;z-index:2;padding:28px 32px 120px;display:flex;flex-direction:column;gap:22px;max-width:1640px;width:100%;margin:0 auto}
 
-.col-crest-wrap{position:fixed;top:18px;left:50%;transform:translateX(-50%);z-index:70;display:flex;align-items:center;gap:10px;-webkit-app-region:no-drag}
+.col-crest-wrap{position:fixed;top:81px;left:300px;z-index:99998;display:flex;align-items:center;gap:10px;-webkit-app-region:no-drag}
 body:not(.coliseum-mode) .col-crest-wrap{display:none}
 body:not(.coliseum-mode).coliseum-can-return .col-crest-wrap{display:flex}
 body:not(.coliseum-mode).coliseum-can-return .col-crest{display:none}
@@ -39582,6 +39589,9 @@ body:not(.coliseum-mode) .col-sigil{display:none}
 .col-ident-btn:hover{background:rgba(255,255,255,.1);border-color:rgba(255,255,255,.22);transform:translateY(-1px)}
 .col-ident-btn svg{width:12px;height:12px}
 .col-ident-btn.primary{background:linear-gradient(135deg,var(--accent),color-mix(in srgb,var(--accent) 60%,#000));border-color:transparent;color:#fff;box-shadow:0 6px 20px color-mix(in srgb,var(--accent) 45%, transparent), 0 1px 0 rgba(255,255,255,.25) inset}
+
+/* === "Where to Drop In" lounges, embedded inside the identity card === */
+.col-ident-lounges{position:relative;z-index:1;margin-top:24px;padding-top:22px;border-top:1px solid rgba(255,255,255,.08);display:flex;flex-direction:column;gap:14px}
 
 /* === Hero row === */
 .col-row-hero{display:grid;grid-template-columns:minmax(0,1fr) 360px;gap:22px}
@@ -39902,6 +39912,22 @@ body:not(.coliseum-mode) .col-sigil{display:none}
           </button>
         </div>
       </div>
+      <div class="col-ident-lounges">
+        <div class="col-lounges-head">
+          <div class="col-lounges-title-wrap">
+            <span class="col-lounges-eyebrow">Lounges and Rooms</span>
+            <h2 class="col-lounges-title">Where to Drop In</h2>
+          </div>
+          <div class="col-lounges-filters">
+            <div class="col-lounge-filter active" data-filter="all">All</div>
+            <div class="col-lounge-filter" data-filter="voice">Voice</div>
+            <div class="col-lounge-filter" data-filter="text">Text</div>
+          </div>
+        </div>
+        <div class="col-lounge-grid" id="colLoungeGrid">
+          <div class="col-lounge-empty">No channels yet. Use Settings to create some.</div>
+        </div>
+      </div>
     </section>
 
     <section class="col-row-hero">
@@ -40027,23 +40053,6 @@ body:not(.coliseum-mode) .col-sigil{display:none}
             <div class="col-const-orbs" id="colConstOnlineOrbs"></div>
           </div>
         </div>
-      </div>
-    </section>
-
-    <section class="col-lounges">
-      <div class="col-lounges-head">
-        <div class="col-lounges-title-wrap">
-          <span class="col-lounges-eyebrow">Lounges and Rooms</span>
-          <h2 class="col-lounges-title">Where to Drop In</h2>
-        </div>
-        <div class="col-lounges-filters">
-          <div class="col-lounge-filter active" data-filter="all">All</div>
-          <div class="col-lounge-filter" data-filter="voice">Voice</div>
-          <div class="col-lounge-filter" data-filter="text">Text</div>
-        </div>
-      </div>
-      <div class="col-lounge-grid" id="colLoungeGrid">
-        <div class="col-lounge-empty">No channels yet. Use Settings to create some.</div>
       </div>
     </section>
 
