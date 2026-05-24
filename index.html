@@ -38880,7 +38880,11 @@ document.addEventListener("click", () => hideProfileHoverCard());
  *  · rank-change indicators · 60-second auto-refresh · live dot
  * ════════════════════════════════════════════════════════════════════════ */
 (function () {
-  const API_BASE = (window.electronAPI?.apiBase) || window.API_BASE || `${window.location.protocol}//${window.location.host}`;
+  const API_BASE = (window.electronAPI?.apiBase)
+    || window.API_BASE
+    || (/^https?:$/i.test(window.location.protocol) && window.location.host
+        ? `${window.location.protocol}//${window.location.host}`
+        : 'https://lobby-auth-server.onrender.com');
   const token = localStorage.getItem('vh_token') || sessionStorage.getItem('vh_token') || null;
   let myUserId = null;
   try { myUserId = JSON.parse(localStorage.getItem('vh_me') || 'null')?.id || null; } catch {}
