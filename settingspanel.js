@@ -60,6 +60,7 @@
       <button class="sp-nav-btn" data-sp="security">🔒 Password</button>
       <div class="sp-nav-label" style="margin-top:10px">App Settings</div>
       <button class="sp-nav-btn" data-sp="audiovideo">🎙 Audio & Video</button>
+      <button class="sp-nav-btn" data-sp="feed">📰 Feed</button>
       <button class="sp-nav-btn" data-sp="content">🔒 Content</button>
       <button class="sp-nav-btn" data-sp="about">ℹ️ About & Updates</button>
       <div class="sp-nav-label" style="margin-top:10px">Tournament</div>
@@ -312,6 +313,34 @@
         </div>
       </div>
 
+      <!-- ── Feed ── -->
+      <div class="sp-section" id="sp-feed">
+        <h2>Feed</h2>
+        <p style="font-size:13px;color:var(--text-3);margin-top:-12px;margin-bottom:20px">Choose where your social feed appears. Works perfectly on every page.</p>
+
+        <div class="sp-form-group">
+          <label class="sp-label">Feed Position</label>
+          <div id="spFeedPosGrid" style="display:grid;grid-template-columns:repeat(3,1fr);gap:12px">
+            <button class="sp-feed-pos" data-pos="left" type="button">
+              <span class="sp-feed-pos-pv sp-feed-pos-pv-left"><i></i></span>
+              <span class="sp-feed-pos-label">Left</span>
+              <span class="sp-feed-pos-sub">Docked sidebar</span>
+            </button>
+            <button class="sp-feed-pos" data-pos="split" type="button">
+              <span class="sp-feed-pos-pv sp-feed-pos-pv-split"><i></i></span>
+              <span class="sp-feed-pos-label">Split Mode</span>
+              <span class="sp-feed-pos-sub">Centred · parts the page</span>
+            </button>
+            <button class="sp-feed-pos" data-pos="right" type="button">
+              <span class="sp-feed-pos-pv sp-feed-pos-pv-right"><i></i></span>
+              <span class="sp-feed-pos-label">Right</span>
+              <span class="sp-feed-pos-sub">Docked sidebar</span>
+            </button>
+          </div>
+          <div class="sp-hint" style="margin-top:10px">Split Mode bisects the page — content reflows around the centred feed. Left and Right behave as classic sidebars.</div>
+        </div>
+      </div>
+
       <!-- ── Content ── -->
       <div class="sp-section" id="sp-content">
         <h2>Content Settings</h2>
@@ -472,8 +501,31 @@
         if (btn.dataset.sp === "themes") loadThemeSection();
         if (btn.dataset.sp === "about") loadAboutSection();
         if (btn.dataset.sp === "tournaments") initTournamentSection();
+        if (btn.dataset.sp === "feed") initFeedSection();
       });
     });
+
+    // ── Feed position picker ──────────────────────────────────
+    function initFeedSection() {
+      const saved = localStorage.getItem("lobby_feed_position") || "right";
+      document.querySelectorAll("#spFeedPosGrid .sp-feed-pos").forEach(btn => {
+        btn.classList.toggle("active", btn.dataset.pos === saved);
+        // Wire once
+        if (btn._spWired) return;
+        btn._spWired = true;
+        btn.addEventListener("click", () => {
+          const pos = btn.dataset.pos;
+          document.querySelectorAll("#spFeedPosGrid .sp-feed-pos")
+            .forEach(b => b.classList.toggle("active", b === btn));
+          if (typeof window.setFeedPosition === "function") {
+            window.setFeedPosition(pos);
+          } else {
+            document.body.setAttribute("data-feed-position", pos);
+            try { localStorage.setItem("lobby_feed_position", pos); } catch(_) {}
+          }
+        });
+      });
+    }
 
     document.getElementById("spSaveProfile").addEventListener("click", saveProfile);
     document.getElementById("spSaveAppearance").addEventListener("click", saveAppearance);

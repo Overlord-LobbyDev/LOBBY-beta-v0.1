@@ -1,0 +1,611 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8"/>
+<title>Hotbar v5 — premium preview</title>
+<style>
+  :root{
+    --accent:#f9a8d4; --accent-h:#c77bff;
+    --font:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;
+    --bg-0:#0a0b10; --bg-1:#14151d; --text-1:#eef0f5; --text-2:#aeb2c2; --text-3:#7e8295;
+    --danger:#ed4245;
+  }
+  *{box-sizing:border-box;margin:0;padding:0}
+  body{ background:#0a0b10; font-family:var(--font); min-height:100vh; color:#eef0f5; }
+
+  /* faux top bar */
+  .demo-topbar{
+    height:72px; display:flex; align-items:center; gap:14px; padding:0 18px;
+    background:linear-gradient(180deg,#15161f,#0e0f15);
+    border-bottom:1px solid rgba(255,255,255,.05);
+  }
+  .demo-logo{ font-weight:900; letter-spacing:1px; font-size:18px;
+    background:linear-gradient(135deg,#f9a8d4,#c77bff); -webkit-background-clip:text;
+    -webkit-text-fill-color:transparent; }
+  .demo-ico{ width:40px;height:40px;border-radius:999px;flex-shrink:0;
+    background:rgba(20,22,32,.7);border:1px solid rgba(255,255,255,.08);
+    display:flex;align-items:center;justify-content:center;color:#9aa0b4;font-size:15px;}
+  .demo-search{ flex:1;max-width:440px;margin:0 auto;height:40px;border-radius:999px;
+    background:rgba(255,255,255,.05);border:1px solid rgba(255,255,255,.08);
+    display:flex;align-items:center;padding:0 16px;color:rgba(255,255,255,.4);font-size:13px;}
+  .demo-caption{ color:rgba(255,255,255,.55);font-size:13px;padding:26px 22px;max-width:760px;
+    margin:0 auto;line-height:1.7;letter-spacing:.2px; }
+  .demo-caption b{ color:#fff;font-weight:700; }
+  .demo-caption .k{ display:inline-block;padding:1px 7px;border-radius:6px;
+    background:rgba(255,255,255,.07);border:1px solid rgba(255,255,255,.1);
+    font-size:11.5px;color:#dfe2ec; }
+  .demo-controls{ display:flex;gap:8px;justify-content:center;padding:4px 0 0; }
+  .demo-controls button{ font-family:var(--font);font-size:12px;font-weight:600;
+    padding:7px 13px;border-radius:9px;cursor:pointer;color:#cfd2de;
+    background:rgba(255,255,255,.04);border:1px solid rgba(255,255,255,.09); }
+  .demo-controls button:hover{ background:rgba(255,255,255,.08);color:#fff; }
+
+  @keyframes phItemIn{from{opacity:0;transform:translateY(4px) scale(.96)}to{opacity:1;transform:none}}
+  @keyframes phPresence{0%,100%{box-shadow:0 0 0 0 rgba(59,165,92,.5)}50%{box-shadow:0 0 0 3.5px rgba(59,165,92,0)}}
+  @keyframes phDropIn{from{opacity:0;transform:translateY(-7px) scale(.98)}to{opacity:1;transform:none}}
+
+  /* ===== Hotbar row ===== */
+  #phHotbarRow{ position:relative; height:50px;
+    background:
+      radial-gradient(80% 140% at 50% -40%, color-mix(in srgb, var(--accent) 7%, transparent) 0%, transparent 65%),
+      linear-gradient(180deg,rgba(255,255,255,.06) 0%,rgba(255,255,255,.014) 28%,rgba(0,0,0,.30) 100%),
+      #0c0d14;
+    border-top:1px solid color-mix(in srgb, var(--accent) 10%, rgba(255,255,255,.045));
+    box-shadow:0 1px 0 rgba(255,255,255,.05) inset,0 18px 36px -18px rgba(0,0,0,.85); }
+  #phHotbarRow::after{ content:"";position:absolute;left:0;right:0;bottom:0;height:1px;pointer-events:none;
+    background:linear-gradient(90deg,transparent,color-mix(in srgb,var(--accent) 40%,transparent) 50%,transparent);opacity:.35; }
+  #phHotbarRowInner{ display:flex;align-items:center;justify-content:flex-start;gap:14px;height:100%;padding:0 14px; }
+
+  .ph-strip{ position:relative;display:flex;align-items:center;gap:6px;height:100%;flex:1 1 0;min-width:0; }
+  .ph-strip-label{ display:inline-flex;align-items:center;gap:9px;flex-shrink:0;height:36px;
+    padding:0 4px 0 2px;border-radius:9px;user-select:none;transition:background .15s; }
+  .ph-strip-label.is-switcher{ cursor:pointer; }
+  .ph-strip-label.is-switcher:hover{ background:rgba(255,255,255,.05); }
+  .ph-label-tile{ width:28px;height:28px;border-radius:8px;flex-shrink:0;display:inline-flex;
+    align-items:center;justify-content:center;background:rgba(255,255,255,.05);
+    border:1px solid rgba(255,255,255,.07);box-shadow:0 1px 0 rgba(255,255,255,.05) inset; }
+  .ph-label-tile svg{ width:15px;height:15px;color:rgba(255,255,255,.82); }
+  .ph-label-text{ font-size:10.5px;font-weight:700;letter-spacing:1.3px;text-transform:uppercase;
+    color:rgba(255,255,255,.56);white-space:nowrap; }
+  .ph-switch-chev{ width:9px;height:9px;color:rgba(255,255,255,.5);transition:transform .25s; }
+  .ph-strip-label.open .ph-switch-chev{ transform:rotate(180deg); }
+  .ph-divider{ width:1px;height:22px;flex-shrink:0;margin:0 4px;
+    background:linear-gradient(180deg,transparent,rgba(255,255,255,.13),transparent); }
+
+  #phLobbiesPills,#phFriendsPills{
+    display:flex;align-items:center;gap:7px;flex:1 1 0;min-width:0;height:100%;padding:0 2px;
+    overflow-x:auto;overflow-y:hidden;scroll-behavior:smooth;scrollbar-width:none; }
+  #phLobbiesPills::-webkit-scrollbar,#phFriendsPills::-webkit-scrollbar{ display:none; }
+  #phLobbiesPills.is-overflowing,#phFriendsPills.is-overflowing{
+    -webkit-mask-image:linear-gradient(90deg,transparent 0,#000 18px,#000 calc(100% - 18px),transparent 100%);
+            mask-image:linear-gradient(90deg,transparent 0,#000 18px,#000 calc(100% - 18px),transparent 100%); }
+
+  .ph-pill{ position:relative;display:inline-flex;align-items:center;gap:8px;height:36px;max-width:190px;
+    min-width:0;padding:0 10px 0 5px;border:1px solid rgba(255,255,255,.075);border-radius:10px;
+    background:linear-gradient(180deg,rgba(255,255,255,.06) 0%,rgba(255,255,255,.018) 100%);
+    box-shadow:0 1px 0 rgba(255,255,255,.055) inset,0 -1px 0 rgba(0,0,0,.28) inset;
+    color:#eef0f5;font-family:var(--font);cursor:pointer;white-space:nowrap;flex-shrink:0;
+    transition:background .16s,border-color .16s,box-shadow .2s,opacity .16s;
+    animation:phItemIn .3s cubic-bezier(.22,1,.36,1) both; }
+  .ph-pill:hover{
+    background:linear-gradient(180deg,color-mix(in srgb,var(--accent) 13%,rgba(255,255,255,.09)) 0%,rgba(255,255,255,.03) 100%);
+    border-color:color-mix(in srgb,var(--accent) 40%,rgba(255,255,255,.2));
+    box-shadow:0 1px 0 rgba(255,255,255,.1) inset,0 0 0 1px color-mix(in srgb,var(--accent) 16%,transparent),0 -1px 0 rgba(0,0,0,.28) inset; }
+  .ph-pill:active{ background:linear-gradient(180deg,rgba(255,255,255,.05),rgba(255,255,255,.012)); }
+  .ph-pill.is-current{ background:color-mix(in srgb,var(--accent) 15%,rgba(255,255,255,.03));
+    border-color:color-mix(in srgb,var(--accent) 52%,transparent); }
+  .ph-pill.is-current .ph-pill-name{ color:#fff; }
+  .ph-pill.ph-dragging{ opacity:.35;cursor:grabbing; }
+  .ph-pill.ph-drag-before::before,.ph-pill.ph-drag-after::after{
+    content:"";position:absolute;top:3px;bottom:3px;width:3px;border-radius:2px;
+    background:var(--accent);box-shadow:0 0 8px color-mix(in srgb,var(--accent) 75%,transparent); }
+  .ph-pill.ph-drag-before::before{ left:-5px; }
+  .ph-pill.ph-drag-after::after{ right:-5px; }
+
+  .ph-pill-ico{ width:26px;height:26px;flex-shrink:0;display:inline-flex;align-items:center;justify-content:center; }
+  .ph-lobby-icon{ width:26px;height:26px;border-radius:7px;overflow:hidden;flex-shrink:0;
+    display:inline-flex;align-items:center;justify-content:center;
+    background:linear-gradient(150deg,#2b2f3d,#1b1d27);color:#cdd0db;font-size:11px;font-weight:800;
+    box-shadow:0 0 0 1px rgba(255,255,255,.07) inset,0 1px 2px rgba(0,0,0,.4); }
+  .ph-pill.is-current .ph-lobby-icon{ box-shadow:0 0 0 1.5px color-mix(in srgb,var(--accent) 75%,transparent),0 1px 2px rgba(0,0,0,.4); }
+  .ph-friend-avatar-wrap{ position:relative;width:26px;height:26px;flex-shrink:0;border-radius:50%;
+    box-shadow:0 0 0 1px rgba(255,255,255,.1) inset,0 1px 2px rgba(0,0,0,.45); }
+  .ph-friend-avatar-fallback{ width:100%;height:100%;border-radius:50%;display:flex;
+    align-items:center;justify-content:center;
+    background:linear-gradient(150deg,#3a3d4e,#24262f);color:#e6e7ee;font-size:11px;font-weight:800; }
+  .ph-presence-dot{ position:absolute;right:-2px;bottom:-2px;width:10px;height:10px;border-radius:50%;
+    background:#3ba55c;border:2.5px solid #11131c;animation:phPresence 2.6s ease-in-out infinite; }
+  .ph-presence-dot.offline{ background:#5b6070;animation:none; }
+  .ph-pill-name{ font-size:12.5px;font-weight:600;color:#e7e9f0;max-width:120px;
+    overflow:hidden;text-overflow:ellipsis;white-space:nowrap; }
+
+  .ph-pill-count{ display:inline-flex;align-items:center;gap:3px;flex-shrink:0;height:18px;
+    padding:0 6px 0 5px;border-radius:6px;background:rgba(255,255,255,.07);
+    box-shadow:0 0 0 1px rgba(255,255,255,.05) inset;font-size:10.5px;font-weight:700;
+    color:rgba(255,255,255,.62);letter-spacing:.2px;line-height:1; }
+  .ph-pill-count svg{ width:9px;height:9px;opacity:.8;flex-shrink:0; }
+  .ph-pill:hover .ph-pill-count{ background:rgba(255,255,255,.1);color:rgba(255,255,255,.8); }
+  .ph-pill.is-current .ph-pill-count{ background:color-mix(in srgb,var(--accent) 26%,transparent);color:#fff; }
+
+  .ph-friend-sep{ display:inline-flex;align-items:center;gap:7px;flex-shrink:0;height:36px;padding:0 3px;user-select:none; }
+  .ph-friend-sep-line{ width:1px;height:22px;background:linear-gradient(180deg,transparent,rgba(255,255,255,.16),transparent); }
+  .ph-friend-sep-text{ display:inline-flex;align-items:center;gap:4px;font-size:9px;font-weight:800;
+    letter-spacing:1px;text-transform:uppercase;color:rgba(255,255,255,.34);white-space:nowrap; }
+  .ph-friend-sep-text::before{ content:"";width:5px;height:5px;border-radius:50%;background:#5b6070;flex-shrink:0; }
+
+  .ph-search-btn{ display:inline-flex;align-items:center;justify-content:center;flex-shrink:0;
+    width:32px;height:32px;border:1px solid rgba(255,255,255,.06);border-radius:9px;
+    background:rgba(255,255,255,.03);color:rgba(255,255,255,.5);cursor:pointer;
+    transition:background .15s,color .15s,border-color .15s; }
+  .ph-search-btn svg{ width:15px;height:15px; }
+  .ph-search-btn:hover{ background:rgba(255,255,255,.075);border-color:rgba(255,255,255,.13);color:#fff; }
+  .ph-search-btn.active{ background:color-mix(in srgb,var(--accent) 16%,transparent);
+    border-color:color-mix(in srgb,var(--accent) 44%,transparent);color:#fff; }
+
+  /* Feed pill */
+  #phFeedToggleBtn{ display:inline-flex;align-items:center;gap:8px;flex-shrink:0;height:36px;
+    padding:0 13px 0 4px;background:rgba(255,255,255,.025);border:1px solid rgba(255,255,255,.05);
+    border-radius:10px;color:var(--text-3);font-size:12px;font-weight:600;font-family:var(--font);
+    cursor:pointer;user-select:none;transition:background .18s,color .18s,border-color .18s; }
+  #phFeedToggleBtn:hover{ background:rgba(255,255,255,.045);border-color:rgba(255,255,255,.08);color:var(--text-1); }
+  #phFeedToggleBtn .ph-fb-tile{ display:inline-flex;align-items:center;justify-content:center;
+    width:28px;height:28px;border-radius:7px;background:rgba(255,255,255,.04);color:var(--text-2);flex-shrink:0; }
+  #phFeedToggleBtn .ph-fb-tile svg{ width:14px;height:14px; }
+  #phFeedToggleBtn.feed-open{ background:linear-gradient(180deg,rgba(246,180,80,.18),rgba(246,180,80,.06));
+    border-color:rgba(246,180,80,.42);color:#f6b450; }
+  #phFeedToggleBtn.feed-open .ph-fb-tile{ background:rgba(246,180,80,.2);color:#f6b450; }
+
+  /* Dropdown / search panel */
+  .ph-drop{ position:absolute;top:calc(100% + 9px);min-width:262px;max-height:60vh;overflow-y:auto;
+    padding:7px;border:1px solid rgba(255,255,255,.09);border-radius:14px;
+    background:linear-gradient(180deg,rgba(255,255,255,.05),rgba(255,255,255,0) 32%),#14151d;
+    box-shadow:0 1px 0 rgba(255,255,255,.07) inset,0 26px 60px rgba(0,0,0,.66);
+    z-index:1000;display:none; }
+  .ph-drop.align-right{ right:0; }
+  .ph-drop.open{ display:block;animation:phDropIn .2s cubic-bezier(.22,.7,.2,1) both; }
+  .ph-drop::-webkit-scrollbar{ width:8px; }
+  .ph-drop::-webkit-scrollbar-thumb{ background:rgba(255,255,255,.1);border-radius:4px;
+    border:2px solid transparent;background-clip:padding-box; }
+  .ph-drop-search{ position:relative;margin:1px 3px 8px; }
+  .ph-drop-search>svg{ position:absolute;left:10px;top:50%;transform:translateY(-50%);
+    width:14px;height:14px;color:rgba(255,255,255,.4);pointer-events:none; }
+  .ph-drop-input{ width:100%;height:34px;padding:0 10px 0 32px;border:1px solid rgba(255,255,255,.09);
+    border-radius:9px;background:rgba(0,0,0,.28);color:#eef0f5;font-family:var(--font);
+    font-size:12.5px;outline:none;transition:border-color .15s,background .15s; }
+  .ph-drop-input:focus{ border-color:color-mix(in srgb,var(--accent) 55%,transparent);background:rgba(0,0,0,.38); }
+  .ph-drop-input::placeholder{ color:rgba(255,255,255,.34); }
+  .ph-drop-list{ display:flex;flex-direction:column;gap:1px; }
+  .ph-drop-group-label{ padding:9px 9px 4px;font-size:9px;font-weight:800;letter-spacing:1.2px;
+    text-transform:uppercase;color:rgba(255,255,255,.34);display:flex;align-items:center;gap:6px; }
+  .ph-dgl-count{ color:rgba(255,255,255,.28);font-weight:700; }
+  .ph-drop-row{ display:flex;align-items:center;gap:11px;padding:8px 9px;border-radius:9px;
+    cursor:pointer;transition:background .12s; }
+  .ph-drop-row:hover{ background:rgba(255,255,255,.06); }
+  .ph-drop-row.is-current-row{ background:color-mix(in srgb,var(--accent) 13%,transparent); }
+  .ph-drop-thumb{ width:30px;height:30px;border-radius:8px;overflow:hidden;flex-shrink:0;
+    display:inline-flex;align-items:center;justify-content:center;
+    background:linear-gradient(150deg,#2f3142,#1d1f2a);color:#cdd0db;font-size:12px;font-weight:800;
+    box-shadow:0 0 0 1px rgba(255,255,255,.07) inset; }
+  .ph-drop-thumb.round{ border-radius:50%; }
+  .ph-drop-info{ flex:1;min-width:0; }
+  .ph-drop-row-name{ font-size:13px;font-weight:600;color:#eceef4;overflow:hidden;
+    text-overflow:ellipsis;white-space:nowrap; }
+  .ph-drop-row.is-current-row .ph-drop-row-name{ color:#fff; }
+  .ph-drop-row-sub{ font-size:11px;font-weight:500;color:rgba(255,255,255,.45);margin-top:1px; }
+  .ph-drop-presence{ position:absolute;right:-2px;bottom:-2px;width:10px;height:10px;border-radius:50%;
+    background:#3ba55c;border:2.5px solid #14151d; }
+  .ph-drop-presence.offline{ background:#5b6070; }
+  .ph-drop-empty{ padding:16px 10px;text-align:center;font-size:12px;color:rgba(255,255,255,.42); }
+
+  /* Context menu */
+  .ph-ctx-menu{ position:fixed;z-index:99999;min-width:222px;padding:8px;
+    background:linear-gradient(180deg,#181922,#101119);
+    border:1px solid color-mix(in srgb,var(--accent) 18%,rgba(255,255,255,.08));
+    border-radius:12px;box-shadow:0 24px 56px -16px rgba(0,0,0,.75),inset 0 1px 0 rgba(255,255,255,.05);
+    color:#eef0f5;font-family:var(--font);opacity:0;transform:translateY(-6px) scale(.97);
+    pointer-events:none;transition:opacity .18s,transform .22s cubic-bezier(.22,1,.36,1); }
+  .ph-ctx-menu.open{ opacity:1;transform:none;pointer-events:auto; }
+  .ph-ctx-head{ display:flex;align-items:center;gap:10px;padding:6px 8px 10px;margin-bottom:4px;
+    border-bottom:1px solid rgba(255,255,255,.07); }
+  .ph-ctx-avatar{ width:36px;height:36px;border-radius:50%;overflow:hidden;flex-shrink:0;
+    background:linear-gradient(135deg,var(--accent),var(--accent-h));
+    display:flex;align-items:center;justify-content:center;color:#fff;font-weight:800;font-size:14px; }
+  .ph-ctx-name{ font-size:13px;font-weight:700;color:#fff;white-space:nowrap;overflow:hidden;text-overflow:ellipsis; }
+  .ph-ctx-sub{ font-size:11px;font-weight:600;color:rgba(255,255,255,.5);margin-top:1px; }
+  .ph-ctx-pres{ display:inline-block;width:7px;height:7px;border-radius:50%;background:#3ba55c;
+    margin-right:5px;vertical-align:middle;box-shadow:0 0 5px rgba(59,165,92,.6); }
+  .ph-ctx-pres.offline{ background:#5b6070;box-shadow:none; }
+  .ph-ctx-action{ display:flex;align-items:center;gap:12px;width:100%;padding:9px 10px;border:none;
+    background:none;border-radius:8px;color:#e2e4ec;font-family:inherit;font-size:13px;font-weight:600;
+    cursor:pointer;text-align:left;transition:background .14s,color .14s,padding-left .14s; }
+  .ph-ctx-action:hover{ background:color-mix(in srgb,var(--accent) 16%,rgba(255,255,255,.04));
+    color:#fff;padding-left:14px; }
+  .ph-ctx-action svg{ width:16px;height:16px;flex-shrink:0;opacity:.9; }
+  .ph-ctx-rule{ height:1px;background:rgba(255,255,255,.06);margin:4px 6px; }
+
+  /* toast */
+  #toast{ position:fixed;left:50%;bottom:32px;transform:translateX(-50%) translateY(20px);
+    background:#1c1d27;border:1px solid rgba(255,255,255,.12);color:#eef0f5;font-size:13px;
+    font-weight:600;padding:11px 18px;border-radius:10px;box-shadow:0 14px 40px rgba(0,0,0,.6);
+    opacity:0;pointer-events:none;transition:opacity .2s,transform .2s;z-index:100000; }
+  #toast.show{ opacity:1;transform:translateX(-50%) translateY(0); }
+</style>
+</head>
+<body>
+
+  <div class="demo-topbar">
+    <span class="demo-logo">LOBBY</span>
+    <span class="demo-ico">&#9733;</span>
+    <span class="demo-ico">&#9776;</span>
+    <span class="demo-ico">&#43;</span>
+    <div class="demo-search">Search users and lobbies&hellip;</div>
+    <span class="demo-ico">&#9993;</span>
+    <span class="demo-ico">&#9679;</span>
+    <span class="demo-ico">&#9786;</span>
+  </div>
+
+  <div id="phHotbarRow">
+    <div id="phHotbarRowInner">
+
+      <div id="phLobbiesHotbar" class="ph-strip">
+        <span class="ph-strip-label">
+          <span class="ph-label-tile">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.1" stroke-linecap="round" stroke-linejoin="round"><path d="M3 9.5 12 3l9 6.5V20a1 1 0 0 1-1 1h-5v-6H9v6H4a1 1 0 0 1-1-1V9.5z"/></svg>
+          </span>
+          <span class="ph-label-text">My Lobbies</span>
+        </span>
+        <span class="ph-divider"></span>
+        <div id="phLobbiesPills"></div>
+        <button id="phLobbiesSearchBtn" class="ph-search-btn" type="button" title="Search lobbies">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="7"/><line x1="21" y1="21" x2="16.5" y2="16.5"/></svg>
+        </button>
+        <div id="phLobbiesDrop" class="ph-drop align-right"></div>
+      </div>
+
+      <button id="phFeedToggleBtn" type="button" onclick="this.classList.toggle('feed-open')">
+        <span class="ph-fb-tile">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.1" stroke-linecap="round" stroke-linejoin="round">
+            <rect x="3" y="4" width="8" height="16" rx="1.6"/><rect x="13" y="4" width="8" height="16" rx="1.6"/>
+            <line x1="13" y1="9" x2="17" y2="9"/><line x1="13" y1="12" x2="19" y2="12"/><line x1="13" y1="15" x2="16" y2="15"/>
+          </svg>
+        </span>
+        <span>Feed</span>
+      </button>
+
+      <div id="phFriendsHotbar" class="ph-strip">
+        <span class="ph-strip-label is-switcher">
+          <span class="ph-label-tile">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.1" stroke-linecap="round" stroke-linejoin="round"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
+          </span>
+          <span class="ph-label-text">Friends</span>
+          <svg class="ph-switch-chev" viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><polyline points="2,4 6,8 10,4"/></svg>
+        </span>
+        <span class="ph-divider"></span>
+        <div id="phFriendsPills"></div>
+        <button id="phFriendsSearchBtn" class="ph-search-btn" type="button" title="Search friends">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="7"/><line x1="21" y1="21" x2="16.5" y2="16.5"/></svg>
+        </button>
+        <div id="phFriendsDrop" class="ph-drop align-right"></div>
+      </div>
+
+    </div>
+  </div>
+
+  <div class="demo-caption">
+    <b>Hotbar v5 — interactive preview.</b> This is a faithful demo of the rebuilt second hotbar.
+    Try it: <b>click a friend</b> for the profile / message / call / invite menu &middot;
+    <b>drag any pill</b> sideways to reorder (saved locally) &middot; <b>scroll</b> the lane with your mouse wheel &middot;
+    click the <span class="k">&#128269;</span> button to open the searchable browse panel &middot;
+    note the <b>Offline</b> separator and the member-count badges on lobbies.
+    <div class="demo-controls">
+      <button onclick="setFeed('left')">Feed: Left</button>
+      <button onclick="setFeed('split')">Feed: Split</button>
+      <button onclick="setFeed('right')">Feed: Right</button>
+      <button onclick="resetOrder()">Reset order</button>
+    </div>
+  </div>
+
+  <div id="toast"></div>
+
+<script>
+(function(){
+  "use strict";
+  var esc = function(s){ return String(s==null?'':s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); };
+
+  // ── Icons ──────────────────────────────────────────────────────
+  var ICO_MEMBERS='<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>';
+  var ICO_MSG='<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>';
+  var ICO_PROFILE='<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M19 21v-2a4 4 0 0 0-4-4H9a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>';
+  var ICO_PHONE='<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72c.13.96.36 1.9.7 2.81a2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45c.91.34 1.85.57 2.81.7A2 2 0 0 1 22 16.92z"/></svg>';
+  var ICO_INVITE='<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><line x1="19" y1="8" x2="19" y2="14"/><line x1="22" y1="11" x2="16" y2="11"/></svg>';
+  var ICO_SEARCH='<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="7"/><line x1="21" y1="21" x2="16.5" y2="16.5"/></svg>';
+
+  // ── Mock data — deliberately long so overflow/scroll is visible ──
+  var LOBBIES=[
+    {id:'l1',name:"Overlord's Lobby",ab:'OL',members:9,cur:true},
+    {id:'l2',name:'D&D Night',ab:'DD',members:4},
+    {id:'l3',name:'Pokémon League',ab:'PK',members:1},
+    {id:'l4',name:'Arc Raiders',ab:'AR',members:12},
+    {id:'l5',name:'Valhalla',ab:'VH',members:23},
+    {id:'l6',name:'Apex Squad',ab:'AX',members:7},
+    {id:'l7',name:'Nova Collective',ab:'NV',members:19},
+    {id:'l8',name:'Late Night Crew',ab:'LN',members:5}
+  ];
+  var FRIENDS=[
+    {id:'u1',name:'MagicManLevi',ab:'M',online:true},
+    {id:'u2',name:'SsteakBake',ab:'S',online:true},
+    {id:'u3',name:'3reilgn',ab:'3',online:true},
+    {id:'u4',name:'Test1234',ab:'T',online:true},
+    {id:'u5',name:'Nightfall',ab:'N',online:true},
+    {id:'u6',name:'QuasarKid',ab:'Q',online:true},
+    {id:'u7',name:'Tarnished',ab:'T',online:false},
+    {id:'u8',name:'Kova',ab:'K',online:false},
+    {id:'u9',name:'PixelWitch',ab:'P',online:false},
+    {id:'u10',name:'Grimlock',ab:'G',online:false},
+    {id:'u11',name:'Echo',ab:'E',online:false},
+    {id:'u12',name:'Voidwalker',ab:'V',online:false}
+  ];
+
+  // ── Local order persistence ─────────────────────────────────────
+  function getOrder(k){ try{var a=JSON.parse(localStorage.getItem(k)||'[]');return Array.isArray(a)?a:[];}catch(e){return[];} }
+  function saveOrder(k,a){ try{localStorage.setItem(k,JSON.stringify(a));}catch(e){} }
+  function applyOrder(items,key){
+    var order=getOrder(key); if(!order.length) return items.slice();
+    var pos={}; order.forEach(function(id,i){pos[id]=i;});
+    return items.slice().sort(function(a,b){
+      var ai=pos[a.id],bi=pos[b.id];
+      if(ai==null&&bi==null)return 0; if(ai==null)return 1; if(bi==null)return -1; return ai-bi;
+    });
+  }
+  function markOverflow(el){ if(el) el.classList.toggle('is-overflowing',el.scrollWidth>el.clientWidth+2); }
+
+  var toastT;
+  function toast(msg){
+    var t=document.getElementById('toast'); t.textContent=msg; t.classList.add('show');
+    clearTimeout(toastT); toastT=setTimeout(function(){t.classList.remove('show');},2400);
+  }
+
+  // ── Render lobbies ──────────────────────────────────────────────
+  function renderLobbies(){
+    var row=document.getElementById('phLobbiesPills');
+    var list=applyOrder(LOBBIES,'pv_lobby_order');
+    row.innerHTML=list.map(function(s){
+      var meta='<span class="ph-pill-count" title="'+s.members+' members">'+ICO_MEMBERS+s.members+'</span>';
+      return '<button class="ph-pill ph-lobby-pill'+(s.cur?' is-current':'')+'" draggable="true" data-id="'+s.id+'">'+
+        '<span class="ph-pill-ico"><span class="ph-lobby-icon">'+esc(s.ab)+'</span></span>'+
+        '<span class="ph-pill-name">'+esc(s.name)+'</span>'+meta+'</button>';
+    }).join('');
+    markOverflow(row);
+  }
+
+  // ── Render friends (with online/offline separator) ──────────────
+  function friendPill(f){
+    return '<button class="ph-pill ph-friend-pill" draggable="true" data-id="'+f.id+'">'+
+      '<span class="ph-pill-ico"><span class="ph-friend-avatar-wrap">'+
+        '<span class="ph-friend-avatar-fallback">'+esc(f.ab)+'</span>'+
+        '<span class="ph-presence-dot'+(f.online?'':' offline')+'"></span>'+
+      '</span></span>'+
+      '<span class="ph-pill-name">'+esc(f.name)+'</span></button>';
+  }
+  function renderFriends(){
+    var row=document.getElementById('phFriendsPills');
+    var list=applyOrder(FRIENDS,'pv_friend_order');
+    var on=list.filter(function(f){return f.online;});
+    var off=list.filter(function(f){return !f.online;});
+    var html=on.map(friendPill).join('');
+    if(on.length&&off.length){
+      html+='<span class="ph-friend-sep"><span class="ph-friend-sep-line"></span>'+
+            '<span class="ph-friend-sep-text">Offline '+off.length+'</span>'+
+            '<span class="ph-friend-sep-line"></span></span>';
+    }
+    html+=off.map(friendPill).join('');
+    row.innerHTML=html;
+    markOverflow(row);
+  }
+
+  // ── Search / browse panel ───────────────────────────────────────
+  function lobbyRows(q){
+    var rows=applyOrder(LOBBIES,'pv_lobby_order').filter(function(s){
+      return !q||s.name.toLowerCase().indexOf(q)!==-1;
+    }).map(function(s){
+      return '<div class="ph-drop-row'+(s.cur?' is-current-row':'')+'" data-lobby="'+s.id+'">'+
+        '<span class="ph-drop-thumb">'+esc(s.ab)+'</span>'+
+        '<div class="ph-drop-info"><div class="ph-drop-row-name">'+esc(s.name)+'</div>'+
+        '<div class="ph-drop-row-sub">'+s.members+' members'+(s.cur?' · Current':'')+'</div></div></div>';
+    }).join('');
+    return rows||'<div class="ph-drop-empty">No lobbies match.</div>';
+  }
+  function friendRow(f){
+    return '<div class="ph-drop-row" data-friend="'+f.id+'">'+
+      '<span style="position:relative;flex-shrink:0"><span class="ph-drop-thumb round">'+esc(f.ab)+'</span>'+
+      '<span class="ph-drop-presence'+(f.online?'':' offline')+'"></span></span>'+
+      '<div class="ph-drop-info"><div class="ph-drop-row-name">'+esc(f.name)+'</div>'+
+      '<div class="ph-drop-row-sub">'+(f.online?'Online':'Offline')+'</div></div></div>';
+  }
+  function friendRows(q){
+    var list=applyOrder(FRIENDS,'pv_friend_order');
+    function m(f){return !q||f.name.toLowerCase().indexOf(q)!==-1;}
+    var on=list.filter(function(f){return f.online&&m(f);});
+    var off=list.filter(function(f){return !f.online&&m(f);});
+    if(!on.length&&!off.length) return '<div class="ph-drop-empty">No friends match.</div>';
+    var h='';
+    if(on.length) h+='<div class="ph-drop-group-label">Online <span class="ph-dgl-count">'+on.length+'</span></div>'+on.map(friendRow).join('');
+    if(off.length) h+='<div class="ph-drop-group-label">Offline <span class="ph-dgl-count">'+off.length+'</span></div>'+off.map(friendRow).join('');
+    return h;
+  }
+  function openSearch(which){
+    var dropId=which==='lobbies'?'phLobbiesDrop':'phFriendsDrop';
+    var btnId =which==='lobbies'?'phLobbiesSearchBtn':'phFriendsSearchBtn';
+    var drop=document.getElementById(dropId);
+    var wasOpen=drop.classList.contains('open');
+    closeAll();
+    if(wasOpen) return;
+    var ph=which==='lobbies'?'Search lobbies…':'Search friends…';
+    drop.innerHTML='<div class="ph-drop-search">'+ICO_SEARCH+
+      '<input type="text" class="ph-drop-input" placeholder="'+ph+'"/></div>'+
+      '<div class="ph-drop-list">'+(which==='lobbies'?lobbyRows(''):friendRows(''))+'</div>';
+    var input=drop.querySelector('.ph-drop-input'), list=drop.querySelector('.ph-drop-list');
+    input.addEventListener('input',function(){
+      list.innerHTML=which==='lobbies'?lobbyRows(input.value.trim().toLowerCase()):friendRows(input.value.trim().toLowerCase());
+    });
+    input.addEventListener('keydown',function(e){ if(e.key==='Escape') closeAll(); });
+    drop.classList.add('open');
+    document.getElementById(btnId).classList.add('active');
+    setTimeout(function(){input.focus();},30);
+  }
+
+  // ── Context menu ────────────────────────────────────────────────
+  function ctx(){
+    var m=document.getElementById('phCtxMenu');
+    if(m) return m;
+    m=document.createElement('div'); m.id='phCtxMenu'; m.className='ph-ctx-menu';
+    document.body.appendChild(m);
+    m.addEventListener('click',function(e){
+      e.stopPropagation();
+      var b=e.target.closest('.ph-ctx-action'); if(!b) return;
+      var act=b.getAttribute('data-act'), name=m.getAttribute('data-name');
+      closeAll();
+      if(act==='msg') toast('Opening direct message with '+name+'…');
+      else if(act==='profile') toast('Opening '+name+"'s profile…");
+      else if(act==='call') toast('Starting a voice call with '+name+'…');
+      else if(act==='invite') toast('Invited '+name+" to Overlord's Lobby.");
+    });
+    return m;
+  }
+  function closeCtx(){ var m=document.getElementById('phCtxMenu'); if(m) m.classList.remove('open'); }
+  function action(act,label,icon){
+    return '<button class="ph-ctx-action" data-act="'+act+'">'+icon+'<span>'+label+'</span></button>';
+  }
+  function openFriendCtx(f,rect){
+    var m=ctx();
+    m.setAttribute('data-name',f.name);
+    m.innerHTML='<div class="ph-ctx-head"><span class="ph-ctx-avatar">'+esc(f.ab)+'</span>'+
+      '<span style="min-width:0;flex:1"><div class="ph-ctx-name">'+esc(f.name)+'</div>'+
+      '<div class="ph-ctx-sub"><span class="ph-ctx-pres'+(f.online?'':' offline')+'"></span>'+
+      (f.online?'Online':'Offline')+'</div></span></div>'+
+      action('msg','Send Message',ICO_MSG)+
+      action('profile','Open Profile',ICO_PROFILE)+
+      action('call','Voice Call',ICO_PHONE)+
+      '<div class="ph-ctx-rule"></div>'+
+      action('invite',"Invite to Overlord's Lobby",ICO_INVITE);
+    m.style.visibility='hidden'; m.classList.add('open');
+    var w=m.offsetWidth,h=m.offsetHeight;
+    var left=Math.max(10,Math.min(rect.left,window.innerWidth-w-10));
+    var top=rect.bottom+8; if(top+h>window.innerHeight-10) top=Math.max(10,rect.top-h-8);
+    m.style.left=left+'px'; m.style.top=top+'px'; m.style.visibility='';
+  }
+
+  function closeAll(){
+    document.querySelectorAll('.ph-drop.open').forEach(function(d){d.classList.remove('open');});
+    document.querySelectorAll('.ph-search-btn.active').forEach(function(b){b.classList.remove('active');});
+    closeCtx();
+  }
+
+  // ── Drag-to-reorder ─────────────────────────────────────────────
+  var drag={id:null,kind:null};
+  function clearMarks(c){ c.querySelectorAll('.ph-drag-before,.ph-drag-after').forEach(function(p){p.classList.remove('ph-drag-before','ph-drag-after');}); }
+  function wireDrag(container,kind,sel,orderKey,render){
+    container.addEventListener('dragstart',function(e){
+      var p=e.target.closest(sel); if(!p) return;
+      drag.id=p.getAttribute('data-id'); drag.kind=kind;
+      p.classList.add('ph-dragging'); closeAll();
+      try{e.dataTransfer.effectAllowed='move';e.dataTransfer.setData('text/plain',drag.id);}catch(_){}
+    });
+    container.addEventListener('dragend',function(){
+      var d=container.querySelector('.ph-dragging'); if(d) d.classList.remove('ph-dragging');
+      clearMarks(container); drag.id=null; drag.kind=null;
+    });
+    container.addEventListener('dragover',function(e){
+      if(drag.kind!==kind) return; e.preventDefault(); clearMarks(container);
+      var p=e.target.closest(sel); if(!p||p.getAttribute('data-id')===drag.id) return;
+      var r=p.getBoundingClientRect();
+      p.classList.add(e.clientX>r.left+r.width/2?'ph-drag-after':'ph-drag-before');
+    });
+    container.addEventListener('drop',function(e){
+      if(drag.kind!==kind) return; e.preventDefault();
+      var p=e.target.closest(sel), id=drag.id; clearMarks(container);
+      if(!p||!id||p.getAttribute('data-id')===id) return;
+      var after=e.clientX>p.getBoundingClientRect().left+p.offsetWidth/2;
+      var ids=[].slice.call(container.querySelectorAll(sel)).map(function(x){return x.getAttribute('data-id');})
+                .filter(function(x){return x!==id;});
+      var ti=ids.indexOf(p.getAttribute('data-id')); if(ti<0) ti=ids.length;
+      ids.splice(after?ti+1:ti,0,id);
+      saveOrder(orderKey,ids); render();
+    });
+  }
+  function wireWheel(el){
+    el.addEventListener('wheel',function(e){
+      if(!e.deltaY||el.scrollWidth<=el.clientWidth) return;
+      el.scrollLeft+=e.deltaY; e.preventDefault();
+    },{passive:false});
+  }
+
+  // ── Wiring ──────────────────────────────────────────────────────
+  var lobbyPills=document.getElementById('phLobbiesPills');
+  var friendPills=document.getElementById('phFriendsPills');
+  wireDrag(lobbyPills,'lobby','.ph-lobby-pill','pv_lobby_order',renderLobbies);
+  wireDrag(friendPills,'friend','.ph-friend-pill','pv_friend_order',renderFriends);
+  wireWheel(lobbyPills); wireWheel(friendPills);
+
+  document.getElementById('phLobbiesHotbar').addEventListener('click',function(e){
+    if(e.target.closest('#phLobbiesSearchBtn')){ e.stopPropagation(); openSearch('lobbies'); return; }
+    var lr=e.target.closest('.ph-drop-row[data-lobby]');
+    if(lr){ e.stopPropagation(); toast('Opening lobby…'); closeAll(); return; }
+    if(e.target.closest('.ph-drop')) return;
+    var pill=e.target.closest('.ph-lobby-pill');
+    if(pill){ toast('Opening '+pill.querySelector('.ph-pill-name').textContent+'…'); }
+  });
+  document.getElementById('phFriendsHotbar').addEventListener('click',function(e){
+    if(e.target.closest('#phFriendsSearchBtn')){ e.stopPropagation(); openSearch('friends'); return; }
+    var fr=e.target.closest('.ph-drop-row[data-friend]');
+    if(fr){
+      e.stopPropagation();
+      var f=FRIENDS.filter(function(x){return x.id===fr.getAttribute('data-friend');})[0];
+      var rect=fr.getBoundingClientRect(); closeAll();
+      if(f) openFriendCtx(f,rect);
+      return;
+    }
+    if(e.target.closest('.ph-drop')) return;
+    var fp=e.target.closest('.ph-friend-pill');
+    if(fp){
+      e.stopPropagation();
+      var fid=fp.getAttribute('data-id');
+      var fo=FRIENDS.filter(function(x){return x.id===fid;})[0];
+      if(fo) openFriendCtx(fo,fp.getBoundingClientRect());
+    }
+  });
+  document.getElementById('phFriendsHotbar').addEventListener('contextmenu',function(e){
+    var fp=e.target.closest('.ph-friend-pill'); if(!fp) return;
+    e.preventDefault(); closeAll();
+    var fo=FRIENDS.filter(function(x){return x.id===fp.getAttribute('data-id');})[0];
+    if(fo) openFriendCtx(fo,fp.getBoundingClientRect());
+  });
+  document.addEventListener('click',function(e){
+    if(e.target.closest('#phCtxMenu')) return;
+    if(e.target.closest('.ph-strip')){ if(!e.target.closest('.ph-friend-pill')) closeCtx(); return; }
+    closeAll();
+  });
+  document.addEventListener('keydown',function(e){ if(e.key==='Escape') closeAll(); });
+  window.addEventListener('resize',function(){ markOverflow(lobbyPills); markOverflow(friendPills); closeCtx(); });
+
+  // ── Demo controls ───────────────────────────────────────────────
+  window.setFeed=function(pos){
+    var row=document.getElementById('phHotbarRowInner');
+    var feed=document.getElementById('phFeedToggleBtn');
+    var lob=document.getElementById('phLobbiesHotbar');
+    var fri=document.getElementById('phFriendsHotbar');
+    if(pos==='left') row.insertBefore(feed,lob);
+    else if(pos==='right') row.appendChild(feed);
+    else row.insertBefore(feed,fri);
+    toast('Feed moved: '+pos+' — strips stay balanced.');
+  };
+  window.resetOrder=function(){
+    localStorage.removeItem('pv_lobby_order'); localStorage.removeItem('pv_friend_order');
+    renderLobbies(); renderFriends(); toast('Pill order reset.');
+  };
+
+  renderLobbies(); renderFriends();
+})();
+</script>
+</body>
+</html>

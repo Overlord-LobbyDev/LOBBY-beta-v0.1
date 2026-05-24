@@ -68,6 +68,30 @@ try {
   console.warn('[!] Tournament routes not found:', err.message);
 }
 
+// ── Ladder Routes ──────────────────────────────────────
+try {
+  const ladderRoutes = require('./ladder.js');
+  // Same auth-injection pattern as tournaments: mutating verbs always require auth.
+  // GETs are public so the leaderboard can be browsed without login, EXCEPT /me which
+  // is always personal.
+  app.use('/api/ladder', (req, res, next) => {
+    if (['POST','PUT','PATCH','DELETE'].includes(req.method)) return authMiddleware(req, res, next);
+    if (req.method === 'GET' && req.path === '/me') return authMiddleware(req, res, next);
+    next();
+  });
+  app.use('/api/ladder', ladderRoutes);
+  console.log('[✓] Ladder routes loaded');
+
+  // Season rollover: check once shortly after boot, then every hour.
+  try {
+    const ratingEngine = require('./rating-engine.js');
+    setTimeout(() => { ratingEngine.checkSeasonRollover().catch(e => console.warn('[ladder] initial rollover check:', e.message)); }, 5000);
+    setInterval(() => { ratingEngine.checkSeasonRollover().catch(e => console.warn('[ladder] periodic rollover check:', e.message)); }, 60 * 60 * 1000);
+  } catch (e) { console.warn('[ladder] rollover scheduler not attached:', e.message); }
+} catch (err) {
+  console.warn('[!] Ladder routes not loaded:', err.message);
+}
+
 // ── WebSocket server ──────────────────────────────────
 const wss = new WebSocketServer({ server });
 

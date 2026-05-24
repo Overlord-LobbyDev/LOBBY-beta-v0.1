@@ -810,9 +810,14 @@
     <!-- Header -->
     <div class="tournaments-header">
       <h1 class="tournaments-title">Tournaments</h1>
-      <button class="create-tournament-btn" onclick="openCreateModal()">
-        <span>+</span> New Tournament
-      </button>
+      <div style="display:flex; gap:8px;">
+        <button class="create-tournament-btn" style="background:var(--bg-2); color:var(--text-1); border:1px solid var(--bg-3);" onclick="window.location.href='leaderboard.html'">
+          <span>🏆</span> Leaderboard
+        </button>
+        <button class="create-tournament-btn" onclick="openCreateModal()">
+          <span>+</span> New Tournament
+        </button>
+      </div>
     </div>
 
     <!-- Tournaments List -->

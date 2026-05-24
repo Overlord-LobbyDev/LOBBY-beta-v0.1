@@ -4,6 +4,10 @@
 const express = require('express');
 const router  = express.Router();
 
+// Ladder engine (RP/Elo/season). Loaded lazily so a missing module doesn't crash tournaments.
+let ratingEngine = null;
+try { ratingEngine = require('./rating-engine.js'); } catch (e) { console.warn('[tournaments] rating-engine not loaded:', e.message); }
+
 // ── DB pool ──────────────────────────────────────────────────
 const { Pool } = require('pg');
 let pool;
@@ -79,9 +83,18 @@ async function advanceWinner(tournamentId, matchId, winnerDbId) {
     );
   } else {
     await pool.query(
-      `UPDATE tournaments SET status = 'completed', winner_id = $1 WHERE id = $2`,
+      `UPDATE tournaments SET status = 'completed', winner_id = $1, end_time = COALESCE(end_time, NOW()) WHERE id = $2`,
       [winnerDbId, tournamentId]
     );
+    // Award RP / update ladder. Idempotent via tournaments.rp_awarded flag.
+    if (ratingEngine) {
+      try {
+        const result = await ratingEngine.applyTournamentResults(tournamentId);
+        console.log(`[ladder] tournament ${tournamentId} processed:`, result);
+      } catch (e) {
+        console.error(`[ladder] failed to apply results for tournament ${tournamentId}:`, e.message);
+      }
+    }
   }
 }
 
@@ -160,18 +173,52 @@ router.post('/create', verifyAuth, async (req, res) => {
   try {
     const { lobbyId, name, description, format, playerCount, rules, prize, startTime,
             hasLosersBracket, hasPointsTally, scheduledStart, alertBeforeMinutes,
-            hostJoinsAsPlayer, resultMode, apiGame, disputeTimeout } = req.body;
+            hostJoinsAsPlayer, resultMode, apiGame, disputeTimeout,
+            gameTag, recommendedSkillTier, isRanked } = req.body;
 
     if (!lobbyId || !name || !format || !playerCount) return res.status(400).json({ error: 'Missing required fields' });
     if (!['single','double','round-robin'].includes(format)) return res.status(400).json({ error: 'Invalid format' });
     if (![4,8,16,32,64,128].includes(playerCount)) return res.status(400).json({ error: 'Invalid player count' });
 
+    // ── Ladder hooks: game tag normalization + host rank-gate + rank snapshot ─────
+    let normalizedTag = 'other';
+    let hostRankGame = 'Wanderer III';
+    let hostRankGlobal = 'Wanderer III';
+    const requestedTier = (recommendedSkillTier && String(recommendedSkillTier).trim()) || 'open';
+    if (ratingEngine) {
+      try {
+        normalizedTag = ratingEngine.normalizeGameTag(gameTag || apiGame || '');
+        // Enforce rank-gate: host can only create at tiers ≤ their per-game rank
+        const allowed = await ratingEngine.canHostAtTier(req.user.id, normalizedTag, requestedTier);
+        if (!allowed) {
+          const userTier = await ratingEngine.getUserTier(req.user.id, normalizedTag);
+          return res.status(403).json({
+            error: 'Recommended skill tier exceeds your current rank in this game',
+            yourTier: userTier.tier,
+            requestedTier
+          });
+        }
+        // Snapshot host's current ranks (per-game + global)
+        const gameTier = await ratingEngine.getUserTier(req.user.id, normalizedTag);
+        const globalTier = await ratingEngine.getUserTier(req.user.id, '__global__');
+        hostRankGame = gameTier.tier;
+        hostRankGlobal = globalTier.tier;
+        // Upsert the game registry
+        await ratingEngine.upsertGame(gameTag || apiGame || 'Other');
+      } catch (e) {
+        console.warn('[tournaments/create] ladder pre-check failed (non-fatal):', e.message);
+      }
+    }
+
     const result = await pool.query(
       `INSERT INTO tournaments
         (lobby_id, host_id, name, description, format, player_count, max_players, status,
          rules, prize, start_time, has_losers_bracket, has_points_tally,
-         scheduled_start, alert_before_minutes, result_mode, api_game, dispute_timeout)
-       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18)
+         scheduled_start, alert_before_minutes, result_mode, api_game, dispute_timeout,
+         game_tag, game_tag_normalized, is_ranked, recommended_skill_tier,
+         host_rank_at_creation_global, host_rank_at_creation_game)
+       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,
+               $19,$20,$21,$22,$23,$24)
        RETURNING *`,
       [
         lobbyId, req.user.id, name, description||null, format, playerCount, playerCount, 'setup',
@@ -179,7 +226,9 @@ router.post('/create', verifyAuth, async (req, res) => {
         hasLosersBracket ? true : false, hasPointsTally !== false,
         scheduledStart ? new Date(scheduledStart) : null, parseInt(alertBeforeMinutes)||15,
         ['manual','self-report','riot-api','chess-api'].includes(resultMode) ? resultMode : 'manual',
-        apiGame || null, parseInt(disputeTimeout)||30
+        apiGame || null, parseInt(disputeTimeout)||30,
+        gameTag || null, normalizedTag, isRanked !== false, requestedTier,
+        hostRankGlobal, hostRankGame
       ]
     );
     const tournament = result.rows[0];
@@ -198,7 +247,11 @@ router.post('/create', verifyAuth, async (req, res) => {
       id: tournament.id, lobbyId: tournament.lobby_id, hostId: tournament.host_id,
       name: tournament.name, format: tournament.format, playerCount: tournament.player_count,
       registeredPlayers: registeredPlayersList, bracket: { rounds: [] }, status: tournament.status,
-      resultMode: tournament.result_mode, apiGame: tournament.api_game
+      resultMode: tournament.result_mode, apiGame: tournament.api_game,
+      gameTag: tournament.game_tag, gameTagNormalized: tournament.game_tag_normalized,
+      isRanked: tournament.is_ranked, recommendedSkillTier: tournament.recommended_skill_tier,
+      hostRankAtCreationGame: tournament.host_rank_at_creation_game,
+      hostRankAtCreationGlobal: tournament.host_rank_at_creation_global
     }});
   } catch(error) {
     console.error('Tournament creation error:', error);
@@ -289,6 +342,19 @@ router.get('/:tournamentId', async (req, res) => {
       scheduledStart: tournament.scheduled_start||null, alertBeforeMinutes: tournament.alert_before_minutes||15,
       resultMode: tournament.result_mode||'manual', apiGame: tournament.api_game||null,
       hasLosersBracket: tournament.has_losers_bracket||false, hasPointsTally: tournament.has_points_tally!==false,
+      // Ladder fields
+      gameTag: tournament.game_tag||null, gameTagNormalized: tournament.game_tag_normalized||null,
+      isRanked: tournament.is_ranked !== false,
+      recommendedSkillTier: tournament.recommended_skill_tier||'open',
+      hostRankAtCreationGame: tournament.host_rank_at_creation_game||null,
+      hostRankAtCreationGlobal: tournament.host_rank_at_creation_global||null,
+      autoTier: tournament.auto_tier||null,
+      credibilityScore: tournament.credibility_score!=null ? Number(tournament.credibility_score) : null,
+      computedWinnerRp: tournament.computed_winner_rp||null,
+      isFeatured: !!tournament.is_featured,
+      adminRpOverride: tournament.admin_rp_override||null,
+      featuredTierLabel: tournament.featured_tier_label||null,
+      rpAwarded: !!tournament.rp_awarded,
       bracket,
       registeredPlayers: playersResult.rows.map(p => ({
         userId: p.user_id, username: p.username, joinedAt: p.joined_at, status: p.status,
@@ -522,6 +588,15 @@ router.post('/:tournamentId/close', verifyAuth, async (req, res) => {
     if (tournament.host_id !== req.user.id) return res.status(403).json({ error: 'Only host can close' });
     if (tournament.status === 'completed') return res.status(400).json({ error: 'Already completed' });
     await pool.query(`UPDATE tournaments SET status = 'completed', end_time = $1 WHERE id = $2`, [new Date(), tournamentId]);
+    // Award RP / update ladder. Idempotent.
+    if (ratingEngine) {
+      try {
+        const result = await ratingEngine.applyTournamentResults(tournamentId);
+        console.log(`[ladder] tournament ${tournamentId} processed on close:`, result);
+      } catch (e) {
+        console.error(`[ladder] failed to apply results for tournament ${tournamentId} on close:`, e.message);
+      }
+    }
     res.json({ success: true });
   } catch(error) { res.status(500).json({ error: 'Failed to close tournament' }); }
 });

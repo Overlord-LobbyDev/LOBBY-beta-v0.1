@@ -1,0 +1,24 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Leaderboard — LOBBY</title>
+  <style>
+    html, body { height: 100%; margin: 0; background: #141820; }
+  </style>
+  <script>
+    /* ──────────────────────────────────────────────────────────────
+       The Leaderboard is no longer a standalone page. It now lives
+       INSIDE the main app (index.html) as an in-app overlay hub —
+       sharing the real LOBBY top bar and the same overlay system as
+       the Tournaments hub.
+
+       This file is kept only so any old/bookmarked links still work:
+       it bounces into index.html and opens the leaderboard overlay.
+       ────────────────────────────────────────────────────────────── */
+    location.replace('index.html#leaderboard');
+  </script>
+</head>
+<body></body>
+</html>

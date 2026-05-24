@@ -624,6 +624,208 @@ async function initDb() {
     await pool.query(`CREATE INDEX IF NOT EXISTS idx_tournament_invites_tournament_id ON tournament_invites(tournament_id);`).catch(() => {});
     await pool.query(`CREATE INDEX IF NOT EXISTS idx_tournament_invites_invited_user ON tournament_invites(invited_user);`).catch(() => {});
 
+    // ============================================================
+    // ── LADDER SYSTEM: seasons, ratings, transactions, anti-abuse
+    //    See LADDER_SYSTEM_DESIGN.md for design rationale.
+    // ============================================================
+
+    // Seasons (Spring '27, Summer '27, etc.)
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS seasons (
+        id                     SERIAL PRIMARY KEY,
+        code                   TEXT UNIQUE NOT NULL,
+        name                   TEXT NOT NULL,
+        start_at               TIMESTAMPTZ NOT NULL,
+        end_at                 TIMESTAMPTZ NOT NULL,
+        status                 TEXT NOT NULL DEFAULT 'upcoming' CHECK (status IN ('upcoming','active','archived')),
+        compression_multiplier NUMERIC NOT NULL DEFAULT 0.5,
+        compression_anchor     INTEGER NOT NULL DEFAULT 500,
+        created_at             TIMESTAMPTZ DEFAULT NOW()
+      );
+    `);
+
+    // Games registry
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS games (
+        id                 SERIAL PRIMARY KEY,
+        tag_normalized     TEXT UNIQUE NOT NULL,
+        display_name       TEXT NOT NULL,
+        tournaments_count  INTEGER NOT NULL DEFAULT 0,
+        first_seen         TIMESTAMPTZ DEFAULT NOW(),
+        last_seen          TIMESTAMPTZ DEFAULT NOW()
+      );
+    `);
+
+    // User ratings (per-user per-game per-season; game_tag_normalized = '__global__' for Global ladder)
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS user_ratings (
+        id                          SERIAL PRIMARY KEY,
+        user_id                     INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+        game_tag_normalized         TEXT NOT NULL,
+        season_id                   INTEGER REFERENCES seasons(id) ON DELETE SET NULL,
+        current_rp                  INTEGER NOT NULL DEFAULT 0,
+        current_elo                 INTEGER NOT NULL DEFAULT 1200,
+        peak_rp                     INTEGER NOT NULL DEFAULT 0,
+        peak_tier                   TEXT,
+        previous_season_peak_tier   TEXT,
+        placement_matches_remaining INTEGER NOT NULL DEFAULT 5,
+        ranked_matches_played       INTEGER NOT NULL DEFAULT 0,
+        ranked_tournaments_played   INTEGER NOT NULL DEFAULT 0,
+        ranked_wins                 INTEGER NOT NULL DEFAULT 0,
+        last_active                 TIMESTAMPTZ DEFAULT NOW(),
+        UNIQUE (user_id, game_tag_normalized, season_id)
+      );
+    `);
+
+    // Archived per-season snapshots
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS season_ratings (
+        id                  SERIAL PRIMARY KEY,
+        user_id             INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+        season_id           INTEGER NOT NULL REFERENCES seasons(id) ON DELETE CASCADE,
+        game_tag_normalized TEXT NOT NULL,
+        final_rp            INTEGER NOT NULL,
+        peak_rp             INTEGER NOT NULL,
+        final_tier          TEXT NOT NULL,
+        peak_tier           TEXT NOT NULL,
+        final_placement     INTEGER,
+        tournaments_played  INTEGER NOT NULL DEFAULT 0,
+        archived_at         TIMESTAMPTZ DEFAULT NOW(),
+        UNIQUE (user_id, season_id, game_tag_normalized)
+      );
+    `);
+
+    // RP audit log
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS rp_transactions (
+        id                  SERIAL PRIMARY KEY,
+        user_id             INTEGER REFERENCES users(id) ON DELETE SET NULL,
+        tournament_id       INTEGER REFERENCES tournaments(id) ON DELETE SET NULL,
+        season_id           INTEGER REFERENCES seasons(id) ON DELETE SET NULL,
+        game_tag_normalized TEXT NOT NULL,
+        delta               INTEGER NOT NULL,
+        reason              TEXT NOT NULL,
+        breakdown           JSONB,
+        rp_before           INTEGER NOT NULL,
+        rp_after            INTEGER NOT NULL,
+        created_at          TIMESTAMPTZ DEFAULT NOW()
+      );
+    `);
+
+    // Per-match per-player confirmation log
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS match_confirmations (
+        id           SERIAL PRIMARY KEY,
+        match_id     INTEGER NOT NULL REFERENCES tournament_matches(id) ON DELETE CASCADE,
+        user_id      INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+        confirmed_at TIMESTAMPTZ DEFAULT NOW(),
+        UNIQUE (match_id, user_id)
+      );
+    `);
+
+    // Cached host trust scores
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS host_trust_scores (
+        host_id       INTEGER PRIMARY KEY REFERENCES users(id) ON DELETE CASCADE,
+        score         NUMERIC NOT NULL DEFAULT 0.2,
+        components    JSONB,
+        last_computed TIMESTAMPTZ DEFAULT NOW()
+      );
+    `);
+
+    // Smurf flags
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS smurf_flags (
+        id          SERIAL PRIMARY KEY,
+        user_id     INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+        reason      TEXT NOT NULL,
+        score       NUMERIC NOT NULL,
+        flagged_at  TIMESTAMPTZ DEFAULT NOW(),
+        cleared_at  TIMESTAMPTZ DEFAULT NULL,
+        cleared_by  INTEGER REFERENCES users(id) ON DELETE SET NULL
+      );
+    `);
+
+    // Ladder columns added to existing tables (idempotent)
+    await pool.query(`
+      ALTER TABLE tournaments ADD COLUMN IF NOT EXISTS game_tag                    TEXT;
+      ALTER TABLE tournaments ADD COLUMN IF NOT EXISTS game_tag_normalized         TEXT;
+      ALTER TABLE tournaments ADD COLUMN IF NOT EXISTS is_ranked                   BOOLEAN DEFAULT TRUE;
+      ALTER TABLE tournaments ADD COLUMN IF NOT EXISTS recommended_skill_tier      TEXT DEFAULT 'open';
+      ALTER TABLE tournaments ADD COLUMN IF NOT EXISTS host_rank_at_creation_global TEXT;
+      ALTER TABLE tournaments ADD COLUMN IF NOT EXISTS host_rank_at_creation_game  TEXT;
+      ALTER TABLE tournaments ADD COLUMN IF NOT EXISTS auto_tier                   TEXT;
+      ALTER TABLE tournaments ADD COLUMN IF NOT EXISTS credibility_score           NUMERIC;
+      ALTER TABLE tournaments ADD COLUMN IF NOT EXISTS computed_winner_rp          INTEGER;
+      ALTER TABLE tournaments ADD COLUMN IF NOT EXISTS is_featured                 BOOLEAN DEFAULT FALSE;
+      ALTER TABLE tournaments ADD COLUMN IF NOT EXISTS admin_rp_override           INTEGER;
+      ALTER TABLE tournaments ADD COLUMN IF NOT EXISTS featured_tier_label         TEXT;
+      ALTER TABLE tournaments ADD COLUMN IF NOT EXISTS featured_by                 INTEGER REFERENCES users(id) ON DELETE SET NULL;
+      ALTER TABLE tournaments ADD COLUMN IF NOT EXISTS featured_at                 TIMESTAMPTZ;
+      ALTER TABLE tournaments ADD COLUMN IF NOT EXISTS rp_awarded                  BOOLEAN DEFAULT FALSE;
+      ALTER TABLE tournaments ADD COLUMN IF NOT EXISTS season_id_at_completion     INTEGER REFERENCES seasons(id) ON DELETE SET NULL;
+    `);
+
+    await pool.query(`
+      ALTER TABLE servers ADD COLUMN IF NOT EXISTS lobby_verified BOOLEAN DEFAULT FALSE;
+      ALTER TABLE servers ADD COLUMN IF NOT EXISTS verified_at    TIMESTAMPTZ;
+      ALTER TABLE servers ADD COLUMN IF NOT EXISTS verified_by    INTEGER REFERENCES users(id) ON DELETE SET NULL;
+    `);
+
+    await pool.query(`
+      ALTER TABLE tournament_matches ADD COLUMN IF NOT EXISTS confirmed_by_p1 BOOLEAN DEFAULT FALSE;
+      ALTER TABLE tournament_matches ADD COLUMN IF NOT EXISTS confirmed_by_p2 BOOLEAN DEFAULT FALSE;
+    `);
+
+    // Ladder indexes
+    await pool.query(`CREATE INDEX IF NOT EXISTS idx_user_ratings_user_id        ON user_ratings(user_id);`).catch(() => {});
+    await pool.query(`CREATE INDEX IF NOT EXISTS idx_user_ratings_game_season    ON user_ratings(game_tag_normalized, season_id);`).catch(() => {});
+    await pool.query(`CREATE INDEX IF NOT EXISTS idx_user_ratings_global_rp      ON user_ratings(game_tag_normalized, season_id, current_rp DESC);`).catch(() => {});
+    await pool.query(`CREATE INDEX IF NOT EXISTS idx_user_ratings_last_active    ON user_ratings(last_active DESC);`).catch(() => {});
+    await pool.query(`CREATE INDEX IF NOT EXISTS idx_season_ratings_user         ON season_ratings(user_id);`).catch(() => {});
+    await pool.query(`CREATE INDEX IF NOT EXISTS idx_season_ratings_season_game  ON season_ratings(season_id, game_tag_normalized, final_rp DESC);`).catch(() => {});
+    await pool.query(`CREATE INDEX IF NOT EXISTS idx_rp_transactions_user        ON rp_transactions(user_id, created_at DESC);`).catch(() => {});
+    await pool.query(`CREATE INDEX IF NOT EXISTS idx_rp_transactions_tournament  ON rp_transactions(tournament_id);`).catch(() => {});
+    await pool.query(`CREATE INDEX IF NOT EXISTS idx_match_confirmations_match   ON match_confirmations(match_id);`).catch(() => {});
+    await pool.query(`CREATE INDEX IF NOT EXISTS idx_match_confirmations_user    ON match_confirmations(user_id);`).catch(() => {});
+    await pool.query(`CREATE INDEX IF NOT EXISTS idx_smurf_flags_user            ON smurf_flags(user_id) WHERE cleared_at IS NULL;`).catch(() => {});
+    await pool.query(`CREATE INDEX IF NOT EXISTS idx_games_tag                   ON games(tag_normalized);`).catch(() => {});
+    await pool.query(`CREATE INDEX IF NOT EXISTS idx_seasons_status              ON seasons(status);`).catch(() => {});
+    await pool.query(`CREATE INDEX IF NOT EXISTS idx_seasons_dates               ON seasons(start_at, end_at);`).catch(() => {});
+    await pool.query(`CREATE INDEX IF NOT EXISTS idx_tournaments_game_normalized ON tournaments(game_tag_normalized);`).catch(() => {});
+    await pool.query(`CREATE INDEX IF NOT EXISTS idx_tournaments_is_featured     ON tournaments(is_featured) WHERE is_featured = TRUE;`).catch(() => {});
+    await pool.query(`CREATE INDEX IF NOT EXISTS idx_tournaments_rp_awarded      ON tournaments(rp_awarded);`).catch(() => {});
+
+    // Seed the initial season if none active.
+    try {
+      const existing = await pool.query(`SELECT id FROM seasons WHERE status = 'active' LIMIT 1`);
+      if (!existing.rows.length) {
+        const now = new Date();
+        const month = now.getUTCMonth();
+        const year  = now.getUTCFullYear();
+        let seasonName, startMonth, endMonth, startYear = year, endYear = year;
+        if (month >= 2 && month <= 4)       { seasonName='Spring'; startMonth=2;  endMonth=4;  }
+        else if (month >= 5 && month <= 7)  { seasonName='Summer'; startMonth=5;  endMonth=7;  }
+        else if (month >= 8 && month <= 10) { seasonName='Fall';   startMonth=8;  endMonth=10; }
+        else                                { seasonName='Winter'; startMonth=11; endMonth=1;
+          if (month < 2) { startYear = year - 1; endYear = year; } else { endYear = year + 1; }
+        }
+        const seasonCode = `${seasonName.toLowerCase()}-${startYear}`;
+        const startAt = new Date(Date.UTC(startYear, startMonth, 1, 0, 0, 0));
+        const endAt   = new Date(Date.UTC(endYear,   endMonth + 1, 1, 0, 0, 0));
+        const displayName = `${seasonName} '${String(startYear).slice(-2)}`;
+        await pool.query(
+          `INSERT INTO seasons (code, name, start_at, end_at, status)
+           VALUES ($1, $2, $3, $4, 'active')
+           ON CONFLICT (code) DO UPDATE SET status = 'active'`,
+          [seasonCode, displayName, startAt, endAt]
+        );
+        console.log(`[OK] Seeded initial season: ${displayName}`);
+      }
+    } catch (e) {
+      console.warn('[db] season seeding warning:', e.message);
+    }
+
     // Profanity words list
     await pool.query(`
       CREATE TABLE IF NOT EXISTS profanity_words (
@@ -647,10 +849,9 @@ async function initDb() {
       );
     `);
 
-    console.log("✅ Database initialized successfully!");
-    // process.exit(0) removed — let caller handle startup
+    console.log("Database initialized successfully!");
   } catch (error) {
-    console.error("❌ Database initialization failed:", error.message);
+    console.error("Database initialization failed:", error.message);
     console.error("Error details:", error);
     throw error;
   }

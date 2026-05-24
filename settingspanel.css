@@ -179,3 +179,54 @@ input.sp-slider::-webkit-slider-thumb:hover { transform: scale(1.2); }
 
 ::-webkit-scrollbar { width: 5px; }
 ::-webkit-scrollbar-thumb { background: var(--bg-3); border-radius: 3px; }
+
+/* ── Feed position picker ─────────────────────────────────── */
+.sp-feed-pos {
+  display: flex; flex-direction: column; align-items: stretch;
+  gap: 6px; padding: 10px 10px 12px;
+  background: var(--bg-1); border: 1.5px solid rgba(255,255,255,.06);
+  border-radius: 12px; cursor: pointer; font-family: inherit;
+  color: var(--text-2); text-align: center;
+  transition: border-color .18s, background .18s, transform .18s, box-shadow .18s;
+}
+.sp-feed-pos:hover {
+  border-color: rgba(255,255,255,.16);
+  background: var(--bg-2);
+  transform: translateY(-2px);
+  box-shadow: 0 8px 22px -10px rgba(0,0,0,.6);
+}
+.sp-feed-pos.active {
+  border-color: var(--accent);
+  background: color-mix(in srgb, var(--accent) 14%, var(--bg-1));
+  box-shadow:
+    0 0 0 1px var(--accent),
+    0 10px 24px -10px color-mix(in srgb, var(--accent) 50%, transparent);
+}
+.sp-feed-pos-pv {
+  position: relative; display: block;
+  height: 64px; border-radius: 8px;
+  background: linear-gradient(180deg, var(--bg-3), var(--bg-0));
+  border: 1px solid rgba(255,255,255,.08);
+  overflow: hidden;
+}
+/* The little inner block that represents the feed itself */
+.sp-feed-pos-pv > i {
+  position: absolute; top: 6px; bottom: 6px;
+  background: linear-gradient(180deg, var(--accent), var(--accent-h));
+  border-radius: 4px;
+  box-shadow: 0 0 12px color-mix(in srgb, var(--accent) 55%, transparent);
+  transition: all .22s cubic-bezier(.22,1,.36,1);
+}
+.sp-feed-pos-pv-left  > i { left: 8px; width: 30%; }
+.sp-feed-pos-pv-right > i { right: 8px; width: 30%; }
+.sp-feed-pos-pv-split > i { left: 50%; width: 26%; transform: translateX(-50%); }
+.sp-feed-pos-label {
+  font-size: 13px; font-weight: 800; color: var(--text-1);
+  letter-spacing: .02em;
+}
+.sp-feed-pos-sub {
+  font-size: 10.5px; color: var(--text-3); font-weight: 600;
+  text-transform: uppercase; letter-spacing: .04em;
+}
+.sp-feed-pos.active .sp-feed-pos-label { color: var(--text-1); }
+.sp-feed-pos.active .sp-feed-pos-pv { border-color: color-mix(in srgb, var(--accent) 45%, transparent); }
