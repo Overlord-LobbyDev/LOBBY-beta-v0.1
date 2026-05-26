@@ -1163,7 +1163,7 @@
         0 0 32px color-mix(in srgb, var(--accent) 10%, transparent);
       position:relative;
       overflow:hidden;
-      /* v3.2 unflash: removed chHeroIn entry animation — fires every renderChatArea */
+      animation:chHeroIn .45s cubic-bezier(.22,1,.36,1);
     }
     .ch-hero::before{
       content:''; position:absolute; inset:0;
@@ -1176,17 +1176,27 @@
     /* Decorative concentric-ring pattern on the right side of the hero
        — adds character without being noisy. Only visible at high accent. */
     .ch-hero::after{
-      /* v3.2 unflash: simplified the concentric-ring decoration — the
-         heavy repeating radial gradient + mask was a known source of
-         repaint cost. Single soft radial accent instead. */
       content:''; position:absolute;
-      right:-40px; top:50%; transform:translateY(-50%);
-      width:200px; height:200px; border-radius:50%;
-      background: radial-gradient(circle,
-        color-mix(in srgb, var(--accent) 7%, transparent) 0%,
-        transparent 70%);
+      right:-60px; top:50%; transform:translateY(-50%);
+      width:240px; height:240px; border-radius:50%;
+      background:
+        radial-gradient(circle,
+          transparent 38%,
+          color-mix(in srgb, var(--accent) 8%, transparent) 39%,
+          color-mix(in srgb, var(--accent) 8%, transparent) 40%,
+          transparent 41%,
+          transparent 48%,
+          color-mix(in srgb, var(--accent) 6%, transparent) 49%,
+          color-mix(in srgb, var(--accent) 6%, transparent) 50%,
+          transparent 51%,
+          transparent 60%,
+          color-mix(in srgb, var(--accent) 4%, transparent) 61%,
+          color-mix(in srgb, var(--accent) 4%, transparent) 62%,
+          transparent 63%);
       pointer-events:none;
-      opacity:.6;
+      opacity:.7;
+      mask-image:radial-gradient(circle, #000 30%, transparent 70%);
+      -webkit-mask-image:radial-gradient(circle, #000 30%, transparent 70%);
     }
     @keyframes chHeroIn{
       from { opacity:0; transform:translateY(6px); }
@@ -1234,7 +1244,7 @@
       width:5px; height:5px; border-radius:50%;
       background:var(--accent);
       box-shadow:0 0 8px var(--accent);
-      /* v3.2 unflash: was chHeroDot infinite pulse — caused flicker on re-render */
+      animation:chHeroDot 2s ease-in-out infinite;
     }
     @keyframes chHeroDot{
       0%, 100% { opacity:1; transform:scale(1); }
@@ -1671,10 +1681,11 @@
     .message-group {
       display:flex; gap:12px; padding:3px 20px; position:relative;
       transition:background .12s ease;
-      /* v3.1 unflash: removed msgFadeIn entry animation — any bulk
-         re-render of the messages list was making the whole conversation
-         fade-in at once, which read as a flash. Individual new messages
-         still feel snappy without the animation. */
+      animation:msgFadeIn .22s cubic-bezier(.2,.8,.2,1);
+    }
+    @keyframes msgFadeIn {
+      from { opacity:0; transform:translateY(4px); }
+      to { opacity:1; transform:none; }
     }
     .message-group:hover { background:rgba(255,255,255,.015); }
     .message-group.msg-new-author { margin-top:14px; }
@@ -11231,8 +11242,8 @@
     box-shadow:
       0 1px 0 rgba(255,255,255,.04) inset,
       0 2px 10px rgba(0,0,0,.18);
-    /* v3.2 unflash: removed backdrop-filter — stacking multiple per-msg
-       filters across hundreds of messages was the main flash source. */
+    backdrop-filter: blur(6px);
+    -webkit-backdrop-filter: blur(6px);
     transition:
       background .18s ease,
       border-color .18s ease,
@@ -11290,7 +11301,8 @@
     border-radius: 10px;
     padding: 3px;
     box-shadow: 0 10px 28px rgba(0,0,0,.45);
-    /* v3.2 unflash: removed backdrop-filter on quick-actions */
+    backdrop-filter: blur(10px);
+    -webkit-backdrop-filter: blur(10px);
     z-index: 4;
   }
   .message-group:hover .msg-quick-actions { display: flex; }
@@ -11419,10 +11431,8 @@
       inset 3px 0 0 var(--danger),
       0 0 18px color-mix(in srgb, var(--danger) 22%, transparent);
   }
-  /* v3.1 unflash: stop the live-dot pulse — the channel sidebar re-renders
-     on presence updates and the animation restart was contributing to flicker. */
   .vc-live-dot {
-    /* static — no animation */
+    animation: vcDotPulse 1.6s ease-in-out infinite;
   }
   @keyframes vcDotPulse {
     0%, 100% { transform: scale(1); box-shadow: 0 0 6px var(--green); }
@@ -11458,12 +11468,13 @@
       0 1px 0 rgba(255,255,255,.06) inset,
       0 8px 26px rgba(0,0,0,.55),
       0 0 22px color-mix(in srgb, var(--green) 22%, transparent);
-    /* v3.2 unflash: removed expensive backdrop-filter */
+    backdrop-filter: blur(18px) saturate(140%);
+    -webkit-backdrop-filter: blur(18px) saturate(140%);
     z-index: 9998;
     -webkit-app-region: no-drag;
     font-family: var(--font);
     color: var(--text-1);
-    /* v3.2 unflash: removed hcmSlideIn — was firing on every showHotbarCall */
+    animation: hcmSlideIn .35s cubic-bezier(.22,1,.36,1);
     max-width: min(360px, 32vw);
   }
   body.hotbar-call-active #hotbarCallManager { display: inline-flex; }
@@ -11518,8 +11529,7 @@
     content: ''; width: 5px; height: 5px; border-radius: 50%;
     background: var(--green);
     box-shadow: 0 0 6px var(--green);
-    /* v3.1 unflash: static — hotbar manager survives across re-renders
-       but consistency with the rest of the UI matters. */
+    animation: vcDotPulse 1.6s ease-in-out infinite;
   }
   .hcm-controls {
     display: inline-flex; align-items: center; gap: 3px;
@@ -11603,8 +11613,8 @@
       0 1px 0 rgba(255,255,255,.07) inset,
       0 -1px 0 rgba(0,0,0,.18) inset,
       0 3px 10px rgba(0,0,0,.28) !important;
-    /* v3.1 unflash: removed backdrop-filter — parent .chat-ribbon already
-       blurs, stacking another filter per-tab caused repaint storms. */
+    backdrop-filter: blur(8px);
+    -webkit-backdrop-filter: blur(8px);
   }
   .cr-tab:hover {
     background: linear-gradient(180deg,
@@ -11642,12 +11652,12 @@
     padding: 6px 4px !important;
   }
   .chat-ribbon {
-    /* v3.2 unflash: removed backdrop-filter — it caused white flashes during
-       composite re-paints whenever anything behind the ribbon changed. The
-       opaque-ish gradient already separates the ribbon visually. */
+    /* Smooth out the ribbon background so the buttons read as the focal point */
     background: linear-gradient(180deg,
-      rgba(20,20,26,.92) 0%,
-      rgba(14,14,20,.88) 100%) !important;
+      rgba(20,20,26,.7) 0%,
+      rgba(14,14,20,.55) 100%) !important;
+    backdrop-filter: blur(14px) saturate(140%);
+    -webkit-backdrop-filter: blur(14px) saturate(140%);
     border-bottom: 1px solid rgba(255,255,255,.05) !important;
   }
 
@@ -11714,10 +11724,26 @@
     opacity: .9;
     filter: blur(1px);
   }
-  /* v3.2 unflash: removed repeating-radial-gradient + mask pseudo
-     element — masks force composite layers and are a known source of
-     repaint flashes on certain GPU drivers. The single radial wash on
-     ::after still gives the ambient glow we wanted. */
+  /* Decorative concentric rings — only when chat is sparse (≤3 msgs) */
+  .chat-main:has(.chat-ribbon) .messages::before {
+    content: '';
+    position: absolute;
+    top: 32%; left: 50%;
+    width: 320px; height: 320px;
+    transform: translate(-50%, -50%);
+    border-radius: 50%;
+    background:
+      repeating-radial-gradient(circle at center,
+        transparent 0px,
+        transparent 28px,
+        color-mix(in srgb, var(--accent) 7%, transparent) 28px,
+        color-mix(in srgb, var(--accent) 7%, transparent) 29px);
+    mask-image: radial-gradient(circle, #000 0%, #000 38%, transparent 70%);
+    -webkit-mask-image: radial-gradient(circle, #000 0%, #000 38%, transparent 70%);
+    pointer-events: none;
+    z-index: 0;
+    opacity: .45;
+  }
   /* Pull messages above the decorative layers */
   .chat-main:has(.chat-ribbon) .messages > * { position: relative; z-index: 1; }
 
@@ -11807,12 +11833,12 @@
     cursor: pointer;
     /* Slight pulse animation on the unjoined Join pill to draw the eye */
   }
-  /* v3.1 unflash: static accent halo instead of an infinite pulse — the
-     ribbon re-renders on every presence/WS update, which would restart
-     this animation and visually flash. A static glow communicates the
-     same affordance without the repaint thrash. */
   .cr-tab[data-type="voice"]:not([data-joined="1"]) .cr-join-pill {
-    box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent) 14%, transparent);
+    animation: joinPillPulse 2.6s ease-in-out infinite;
+  }
+  @keyframes joinPillPulse {
+    0%, 100% { box-shadow: 0 0 0 0 color-mix(in srgb, var(--accent) 0%, transparent); }
+    50%      { box-shadow: 0 0 0 4px color-mix(in srgb, var(--accent) 18%, transparent); }
   }
   /* Pill hover bumps the pill itself, not just the parent tab */
   .cr-tab[data-type="voice"] .cr-join-pill:hover {
@@ -11862,14 +11888,13 @@
       0 1px 4px rgba(0,0,0,.4);
   }
   /* The button shows a count label after the orbs, with a presence dot */
-  /* v3.1 unflash: static live-dot — was animating with vcDotPulse, which
-     restarted on every ribbon re-render and caused visible flicker. */
   .cr-roster-btn::after {
     content: '';
     width: 6px; height: 6px; border-radius: 50%;
     background: var(--green);
     box-shadow: 0 0 6px var(--green);
     margin-left: 2px;
+    animation: vcDotPulse 1.8s ease-in-out infinite;
   }
 
   /* ── Global search — channel quick-switcher styling ──────────── */

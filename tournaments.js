@@ -314,6 +314,31 @@ function getInitials(username) {
 
 // Open tournament details and bracket
 async function openTournamentDetails(tournamentId) {
+    // Show the chat panel immediately with a loading skeleton to prevent flicker
+    const chatPanel = document.getElementById('chatPanel');
+    if (chatPanel) {
+        document.getElementById('homePanel')?.classList.add('hidden');
+        document.getElementById('profilePage')?.classList.add('hidden');
+        document.getElementById('vcPanel')?.classList.add('hidden');
+        chatPanel.classList.remove('hidden');
+        const chatMain = chatPanel.querySelector('.chat-main, #chatMain');
+        if (chatMain) {
+            chatMain.innerHTML = `
+              <div style="display:flex;flex-direction:column;flex:1;min-height:0;overflow:hidden">
+                <div style="display:flex;align-items:center;gap:12px;padding:12px 20px;background:var(--bg-1);border-bottom:1px solid rgba(255,255,255,.06);flex-shrink:0">
+                  <div style="width:32px;height:32px;border-radius:8px;background:rgba(255,255,255,.06);flex-shrink:0"></div>
+                  <div style="flex:1">
+                    <div style="height:14px;width:160px;background:rgba(255,255,255,.07);border-radius:4px;margin-bottom:7px"></div>
+                    <div style="height:10px;width:100px;background:rgba(255,255,255,.05);border-radius:3px"></div>
+                  </div>
+                </div>
+                <div style="display:flex;align-items:center;justify-content:center;flex:1;flex-direction:column;gap:10px;color:var(--text-3);font-size:13px">
+                  <div style="width:20px;height:20px;border:2px solid rgba(255,255,255,.12);border-top-color:var(--accent);border-radius:50%;animation:spin .8s linear infinite"></div>
+                  Loading tournament…
+                </div>
+              </div>`;
+        }
+    }
     try {
         const response = await fetch(`${API_BASE}/api/tournaments/${tournamentId}`, {
             headers: {
@@ -830,7 +855,30 @@ function showBracketPanel(tournament) {
 
     // ── Main content ──
     if (chatMain) {
+        // Build a header row to inject at the top of chatMain.
+        // This ensures the tournament title + back button are ALWAYS visible
+        // even when chatPanel has no pre-existing .chat-header (e.g. Coliseum mode).
+        const cp  = players.find(p => p.userId === currentUserId);
+        const cav = cp?.avatar_url ? `<img src="${cp.avatar_url}" style="width:100%;height:100%;object-fit:cover">` : (cp?.username||'?')[0].toUpperCase();
+        const headerRowHtml = `
+          <div style="display:flex;align-items:center;justify-content:space-between;padding:10px 20px;background:linear-gradient(135deg,var(--bg-2),rgba(249,168,212,0.06));border-bottom:1px solid rgba(255,255,255,.07);flex-shrink:0;min-height:52px">
+            <div style="display:flex;align-items:center;gap:10px;min-width:0">
+              <button onclick="closeBracketPanel()" title="Back" style="background:var(--bg-3);border:1px solid rgba(255,255,255,.1);color:var(--text-2);cursor:pointer;width:30px;height:30px;border-radius:8px;display:flex;align-items:center;justify-content:center;font-size:14px;flex-shrink:0;transition:all .15s" onmouseover="this.style.background='var(--bg-2)';this.style.color='var(--text-1)'" onmouseout="this.style.background='var(--bg-3)';this.style.color='var(--text-2)'">←</button>
+              <div style="width:32px;height:32px;border-radius:50%;background:linear-gradient(135deg,var(--accent),var(--accent-h));display:flex;align-items:center;justify-content:center;color:#fff;font-weight:800;font-size:13px;flex-shrink:0;overflow:hidden">${cav}</div>
+              <div style="min-width:0">
+                <div style="font-size:14px;font-weight:800;color:var(--text-1);overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${tournament.name}</div>
+                <div style="display:flex;align-items:center;gap:5px;margin-top:3px;flex-wrap:wrap">
+                  <span style="font-size:10px;font-weight:700;padding:2px 7px;border-radius:10px;background:rgba(88,101,242,.1);border:1px solid rgba(88,101,242,.25);color:var(--text-2)">👥 ${players.length}/${tournament.playerCount}</span>
+                  <span style="font-size:10px;font-weight:700;padding:2px 7px;border-radius:10px;background:rgba(88,101,242,.1);border:1px solid rgba(88,101,242,.25);color:var(--text-2)">📋 ${{single:'Single',double:'Double','round-robin':'Round Robin'}[tournament.format]||fmtMap[tournament.format]||tournament.format}</span>
+                  <span style="font-size:10px;font-weight:700;padding:2px 7px;border-radius:10px;color:${statusColour};background:rgba(0,0,0,.18);border:1px solid currentColor">${tournament.status.replace(/-/g,' ').toUpperCase()}</span>
+                </div>
+              </div>
+            </div>
+          </div>`;
+
         chatMain.innerHTML = `
+          <div style="display:flex;flex-direction:column;flex:1;min-height:0;overflow:hidden">
+          ${!chatHeader ? headerRowHtml : ''}
           <div style="display:flex;flex:1;min-height:0;overflow:hidden">
             <!-- Sidebar -->
             <div style="width:240px;min-width:240px;background:var(--bg-1);border-right:1px solid rgba(255,255,255,.06);display:flex;flex-direction:column;overflow-y:auto;flex-shrink:0">
@@ -838,7 +886,7 @@ function showBracketPanel(tournament) {
               <div style="padding:14px 16px;border-bottom:1px solid rgba(255,255,255,.06)">
                 <div style="font-size:9px;font-weight:800;text-transform:uppercase;letter-spacing:1px;color:var(--text-3);margin-bottom:10px">Stats</div>
                 <div style="display:grid;grid-template-columns:1fr 1fr;gap:7px">
-                  <div style="background:rgba(88,101,242,.08);border:1px solid rgba(88,101,242,.15);border-radius:6px;padding:9px;text-align:center"><div style="font-size:8px;color:var(--text-3);text-transform:uppercase;font-weight:700;margin-bottom:2px">Format</div><div style="font-size:13px;font-weight:800;color:var(--accent)">${(fmtMap[tournament.format]||tournament.format).split(' ')[0]}</div></div>
+                  <div style="background:rgba(88,101,242,.08);border:1px solid rgba(88,101,242,.15);border-radius:6px;padding:9px;text-align:center"><div style="font-size:8px;color:var(--text-3);text-transform:uppercase;font-weight:700;margin-bottom:2px">Format</div><div style="font-size:${tournament.format==='round-robin'?'9px':'12px'};font-weight:800;color:var(--accent);line-height:1.2">${{single:'Single Elim',double:'Double Elim','round-robin':'Round Robin'}[tournament.format]||fmtMap[tournament.format]||tournament.format}</div></div>
                   <div style="background:rgba(88,101,242,.08);border:1px solid rgba(88,101,242,.15);border-radius:6px;padding:9px;text-align:center"><div style="font-size:8px;color:var(--text-3);text-transform:uppercase;font-weight:700;margin-bottom:2px">Status</div><div style="font-size:11px;font-weight:800;color:${statusColour}">${tournament.status}</div></div>
                   <div style="background:rgba(88,101,242,.08);border:1px solid rgba(88,101,242,.15);border-radius:6px;padding:9px;text-align:center"><div style="font-size:8px;color:var(--text-3);text-transform:uppercase;font-weight:700;margin-bottom:2px">Players</div><div style="font-size:13px;font-weight:800;color:var(--accent)">${players.length}</div></div>
                   <div style="background:rgba(88,101,242,.08);border:1px solid rgba(88,101,242,.15);border-radius:6px;padding:9px;text-align:center"><div style="font-size:8px;color:var(--text-3);text-transform:uppercase;font-weight:700;margin-bottom:2px">Slots</div><div style="font-size:13px;font-weight:800;color:var(--accent)">${tournament.playerCount}</div></div>
@@ -891,6 +939,7 @@ function showBracketPanel(tournament) {
                 <div style="position:absolute;bottom:14px;left:14px;font-size:9px;color:var(--text-3);pointer-events:none">Drag to pan · Ctrl+scroll to zoom</div>
               </div>
             </div>
+          </div>
           </div>`;
         // Init pan/zoom after DOM is ready
         setTimeout(_initBracketPanZoom, 0);

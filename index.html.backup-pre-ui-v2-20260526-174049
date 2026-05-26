@@ -1163,7 +1163,7 @@
         0 0 32px color-mix(in srgb, var(--accent) 10%, transparent);
       position:relative;
       overflow:hidden;
-      /* v3.2 unflash: removed chHeroIn entry animation — fires every renderChatArea */
+      animation:chHeroIn .45s cubic-bezier(.22,1,.36,1);
     }
     .ch-hero::before{
       content:''; position:absolute; inset:0;
@@ -1176,17 +1176,27 @@
     /* Decorative concentric-ring pattern on the right side of the hero
        — adds character without being noisy. Only visible at high accent. */
     .ch-hero::after{
-      /* v3.2 unflash: simplified the concentric-ring decoration — the
-         heavy repeating radial gradient + mask was a known source of
-         repaint cost. Single soft radial accent instead. */
       content:''; position:absolute;
-      right:-40px; top:50%; transform:translateY(-50%);
-      width:200px; height:200px; border-radius:50%;
-      background: radial-gradient(circle,
-        color-mix(in srgb, var(--accent) 7%, transparent) 0%,
-        transparent 70%);
+      right:-60px; top:50%; transform:translateY(-50%);
+      width:240px; height:240px; border-radius:50%;
+      background:
+        radial-gradient(circle,
+          transparent 38%,
+          color-mix(in srgb, var(--accent) 8%, transparent) 39%,
+          color-mix(in srgb, var(--accent) 8%, transparent) 40%,
+          transparent 41%,
+          transparent 48%,
+          color-mix(in srgb, var(--accent) 6%, transparent) 49%,
+          color-mix(in srgb, var(--accent) 6%, transparent) 50%,
+          transparent 51%,
+          transparent 60%,
+          color-mix(in srgb, var(--accent) 4%, transparent) 61%,
+          color-mix(in srgb, var(--accent) 4%, transparent) 62%,
+          transparent 63%);
       pointer-events:none;
-      opacity:.6;
+      opacity:.7;
+      mask-image:radial-gradient(circle, #000 30%, transparent 70%);
+      -webkit-mask-image:radial-gradient(circle, #000 30%, transparent 70%);
     }
     @keyframes chHeroIn{
       from { opacity:0; transform:translateY(6px); }
@@ -1234,7 +1244,7 @@
       width:5px; height:5px; border-radius:50%;
       background:var(--accent);
       box-shadow:0 0 8px var(--accent);
-      /* v3.2 unflash: was chHeroDot infinite pulse — caused flicker on re-render */
+      animation:chHeroDot 2s ease-in-out infinite;
     }
     @keyframes chHeroDot{
       0%, 100% { opacity:1; transform:scale(1); }
@@ -1671,10 +1681,11 @@
     .message-group {
       display:flex; gap:12px; padding:3px 20px; position:relative;
       transition:background .12s ease;
-      /* v3.1 unflash: removed msgFadeIn entry animation — any bulk
-         re-render of the messages list was making the whole conversation
-         fade-in at once, which read as a flash. Individual new messages
-         still feel snappy without the animation. */
+      animation:msgFadeIn .22s cubic-bezier(.2,.8,.2,1);
+    }
+    @keyframes msgFadeIn {
+      from { opacity:0; transform:translateY(4px); }
+      to { opacity:1; transform:none; }
     }
     .message-group:hover { background:rgba(255,255,255,.015); }
     .message-group.msg-new-author { margin-top:14px; }
@@ -11231,8 +11242,8 @@
     box-shadow:
       0 1px 0 rgba(255,255,255,.04) inset,
       0 2px 10px rgba(0,0,0,.18);
-    /* v3.2 unflash: removed backdrop-filter — stacking multiple per-msg
-       filters across hundreds of messages was the main flash source. */
+    backdrop-filter: blur(6px);
+    -webkit-backdrop-filter: blur(6px);
     transition:
       background .18s ease,
       border-color .18s ease,
@@ -11290,7 +11301,8 @@
     border-radius: 10px;
     padding: 3px;
     box-shadow: 0 10px 28px rgba(0,0,0,.45);
-    /* v3.2 unflash: removed backdrop-filter on quick-actions */
+    backdrop-filter: blur(10px);
+    -webkit-backdrop-filter: blur(10px);
     z-index: 4;
   }
   .message-group:hover .msg-quick-actions { display: flex; }
@@ -11419,10 +11431,8 @@
       inset 3px 0 0 var(--danger),
       0 0 18px color-mix(in srgb, var(--danger) 22%, transparent);
   }
-  /* v3.1 unflash: stop the live-dot pulse — the channel sidebar re-renders
-     on presence updates and the animation restart was contributing to flicker. */
   .vc-live-dot {
-    /* static — no animation */
+    animation: vcDotPulse 1.6s ease-in-out infinite;
   }
   @keyframes vcDotPulse {
     0%, 100% { transform: scale(1); box-shadow: 0 0 6px var(--green); }
@@ -11458,12 +11468,13 @@
       0 1px 0 rgba(255,255,255,.06) inset,
       0 8px 26px rgba(0,0,0,.55),
       0 0 22px color-mix(in srgb, var(--green) 22%, transparent);
-    /* v3.2 unflash: removed expensive backdrop-filter */
+    backdrop-filter: blur(18px) saturate(140%);
+    -webkit-backdrop-filter: blur(18px) saturate(140%);
     z-index: 9998;
     -webkit-app-region: no-drag;
     font-family: var(--font);
     color: var(--text-1);
-    /* v3.2 unflash: removed hcmSlideIn — was firing on every showHotbarCall */
+    animation: hcmSlideIn .35s cubic-bezier(.22,1,.36,1);
     max-width: min(360px, 32vw);
   }
   body.hotbar-call-active #hotbarCallManager { display: inline-flex; }
@@ -11518,8 +11529,7 @@
     content: ''; width: 5px; height: 5px; border-radius: 50%;
     background: var(--green);
     box-shadow: 0 0 6px var(--green);
-    /* v3.1 unflash: static — hotbar manager survives across re-renders
-       but consistency with the rest of the UI matters. */
+    animation: vcDotPulse 1.6s ease-in-out infinite;
   }
   .hcm-controls {
     display: inline-flex; align-items: center; gap: 3px;
@@ -11580,349 +11590,6 @@
   @media (max-width: 880px) {
     #hotbarCallManager { right: calc(50% + min(180px, 22vw) + 10px); padding: 4px; }
     .hcm-meta { display: none; }
-  }
-
-  /* ════════════════════════════════════════════════════════════════════
-     PREMIUM UI v2 — fills the dead space, beefs up the ribbon tabs,
-     compacts the channel hero, and adds an "empty room" ambient state.
-     Targets the visual underwhelm of a fresh channel with one message.
-     ════════════════════════════════════════════════════════════════ */
-
-  /* ── Ribbon tabs — substantial premium pills ──────────────────── */
-  /* Lift the resting state out of "flat dev placeholder" territory by
-     deepening the gradient, adding a subtle inner highlight, and giving
-     active tabs a real glow halo. */
-  .cr-tab {
-    padding: 10px 16px 10px 13px !important;
-    background: linear-gradient(180deg,
-      rgba(255,255,255,.055) 0%,
-      rgba(255,255,255,.018) 60%,
-      rgba(0,0,0,.12) 100%) !important;
-    border: 1px solid rgba(255,255,255,.08) !important;
-    box-shadow:
-      0 1px 0 rgba(255,255,255,.07) inset,
-      0 -1px 0 rgba(0,0,0,.18) inset,
-      0 3px 10px rgba(0,0,0,.28) !important;
-    /* v3.1 unflash: removed backdrop-filter — parent .chat-ribbon already
-       blurs, stacking another filter per-tab caused repaint storms. */
-  }
-  .cr-tab:hover {
-    background: linear-gradient(180deg,
-      rgba(255,255,255,.1) 0%,
-      rgba(255,255,255,.04) 60%,
-      rgba(0,0,0,.1) 100%) !important;
-    border-color: color-mix(in srgb, var(--accent) 32%, rgba(255,255,255,.14)) !important;
-    box-shadow:
-      0 1px 0 rgba(255,255,255,.12) inset,
-      0 -1px 0 rgba(0,0,0,.2) inset,
-      0 8px 24px rgba(0,0,0,.4),
-      0 0 22px color-mix(in srgb, var(--accent) 24%, transparent) !important;
-  }
-  .cr-tab.active {
-    background:
-      linear-gradient(180deg,
-        color-mix(in srgb, var(--accent) 40%, transparent) 0%,
-        color-mix(in srgb, var(--accent) 22%, transparent) 55%,
-        color-mix(in srgb, var(--accent) 32%, transparent) 100%) !important;
-    border-color: color-mix(in srgb, var(--accent) 80%, transparent) !important;
-    box-shadow:
-      0 1px 0 rgba(255,255,255,.24) inset,
-      0 -1px 0 rgba(0,0,0,.22) inset,
-      0 0 0 1px color-mix(in srgb, var(--accent) 42%, transparent),
-      0 12px 34px color-mix(in srgb, var(--accent) 42%, transparent),
-      0 0 38px color-mix(in srgb, var(--accent) 28%, transparent) !important;
-  }
-  .cr-tab .cr-tab-name {
-    font-weight: 800;
-    text-shadow: 0 1px 0 rgba(0,0,0,.32);
-  }
-
-  /* Tighten the ribbon strip itself — softer bg, more breathing room */
-  .cr-strip-wrap {
-    padding: 6px 4px !important;
-  }
-  .chat-ribbon {
-    /* v3.2 unflash: removed backdrop-filter — it caused white flashes during
-       composite re-paints whenever anything behind the ribbon changed. The
-       opaque-ish gradient already separates the ribbon visually. */
-    background: linear-gradient(180deg,
-      rgba(20,20,26,.92) 0%,
-      rgba(14,14,20,.88) 100%) !important;
-    border-bottom: 1px solid rgba(255,255,255,.05) !important;
-  }
-
-  /* ── Compact channel hero — same info, less dead space ────────── */
-  /* The hero was eating ~25% of vertical real estate for very little.
-     Tighten the proportions: smaller padding, inline stats row, refined
-     emblem. Keep the radial accent wash + ring decoration. */
-  .ch-hero {
-    margin: 10px 12px 14px !important;
-    padding: 14px 20px 12px !important;
-    border-radius: 14px !important;
-  }
-  .ch-hero-row {
-    align-items: flex-start !important;
-    gap: 14px !important;
-  }
-  .ch-hero-emblem {
-    width: 46px !important; height: 46px !important;
-    border-radius: 13px !important;
-  }
-  .ch-hero-emblem svg { width: 20px !important; height: 20px !important; }
-  .ch-hero-name {
-    font-size: 24px !important;
-    letter-spacing: 1.2px !important;
-  }
-  .ch-hero-topic {
-    font-size: 12px !important;
-    margin-top: 1px !important;
-    color: var(--text-3);
-  }
-  .ch-hero-stats {
-    margin-top: 8px !important;
-    padding-top: 8px !important;
-    gap: 14px !important;
-    border-top: 1px solid rgba(255,255,255,.05) !important;
-  }
-  .ch-hero-stat { font-size: 9px !important; letter-spacing: 1px !important; }
-  .ch-hero-stat b { font-size: 13px !important; }
-
-  /* ── Decorative "empty room" state — fills the dead middle ────── */
-  /* When the chat area has only a handful of messages, the middle reads
-     as empty/uninhabited. Insert a soft decorative pattern via an
-     ambient pseudo-element on .messages itself. */
-  .chat-main:has(.chat-ribbon) .messages {
-    position: relative;
-    /* Larger content padding so messages don't hug the edges */
-    padding: 14px 36px 16px !important;
-  }
-  .chat-main:has(.chat-ribbon) .messages::after {
-    /* A faint radial glow + tiny "compass rose" pattern that sits at the
-       center of the empty area. Stacks below messages with z-index 0. */
-    content: '';
-    position: absolute;
-    top: 28%; left: 50%;
-    width: 380px; height: 380px;
-    transform: translate(-50%, -50%);
-    background:
-      radial-gradient(circle,
-        color-mix(in srgb, var(--accent) 8%, transparent) 0%,
-        color-mix(in srgb, var(--accent) 3%, transparent) 35%,
-        transparent 65%);
-    pointer-events: none;
-    z-index: 0;
-    opacity: .9;
-    filter: blur(1px);
-  }
-  /* v3.2 unflash: removed repeating-radial-gradient + mask pseudo
-     element — masks force composite layers and are a known source of
-     repaint flashes on certain GPU drivers. The single radial wash on
-     ::after still gives the ambient glow we wanted. */
-  /* Pull messages above the decorative layers */
-  .chat-main:has(.chat-ribbon) .messages > * { position: relative; z-index: 1; }
-
-  /* Decorative scroll hint — when there are messages but the chat is
-     still mostly empty, show a faint "scroll for more" floater? Actually
-     skip that — keep the focus on the conversation. */
-
-  /* ── Composer — substantial pill, better depth ────────────────── */
-  .chat-main:has(.chat-ribbon) .chat-input-wrap {
-    padding: 14px 32px 22px !important;
-  }
-  .chat-main:has(.chat-ribbon) .chat-input-box {
-    border-radius: 16px !important;
-    padding: 4px 8px 4px 14px !important;
-    min-height: 50px;
-    background: linear-gradient(180deg,
-      rgba(255,255,255,.045) 0%,
-      rgba(255,255,255,.015) 100%) !important;
-    border: 1px solid rgba(255,255,255,.1) !important;
-    box-shadow:
-      0 1px 0 rgba(255,255,255,.06) inset,
-      0 8px 26px rgba(0,0,0,.32) !important;
-  }
-  .chat-main:has(.chat-ribbon) .chat-input {
-    font-size: 14px !important;
-    padding: 13px 10px !important;
-  }
-  .chat-main:has(.chat-ribbon) .send-btn {
-    width: 38px !important; height: 38px !important;
-    border-radius: 12px !important;
-    background: linear-gradient(180deg,
-      color-mix(in srgb, var(--accent) 90%, white),
-      var(--accent)) !important;
-    box-shadow:
-      0 1px 0 rgba(255,255,255,.22) inset,
-      0 6px 16px color-mix(in srgb, var(--accent) 45%, transparent) !important;
-    transition: transform .15s cubic-bezier(.22,1,.36,1),
-                box-shadow .2s ease,
-                filter .15s ease !important;
-  }
-  .chat-main:has(.chat-ribbon) .send-btn:hover {
-    transform: translateY(-1px) scale(1.03) !important;
-    filter: brightness(1.08);
-    box-shadow:
-      0 1px 0 rgba(255,255,255,.28) inset,
-      0 10px 22px color-mix(in srgb, var(--accent) 55%, transparent) !important;
-  }
-  .chat-main:has(.chat-ribbon) .send-btn:active {
-    transform: translateY(0) scale(.97) !important;
-  }
-
-  /* ── Right roster column — subtle visual separator polish ────── */
-  /* Just a hairline accent on the divider so the tournament column on the
-     right doesn't visually compete with the chat. */
-  .lobby-roster-rail,
-  .roster-column,
-  #lobbyRosterPanel {
-    border-left: 1px solid rgba(255,255,255,.05);
-  }
-
-  /* ── Date divider — make it visually richer ──────────────────── */
-  .chat-main:has(.chat-ribbon) .msg-date-divider {
-    margin: 18px 24px 12px !important;
-  }
-  .chat-main:has(.chat-ribbon) .msg-date-divider::before,
-  .chat-main:has(.chat-ribbon) .msg-date-divider::after {
-    content: '';
-    flex: 1;
-    height: 1px;
-    background: linear-gradient(90deg,
-      transparent,
-      color-mix(in srgb, var(--accent) 35%, transparent),
-      transparent);
-  }
-
-  /* ════════════════════════════════════════════════════════════════════
-     PREMIUM UI v3 — DISCOVERABILITY + SPEED
-     ════════════════════════════════════════════════════════════════ */
-
-  /* ── Voice tab CTAs are ALWAYS visible (not hover-only) ──────── */
-  /* Users shouldn't have to discover hover affordances. The Join/Leave
-     pill on voice tabs now shows permanently. */
-  .cr-tab[data-type="voice"] .cr-join-pill {
-    opacity: 1 !important;
-    transform: translateY(0) scale(1) !important;
-    pointer-events: auto !important;
-    cursor: pointer;
-    /* Slight pulse animation on the unjoined Join pill to draw the eye */
-  }
-  /* v3.1 unflash: static accent halo instead of an infinite pulse — the
-     ribbon re-renders on every presence/WS update, which would restart
-     this animation and visually flash. A static glow communicates the
-     same affordance without the repaint thrash. */
-  .cr-tab[data-type="voice"]:not([data-joined="1"]) .cr-join-pill {
-    box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent) 14%, transparent);
-  }
-  /* Pill hover bumps the pill itself, not just the parent tab */
-  .cr-tab[data-type="voice"] .cr-join-pill:hover {
-    transform: translateY(-1px) scale(1.05) !important;
-    filter: brightness(1.15);
-  }
-
-  /* ── Voice tab: permanent "N in call" subline (when live) ───── */
-  /* Adds a small line under the channel name showing the member count.
-     Implemented via ::after on the cr-tab-orbs container so we don't
-     have to change the renderTab markup. */
-  .cr-tab[data-type="voice"][data-live="1"] {
-    /* Slight green tint on the border for at-a-glance "live" state */
-    border-color: color-mix(in srgb, var(--green) 35%, rgba(255,255,255,.08)) !important;
-    box-shadow:
-      0 1px 0 rgba(255,255,255,.08) inset,
-      0 3px 10px rgba(0,0,0,.28),
-      0 0 0 1px color-mix(in srgb, var(--green) 20%, transparent),
-      0 0 18px color-mix(in srgb, var(--green) 20%, transparent) !important;
-  }
-
-  /* ── Expanded Live Roster dock — show 5 orbs + clear label ──── */
-  /* The cr-roster-btn currently shows 3 orbs. Bump it so people see
-     who's around without having to click. */
-  .cr-roster-btn {
-    padding: 4px 12px 4px 6px !important;
-    gap: 8px !important;
-  }
-  .cr-roster-orbs {
-    display: inline-flex;
-    align-items: center;
-  }
-  /* Allow the orb stack to render up to 5 children with a tighter overlap */
-  .cr-roster-orbs .orb {
-    width: 22px !important; height: 22px !important;
-    margin-left: -7px;
-    border: 2px solid var(--bg-1);
-    box-shadow: 0 1px 4px rgba(0,0,0,.4);
-  }
-  .cr-roster-orbs .orb:first-child { margin-left: 0; }
-  /* When in voice, orbs get a soft green halo so "N people are in voice"
-     reads instantly */
-  .cr-roster-orbs .orb.voice-active {
-    box-shadow:
-      0 0 0 2px color-mix(in srgb, var(--green) 70%, transparent),
-      0 0 8px color-mix(in srgb, var(--green) 50%, transparent),
-      0 1px 4px rgba(0,0,0,.4);
-  }
-  /* The button shows a count label after the orbs, with a presence dot */
-  /* v3.1 unflash: static live-dot — was animating with vcDotPulse, which
-     restarted on every ribbon re-render and caused visible flicker. */
-  .cr-roster-btn::after {
-    content: '';
-    width: 6px; height: 6px; border-radius: 50%;
-    background: var(--green);
-    box-shadow: 0 0 6px var(--green);
-    margin-left: 2px;
-  }
-
-  /* ── Global search — channel quick-switcher styling ──────────── */
-  /* New channel results in the global search look slightly different
-     from user/lobby results so people see they can jump to channels. */
-  .gsearch-item.channel-result {
-    border-left: 3px solid transparent;
-    transition: border-color .15s ease, background .15s ease;
-  }
-  .gsearch-item.channel-result:hover {
-    border-left-color: var(--accent);
-    background: rgba(88,101,242,.08);
-  }
-  .gsearch-item .gsearch-av.channel-av {
-    background: linear-gradient(135deg,
-      color-mix(in srgb, var(--accent) 60%, transparent),
-      color-mix(in srgb, var(--accent) 30%, transparent));
-    color: #fff;
-    font-weight: 800;
-  }
-  .gsearch-item .gsearch-av.voice-av {
-    background: linear-gradient(135deg,
-      color-mix(in srgb, var(--green) 70%, transparent),
-      color-mix(in srgb, var(--green) 35%, transparent));
-    color: #fff;
-  }
-  .gsearch-tag.channel-tag {
-    background: rgba(88,101,242,.16) !important;
-    color: var(--accent) !important;
-  }
-  .gsearch-tag.voice-tag {
-    background: rgba(67,181,129,.18) !important;
-    color: #43b581 !important;
-  }
-  /* Helper text shown when the search modal opens to hint at keyboard nav */
-  .gsearch-hint {
-    padding: 8px 14px;
-    font-size: 10px; font-weight: 700; color: var(--text-3);
-    text-transform: uppercase; letter-spacing: 1px;
-    display: flex; align-items: center; gap: 10px;
-    border-top: 1px solid rgba(255,255,255,.04);
-  }
-  .gsearch-hint kbd {
-    padding: 2px 6px; border-radius: 5px;
-    background: rgba(255,255,255,.08);
-    border: 1px solid rgba(255,255,255,.1);
-    font-family: ui-monospace, SFMono-Regular, Consolas, monospace;
-    font-size: 10px; color: var(--text-2);
-  }
-  /* Keyboard focus state for arrow-key navigation */
-  .gsearch-item.kb-focus {
-    background: rgba(88,101,242,.12) !important;
-    box-shadow: inset 3px 0 0 var(--accent);
   }
 
   </style>
@@ -19408,9 +19075,7 @@ function renderChannelRibbon(activeId) {
   // channel hero and the roster overlay so all three never disagree.
   const onlineMembers = members.filter(m => m && (m.status === 'online' || m.status === 'away' || m.status === 'dnd'));
   const voiceMembers  = members.filter(m => m && (m.voiceChannelId || m.voice_channel_id));
-  // v3: show 5 avatars in the inline roster dock (was 3) so users see
-  // who's around without having to click into the overlay.
-  const orbMembers    = (voiceMembers.length ? voiceMembers : onlineMembers).slice(0, 5);
+  const orbMembers    = (voiceMembers.length ? voiceMembers : onlineMembers).slice(0, 3);
   const initials = n => (n||'?').trim().split(/\s+/).map(w=>w[0]||'').join('').slice(0,2).toUpperCase() || '?';
   const orbsHtml = orbMembers.map(m => {
     const av = m.avatar_url || m.avatarUrl;
@@ -24325,24 +23990,6 @@ async function runGlobalSearch(q) {
   const headers = { Authorization: `Bearer ${token}` };
   const lq = q.toLowerCase();
 
-  // v3: also surface channels in the CURRENT lobby at the top of results.
-  // This is purely client-side — no extra HTTP. Channels live in window._lastChannels
-  // which the lounge ribbon already maintains.
-  let localChannels = [];
-  try {
-    const all = (window._lastChannels || []).filter(c => c && c.name);
-    localChannels = all.filter(c => (c.name || "").toLowerCase().includes(lq))
-      .sort((a, b) => {
-        // Prefer name-starts-with matches, then voice (lower friction to join), then text
-        const aStarts = (a.name||"").toLowerCase().startsWith(lq) ? 0 : 1;
-        const bStarts = (b.name||"").toLowerCase().startsWith(lq) ? 0 : 1;
-        if (aStarts !== bStarts) return aStarts - bStarts;
-        return (a.type === "voice" ? 0 : 1) - (b.type === "voice" ? 0 : 1);
-      })
-      .slice(0, 6);
-  } catch (e) { console.warn("[gs] local channel search failed", e); }
-
-
   // Detect name#uid pattern for direct lobby lookup
   const uidMatch = q.match(/^(.+)#(\w+)$/);
 
@@ -24377,39 +24024,12 @@ async function runGlobalSearch(q) {
       .map(f => ({ id: f.friend_id || f.id, username: f.username, display_name: f.display_name, avatar_url: f.avatar_url }));
   }
 
-  if (!users.length && !servers.length && !localChannels.length) {
+  if (!users.length && !servers.length) {
     results.innerHTML = `<div class="gsearch-empty">No results for "<strong>${escapeHtml(q)}</strong>"</div>`;
     return;
   }
 
   let html = "";
-
-  // ── v3: Channels in the current lobby (shown FIRST — closest match first) ──
-  if (localChannels.length) {
-    html += `<div class="gsearch-section-label">⚡ In this lobby</div>`;
-    html += localChannels.map(c => {
-      const isVoice = c.type === "voice";
-      const safeName = (c.name || "channel").replace(/^#/, "");
-      const sym = isVoice ? "🔊" : "#";
-      const tag = isVoice ? "Voice" : (c.type === "announcement" ? "Announce" : "Lounge");
-      const tagCls = isVoice ? "voice-tag" : "channel-tag";
-      const avCls = isVoice ? "voice-av" : "channel-av";
-      const nameJsEsc = safeName.replace(/\\/g, "\\\\").replace(/'/g, "\\'");
-      // For voice channels go through joinVoiceChannel (idempotent — joins if not in);
-      // for text/announcement use openChannel.
-      const action = isVoice
-        ? `closeGlobalSearch();if(typeof joinVoiceChannel==='function')joinVoiceChannel(${c.id},'${nameJsEsc}')`
-        : `closeGlobalSearch();if(typeof openChannel==='function')openChannel(${c.id},'${nameJsEsc}','${c.type||'text'}')`;
-      return `<div class="gsearch-item channel-result" onclick="${action}">
-        <div class="gsearch-av ${avCls}">${sym}</div>
-        <div>
-          <div class="gsearch-name">${escapeHtml(safeName)}</div>
-          <div class="gsearch-sub">${isVoice ? 'Click to join voice' : 'Jump to channel'}</div>
-        </div>
-        <span class="gsearch-tag ${tagCls}">${tag}</span>
-      </div>`;
-    }).join("");
-  }
 
   if (users.length) {
     // Filter out private profiles — backend should do this too, but enforce client-side
@@ -24455,54 +24075,7 @@ async function runGlobalSearch(q) {
     }
   }
 
-  // v3: footer hint showing keyboard shortcuts users can use right now
-  if (html) {
-    html += `<div class="gsearch-hint">
-      <span><kbd>↑↓</kbd> navigate</span>
-      <span><kbd>Enter</kbd> open</span>
-      <span><kbd>Esc</kbd> close</span>
-    </div>`;
-  }
-
   results.innerHTML = html || `<div class="gsearch-empty">No results for "<strong>${escapeHtml(q)}</strong>"</div>`;
-
-  // v3: enable arrow-key navigation within the open search results
-  try { _wireSearchKbNav(); } catch (e) {}
-}
-
-// v3 keyboard navigation for the global search results panel.
-// Wired once; idempotent.
-window._gsearchKbWired = window._gsearchKbWired || false;
-function _wireSearchKbNav() {
-  if (window._gsearchKbWired) return;
-  window._gsearchKbWired = true;
-  const input = document.getElementById("globalSearchInput");
-  if (!input) return;
-  input.addEventListener("keydown", function(e) {
-    const results = document.getElementById("globalSearchResults");
-    if (!results || !results.classList.contains("open")) return;
-    const items = Array.from(results.querySelectorAll(".gsearch-item"));
-    if (!items.length) return;
-    let idx = items.findIndex(it => it.classList.contains("kb-focus"));
-    if (e.key === "ArrowDown") {
-      e.preventDefault();
-      items.forEach(it => it.classList.remove("kb-focus"));
-      idx = idx < 0 ? 0 : (idx + 1) % items.length;
-      items[idx].classList.add("kb-focus");
-      items[idx].scrollIntoView({ block: "nearest" });
-    } else if (e.key === "ArrowUp") {
-      e.preventDefault();
-      items.forEach(it => it.classList.remove("kb-focus"));
-      idx = idx < 0 ? items.length - 1 : (idx - 1 + items.length) % items.length;
-      items[idx].classList.add("kb-focus");
-      items[idx].scrollIntoView({ block: "nearest" });
-    } else if (e.key === "Enter") {
-      if (idx >= 0) {
-        e.preventDefault();
-        items[idx].click();
-      }
-    }
-  });
 }
 
 function globalSearchSelectUser(userId) {
