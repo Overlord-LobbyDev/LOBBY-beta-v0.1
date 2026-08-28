@@ -48968,9 +48968,11 @@ body.lir-resizing #chatPanel{ transition:none !important; }
     if (!force && srv.id === lastServer && (Date.now() - lastAt) < 45000) return;
     fetching = true;
     // Same token rule as the app — localStorage OR sessionStorage.
+    // /servers/:id/activity lives on the auth/API server (it's defined in
+    // backend/auth.js), NOT on API_BASE, which is the websocket server.
     var token = localStorage.getItem('vh_token') || sessionStorage.getItem('vh_token');
-    var base = (typeof API_BASE !== 'undefined' && API_BASE)
-      ? API_BASE
+    var base = (typeof FEED_AUTH_URL !== 'undefined' && FEED_AUTH_URL)
+      ? FEED_AUTH_URL
       : ((typeof AUTH_URL !== 'undefined') ? AUTH_URL : (window.AUTH_URL || ''));
     fetch(base + '/servers/' + srv.id + '/activity', {
       headers: { Authorization: 'Bearer ' + token }
@@ -49666,14 +49668,50 @@ body.lir-collapsed #lirRecents{ display:none; }
     var chId = row.dataset.channelId;
     var chType = row.dataset.type || 'text';
     var chName = (row.getAttribute('title') || 'channel').replace(/^#/, '');
-    gotoLobby(pv.id);
-    setTimeout(function(){
+    enterThen(pv.id, function(){
       if (chType === 'voice'){
         if (typeof window.joinVoiceChannel === 'function') window.joinVoiceChannel(Number(chId), chName);
       } else if (typeof window.openChannel === 'function'){
         window.openChannel(Number(chId), chName, chType);
       }
-    }, 450);
+    });
+  }, true);
+
+  /* Enter a lobby, then run something once it's actually selected.
+     Polling beats a fixed timeout — selectServer is async and how long it
+     takes depends on the network. */
+  function enterThen(id, done){
+    gotoLobby(id);
+    var tries = 0;
+    var iv = setInterval(function(){
+      var s = lexServer();
+      if (s && String(s.id) === String(id)){ clearInterval(iv); try { done(); } catch(e){} }
+      else if (++tries > 40) clearInterval(iv);
+    }, 100);
+  }
+
+  /* CALENDAR / INVITE act on the selected lobby, so while the rail is
+     previewing a different one they'd fire against the wrong lobby (or
+     none at all). Enter that lobby first, then run the button. */
+  document.addEventListener('click', function(e){
+    var btn = e.target.closest('#lirCalendarBtn, #lirInviteBtn');
+    if (!btn) return;
+    var pv = window._lirPreview;
+    if (!pv) return;
+    var sel = lexServer();
+    if (sel && String(sel.id) === String(pv.id)) return;   // already correct
+    e.preventDefault(); e.stopPropagation();
+    var isCal = btn.id === 'lirCalendarBtn';
+    enterThen(pv.id, function(){
+      if (isCal){
+        // openLobbyCalendar takes (lobbyId, lobbyName) — calling it bare
+        // would open the calendar with no lobby.
+        if (typeof window.openLobbyCalendar === 'function') window.openLobbyCalendar(pv.id, pv.name);
+        else { var c = $('lirCalendarBtn'); if (c) c.click(); }
+      } else {
+        var i = $('lirInviteBtn'); if (i) i.click();
+      }
+    });
   }, true);
 
   /* ── Previewing a lobby's sidebar while you're not inside it ──────
@@ -49699,9 +49737,6 @@ body.lir-collapsed #lirRecents{ display:none; }
     // rendered fine because it needs no network, while every section came
     // back empty. Match the app exactly, including its API_BASE preference.
     var token = localStorage.getItem('vh_token') || sessionStorage.getItem('vh_token');
-    var base = (typeof API_BASE !== 'undefined' && API_BASE)
-      ? API_BASE
-      : ((typeof AUTH_URL !== 'undefined') ? AUTH_URL : (window.AUTH_URL || ''));
     var h = { Authorization: 'Bearer ' + token };
     function get(u){
       return fetch(u, { headers:h })
@@ -49712,13 +49747,24 @@ body.lir-collapsed #lirRecents{ display:none; }
         .catch(function(err){ console.warn('[rail] failed ' + u, err && err.message); return null; });
     }
 
-    // Everything the rail shows, so a previewed lobby looks exactly as it
-    // would if you'd just walked into it — not a half-populated shell.
+    // These endpoints do NOT share a host. API_BASE is the WEBSOCKET
+    // server; channels, members and events live on the auth/API server.
+    // Preferring API_BASE for everything 404'd all three while tournaments
+    // (which really are served there) kept working — hence "only activity
+    // loads". Each base now matches what the app itself uses:
+    //   channels/members -> FEED_AUTH_URL, same as api()
+    //   tournaments      -> API_BASE || AUTH_URL, as _lirLoadTournaments
+    //   events           -> AUTH_URL, as _calendarFetchEvents
+    var AUTH = (typeof FEED_AUTH_URL !== 'undefined' && FEED_AUTH_URL)
+      ? FEED_AUTH_URL
+      : ((typeof AUTH_URL !== 'undefined') ? AUTH_URL : (window.AUTH_URL || ''));
+    var TBASE = (typeof API_BASE !== 'undefined' && API_BASE) ? API_BASE : AUTH;
+
     Promise.all([
-      get(base + '/servers/' + id + '/channels'),
-      get(base + '/servers/' + id + '/members'),
-      get(base + '/api/tournaments/lobby/' + id),
-      get(base + '/api/events/lobby/' + id)
+      get(AUTH  + '/servers/' + id + '/channels'),
+      get(AUTH  + '/servers/' + id + '/members'),
+      get(TBASE + '/api/tournaments/lobby/' + id),
+      get(AUTH  + '/api/events/lobby/' + id)
     ]).then(function(res){
       // Name/icon come from the stored recent FIRST. lobbyById() reads
       // _allServers, which is often still empty this early in a boot — and
