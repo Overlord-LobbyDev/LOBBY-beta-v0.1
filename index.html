@@ -47210,6 +47210,31 @@ body.lobby-selected .ch-hero{
   -webkit-backdrop-filter:none !important;
 }
 
+/* ══ STRANDED FLOATING CHROME ═══════════════════════════════════════
+   Two fixed, centred pills were pinned at the very top of the viewport:
+     .chamber-nav  (top:84px) — Channels / Voice / Announce /
+                    Tournaments / Calendar / Hall of Fame
+     .chamber-back (top:88px) — "Back to Coliseum"
+   The topbar plus the hotbar row occupy roughly the first 122px, so both
+   sat UNDERNEATH them and could never be clicked. The sliver of rounded
+   edge poking out below the hotbar row was them — the top-centre artifact
+   visible in every screenshot this session.
+
+   Every control they carried already has a reachable home:
+     Channels / Voice / Announce -> the channel tabs in this header,
+                                    and the rail's Lounge tab
+     Tournaments                 -> the rail's Activities tab
+     Calendar                    -> CALENDAR in the rail header
+     Hall of Fame                -> the HALL OF FAME footer button
+     Back to Coliseum            -> the Coliseum button in this header
+   So they are hidden rather than repositioned: moving them down would
+   just float a second copy of the header over the chat. Hidden, not
+   deleted — one line brings them back if you want them relocated instead. */
+body.chamber-mode .chamber-nav,
+body.voice-room-mode .chamber-nav,
+body.chamber-mode .chamber-back,
+body.voice-room-mode .chamber-back{ display:none !important; }
+
 /* ══ TOP CHROME CLEARANCE ═══════════════════════════════════════════
    The panels are pinned with top:calc(72px + var(--ph-row-h)) — two
    hardcoded numbers that have to match the real height of the topbar
