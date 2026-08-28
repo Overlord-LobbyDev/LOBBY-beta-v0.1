@@ -49653,12 +49653,16 @@ body.lir-collapsed #lirRecents{ display:none; }
      Intercept in the capture phase: enter the lobby first, then open the
      channel once its data has loaded. */
   document.addEventListener('click', function(e){
-    if (document.body.classList.contains('lobby-selected')) return;
     var row = e.target.closest('#lobbyInfoRail .lir-ch-row');
     if (!row) return;
-    e.preventDefault(); e.stopPropagation();
     var pv = window._lirPreview;
     if (!pv) return;
+    // Only intercept when the rail is showing a DIFFERENT lobby than the
+    // one you're in. If they match, the inline openChannel() is already
+    // firing against the right state and should be left alone.
+    var sel = lexServer();
+    if (sel && String(sel.id) === String(pv.id)) return;
+    e.preventDefault(); e.stopPropagation();
     var chId = row.dataset.channelId;
     var chType = row.dataset.type || 'text';
     var chName = (row.getAttribute('title') || 'channel').replace(/^#/, '');
@@ -49742,9 +49746,15 @@ body.lir-collapsed #lirRecents{ display:none; }
 
   var applying = false;
   function applyPreview(force){
-    if (document.body.classList.contains('lobby-selected')) return;
+    // No .lobby-selected bail. The rail has to be right on EVERY page,
+    // and a lobby being selected is no guarantee the app has actually
+    // populated it — that gap is what left sections empty.
     var pv = window._lirPreview;
     if (!pv || applying) return;
+    // If the app has genuinely filled the rail for this same lobby, leave
+    // its work alone rather than overwriting it with our copy.
+    var sel = lexServer();
+    if (!force && sel && String(sel.id) === String(pv.id) && !railLooksEmpty()) return;
 
     // Navigating home clears these caches AND resets the rail header back
     // to its static "Lobby / Community" defaults. Checking only the caches
@@ -49829,30 +49839,54 @@ body.lir-collapsed #lirRecents{ display:none; }
      seeing it. Name and icon are already in localStorage, so paint them
      synchronously on boot. No request, nothing to fail, no window where
      the placeholder is what's on screen. */
+  /* Which lobby the rail should be showing, on any page: the one you're
+     actually in, otherwise the ranked recent. */
+  function targetLobbyId(){
+    var s = lexServer();
+    if (s && s.id != null) return s.id;
+    return wantedPreviewId();
+  }
+
+  /* Has the rail actually got channels in it? "A lobby is selected" is not
+     the same as "the rail is populated", and conflating the two is what
+     left sections blank. */
+  function railLooksEmpty(){
+    var ch = $('lirChannelsList');
+    return !ch || !ch.querySelector('.lir-ch-row');
+  }
+
   function paintHeaderFromRecent(){
-    if (document.body.classList.contains('lobby-selected')) return false;
-    var id = wantedPreviewId();
+    var id = targetLobbyId();
     if (id == null) return false;
-    var r = loadRecents().find(function(x){ return String(x.id) === String(id); });
-    if (!r) return false;
+    var sel = lexServer();
+    var src = (sel && String(sel.id) === String(id))
+      ? { name: sel.name, icon: sel.icon_url || sel.iconUrl }
+      : loadRecents().find(function(x){ return String(x.id) === String(id); });
+    if (!src || !src.name) return false;
 
     var name = $('lirName'), icon = $('lirIcon'), meta = $('lirMeta');
-    if (name && name.textContent !== r.name) name.textContent = r.name || 'Lobby';
+    if (name && name.textContent !== src.name) name.textContent = src.name;
     if (icon){
-      var want = r.icon
-        ? '<img src="' + esc(r.icon) + '" alt="" style="width:100%;height:100%;object-fit:cover;border-radius:inherit">'
-        : esc(String(r.name || 'L').charAt(0).toUpperCase());
+      var want = src.icon
+        ? '<img src="' + esc(src.icon) + '" alt="" style="width:100%;height:100%;object-fit:cover;border-radius:inherit">'
+        : esc(String(src.name || 'L').charAt(0).toUpperCase());
       if (icon.innerHTML !== want) icon.innerHTML = want;
     }
-    if (meta && /community/i.test(meta.textContent || '')) meta.textContent = 'RECENT LOBBY';
+    if (meta && /community/i.test(meta.textContent || '')){
+      meta.textContent = (sel && String(sel.id) === String(id)) ? 'LOBBY' : 'RECENT LOBBY';
+    }
     return true;
   }
 
   function ensurePreview(){
-    if (document.body.classList.contains('lobby-selected')) return;
-    paintHeaderFromRecent();          // instant, from storage
-    var id = wantedPreviewId();
-    if (id != null) setPreview(id);   // then fill the sections
+    var id = targetLobbyId();
+    if (id == null) return;
+    paintHeaderFromRecent();            // instant, from storage — no network
+    // Only fetch when the rail isn't already populated for this lobby by
+    // the app itself. Otherwise we'd duplicate its work on every page.
+    var sel = lexServer();
+    var appHasIt = sel && String(sel.id) === String(id) && !railLooksEmpty();
+    if (!appHasIt) setPreview(id);
   }
 
 
@@ -49967,16 +50001,13 @@ body.lir-collapsed #lirRecents{ display:none; }
     // navigating home clears them. Re-assert the preview so a previewed
     // sidebar can't be blanked out from under us. applyPreview() no-ops
     // unless something has actually changed, so this is cheap.
+    // Runs on EVERY page — no .lobby-selected gate. Header first (it's
+    // synchronous and needs no network, so the placeholder can never be
+    // what's on screen), then fill any section the app has left empty.
     setInterval(function(){
       if (document.hidden) return;
-      if (document.body.classList.contains('lobby-selected')) return;
-      // Header first and unconditionally: it's synchronous, needs no
-      // network, and guarantees the placeholder can never be what's on
-      // screen even if every request below fails.
       paintHeaderFromRecent();
-      // Then the sections. ensurePreview covers the cold-boot case where
-      // recents weren't readable yet when the staged retries ran.
-      if (!window._lirPreview) ensurePreview();
+      if (!window._lirPreview || railLooksEmpty()) ensurePreview();
       applyPreview();
     }, 2000);
 
