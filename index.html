@@ -49482,13 +49482,33 @@ body.rail-hidden .lobby-overlay{ right:0 !important; }
 /* The header's own hairline sits above the artwork. */
 #lobbyInfoRail .lir-header[data-banner]::after{ z-index:2; }
 #lobbyInfoRail .lir-header[data-banner] > *{ position:relative; z-index:1; }
-/* Type and controls need a touch more weight over a photo. */
+/* Type over a photo needs a real edge, not just a blur. A literal border
+   would thicken the letterforms, so this uses a text STROKE with
+   paint-order:stroke fill — the outline is painted BEHIND the glyph, so
+   the weight stays exactly as designed and only the edge is added. The
+   soft shadow underneath then lifts it off whatever is behind. */
 #lobbyInfoRail .lir-header[data-banner] .lir-name{
-  text-shadow:0 1px 6px rgba(0,0,0,.85);
+  color:#fff;
+  -webkit-text-stroke:3px rgba(0,0,0,.6);
+  paint-order:stroke fill;
+  text-shadow:
+    0 1px 2px rgba(0,0,0,.95),
+    0 3px 12px rgba(0,0,0,.75);
 }
 #lobbyInfoRail .lir-header[data-banner] .lir-meta{
-  text-shadow:0 1px 4px rgba(0,0,0,.9);
-  color:rgba(255,255,255,.72);
+  color:rgba(255,255,255,.92);
+  -webkit-text-stroke:2.5px rgba(0,0,0,.55);
+  paint-order:stroke fill;
+  text-shadow:0 1px 3px rgba(0,0,0,.95);
+}
+/* The crest gets a dark ring so it reads as sitting ON the banner rather
+   than dissolving into it, plus a deeper shadow for separation. */
+#lobbyInfoRail .lir-header[data-banner] .lir-icon{
+  box-shadow:
+    0 0 0 2.5px rgba(0,0,0,.72),
+    0 0 0 4px color-mix(in srgb, var(--accent) 34%, transparent),
+    0 8px 22px rgba(0,0,0,.6),
+    0 0 0 1px rgba(255,255,255,.1) inset;
 }
 #lobbyInfoRail .lir-header[data-banner] .lir-action-btn{
   background:rgba(0,0,0,.42);
