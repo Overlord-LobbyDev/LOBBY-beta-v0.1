@@ -48360,6 +48360,28 @@ body.lir-resizing #chatPanel{ transition:none !important; }
       sections:['tourney','events'],         badge:['lirTourneyCount','lirEventCount'] }
   ];
 
+  /* Second entry point into sidebar DMs, alongside the top-bar Messages
+     button — so it's reachable without leaving the page you're on. Added
+     to the rail header's action row next to Calendar / Invite. */
+  function buildDMButton(){
+    var actions = document.querySelector('#lobbyInfoRail .lir-actions');
+    if (!actions || document.getElementById('lirDMBtn')) return;
+    var b = document.createElement('button');
+    b.className = 'lir-action-btn';
+    b.id = 'lirDMBtn';
+    b.type = 'button';
+    b.title = 'Direct messages';
+    b.innerHTML =
+      '<svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" ' +
+      'stroke-width="2.3" stroke-linecap="round" stroke-linejoin="round">' +
+      '<path d="M21 11.5a8.4 8.4 0 0 1-9 8.4 9 9 0 0 1-3.3-.7L3 21l1.9-5.2A8.4 8.4 0 0 1 12 3a8.4 8.4 0 0 1 9 8.5z"/>' +
+      '</svg>Messages';
+    b.addEventListener('click', function(){
+      if (window.lobbyRailDM) window.lobbyRailDM.open();
+    });
+    actions.appendChild(b);
+  }
+
   var TAB_KEY = 'lobbyRailTab';
   function bodyIdFor(k){ return 'lir' + k.charAt(0).toUpperCase() + k.slice(1) + 'Body'; }
   function sectionFor(k){
@@ -48508,6 +48530,7 @@ body.lir-resizing #chatPanel{ transition:none !important; }
     }
 
     buildResizer(rail);
+    buildDMButton();
     buildMemberSearch();
     setTab(getTab());
   }
@@ -50730,6 +50753,501 @@ body.feed-resizing .lobby-overlay{ transition:none !important; }
       console.log('[nav] authority active — ' + ok.length + '/' + NAMES.length +
         ' wired' + (no.length ? '  |  NOT WIRED: ' + no.join(', ') : ''));
     }, 1500);
+  }
+
+  if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', start);
+  else start();
+})();
+</script>
+
+<!-- ══════════════════════════════════════════════════════════════════
+     DIRECT MESSAGES IN THE SIDEBAR
+     Full DM mode inside #lobbyInfoRail: conversation list AND the thread
+     itself, so you can message someone without leaving whatever page
+     you're on. The main area is never touched.
+
+     Deliberately does NOT set `currentView`. That global drives the MAIN
+     chat area's send/receive path — repointing it at a DM would hijack
+     the page behind you, which is the opposite of the point. This module
+     talks to the same endpoints directly instead.
+     ══════════════════════════════════════════════════════════════════ -->
+<style>
+/* In DM mode the rail belongs to messages, so the lobby view steps aside. */
+body.rail-dm #lobbyInfoRail .lir-header,
+body.rail-dm #lobbyInfoRail .lir-scroll,
+body.rail-dm #lobbyInfoRail #lirTabs,
+body.rail-dm #lobbyInfoRail #lirRecents,
+body.rail-dm #lobbyInfoRail #lirHofFooter{ display:none !important; }
+#lirDM{ display:none; }
+body.rail-dm #lirDM{ display:flex; flex-direction:column; height:100%; min-height:0; }
+
+.ldm-head{
+  display:flex; align-items:center; gap:9px; flex:none;
+  padding:12px 12px 11px;
+  border-bottom:1px solid rgba(255,255,255,.06);
+}
+.ldm-back{
+  width:26px; height:26px; flex:none; border-radius:7px; cursor:pointer;
+  display:grid; place-items:center;
+  background:rgba(255,255,255,.05); border:1px solid rgba(255,255,255,.08);
+  color:var(--text-2);
+}
+.ldm-back:hover{ background:rgba(255,255,255,.11); color:#fff; }
+.ldm-back svg{ width:13px; height:13px; }
+.ldm-title{
+  font-family:'Bebas Neue', var(--font), sans-serif;
+  font-size:17px; letter-spacing:.6px; color:var(--text-1);
+  flex:1; min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;
+}
+.ldm-x{
+  width:26px; height:26px; flex:none; border-radius:7px; cursor:pointer;
+  display:grid; place-items:center; font-size:15px; line-height:1;
+  background:rgba(255,255,255,.05); border:1px solid rgba(255,255,255,.08);
+  color:var(--text-2);
+}
+.ldm-x:hover{ background:rgba(255,255,255,.11); color:#fff; }
+
+.ldm-search{
+  flex:none; margin:9px 10px 4px; padding:6px 9px;
+  display:flex; align-items:center; gap:7px;
+  background:rgba(255,255,255,.04); border:1px solid rgba(255,255,255,.07);
+  border-radius:8px;
+}
+.ldm-search svg{ width:12px; height:12px; color:var(--text-3); flex:none; }
+.ldm-search input{
+  flex:1; min-width:0; background:none; border:0; outline:none; padding:0;
+  font-family:var(--font); font-size:11.5px; font-weight:600; color:var(--text-1);
+}
+.ldm-search input::placeholder{ color:var(--text-3); }
+
+.ldm-list{ flex:1; min-height:0; overflow-y:auto; padding:6px 10px 12px; }
+.ldm-row{
+  display:flex; align-items:center; gap:10px; width:100%;
+  padding:8px 9px; margin-bottom:4px; border-radius:10px; cursor:pointer;
+  background:rgba(255,255,255,.025); border:1px solid rgba(255,255,255,.05);
+  border-left:3px solid transparent; text-align:left;
+  transition:background .16s, border-color .16s, transform .16s;
+}
+.ldm-row:hover{
+  background:color-mix(in srgb, var(--accent) 12%, transparent);
+  border-color:color-mix(in srgb, var(--accent) 30%, transparent);
+  transform:translateX(3px);
+}
+.ldm-row.online{ border-left-color:var(--green); }
+.ldm-row.unread{ border-left-color:var(--accent); }
+.ldm-av{
+  width:30px; height:30px; border-radius:50%; flex:none; overflow:hidden;
+  background:linear-gradient(135deg,var(--accent),var(--accent-h));
+  display:grid; place-items:center; font-size:11px; font-weight:800; color:#fff;
+  position:relative;
+}
+.ldm-av img{ width:100%; height:100%; object-fit:cover; }
+.ldm-meta{ flex:1; min-width:0; }
+.ldm-name{
+  font-family:var(--font); font-size:12.5px; font-weight:800; color:#fff;
+  overflow:hidden; text-overflow:ellipsis; white-space:nowrap;
+}
+.ldm-sub{
+  font-family:var(--font); font-size:9.5px; font-weight:700; color:var(--text-3);
+  margin-top:2px;
+}
+.ldm-sub.online{ color:var(--green); }
+.ldm-badge{
+  flex:none; min-width:17px; height:17px; padding:0 5px; border-radius:99px;
+  background:var(--accent); color:var(--bg-0);
+  font-family:var(--font); font-size:9px; font-weight:900; line-height:17px;
+  text-align:center;
+}
+.ldm-empty{
+  padding:22px 14px; text-align:center;
+  font-family:var(--font); font-size:11.5px; color:var(--text-3); line-height:1.6;
+}
+
+/* ── Thread ─────────────────────────────────────────────────────── */
+.ldm-thread{ flex:1; min-height:0; overflow-y:auto; padding:12px 12px 8px; display:flex; flex-direction:column; gap:3px; }
+.ldm-msg{ display:flex; max-width:100%; }
+.ldm-msg.me{ justify-content:flex-end; }
+.ldm-bub{
+  max-width:82%; padding:8px 11px; border-radius:14px 14px 14px 5px;
+  background:color-mix(in srgb, var(--bg-2) 82%, #fff 4%);
+  font-family:var(--font); font-size:12.5px; line-height:1.5; color:var(--text-1);
+  word-break:break-word; box-shadow:0 1px 4px rgba(0,0,0,.25);
+}
+.ldm-msg.me .ldm-bub{
+  border-radius:14px 14px 5px 14px;
+  background:linear-gradient(180deg,
+    color-mix(in srgb, var(--accent) 88%, #fff), var(--accent));
+  color:#1c1220;
+}
+.ldm-day{
+  align-self:center; margin:10px 0 6px;
+  font-family:var(--font); font-size:8.5px; font-weight:900;
+  letter-spacing:1.4px; text-transform:uppercase; color:var(--text-3);
+}
+.ldm-compose{
+  flex:none; display:flex; align-items:center; gap:6px;
+  padding:9px 10px 12px; border-top:1px solid rgba(255,255,255,.06);
+}
+.ldm-compose textarea{
+  flex:1; min-width:0; resize:none; max-height:96px;
+  background:var(--bg-1); border:1px solid rgba(255,255,255,.08);
+  border-radius:9px; padding:8px 10px; outline:none;
+  font-family:var(--font); font-size:12.5px; line-height:1.45; color:var(--text-1);
+}
+.ldm-compose textarea:focus{ border-color:color-mix(in srgb, var(--accent) 45%, transparent); }
+.ldm-send{
+  width:32px; height:32px; flex:none; border-radius:9px; cursor:pointer;
+  display:grid; place-items:center; border:0;
+  background:color-mix(in srgb, var(--accent) 22%, transparent);
+  color:color-mix(in srgb, var(--accent) 96%, white);
+}
+.ldm-send:hover{ background:color-mix(in srgb, var(--accent) 38%, transparent); color:#fff; }
+.ldm-send svg{ width:15px; height:15px; }
+
+/* ── Top-bar Messages button — sits BEFORE Feed ─────────────────── */
+#phMessagesBtn{ display:none; }
+body.layout-hotbar #phMessagesBtn{
+  display:inline-flex; align-items:center; gap:8px; flex-shrink:0;
+  height:36px; padding:0 13px 0 4px;
+  background:rgba(255,255,255,.025);
+  border:1px solid rgba(255,255,255,.05);
+  border-radius:10px; color:var(--text-3);
+  font-family:var(--font); font-size:12px; font-weight:600; letter-spacing:.2px;
+  cursor:pointer; user-select:none; position:relative;
+  -webkit-app-region:no-drag; margin-right:6px;
+  transition:background .18s, color .18s, border-color .18s;
+}
+body.layout-hotbar #phMessagesBtn:hover{
+  background:rgba(255,255,255,.06); color:var(--text-1);
+  border-color:rgba(255,255,255,.1);
+}
+#phMessagesBtn .ph-fb-tile{
+  width:28px; height:28px; border-radius:8px; flex:none;
+  display:grid; place-items:center; background:rgba(255,255,255,.05);
+}
+#phMessagesBtn .ph-fb-tile svg{ width:15px; height:15px; }
+body.rail-dm #phMessagesBtn{
+  background:color-mix(in srgb, var(--accent) 16%, transparent);
+  border-color:color-mix(in srgb, var(--accent) 40%, transparent);
+  color:color-mix(in srgb, var(--accent) 96%, white);
+}
+body.rail-dm #phMessagesBtn .ph-fb-tile{
+  background:color-mix(in srgb, var(--accent) 26%, transparent);
+}
+#phMessagesBtn .ph-dm-dot{
+  position:absolute; top:5px; right:7px;
+  min-width:15px; height:15px; padding:0 4px; border-radius:99px;
+  background:var(--accent); color:var(--bg-0);
+  font-family:var(--font); font-size:9px; font-weight:900; line-height:15px;
+  text-align:center; display:none;
+}
+#phMessagesBtn .ph-dm-dot.on{ display:block; }
+</style>
+
+<script>
+(function () {
+  'use strict';
+
+  function $(id){ return document.getElementById(id); }
+  function esc(s){
+    return String(s == null ? '' : s)
+      .replace(/&/g,'&amp;').replace(/"/g,'&quot;')
+      .replace(/</g,'&lt;').replace(/>/g,'&gt;');
+  }
+  function call(path, opts){
+    try { if (typeof api === 'function') return Promise.resolve(api(path, opts)).catch(function(){ return null; }); }
+    catch(e){}
+    return Promise.resolve(null);
+  }
+  function meId(){ return (window.me && window.me.id) || null; }
+  function onlineIds(){
+    try { if (typeof onlineUserIds !== 'undefined') return onlineUserIds; } catch(e){}
+    return window.onlineUserIds || { has: function(){ return false; } };
+  }
+  function unread(){
+    try { if (typeof unreadDMs !== 'undefined') return unreadDMs; } catch(e){}
+    return window.unreadDMs || {};
+  }
+
+  var friends = [], openWith = null, query = '';
+
+  /* ── Rail shell ─────────────────────────────────────────────── */
+  function shell(){
+    var rail = $('lobbyInfoRail');
+    if (!rail) return null;
+    var el = $('lirDM');
+    if (!el || !el.isConnected){
+      el = document.createElement('div');
+      el.id = 'lirDM';
+      rail.appendChild(el);
+    }
+    return el;
+  }
+
+  function open(){
+    document.body.classList.add('rail-dm');
+    // The rail has to be on screen for any of this to be visible.
+    if (document.body.classList.contains('rail-hidden') &&
+        typeof window.toggleLobbyRail === 'function') window.toggleLobbyRail();
+    if (!friends.length) loadFriends(); else renderList();
+    render();
+  }
+  function close(){
+    document.body.classList.remove('rail-dm');
+    openWith = null;
+  }
+  function toggle(){
+    if (document.body.classList.contains('rail-dm')) close(); else open();
+  }
+  window.lobbyRailDM = { open: open, close: close, toggle: toggle };
+
+  /* ── Data ───────────────────────────────────────────────────── */
+  function loadFriends(){
+    call('/friends').then(function(d){
+      friends = (Array.isArray(d) ? d : []).filter(function(f){ return f.status === 'accepted'; });
+      renderList();
+    });
+  }
+
+  function loadThread(uid){
+    var box = document.querySelector('#lirDM .ldm-thread');
+    if (box) box.innerHTML = '<div class="ldm-empty">Loading…</div>';
+    call('/dm/' + uid).then(function(msgs){
+      if (openWith !== uid) return;          // user moved on while loading
+      renderThread(Array.isArray(msgs) ? msgs : []);
+    });
+  }
+
+  /* ── Views ──────────────────────────────────────────────────── */
+  function render(){
+    var el = shell(); if (!el) return;
+    if (openWith == null) renderList(); else renderThreadShell();
+  }
+
+  function renderList(){
+    var el = shell(); if (!el) return;
+    if (openWith != null) return;
+    var on = onlineIds(), un = unread();
+    var q = query.trim().toLowerCase();
+    var list = friends.filter(function(f){
+      return !q || String(f.username || '').toLowerCase().indexOf(q) >= 0;
+    });
+    // Unread first, then online, then alphabetical — same priority idea as
+    // the recents strip.
+    list.sort(function(a, b){
+      var ua = un[a.other_id] || 0, ub = un[b.other_id] || 0;
+      if (!!ua !== !!ub) return ub - ua;
+      var oa = on.has && on.has(a.other_id) ? 1 : 0;
+      var ob = on.has && on.has(b.other_id) ? 1 : 0;
+      if (oa !== ob) return ob - oa;
+      return String(a.username||'').localeCompare(String(b.username||''));
+    });
+
+    el.innerHTML =
+      '<div class="ldm-head">' +
+        '<span class="ldm-title">Messages</span>' +
+        '<button class="ldm-x" data-ldm="close" title="Back to lobby">&times;</button>' +
+      '</div>' +
+      '<div class="ldm-search">' +
+        '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg>' +
+        '<input id="ldmSearch" type="text" placeholder="Search friends" autocomplete="off" value="' + esc(query) + '">' +
+      '</div>' +
+      '<div class="ldm-list">' +
+        (list.length ? list.map(function(f){
+          var isOn = on.has && on.has(f.other_id);
+          var n = un[f.other_id] || 0;
+          var av = f.avatar_url
+            ? '<img src="' + esc(f.avatar_url) + '" alt="">'
+            : esc(String(f.username || '?').charAt(0).toUpperCase());
+          return '<button class="ldm-row' + (n ? ' unread' : (isOn ? ' online' : '')) +
+                 '" data-ldm="open" data-uid="' + esc(f.other_id) +
+                 '" data-name="' + esc(f.username) + '" data-av="' + esc(f.avatar_url || '') + '">' +
+            '<span class="ldm-av">' + av + '</span>' +
+            '<span class="ldm-meta"><span class="ldm-name">' + esc(f.username) + '</span>' +
+              '<span class="ldm-sub' + (isOn ? ' online' : '') + '">' +
+              (isOn ? '● Online' : 'Offline') + '</span></span>' +
+            (n ? '<span class="ldm-badge">' + (n > 9 ? '9+' : n) + '</span>' : '') +
+          '</button>';
+        }).join('') : '<div class="ldm-empty">No friends yet.<br>Add someone to start a conversation.</div>') +
+      '</div>';
+
+    var s = $('ldmSearch');
+    if (s) s.addEventListener('input', function(){ query = s.value; renderList();
+      var s2 = $('ldmSearch'); if (s2){ s2.focus(); s2.selectionStart = s2.selectionEnd = s2.value.length; } });
+  }
+
+  function renderThreadShell(){
+    var el = shell(); if (!el) return;
+    var f = friends.find(function(x){ return String(x.other_id) === String(openWith); }) || {};
+    el.innerHTML =
+      '<div class="ldm-head">' +
+        '<button class="ldm-back" data-ldm="back" title="All conversations">' +
+          '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 18 9 12 15 6"/></svg>' +
+        '</button>' +
+        '<span class="ldm-title">' + esc(f.username || 'Conversation') + '</span>' +
+        '<button class="ldm-x" data-ldm="close" title="Back to lobby">&times;</button>' +
+      '</div>' +
+      '<div class="ldm-thread"><div class="ldm-empty">Loading…</div></div>' +
+      '<div class="ldm-compose">' +
+        '<textarea id="ldmInput" rows="1" placeholder="Message ' + esc(f.username || '') + '"></textarea>' +
+        '<button class="ldm-send" data-ldm="send" title="Send">' +
+          '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="m22 2-7 20-4-9-9-4z"/><path d="M22 2 11 13"/></svg>' +
+        '</button>' +
+      '</div>';
+
+    var ta = $('ldmInput');
+    if (ta){
+      ta.addEventListener('input', function(){
+        ta.style.height = 'auto';
+        ta.style.height = Math.min(ta.scrollHeight, 96) + 'px';
+      });
+      ta.addEventListener('keydown', function(e){
+        if (e.key === 'Enter' && !e.shiftKey){ e.preventDefault(); send(); }
+      });
+      setTimeout(function(){ ta.focus(); }, 30);
+    }
+  }
+
+  function renderThread(msgs){
+    var box = document.querySelector('#lirDM .ldm-thread');
+    if (!box) return;
+    var mid = meId(), lastDay = '';
+    if (!msgs.length){
+      box.innerHTML = '<div class="ldm-empty">No messages yet.<br>Say hello.</div>';
+      return;
+    }
+    box.innerHTML = msgs.map(function(m){
+      var out = '';
+      var d = new Date(m.created_at);
+      var day = d.toDateString();
+      if (day !== lastDay){
+        lastDay = day;
+        var today = new Date().toDateString();
+        out += '<div class="ldm-day">' + esc(day === today ? 'Today'
+          : d.toLocaleDateString([], { weekday:'short', day:'numeric', month:'short' })) + '</div>';
+      }
+      var isMe = (m.from_user_id || m.user_id) === mid;
+      out += '<div class="ldm-msg' + (isMe ? ' me' : '') + '">' +
+             '<div class="ldm-bub">' + esc(m.content || '') + '</div></div>';
+      return out;
+    }).join('');
+    box.scrollTop = box.scrollHeight;
+  }
+
+  /* ── Sending ────────────────────────────────────────────────── */
+  function send(){
+    var ta = $('ldmInput');
+    if (!ta || openWith == null) return;
+    var text = ta.value.trim();
+    if (!text) return;
+    ta.value = ''; ta.style.height = 'auto';
+
+    // Optimistic append, so it feels immediate like the main composer.
+    var box = document.querySelector('#lirDM .ldm-thread');
+    if (box){
+      if (box.querySelector('.ldm-empty')) box.innerHTML = '';
+      var d = document.createElement('div');
+      d.className = 'ldm-msg me';
+      d.innerHTML = '<div class="ldm-bub">' + esc(text) + '</div>';
+      box.appendChild(d);
+      box.scrollTop = box.scrollHeight;
+    }
+    var to = openWith;
+    call('/dm/' + to, { method:'POST', body: JSON.stringify({ content: text }) })
+      .then(function(){ if (openWith === to) loadThread(to); });
+  }
+
+  /* ── Incoming ───────────────────────────────────────────────────
+     The WS handler is inline and not hookable, but it calls
+     updateDMBadge() on every inbound DM. Wrapping that gives us a
+     reliable "a DM just arrived" signal without touching the socket. */
+  function hookIncoming(){
+    if (typeof window.updateDMBadge !== 'function' || window.updateDMBadge.__ldmWrapped) return false;
+    var orig = window.updateDMBadge;
+    window.updateDMBadge = function(){
+      var r = orig.apply(this, arguments);
+      try {
+        syncBtnBadge();
+        if (document.body.classList.contains('rail-dm')){
+          if (openWith != null){
+            loadThread(openWith);
+            try { delete unread()[openWith]; } catch(e){}
+          } else renderList();
+        }
+      } catch(e){}
+      return r;
+    };
+    window.updateDMBadge.__ldmWrapped = true;
+    return true;
+  }
+
+  function syncBtnBadge(){
+    var dot = document.querySelector('#phMessagesBtn .ph-dm-dot');
+    if (!dot) return;
+    var total = 0, un = unread();
+    Object.keys(un).forEach(function(k){ total += un[k] || 0; });
+    if (total > 0){ dot.textContent = total > 9 ? '9+' : total; dot.classList.add('on'); }
+    else dot.classList.remove('on');
+  }
+
+  /* ── Buttons ────────────────────────────────────────────────── */
+  function placeButton(){
+    var feed = $('phFeedToggleBtn');
+    if (!feed || !feed.parentNode) return;
+    var btn = $('phMessagesBtn');
+    if (!btn){
+      btn = document.createElement('button');
+      btn.id = 'phMessagesBtn';
+      btn.type = 'button';
+      btn.title = 'Direct messages';
+      btn.innerHTML =
+        '<span class="ph-fb-tile" aria-hidden="true">' +
+          '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.1" ' +
+          'stroke-linecap="round" stroke-linejoin="round">' +
+          '<path d="M21 11.5a8.4 8.4 0 0 1-9 8.4 9 9 0 0 1-3.3-.7L3 21l1.9-5.2A8.4 8.4 0 0 1 12 3a8.4 8.4 0 0 1 9 8.5z"/>' +
+          '</svg></span>' +
+        '<span class="ph-fb-text">Messages</span>' +
+        '<span class="ph-dm-dot" aria-hidden="true"></span>';
+      btn.addEventListener('click', toggle);
+    }
+    // BEFORE Feed, as asked. positionFeedPill() moves the Feed pill at
+    // runtime, so re-seat ours against it rather than a fixed slot.
+    if (btn.nextElementSibling !== feed) feed.parentNode.insertBefore(btn, feed);
+  }
+
+  document.addEventListener('click', function(e){
+    var b = e.target.closest('[data-ldm]');
+    if (!b) return;
+    var k = b.dataset.ldm;
+    if (k === 'close'){ close(); }
+    else if (k === 'back'){ openWith = null; renderList(); }
+    else if (k === 'send'){ send(); }
+    else if (k === 'open'){
+      openWith = Number(b.dataset.uid);
+      try { delete unread()[openWith]; } catch(e){}
+      if (typeof window.updateDMBadge === 'function') window.updateDMBadge();
+      renderThreadShell();
+      loadThread(openWith);
+    }
+  });
+
+  function start(){
+    if (!$('lobbyInfoRail')){ setTimeout(start, 300); return; }
+    placeButton();
+    shell();
+    loadFriends();
+    hookIncoming();
+    syncBtnBadge();
+
+    var n = 0;
+    var iv = setInterval(function(){
+      placeButton();               // survives positionFeedPill() moving things
+      hookIncoming();
+      syncBtnBadge();
+      if (++n > 60) clearInterval(iv);
+    }, 250);
+
+    console.log('[dm] sidebar messages ready — window.lobbyRailDM.toggle()');
   }
 
   if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', start);
