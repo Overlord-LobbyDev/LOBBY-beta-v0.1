@@ -14753,7 +14753,8 @@
 </div>
 
 <!-- ── Premium Store — full-page overlay ── -->
-<div id="storeOverlay" class="lobby-overlay">
+<!-- Also had no background — same transparent-overlay bug as Discover. -->
+<div id="storeOverlay" class="lobby-overlay" style="background:radial-gradient(1200px 600px at 80% -10%, rgba(52,211,153,.15) 0%, transparent 60%), radial-gradient(900px 500px at 10% 110%, rgba(250,204,21,.10) 0%, transparent 60%), linear-gradient(160deg,var(--bg-0) 0%,var(--bg-1) 100%)">
   <div class="store-hero">
     <div class="store-hero-top">
       <div class="store-hero-eyebrow">
@@ -15334,7 +15335,11 @@
 </div>
 
 <!-- ── Premium Discover — full-page overlay ── -->
-<div id="discoverOverlay" class="lobby-overlay">
+<!-- Every other .lobby-overlay carries an opaque inline background; this
+     one had none, so it was the single transparent full-page overlay in
+     the app and whatever page sat behind it showed straight through.
+     Matches the gradient the sibling overlays use. -->
+<div id="discoverOverlay" class="lobby-overlay" style="background:radial-gradient(1200px 600px at 80% -10%, rgba(56,189,248,.16) 0%, transparent 60%), radial-gradient(900px 500px at 10% 110%, rgba(16,185,129,.12) 0%, transparent 60%), linear-gradient(160deg,var(--bg-0) 0%,var(--bg-1) 100%)">
   <div class="discover-hero">
     <div class="discover-hero-top">
       <div class="discover-hero-eyebrow">
@@ -50535,151 +50540,188 @@ body.feed-resizing .lobby-overlay{ transition:none !important; }
 })();
 </script>
 
+
 <!-- ══════════════════════════════════════════════════════════════════
-     SINGLE OWNER FOR PAGE SWITCHING
-     Every page-switch site hid a DIFFERENT subset of the panels, so
-     residue accumulated and you'd eventually land on a previous page.
-     This makes "show exactly one page" one function that every switch
-     goes through, so no site can forget a panel again.
+     NAVIGATION AUTHORITY
+     ══════════════════════════════════════════════════════════════════
+     Every page in the app, and the rule for each:
+
+       PANEL PAGES  (exclusive, one visible at a time)
+         #homePanel  #chatPanel  #profilePage  #calendarPanel  #vcPanel
+
+       OVERLAY PAGES  (.lobby-overlay — opaque, full-page, exclusive)
+         discover · globalTournaments · leaderboard · myTournaments
+         queue · speedrun · store · gamePage · new · help
+
+       COLISEUM  (body.coliseum-mode + #coliseumRoot)
+
+       NOT PAGES — never touched by navigation:
+         #socialFeed and #lobbyInfoRail are docked chrome that persist
+         across pages. #hofOverlay, #colSwitcherOverlay,
+         #colTournamentsOverlay, #liveRosterOverlay, #callVideoOverlay,
+         #chatDropOverlay, #appWallpaperOverlay are modals//layers that
+         belong to a page rather than being one.
+
+     THE RULE: exactly one page is open. Opening any page closes every
+     other page first — panels, overlays and the Coliseum alike. Overlays
+     remember which panel to return to, so closing one restores the page
+     you came from instead of whatever happened to still be visible.
+
+     Previously each switch site hid its own ad-hoc subset, which is why
+     residue accumulated and old pages resurfaced.
      ══════════════════════════════════════════════════════════════════ -->
 <script>
 (function () {
   'use strict';
 
-  // Every full-page container in the app.
   var PANELS = ['homePanel', 'chatPanel', 'profilePage', 'calendarPanel', 'vcPanel'];
+  var OVERLAYS = ['discoverOverlay', 'globalTournamentsOverlay', 'leaderboardOverlay',
+                  'myTournamentsOverlay', 'queueOverlay', 'speedrunOverlay',
+                  'storeOverlay', 'gamePageOverlay', 'newOverlay', 'helpOverlay'];
 
-  /* Close everything, then open exactly one thing.
-     Before this, the three switch sites each hid their own subset:
-       showHomePanel   hid chat/profile/calendar   — NOT vcPanel, NO overlays
-       showChatPanel   hid home/profile/calendar   — NOT vcPanel
-       openProfilePanel hid home/chat/calendar     — NOT vcPanel, NO overlays
-     So #vcPanel was never hidden by ANY page switch, and overlays were only
-     closed on two of the paths. Whatever was left visible underneath became
-     "it loaded a previous page". */
-  window._showOnlyPage = function (showId) {
-    try {
-      // Full-page overlays (Discover / Tournaments / Leaderboards / Queue /
-      // Speedrun) sit at z-index 9000 and would otherwise cover the new page.
-      if (typeof window.hideOverlay === 'function') window.hideOverlay();
-      else document.querySelectorAll('.lobby-overlay.open')
-                   .forEach(function (o) { o.classList.remove('open'); });
-    } catch (e) {}
+  var returnPanel = 'homePanel';   // where closing an overlay takes you
+  var inside = false;              // re-entrancy guard
 
-    try {
-      // coliseum-mode CSS-hides every panel, so leaving it on makes any
-      // destination look blank.
-      if (typeof window.exitColiseumMode === 'function') window.exitColiseumMode();
-    } catch (e) {}
+  function $(id){ return document.getElementById(id); }
 
+  function visiblePanel(){
+    for (var i = 0; i < PANELS.length; i++){
+      var el = $(PANELS[i]);
+      if (el && !el.classList.contains('hidden')) return PANELS[i];
+    }
+    return null;
+  }
+  function anyOverlayOpen(){
+    return !!document.querySelector('.lobby-overlay.open');
+  }
+  function closeOverlays(){
+    // Direct class removal, NOT hideOverlay() — that is wrapped below and
+    // would recurse straight back into this module.
+    document.querySelectorAll('.lobby-overlay.open')
+      .forEach(function (o) { o.classList.remove('open'); });
+  }
+  function hidePanels(){
     PANELS.forEach(function (id) {
-      var el = document.getElementById(id);
-      if (!el) return;
-      if (id === showId) el.classList.remove('hidden');
-      else el.classList.add('hidden');
+      var el = $(id); if (el) el.classList.add('hidden');
     });
-  };
+  }
+  function leaveColiseum(){
+    try { if (typeof window.exitColiseumMode === 'function') window.exitColiseumMode(); }
+    catch (e) { document.body.classList.remove('coliseum-mode'); }
+  }
 
-  /* Route the existing switch sites through it. Wrapping rather than
-     editing each one keeps their own logic (titles, sidebar state, voice
-     PiP) intact — this only guarantees the panel set is correct. */
-  function wrap(name, target){
+  /* Open a panel page: everything else closes first. */
+  function enterPanel(id){
+    if (inside) return;
+    inside = true;
+    try {
+      closeOverlays();
+      leaveColiseum();
+      hidePanels();
+      var el = $(id);
+      if (el) el.classList.remove('hidden');
+      returnPanel = id;
+    } finally { inside = false; }
+  }
+
+  /* Open an overlay page. Overlays are opaque and full-page, so the panel
+     behind is not a backdrop — it is a stale page that would show through
+     wherever the overlay does not reach (the rail's slot, for one). Hide
+     it, and remember it so closing the overlay comes back here. */
+  function enterOverlay(){
+    if (inside) return;
+    inside = true;
+    try {
+      leaveColiseum();
+      var cur = visiblePanel();
+      if (cur) returnPanel = cur;
+      hidePanels();
+    } finally { inside = false; }
+  }
+
+  /* Closing the last overlay restores the page you came from. Without
+     this, every panel is hidden and the app shows nothing. */
+  function leaveOverlay(){
+    if (inside) return;
+    if (anyOverlayOpen()) return;          // another overlay took over
+    if (visiblePanel()) return;            // something already restored one
+    enterPanel(returnPanel);
+  }
+
+  /* The Coliseum is a page too: it must close overlays on the way in. */
+  function enterColiseum(){
+    if (inside) return;
+    inside = true;
+    try {
+      var cur = visiblePanel();
+      if (cur) returnPanel = cur;
+      closeOverlays();
+    } finally { inside = false; }
+  }
+
+  window._navEnterPanel = enterPanel;
+
+  /* ── Wiring ─────────────────────────────────────────────────────
+     Wrapped, never edited, so each function keeps its own logic
+     (titles, sidebar state, voice PiP) and only the page set is
+     enforced. Async originals are handled so enforcement lands after
+     the await, not before it. */
+  function wrapAfter(name, fn){
     var orig = window[name];
-    if (typeof orig !== 'function' || orig.__showOnlyWrapped) return false;
-    window[name] = function () {
+    if (typeof orig !== 'function' || orig.__navWrapped) return false;
+    window[name] = function(){
       var r = orig.apply(this, arguments);
-      // AFTER the original, so it wins over whatever partial set that
-      // function applied. Handles async originals too.
-      try { window._showOnlyPage(target); } catch (e) {}
       if (r && typeof r.then === 'function'){
-        return r.then(function (v) {
-          try { window._showOnlyPage(target); } catch (e) {}
-          return v;
-        });
+        return r.then(function (v) { try { fn(); } catch (e) {} return v; });
       }
+      try { fn(); } catch (e) {}
       return r;
     };
-    window[name].__showOnlyWrapped = true;
+    window[name].__navWrapped = true;
     return true;
   }
-
-  var TARGETS = [
-    ['showHomePanel',   'homePanel'],
-    ['showChatPanel',   'chatPanel'],
-    ['openProfilePanel','profilePage'],
-    ['showVcPanel',     'vcPanel'],
-  ];
-
-  /* Overlay pages are pages too, and they bypassed all of the above.
-     showOverlay() never left coliseum-mode — and body.coliseum-mode
-     display:none's the rail while #coliseumRoot spans the full width, so
-     the Coliseum showed through in the rail's slot beside an open overlay.
-
-     It only exits the Coliseum: it must NOT hide the panels. Overlays open
-     ON TOP of whatever page you were on, and closing one is expected to
-     reveal that page again — hiding it here would leave a blank app after
-     the overlay closed. */
-  function wrapShowOverlay(){
-    var orig = window.showOverlay;
-    if (typeof orig !== 'function' || orig.__showOnlyWrapped) return false;
-    window.showOverlay = function(){
-      try {
-        if (typeof window.exitColiseumMode === 'function') window.exitColiseumMode();
-      } catch (e) {}
+  function wrapBefore(name, fn){
+    var orig = window[name];
+    if (typeof orig !== 'function' || orig.__navWrapped) return false;
+    window[name] = function(){
+      try { fn.apply(null, arguments); } catch (e) {}
       return orig.apply(this, arguments);
     };
-    window.showOverlay.__showOnlyWrapped = true;
-    return true;
-  }
-
-  /* And the reverse: entering the Coliseum must close any open overlay,
-     or the overlay (z-index 9000) sits on top of the Coliseum instead. */
-  function wrapColiseumShow(){
-    var orig = window.coliseumShow;
-    if (typeof orig !== 'function' || orig.__showOnlyWrapped) return false;
-    window.coliseumShow = function(){
-      try {
-        if (typeof window.hideOverlay === 'function') window.hideOverlay();
-      } catch (e) {}
-      return orig.apply(this, arguments);
-    };
-    window.coliseumShow.__showOnlyWrapped = true;
+    window[name].__navWrapped = true;
     return true;
   }
 
   function install(){
-    var pending = 0;
-    TARGETS.forEach(function (t) { if (!wrap(t[0], t[1])) pending++; });
-    wrapShowOverlay();
-    wrapColiseumShow();
-    return pending === 0;
+    wrapAfter('showHomePanel',    function(){ enterPanel('homePanel'); });
+    wrapAfter('showChatPanel',    function(){ enterPanel('chatPanel'); });
+    wrapAfter('openProfilePanel', function(){ enterPanel('profilePage'); });
+    wrapAfter('showVcPanel',      function(){ enterPanel('vcPanel'); });
+    wrapAfter('openLobbyCalendar',function(){ enterPanel('calendarPanel'); });
+    wrapBefore('showOverlay',     enterOverlay);
+    wrapAfter('hideOverlay',      leaveOverlay);
+    wrapBefore('coliseumShow',    enterColiseum);
   }
+
+  var NAMES = ['showHomePanel','showChatPanel','openProfilePanel','showVcPanel',
+               'openLobbyCalendar','showOverlay','hideOverlay','coliseumShow'];
 
   function start(){
     install();
-    /* Keep re-checking rather than stopping at the first success.
-       openProfilePanel is reassigned in five different places, and other
-       blocks monkey-patch these too — a wrapper installed once can simply
-       be replaced later, silently losing the guarantee. wrap() is a no-op
-       once the CURRENT value carries the flag, so re-running is free. */
-    var tries = 0;
-    var iv = setInterval(function () {
-      install();
-      if (++tries > 60) { clearInterval(iv); }
-    }, 250);
-    setTimeout(ready, 1200);
-  }
+    /* Keep re-installing: several of these are reassigned or
+       monkey-patched by later blocks, so a wrapper applied once can be
+       silently replaced. wrap*() no-ops once the CURRENT value carries
+       the flag, so repeating is free. */
+    var n = 0;
+    var iv = setInterval(function(){ install(); if (++n > 60) clearInterval(iv); }, 250);
 
-  function ready(){
-    var names = TARGETS.map(function (t) { return t[0]; })
-      .concat(['showOverlay', 'coliseumShow']);
-    var wrapped = names.filter(function (n) {
-      return typeof window[n] === 'function' && window[n].__showOnlyWrapped;
-    });
-    var missing = names.filter(function (n) { return wrapped.indexOf(n) < 0; });
-    console.log('[nav] single-owner page switching active — ' +
-      (wrapped.length ? wrapped.join(', ') : 'none') +
-      (missing.length ? '  |  NOT WRAPPED: ' + missing.join(', ') : ''));
+    setTimeout(function(){
+      var ok = NAMES.filter(function (x) {
+        return typeof window[x] === 'function' && window[x].__navWrapped;
+      });
+      var no = NAMES.filter(function (x) { return ok.indexOf(x) < 0; });
+      console.log('[nav] authority active — ' + ok.length + '/' + NAMES.length +
+        ' wired' + (no.length ? '  |  NOT WIRED: ' + no.join(', ') : ''));
+    }, 1500);
   }
 
   if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', start);
