@@ -15749,8 +15749,8 @@
     <div class="empty-state" id="emptyState" style="gap:16px">
       <div style="width:72px;height:72px;border-radius:20px;background:rgba(88,101,242,0.12);border:1px solid rgba(88,101,242,0.2);display:flex;align-items:center;justify-content:center;font-size:32px">💬</div>
       <div style="display:flex;flex-direction:column;align-items:center;gap:6px">
-        <h3 style="font-size:17px;font-weight:700;color:var(--text-1);margin:0">Direct Messages</h3>
-        <p style="font-size:13px;color:var(--text-3);margin:0;text-align:center;max-width:260px;line-height:1.5">Select a conversation from the left, or start a new one by searching for a friend.</p>
+        <h3 style="font-size:17px;font-weight:700;color:var(--text-1);margin:0">No channel selected</h3>
+        <p style="font-size:13px;color:var(--text-3);margin:0;text-align:center;max-width:260px;line-height:1.5">Pick a channel from the left to start talking. Direct messages live in the sidebar — open them with Messages.</p>
       </div>
     </div>
   </div>
@@ -21334,7 +21334,7 @@ document.addEventListener("click", hideFriendContextMenu);
 document.addEventListener("contextmenu", e => { if (!e.target.closest(".dm-item")) hideFriendContextMenu(); });
 
 document.getElementById("ctxCall").addEventListener("click", async (e) => { e.stopPropagation(); const uid=ctxUserId, uname=ctxUsername; hideFriendContextMenu(); if (uid && uname) await startDirectCall(uid, uname); });
-document.getElementById("ctxSendMessage").addEventListener("click", async (e) => { e.stopPropagation(); const uid=ctxUserId, uname=ctxUsername; hideFriendContextMenu(); if (uid && uname) { showChatPanel(); await showDMPanel(); await openDM(uid, uname, ""); } });
+document.getElementById("ctxSendMessage").addEventListener("click", async (e) => { e.stopPropagation(); const uid=ctxUserId, uname=ctxUsername; hideFriendContextMenu(); if (uid && uname) { await openDM(uid, uname, ""); } });   /* no showChatPanel: the DM opens in the sidebar, the page stays put */
 document.getElementById("ctxViewProfile").addEventListener("click", (e) => { e.stopPropagation(); const uid=ctxUserId; hideFriendContextMenu(); if (uid) openProfile(uid); });
 document.getElementById("ctxRemoveFriend").addEventListener("click", async () => {
   if (!ctxFriendId) return;
@@ -30700,7 +30700,7 @@ window.renderFriendsDrawer = async function() {
           <div class="fp-friend-sub">${isOnline ? '<span style="color:#23a55a;font-weight:600">● Online</span>' : '○ Offline'}</div>
         </div>
         <div class="fp-friend-actions" onclick="event.stopPropagation()">
-          <button class="fp-action-btn fp-btn-msg" onclick="window.closeFriendsPage();if(typeof showChatPanel==='function')showChatPanel();if(typeof showDMPanel==='function')showDMPanel().then(()=>openDM(${f.other_id},'${_fpEsc(f.username)}','${_fpEsc(f.avatar_url||'')}'));else if(typeof openDM==='function')openDM(${f.other_id},'${_fpEsc(f.username)}','${_fpEsc(f.avatar_url||'')}')">
+          <button class="fp-action-btn fp-btn-msg" onclick="window.closeFriendsPage();if(typeof openDM==='function')openDM(${f.other_id},'${_fpEsc(f.username)}','${_fpEsc(f.avatar_url||'')}')">
             <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
             Message
           </button>
@@ -31097,7 +31097,12 @@ function showChatPanel() {
     document.body.classList.remove("members-bar-open", "members-visible");
   }
   
-  if (typeof showDMPanel === "function") showDMPanel();
+  /* showDMPanel() used to be called here unconditionally, which is how
+     opening a LOBBY could land on the Direct Messages page: selectServer()
+     calls showChatPanel(), this fired showDMPanel(), and showDMPanel() is
+     async and sets `selectedServer = null` — so whenever it resolved after
+     selectServer had set the server, it wiped it and left the DM view up.
+     DMs live in the sidebar now, so there is nothing to open here. */
 }
 
 // Rewire nav icons — cloneNode kills duplicate listeners
@@ -32876,7 +32881,7 @@ async function renderFullProfilePage() {
       }
     } catch(e) {}
     actions = `${friendBtnHtml}
-               <button class="fp-btn fp-btn-ghost" onclick="hideFullProfilePage();showChatPanel();openDM(${fpUserId},'${fpData.username}','${fpData.avatar_url||''}')">💬 Message</button>`;
+               <button class="fp-btn fp-btn-ghost" onclick="hideFullProfilePage();openDM(${fpUserId},'${fpData.username}','${fpData.avatar_url||''}')">💬 Message</button>`;
   }
 
   // Wallpaper layer — uses the cover image (or fallback) blurred behind everything.
@@ -50753,7 +50758,9 @@ body.feed-resizing .lobby-overlay{ transition:none !important; }
        friend looked like nothing happened at all. They land on the chat
        panel, so they go through the same door as everything else. */
     wrapAfter('selectServer',     function(){ enterPanel('chatPanel'); });
-    wrapAfter('openDM',           function(){ enterPanel('chatPanel'); });
+    /* openDM is NOT a navigation any more — DMs open in the sidebar and
+       the main area keeps whatever page you were on, so wrapping it here
+       would yank you to the chat panel every time you messaged someone. */
     wrapBefore('showOverlay',     enterOverlay);
     wrapAfter('hideOverlay',      leaveOverlay);
     wrapBefore('coliseumShow',    enterColiseum);
@@ -51083,13 +51090,18 @@ body.dock-sidebar:not(.dock-feed)  #phFeedToggleBtn .ph-fb-dot {
     return el;
   }
 
-  function open(){
+  /* `uid` opens straight onto that conversation — this is what the old
+     full-page openDM() used to do, and the redirect below needs it so a
+     "Message" button lands in the thread rather than the friend list. */
+  function open(uid){
     document.body.classList.add('rail-dm');
     // The rail has to be on screen for any of this to be visible.
     if (document.body.classList.contains('rail-hidden') &&
         typeof window.toggleLobbyRail === 'function') window.toggleLobbyRail();
+    if (uid != null && uid !== '') openWith = Number(uid);
     if (!friends.length) loadFriends(); else renderList();
     render();
+    if (openWith != null) loadThread(openWith);
   }
   function close(){
     document.body.classList.remove('rail-dm');
@@ -51590,6 +51602,43 @@ body.dock-sidebar:not(.dock-feed)  #phFeedToggleBtn .ph-fb-dot {
 
   if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', start);
   else start();
+})();
+</script>
+
+<!-- ══════════════════════════════════════════════════════════════════
+     RETIRE THE FULL-PAGE DIRECT MESSAGES VIEW
+     DMs live in the sidebar only. The old full-page view was still
+     reachable from ~15 call sites (friend list, profile cards, context
+     menus, notification taps), so it is retired at the two functions they
+     all go through rather than by editing every caller.
+
+       showDMPanel()  -> open the DM rail, keep the current page
+       openDM(id,...) -> open that conversation in the DM rail
+
+     Both keep returning a Promise: most call sites `await` them.
+     ══════════════════════════════════════════════════════════════════ -->
+<script>
+(function () {
+  'use strict';
+
+  function rail(){ return window.lobbyRailDM || null; }
+
+  /* Replacing the global binding, not editing the callers: these are
+     top-level function declarations, so `showDMPanel(...)` at a call site
+     resolves through the global object and picks these up. */
+  window.showDMPanel = function(){
+    var r = rail();
+    if (r) r.open();
+    return Promise.resolve();
+  };
+
+  window.openDM = function(userId){
+    var r = rail();
+    if (r) r.open(userId);
+    return Promise.resolve();
+  };
+
+  console.log('[dm] full-page view retired — DMs open in the sidebar');
 })();
 </script>
 
