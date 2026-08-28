@@ -49663,9 +49663,11 @@ body.lir-collapsed #lirRecents{ display:none; }
      previewed lobby's data, run the real renderers, and get the genuine
      sidebar rather than a reimplementation of it. */
   var previewLoading = null;
+  var PV_KEY = 'lobbyPreviewId';
 
   function setPreview(id, force){
     if (id == null) return;
+    try { localStorage.setItem(PV_KEY, String(id)); } catch(e){}
     if (!force && window._lirPreview && String(window._lirPreview.id) === String(id)){
       applyPreview(); return;
     }
@@ -49675,49 +49677,111 @@ body.lir-collapsed #lirRecents{ display:none; }
     var token = localStorage.getItem('vh_token');
     var base = (typeof AUTH_URL !== 'undefined') ? AUTH_URL : (window.AUTH_URL || '');
     var h = { Authorization: 'Bearer ' + token };
+    function get(u){ return fetch(u, { headers:h }).then(function(r){ return r.ok ? r.json() : null; }).catch(function(){ return null; }); }
+
+    // Everything the rail shows, so a previewed lobby looks exactly as it
+    // would if you'd just walked into it — not a half-populated shell.
     Promise.all([
-      fetch(base + '/servers/' + id + '/channels', { headers:h }).then(function(r){ return r.ok ? r.json() : []; }),
-      fetch(base + '/servers/' + id + '/members',  { headers:h }).then(function(r){ return r.ok ? r.json() : []; })
+      get(base + '/servers/' + id + '/channels'),
+      get(base + '/servers/' + id + '/members'),
+      get(base + '/api/tournaments/lobby/' + id),
+      get(base + '/api/events/lobby/' + id)
     ]).then(function(res){
       var srv = lobbyById(id) || {};
       window._lirPreview = {
         id: id,
         name: srv.name || 'Lobby',
         icon: srv.icon_url || srv.iconUrl || null,
-        channels: Array.isArray(res[0]) ? res[0] : [],
-        members:  Array.isArray(res[1]) ? res[1] : []
+        channels:  Array.isArray(res[0]) ? res[0] : [],
+        members:   Array.isArray(res[1]) ? res[1] : [],
+        tourneys:  Array.isArray(res[2]) ? res[2] : [],
+        events:    (res[3] && Array.isArray(res[3].events)) ? res[3].events : []
       };
-      applyPreview();
-    }).catch(function(){}).finally(function(){ previewLoading = null; });
+      applyPreview(true);
+    }).finally(function(){ previewLoading = null; });
   }
 
-  function applyPreview(){
+  var applying = false;
+  function applyPreview(force){
     if (document.body.classList.contains('lobby-selected')) return;
     var pv = window._lirPreview;
-    if (!pv) return;
+    if (!pv || applying) return;
 
-    window.cachedServerChannels = pv.channels;
-    window.cachedServerMembers  = pv.members;
+    // Navigating home clears these caches, which would blank the previewed
+    // sidebar. Re-assert ours whenever they've been swapped out from under
+    // us — that's why the rail looked empty after a reload.
+    var stale = window.cachedServerMembers !== pv.members
+             || window.cachedServerChannels !== pv.channels
+             || window._lirTourneyAll !== pv.tourneys;
+    if (!force && !stale) return;
 
-    var icon = $('lirIcon'), name = $('lirName'), meta = $('lirMeta');
-    if (name) name.textContent = pv.name;
-    if (icon){
-      icon.innerHTML = pv.icon
-        ? '<img src="' + esc(pv.icon) + '" alt="" style="width:100%;height:100%;object-fit:cover;border-radius:inherit">'
-        : esc(String(pv.name || 'L').charAt(0).toUpperCase());
-    }
-    if (meta) meta.textContent = pv.members.length + ' MEMBERS';
+    applying = true;
+    try {
+      window.cachedServerChannels = pv.channels;
+      window.cachedServerMembers  = pv.members;
+      window._lirTourneyAll       = pv.tourneys;
+      window._calendarState = window._calendarState || {};
+      window._calendarState.lobbyId = pv.id;
+      window._calendarState.lobbyName = pv.name;
+      window._calendarState.events = pv.events;
 
-    try { if (typeof window._lirRenderChannels === 'function') window._lirRenderChannels(); } catch(e){}
-    try { if (typeof window._lirRenderMembers  === 'function') window._lirRenderMembers();  } catch(e){}
+      var icon = $('lirIcon'), name = $('lirName'), meta = $('lirMeta');
+      if (name) name.textContent = pv.name;
+      if (icon){
+        icon.innerHTML = pv.icon
+          ? '<img src="' + esc(pv.icon) + '" alt="" style="width:100%;height:100%;object-fit:cover;border-radius:inherit">'
+          : esc(String(pv.name || 'L').charAt(0).toUpperCase());
+      }
+      if (meta) meta.textContent = pv.members.length + ' MEMBERS';
+
+      try { if (typeof window._lirRenderChannels === 'function') window._lirRenderChannels(); } catch(e){}
+      try { if (typeof window._lirRenderMembers  === 'function') window._lirRenderMembers();  } catch(e){}
+      try { if (typeof window._lirRenderTourneys === 'function') window._lirRenderTourneys(); } catch(e){}
+      renderPreviewEvents(pv);
+    } finally { applying = false; }
     renderRecents();
   }
 
-  /* Off-lobby, show the top-ranked recent's sidebar by default. */
+  /* The rail's own event list is built inside updateLobbyInfoRail(), which
+     needs a selected server — so render it here for the previewed lobby. */
+  function renderPreviewEvents(pv){
+    var list = $('lirEventsList'), count = $('lirEventCount');
+    if (!list) return;
+    var now = Date.now();
+    var meId = (window.me && window.me.id) || null;
+    var up = (pv.events || [])
+      .filter(function(e){ return e && new Date(e.event_date).getTime() >= now - 3600000; })
+      .filter(function(e){ return !e.is_private || e.created_by === meId; })
+      .sort(function(a,b){ return new Date(a.event_date) - new Date(b.event_date); })
+      .slice(0, 8);
+    if (count) count.textContent = String(up.length);
+    list.innerHTML = up.length ? up.map(function(e){
+      var d = new Date(e.event_date);
+      return '<div class="lir-event">' +
+        '<div class="lir-event-title">' + esc(e.title || 'Untitled') + '</div>' +
+        '<div class="lir-event-time">' +
+          esc(d.toLocaleDateString('en-GB', { weekday:'short', day:'numeric', month:'short' })) +
+          ' · ' + esc(d.toLocaleTimeString('en-GB', { hour:'2-digit', minute:'2-digit' })) +
+        '</div></div>';
+    }).join('') : '<div class="lir-empty">No upcoming events.</div>';
+  }
+
+  /* Off-lobby, show a recent lobby's sidebar. Prefers whichever you were
+     last looking at, so a reload puts you back where you were rather than
+     silently jumping to a different lobby. */
   function ensurePreview(){
     if (document.body.classList.contains('lobby-selected')) return;
-    var top = ranked()[0];
-    if (top) setPreview(top.r.id);
+    var recents = loadRecents();
+    if (!recents.length) return;
+
+    var want = null;
+    try { want = localStorage.getItem(PV_KEY); } catch(e){}
+    var stillThere = want && recents.some(function(r){ return String(r.id) === String(want); });
+    if (!stillThere){
+      var top = ranked()[0];
+      want = top ? top.r.id : recents[0].id;
+    }
+    setPreview(want);
   }
 
 
@@ -49828,6 +49892,16 @@ body.lir-collapsed #lirRecents{ display:none; }
     [200, 700, 1800, 4000].forEach(function(ms){
       setTimeout(function(){ noteVisit(lexServer()); renderRecents(); ensurePreview(); }, ms);
     });
+
+    // The app's own 4s poll re-renders the rail from the shared caches, and
+    // navigating home clears them. Re-assert the preview so a previewed
+    // sidebar can't be blanked out from under us. applyPreview() no-ops
+    // unless something has actually changed, so this is cheap.
+    setInterval(function(){
+      if (document.hidden) return;
+      if (document.body.classList.contains('lobby-selected')) return;
+      applyPreview();
+    }, 2000);
 
     console.log('[rail] sidebar toggle + recents ready — ' +
                 loadRecents().length + ' stored, double-dock ' +
