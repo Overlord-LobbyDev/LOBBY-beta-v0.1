@@ -49414,19 +49414,30 @@ body.lir-collapsed #lirRecents{ display:none; }
      collapsing something you cannot see. */
   window.toggleLobbyRail = function(){
     var body = document.body;
-    var feedCovering = body.classList.contains('feed-open') && !doubleDock();
 
-    if (feedCovering){
-      if (typeof window.toggleFeed === 'function') window.toggleFeed();
+    // Key off whether the rail is ACTUALLY on screen, not off feed-open.
+    // During startup the body can briefly carry neither feed-open nor
+    // feed-closed, and the rail's CSS requires feed-closed — so the rail
+    // is invisible while `feed-open` is also false. Testing feed-open
+    // alone made the first press toggle the feed instead of the sidebar.
+    var railVisible = doubleDock() || body.classList.contains('feed-closed');
+
+    if (!railVisible){
+      if (body.classList.contains('feed-open') && typeof window.toggleFeed === 'function'){
+        window.toggleFeed();                 // let the app run its own close
+      } else {
+        body.classList.add('feed-closed');   // startup case: nothing to close
+        body.classList.remove('feed-open');
+      }
       // Come back expanded — you asked for the sidebar, so show it.
-      if (typeof window.lobbyRailToggle === 'function'
-          && body.classList.contains('lir-collapsed')){
+      if (body.classList.contains('lir-collapsed')
+          && typeof window.lobbyRailToggle === 'function'){
         window.lobbyRailToggle();
       }
       syncRailBtn();
       return;
     }
-    // Otherwise: identical to the » arrow.
+    // Rail is on screen: identical to the » arrow.
     if (typeof window.lobbyRailToggle === 'function') window.lobbyRailToggle();
     syncRailBtn();
   };
@@ -49491,10 +49502,15 @@ body.lir-collapsed #lirRecents{ display:none; }
     if (!header) return;
 
     var host = $('lirRecents');
-    if (!host){
+    // The rail's contents get rebuilt, which takes our strip with it. The
+    // signature guard would then see "nothing changed" and never put it
+    // back — so a missing host has to reset the guard, not just re-create
+    // the node. This is why recents looked like they weren't persisting.
+    if (!host || !host.isConnected){
       host = document.createElement('div');
       host.id = 'lirRecents';
       header.parentNode.insertBefore(host, header);
+      recSig = '';
     }
 
     var items = ranked();
@@ -49623,8 +49639,17 @@ body.lir-collapsed #lirRecents{ display:none; }
       .observe(document.body, { attributes:true, attributeFilter:['class'] });
 
     noteVisit(lexServer());
-    console.log('[rail] sidebar toggle + recents ready (double-dock ' +
-                (doubleDock() ? 'on' : 'off') + ')');
+
+    // On a cold start the rail's header may not be in place yet, and a
+    // lobby is often auto-restored a moment later. Without these retries
+    // the stored recents render into nothing and appear to have been lost.
+    [200, 700, 1800, 4000].forEach(function(ms){
+      setTimeout(function(){ noteVisit(lexServer()); renderRecents(); }, ms);
+    });
+
+    console.log('[rail] sidebar toggle + recents ready — ' +
+                loadRecents().length + ' stored, double-dock ' +
+                (doubleDock() ? 'on' : 'off'));
   }
 
   if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', start);
