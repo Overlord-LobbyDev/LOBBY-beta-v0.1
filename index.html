@@ -48967,8 +48967,11 @@ body.lir-resizing #chatPanel{ transition:none !important; }
     if (fetching) return;
     if (!force && srv.id === lastServer && (Date.now() - lastAt) < 45000) return;
     fetching = true;
-    var token = localStorage.getItem('vh_token');
-    var base = (typeof AUTH_URL !== 'undefined') ? AUTH_URL : (window.AUTH_URL || '');
+    // Same token rule as the app — localStorage OR sessionStorage.
+    var token = localStorage.getItem('vh_token') || sessionStorage.getItem('vh_token');
+    var base = (typeof API_BASE !== 'undefined' && API_BASE)
+      ? API_BASE
+      : ((typeof AUTH_URL !== 'undefined') ? AUTH_URL : (window.AUTH_URL || ''));
     fetch(base + '/servers/' + srv.id + '/activity', {
       headers: { Authorization: 'Bearer ' + token }
     })
@@ -49686,10 +49689,24 @@ body.lir-collapsed #lirRecents{ display:none; }
     if (previewLoading === String(id)) return;
     previewLoading = String(id);
 
-    var token = localStorage.getItem('vh_token');
-    var base = (typeof AUTH_URL !== 'undefined') ? AUTH_URL : (window.AUTH_URL || '');
+    // The app reads its token as localStorage OR sessionStorage (see
+    // authHeaders). Reading only localStorage meant every one of these
+    // requests 401'd when the session lived in sessionStorage — the header
+    // rendered fine because it needs no network, while every section came
+    // back empty. Match the app exactly, including its API_BASE preference.
+    var token = localStorage.getItem('vh_token') || sessionStorage.getItem('vh_token');
+    var base = (typeof API_BASE !== 'undefined' && API_BASE)
+      ? API_BASE
+      : ((typeof AUTH_URL !== 'undefined') ? AUTH_URL : (window.AUTH_URL || ''));
     var h = { Authorization: 'Bearer ' + token };
-    function get(u){ return fetch(u, { headers:h }).then(function(r){ return r.ok ? r.json() : null; }).catch(function(){ return null; }); }
+    function get(u){
+      return fetch(u, { headers:h })
+        .then(function(r){
+          if (!r.ok){ console.warn('[rail] ' + r.status + ' ' + u); return null; }
+          return r.json();
+        })
+        .catch(function(err){ console.warn('[rail] failed ' + u, err && err.message); return null; });
+    }
 
     // Everything the rail shows, so a previewed lobby looks exactly as it
     // would if you'd just walked into it — not a half-populated shell.
