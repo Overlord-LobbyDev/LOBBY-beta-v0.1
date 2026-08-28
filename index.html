@@ -19344,6 +19344,22 @@ window._doInviteToServer = async function(serverId, userId, username) {
 
 // ── DM Panel ──────────────────────────────────────────────────
 async function showDMPanel() {
+  /* Switch the page ourselves rather than trusting the caller.
+     showChatPanel() is what actually performs the switch — exitColiseumMode(),
+     hide #homePanel/#profilePage/#calendarPanel, show #chatPanel, fix
+     currentPanel — but of the ~13 call sites for showDMPanel() only TWO
+     called it first. Every other route into DMs therefore left:
+       • coliseum-mode stuck  -> CSS hides every panel, page looks frozen
+       • #homePanel visible   -> you land on Home instead of Messages
+       • #chatPanel hidden    -> the DM list renders into an invisible panel
+       • a .lobby-overlay open-> it covers everything at z-index 9000
+     That is the "switching to DMs from a lobby (or any major page) breaks"
+     report. Fixing it here removes the whole class of bug instead of
+     patching eleven callers and hoping the twelfth remembers.
+     showChatPanel() is idempotent, so the two callers that already call it
+     are unaffected. */
+  if (typeof showChatPanel === "function") showChatPanel();
+
   selectedServer = null;
   // Hide the lobby info rail when leaving a lobby
   document.body.classList.remove("lobby-selected");
@@ -31026,6 +31042,17 @@ window._lobbiesDrawerMoveIcons = function() {
 function showChatPanel() {
   maybeShowVcPip();
   exitColiseumMode();
+  /* Close any full-page overlay first. Discover / Tournaments /
+     Leaderboards / Queue / Speedrun are .lobby-overlay elements at
+     z-index 9000 — leaving one open means the chat or DM page renders
+     correctly underneath but is completely covered, which reads as "the
+     page didn't change" or "it hung". goHome() already does this via the
+     same manager; chat navigation never did. */
+  try {
+    if (typeof window.hideOverlay === 'function') window.hideOverlay();
+    else document.querySelectorAll('.lobby-overlay.open')
+                 .forEach(function(o){ o.classList.remove('open'); });
+  } catch (e) { console.warn('[showChatPanel] overlay cleanup', e); }
   document.getElementById("homePanel").classList.add("hidden");
   document.getElementById("chatPanel").classList.remove("hidden");
   document.getElementById("profilePage").classList.add("hidden");
