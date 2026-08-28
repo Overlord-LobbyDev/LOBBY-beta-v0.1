@@ -47135,9 +47135,14 @@ body.bracket-active .chamber-back{ display:none !important; }
   --lbv-col: 100%;
 }
 
-/* ── Rail width is driven by one variable so the chat reflows with it ── */
-body.feed-closed.lobby-selected #lobbyInfoRail{
-  width: var(--lir-w);
+/* ── Rail width is driven by one variable so pages reflow with it ──
+   NOT scoped to .lobby-selected. The panels reserve --lir-w on every
+   page, but this rule only applied inside a lobby — so elsewhere the rail
+   fell back to its base 320px while the page still gave up 360px, leaving
+   a dead strip between them. It also meant dragging to resize did nothing
+   off-lobby, since the width was pinned. */
+#lobbyInfoRail{
+  width: var(--lir-w) !important;
   transition: transform .28s cubic-bezier(.16,1,.3,1),
               width .26s cubic-bezier(.16,1,.3,1);
 }
@@ -50081,6 +50086,148 @@ body.lir-collapsed #lirRecents{ display:none; }
     console.log('[rail] sidebar toggle + recents ready — ' +
                 loadRecents().length + ' stored, double-dock ' +
                 (doubleDock() ? 'on' : 'off'));
+  }
+
+  if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', start);
+  else start();
+})();
+</script>
+
+<!-- ══════════════════════════════════════════════════════════════════
+     FEED RESIZE
+     Self-contained on purpose: it only writes --feed-w. #socialFeed is
+     already `width: var(--feed-w)`, and _enforceFeedLayout() writes
+     `right: var(--feed-w)` inline on every panel — so changing that one
+     variable resizes the feed AND reflows the page through the app's own
+     layout code. None of that logic is touched.
+     ══════════════════════════════════════════════════════════════════ -->
+<style>
+#feedResize{
+  position:absolute; top:0; bottom:0; width:7px;
+  cursor:col-resize; z-index:6; background:transparent;
+}
+body[data-feed-position="right"] #feedResize{ left:0; right:auto; }
+body[data-feed-position="left"]  #feedResize{ right:0; left:auto; }
+/* Split mode centres the feed and reflows via a grid — dragging an edge
+   has no meaning there, so the handle stays out of the way. */
+body[data-feed-position="split"] #feedResize{ display:none; }
+
+#feedResize::after{
+  content:''; position:absolute; top:0; bottom:0; width:2px;
+  left:2px; background:transparent; transition:background .16s;
+}
+#feedResize:hover::after,
+#feedResize:focus-visible::after,
+body.feed-resizing #feedResize::after{
+  background:color-mix(in srgb, var(--accent) 65%, transparent);
+}
+#feedResize:focus-visible{ outline:2px solid var(--accent); outline-offset:-2px; }
+
+body.feed-resizing{ cursor:col-resize; user-select:none; }
+/* Track the cursor exactly while dragging instead of easing behind it. */
+body.feed-resizing #socialFeed,
+body.feed-resizing #homePanel,
+body.feed-resizing #chatPanel,
+body.feed-resizing #profilePage,
+body.feed-resizing #calendarPanel,
+body.feed-resizing #vcPanel,
+body.feed-resizing .lobby-overlay{ transition:none !important; }
+</style>
+
+<script>
+(function () {
+  'use strict';
+  var KEY = 'lobbyFeedWidth', MIN = 300, MAX = 720;
+
+  function apply(px){
+    px = Math.max(MIN, Math.min(MAX, Math.round(px)));
+    document.documentElement.style.setProperty('--feed-w', px + 'px');
+    return px;
+  }
+  function current(){
+    var v = parseInt(getComputedStyle(document.documentElement)
+      .getPropertyValue('--feed-w'), 10);
+    return isNaN(v) ? 420 : v;
+  }
+  function save(px){ try { localStorage.setItem(KEY, String(px)); } catch(e){} }
+  function load(){
+    try {
+      var v = parseInt(localStorage.getItem(KEY), 10);
+      if (!isNaN(v)) apply(v);
+    } catch(e){}
+  }
+  /* Never let the feed swallow the window. Shrinks to fit but never
+     rewrites the saved preference, so widening the window restores it. */
+  function clampToWindow(){
+    var saved = null;
+    try { saved = parseInt(localStorage.getItem(KEY), 10); } catch(e){}
+    if (isNaN(saved) || saved == null) return;
+    apply(Math.min(saved, Math.max(MIN, Math.round(window.innerWidth * 0.5))));
+  }
+
+  function build(){
+    var feed = document.getElementById('socialFeed');
+    if (!feed || document.getElementById('feedResize')) return;
+
+    var h = document.createElement('div');
+    h.id = 'feedResize';
+    h.tabIndex = 0;
+    h.setAttribute('role', 'separator');
+    h.setAttribute('aria-orientation', 'vertical');
+    h.setAttribute('aria-label', 'Resize feed');
+    h.title = 'Drag to resize · double-click to reset';
+    feed.appendChild(h);
+
+    h.addEventListener('mousedown', function(e){
+      e.preventDefault();
+      document.body.classList.add('feed-resizing');
+      var pos = document.body.getAttribute('data-feed-position') || 'right';
+      var last = current();
+      function move(ev){
+        // Docked right: width grows as the cursor moves left. Docked left:
+        // the cursor position IS the width.
+        last = apply(pos === 'left' ? ev.clientX : (window.innerWidth - ev.clientX));
+      }
+      function up(){
+        document.body.classList.remove('feed-resizing');
+        document.removeEventListener('mousemove', move);
+        document.removeEventListener('mouseup', up);
+        save(last);
+      }
+      document.addEventListener('mousemove', move);
+      document.addEventListener('mouseup', up);
+    });
+
+    // Keyboard-resizable — a drag-only control is unusable without a mouse.
+    h.addEventListener('keydown', function(e){
+      var step = e.shiftKey ? 48 : 16, w = null;
+      if (e.key === 'ArrowLeft')       w = current() + step;
+      else if (e.key === 'ArrowRight') w = current() - step;
+      else if (e.key === 'Home')       w = MAX;
+      else if (e.key === 'End')        w = MIN;
+      else return;
+      e.preventDefault();
+      save(apply(w));
+    });
+
+    // Double-click clears the override so the stylesheet's
+    // clamp(360px, 26vw, 540px) default takes over again.
+    h.addEventListener('dblclick', function(){
+      document.documentElement.style.removeProperty('--feed-w');
+      try { localStorage.removeItem(KEY); } catch(e){}
+    });
+  }
+
+  function start(){
+    if (!document.getElementById('socialFeed')){ setTimeout(start, 300); return; }
+    load();
+    clampToWindow();
+    build();
+    var t = null;
+    window.addEventListener('resize', function(){
+      clearTimeout(t); t = setTimeout(clampToWindow, 120);
+    });
+    console.log('[feed] resize ready (' + current() + 'px)');
   }
 
   if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', start);
