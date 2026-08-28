@@ -48967,17 +48967,15 @@ body.lir-resizing #chatPanel{ transition:none !important; }
     if (fetching) return;
     if (!force && srv.id === lastServer && (Date.now() - lastAt) < 45000) return;
     fetching = true;
-    // Same token rule as the app — localStorage OR sessionStorage.
-    // /servers/:id/activity lives on the auth/API server (it's defined in
-    // backend/auth.js), NOT on API_BASE, which is the websocket server.
-    var token = localStorage.getItem('vh_token') || sessionStorage.getItem('vh_token');
-    var base = (typeof FEED_AUTH_URL !== 'undefined' && FEED_AUTH_URL)
-      ? FEED_AUTH_URL
-      : ((typeof AUTH_URL !== 'undefined') ? AUTH_URL : (window.AUTH_URL || ''));
-    fetch(base + '/servers/' + srv.id + '/activity', {
-      headers: { Authorization: 'Bearer ' + token }
-    })
-      .then(function(r){ return r.ok ? r.json() : []; })
+    // Go through the app's own api() helper — it already resolves the
+    // correct host and accepts a token from localStorage OR sessionStorage.
+    // Hand-building the URL here is what produced wrong-host 404s elsewhere.
+    (function(){
+      try {
+        if (typeof api === 'function') return Promise.resolve(api('/servers/' + srv.id + '/activity'));
+      } catch(e){}
+      return Promise.resolve([]);
+    })()
       .then(function(d){
         data = Array.isArray(d) ? d : [];
         lastServer = srv.id; lastAt = Date.now();
@@ -49731,62 +49729,66 @@ body.lir-collapsed #lirRecents{ display:none; }
     if (previewLoading === String(id)) return;
     previewLoading = String(id);
 
-    // The app reads its token as localStorage OR sessionStorage (see
-    // authHeaders). Reading only localStorage meant every one of these
-    // requests 401'd when the session lived in sessionStorage — the header
-    // rendered fine because it needs no network, while every section came
-    // back empty. Match the app exactly, including its API_BASE preference.
-    var token = localStorage.getItem('vh_token') || sessionStorage.getItem('vh_token');
-    var h = { Authorization: 'Bearer ' + token };
-    function get(u){
-      return fetch(u, { headers:h })
-        .then(function(r){
-          if (!r.ok){ console.warn('[rail] ' + r.status + ' ' + u); return null; }
-          return r.json();
-        })
-        .catch(function(err){ console.warn('[rail] failed ' + u, err && err.message); return null; });
+    /* Use the app's OWN loaders rather than rebuilding requests.
+       Every failure in this feature came from reimplementing them: the
+       wrong host (API_BASE is the websocket server, not the API one), and
+       the wrong token source (the app accepts localStorage OR
+       sessionStorage). api() already resolves both correctly, and
+       _lirLoadTournaments() both fetches AND renders. There is no reason
+       for this module to know a single URL. */
+    function call(path){
+      try {
+        if (typeof api === 'function'){
+          return Promise.resolve(api(path)).catch(function(e){
+            console.warn('[rail] ' + path + ' failed', e && e.message);
+            return null;
+          });
+        }
+      } catch(e){}
+      return Promise.resolve(null);
     }
 
-    // These endpoints do NOT share a host. API_BASE is the WEBSOCKET
-    // server; channels, members and events live on the auth/API server.
-    // Preferring API_BASE for everything 404'd all three while tournaments
-    // (which really are served there) kept working — hence "only activity
-    // loads". Each base now matches what the app itself uses:
-    //   channels/members -> FEED_AUTH_URL, same as api()
-    //   tournaments      -> API_BASE || AUTH_URL, as _lirLoadTournaments
-    //   events           -> AUTH_URL, as _calendarFetchEvents
-    var AUTH = (typeof FEED_AUTH_URL !== 'undefined' && FEED_AUTH_URL)
-      ? FEED_AUTH_URL
-      : ((typeof AUTH_URL !== 'undefined') ? AUTH_URL : (window.AUTH_URL || ''));
-    var TBASE = (typeof API_BASE !== 'undefined' && API_BASE) ? API_BASE : AUTH;
+    var rec = loadRecents().find(function(x){ return String(x.id) === String(id); }) || {};
+    var srv = lobbyById(id) || {};
+    var pvName = rec.name || srv.name || 'Lobby';
 
     Promise.all([
-      get(AUTH  + '/servers/' + id + '/channels'),
-      get(AUTH  + '/servers/' + id + '/members'),
-      get(TBASE + '/api/tournaments/lobby/' + id),
-      get(AUTH  + '/api/events/lobby/' + id)
+      call('/servers/' + id + '/channels'),
+      call('/servers/' + id + '/members')
     ]).then(function(res){
-      // Name/icon come from the stored recent FIRST. lobbyById() reads
-      // _allServers, which is often still empty this early in a boot — and
-      // its `|| 'Lobby'` fallback was writing the literal placeholder name
-      // into the header, overwriting the correct one. So a successful
-      // preview was itself restoring the placeholder.
-      var rec = loadRecents().find(function(x){ return String(x.id) === String(id); }) || {};
-      var srv = lobbyById(id) || {};
       window._lirPreview = {
         id: id,
-        name: rec.name || srv.name || 'Lobby',
+        // Name/icon from the stored recent first: lobbyById() reads
+        // _allServers, often still empty this early in a boot, and its
+        // 'Lobby' fallback would write the placeholder into the header.
+        name: pvName,
         icon: rec.icon || srv.icon_url || srv.iconUrl || null,
-        channels:  Array.isArray(res[0]) ? res[0] : [],
-        members:   Array.isArray(res[1]) ? res[1] : [],
-        tourneys:  Array.isArray(res[2]) ? res[2] : [],
-        events:    (res[3] && Array.isArray(res[3].events)) ? res[3].events : []
+        channels: Array.isArray(res[0]) ? res[0] : [],
+        members:  Array.isArray(res[1]) ? res[1] : []
       };
-      console.log('[rail] previewing "' + window._lirPreview.name + '" — ' +
+      console.log('[rail] previewing "' + pvName + '" — ' +
         window._lirPreview.channels.length + ' channels, ' +
-        window._lirPreview.members.length + ' members, ' +
-        window._lirPreview.tourneys.length + ' tournaments');
+        window._lirPreview.members.length + ' members');
       applyPreview(true);
+
+      // Tournaments: the rail's own loader fetches AND renders, and knows
+      // its own host. Just hand it the lobby id.
+      try {
+        if (typeof window._lirLoadTournaments === 'function') window._lirLoadTournaments(id);
+      } catch(e){}
+
+      // Events: point the app's calendar state at this lobby and let its
+      // own fetcher run, then render the list from what it stored.
+      try {
+        window._calendarState = window._calendarState || {};
+        window._calendarState.lobbyId = id;
+        window._calendarState.lobbyName = pvName;
+        if (typeof _calendarFetchEvents === 'function'){
+          _calendarFetchEvents().then(function(){
+            renderPreviewEvents({ events: (window._calendarState || {}).events || [] });
+          }).catch(function(){});
+        }
+      } catch(e){}
     }).finally(function(){ previewLoading = null; });
   }
 
@@ -49809,19 +49811,16 @@ body.lir-collapsed #lirRecents{ display:none; }
     var nameEl = $('lirName');
     var stale = window.cachedServerMembers !== pv.members
              || window.cachedServerChannels !== pv.channels
-             || window._lirTourneyAll !== pv.tourneys
              || !nameEl || nameEl.textContent !== pv.name;
     if (!force && !stale) return;
 
     applying = true;
     try {
+      // Only channels/members live here. Tournaments and events are loaded
+      // AND rendered by the app's own loaders (see setPreview), so writing
+      // them from here as well would just fight those.
       window.cachedServerChannels = pv.channels;
       window.cachedServerMembers  = pv.members;
-      window._lirTourneyAll       = pv.tourneys;
-      window._calendarState = window._calendarState || {};
-      window._calendarState.lobbyId = pv.id;
-      window._calendarState.lobbyName = pv.name;
-      window._calendarState.events = pv.events;
 
       var icon = $('lirIcon'), name = $('lirName'), meta = $('lirMeta');
       if (name) name.textContent = pv.name;
@@ -49834,8 +49833,6 @@ body.lir-collapsed #lirRecents{ display:none; }
 
       try { if (typeof window._lirRenderChannels === 'function') window._lirRenderChannels(); } catch(e){}
       try { if (typeof window._lirRenderMembers  === 'function') window._lirRenderMembers();  } catch(e){}
-      try { if (typeof window._lirRenderTourneys === 'function') window._lirRenderTourneys(); } catch(e){}
-      renderPreviewEvents(pv);
     } finally { applying = false; }
     renderRecents();
   }
