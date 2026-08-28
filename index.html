@@ -49311,30 +49311,18 @@ body.layout-hotbar #phRailToggleBtn:hover{
 #phRailToggleBtn .ph-fb-tile svg{ width:15px; height:15px; }
 #phRailToggleBtn:hover .ph-fb-tile{ background:rgba(255,255,255,.1); }
 /* Active state uses the accent, so it never looks like the gold Feed
-   pill — two different panels shouldn't share one "on" colour. */
-body.rail-open #phRailToggleBtn{
+   pill — two different panels shouldn't share one "on" colour. It marks
+   EXPANDED, since the rail is always present either way. */
+body.lobby-selected:not(.lir-collapsed) #phRailToggleBtn{
   background:color-mix(in srgb, var(--accent) 16%, transparent);
   border-color:color-mix(in srgb, var(--accent) 40%, transparent);
   color:color-mix(in srgb, var(--accent) 96%, white);
 }
-body.rail-open #phRailToggleBtn .ph-fb-tile{
+body.lobby-selected:not(.lir-collapsed) #phRailToggleBtn .ph-fb-tile{
   background:color-mix(in srgb, var(--accent) 26%, transparent);
 }
 /* Nothing to toggle when you aren't in a lobby. */
 body:not(.lobby-selected) #phRailToggleBtn{ opacity:.4; pointer-events:none; }
-
-/* ── Rail visibility now keys off .rail-open, not "feed happens to be
-      closed" — that coupling is what made the rail vanish silently. ── */
-body.lobby-selected.rail-open #lobbyInfoRail{
-  transform:translateX(0) !important;
-  pointer-events:auto !important;
-}
-body.lobby-selected:not(.rail-open) #lobbyInfoRail{
-  transform:translateX(100%) !important;
-  pointer-events:none !important;
-}
-body.lobby-selected.rail-open #chatPanel{ right:var(--lir-w) !important; }
-body.feed-closed.lobby-selected:not(.rail-open) #chatPanel{ right:0 !important; }
 
 /* ── Recent lobbies strip in the rail header ────────────────────── */
 #lirRecents{
@@ -49415,43 +49403,40 @@ body.lir-collapsed #lirRecents{ display:none; }
   }
   window.lobbySetDoubleDock = setDoubleDock;
 
-  /* ── Rail open / closed ─────────────────────────────────────── */
-  var RAIL_KEY = 'lobbyRailOpen';
-  function railOpen(){
-    try {
-      var v = localStorage.getItem(RAIL_KEY);
-      return v === null ? true : v === '1';   // default open, so it's discoverable
-    } catch(e){ return true; }
-  }
-  function setRail(open){
-    document.body.classList.toggle('rail-open', !!open);
-    try { localStorage.setItem(RAIL_KEY, open ? '1' : '0'); } catch(e){}
-    var b = $('phRailToggleBtn');
-    if (b) b.setAttribute('aria-pressed', open ? 'true' : 'false');
-    // Feed and rail share the right edge unless Double Dock is on.
-    if (open && !doubleDock() && document.body.classList.contains('feed-open')){
-      if (typeof window.toggleFeed === 'function') window.toggleFeed();
-    }
-  }
+  /* ── The button behaves exactly like the rail's own » arrow ──────
+     It collapses and expands the rail; it never hides it. The rail is
+     always present as either the full panel or the 56px icon strip, so
+     there is no state where the sidebar has silently disappeared.
+
+     The one extra job: the Feed still takes the rail's slot (unless
+     Double Dock is on), so if the Feed is currently covering it, the
+     first press closes the Feed to bring the rail back rather than
+     collapsing something you cannot see. */
   window.toggleLobbyRail = function(){
-    setRail(!document.body.classList.contains('rail-open'));
+    var body = document.body;
+    var feedCovering = body.classList.contains('feed-open') && !doubleDock();
+
+    if (feedCovering){
+      if (typeof window.toggleFeed === 'function') window.toggleFeed();
+      // Come back expanded — you asked for the sidebar, so show it.
+      if (typeof window.lobbyRailToggle === 'function'
+          && body.classList.contains('lir-collapsed')){
+        window.lobbyRailToggle();
+      }
+      syncRailBtn();
+      return;
+    }
+    // Otherwise: identical to the » arrow.
+    if (typeof window.lobbyRailToggle === 'function') window.lobbyRailToggle();
+    syncRailBtn();
   };
 
-  /* Opening the Feed closes the rail (unless docked together). Wrapping
-     rather than editing toggleFeed keeps that function's own logic intact. */
-  function patchToggleFeed(){
-    if (typeof window.toggleFeed !== 'function' || window.toggleFeed.__railWrapped) return false;
-    var orig = window.toggleFeed;
-    window.toggleFeed = function(){
-      var r = orig.apply(this, arguments);
-      if (!doubleDock() && document.body.classList.contains('feed-open')
-          && document.body.classList.contains('rail-open')){
-        setRail(false);
-      }
-      return r;
-    };
-    window.toggleFeed.__railWrapped = true;
-    return true;
+  function syncRailBtn(){
+    var b = $('phRailToggleBtn');
+    if (!b) return;
+    var expanded = !document.body.classList.contains('lir-collapsed');
+    b.setAttribute('aria-pressed', expanded ? 'true' : 'false');
+    b.title = expanded ? 'Collapse lobby sidebar' : 'Expand lobby sidebar';
   }
 
   /* ── Recent lobbies ─────────────────────────────────────────────
@@ -49609,17 +49594,10 @@ body.lir-collapsed #lirRecents{ display:none; }
     if (!document.body){ setTimeout(start, 200); return; }
 
     document.body.classList.toggle('double-dock', doubleDock());
-    document.body.classList.toggle('rail-open', railOpen());
     placeButton();
+    syncRailBtn();
     renderRecents();
     buildDDToggle();
-
-    if (!patchToggleFeed()){
-      var tries = 0;
-      var iv = setInterval(function(){
-        if (patchToggleFeed() || ++tries > 40) clearInterval(iv);
-      }, 250);
-    }
 
     // Record every lobby you open.
     (function hookSelect(){
@@ -49639,7 +49617,9 @@ body.lir-collapsed #lirRecents{ display:none; }
     var rail = $('lobbyInfoRail');
     if (rail) new MutationObserver(function(){ renderRecents(); })
       .observe(rail, { childList:true, subtree:true });
-    new MutationObserver(function(){ placeButton(); })
+    // The » arrow inside the rail toggles the same state, so keep the
+    // button's label and active styling in step with it.
+    new MutationObserver(function(){ placeButton(); syncRailBtn(); })
       .observe(document.body, { attributes:true, attributeFilter:['class'] });
 
     noteVisit(lexServer());
