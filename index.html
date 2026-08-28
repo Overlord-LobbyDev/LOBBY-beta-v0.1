@@ -19799,7 +19799,10 @@ function renderChannelRibbon(activeId) {
   return `<div class="chat-ribbon" id="chatRibbon">
     ${crestHtml}
     <div class="cr-strip-wrap">
-      <div class="cr-strip">${tabsHtml}${addBtn}</div>
+      <!-- The channels live INSIDE the segmented track; "+ New Lounge" sits
+           outside it, because it creates a room rather than being one. -->
+      <div class="cr-strip">${tabsHtml}</div>
+      ${addBtn}
     </div>
     <div class="cr-actions">
       ${rosterBtn}
@@ -47202,64 +47205,92 @@ body.lobby-selected .ch-hero{
   -webkit-backdrop-filter:none !important;
 }
 
-/* ══ CHANNEL TABS ═══════════════════════════════════════════════════
-   The tabs were chunky: gradient fill, a border, an inset highlight AND
-   a drop shadow on every one — five effects fighting for attention on a
-   control that should just say which room you're in. Stripped back to a
-   flat pill that is invisible at rest, tinted on hover, and clearly
-   filled when active. */
+/* ══ CHANNEL TABS — segmented track ═════════════════════════════════
+   Previously every tab carried a gradient, a border, an inset highlight
+   AND a drop shadow, so three loose buttons shouted at each other. Now
+   they're one control: a single recessed track holding the channels,
+   with the active room lifted out of it.
 
-/* The strip masked its first 20px to transparent as a scroll hint. With
-   nothing to scroll it simply ate the left edge of the first tab, which
-   is the "overlapping on the left". The fade now only applies on the
-   right, where tabs actually run off. */
+   Type: channel names stay sentence case (they ARE lowercase, and they're
+   content, not labels). Uppercase is reserved for the action button, so
+   "general" and "+ NEW LOUNGE" stop competing at the same weight — that
+   clash was a big part of why the row read as messy. */
+
+/* The track. Recessed, so the active segment can sit proud of it. */
+body.lobby-selected .chat-ribbon .cr-strip-wrap{ gap:10px; }
 body.lobby-selected .chat-ribbon .cr-strip{
-  padding-left:2px;
-  mask-image:linear-gradient(90deg, #000 0, #000 calc(100% - 24px), transparent 100%);
-  -webkit-mask-image:linear-gradient(90deg, #000 0, #000 calc(100% - 24px), transparent 100%);
+  flex:0 1 auto;
+  padding:3px;
+  gap:0;
+  border-radius:10px;
+  background:rgba(0,0,0,.26);
+  border:1px solid rgba(255,255,255,.055);
+  box-shadow:inset 0 1px 2px rgba(0,0,0,.32);
+  overflow:visible;
+  /* The old edge-fade existed to hint at scrolling; the track has real
+     edges now, and the left half of it was clipping the first tab. */
+  mask-image:none; -webkit-mask-image:none;
 }
+body.lobby-selected .chat-ribbon .cr-group{ gap:0; }
+body.lobby-selected .chat-ribbon .cr-group-divider{
+  width:1px; height:16px; margin:0 3px;
+  background:rgba(255,255,255,.09);
+}
+body.lobby-selected .chat-ribbon .cr-group-divider::after{ display:none; }
 
-body.lobby-selected .chat-ribbon .cr-tab{
-  padding:7px 12px;
-  border-radius:8px;
+/* Segments — flat inside the track, separated by hairlines. */
+body.lobby-selected .chat-ribbon .cr-tab:not(.add){
+  position:relative;
+  padding:6px 14px;
+  border-radius:7px;
   gap:8px;
   background:transparent;
   border:1px solid transparent;
   box-shadow:none;
   color:var(--text-3);
-  font-size:12.5px; font-weight:700; letter-spacing:.1px;
+  font-size:13px; font-weight:600; letter-spacing:0;
   transition:background .16s ease, color .16s ease, border-color .16s ease;
 }
-body.lobby-selected .chat-ribbon .cr-tab:hover{
-  background:rgba(255,255,255,.06);
-  border-color:transparent;
+body.lobby-selected .chat-ribbon .cr-tab:not(.add) + .cr-tab:not(.add)::before{
+  content:''; position:absolute; left:-1px; top:50%;
+  width:1px; height:15px; transform:translateY(-50%);
+  background:rgba(255,255,255,.08);
+}
+body.lobby-selected .chat-ribbon .cr-tab:not(.add):hover{
+  background:rgba(255,255,255,.05);
   color:var(--text-1);
-  transform:none;
-  box-shadow:none;
+  transform:none; box-shadow:none; border-color:transparent;
 }
+/* The active room lifts out of the recess. */
 body.lobby-selected .chat-ribbon .cr-tab.active{
-  background:color-mix(in srgb, var(--accent) 15%, transparent);
-  border-color:color-mix(in srgb, var(--accent) 32%, transparent);
-  color:#fff;
-  box-shadow:none;
+  background:linear-gradient(180deg,
+    color-mix(in srgb, var(--accent) 28%, transparent),
+    color-mix(in srgb, var(--accent) 17%, transparent));
+  border-color:color-mix(in srgb, var(--accent) 38%, transparent);
+  color:#fff; font-weight:700;
   transform:none;
+  box-shadow:0 1px 0 rgba(255,255,255,.14) inset, 0 2px 8px rgba(0,0,0,.32);
 }
+/* A hairline either side of the raised segment would read as a seam. */
+body.lobby-selected .chat-ribbon .cr-tab.active::before,
+body.lobby-selected .chat-ribbon .cr-tab.active + .cr-tab::before{ display:none; }
+
 body.lobby-selected .chat-ribbon .cr-tab .cr-tab-ico{
-  opacity:.75; display:inline-flex; align-items:center;
+  opacity:.7; display:inline-flex; align-items:center;
 }
-body.lobby-selected .chat-ribbon .cr-tab .cr-tab-ico svg{ width:15px; height:15px; }
+body.lobby-selected .chat-ribbon .cr-tab .cr-tab-ico svg{ width:14px; height:14px; }
 body.lobby-selected .chat-ribbon .cr-tab.active .cr-tab-ico{ opacity:1; }
 body.lobby-selected .chat-ribbon .cr-tab:focus-visible{
   outline:2px solid var(--accent); outline-offset:2px;
 }
 
-/* Join / Leave: green to join, red to leave — the colour should say what
-   the click does. Kept visible rather than fading in on hover, since a
-   control you can't see until you touch it isn't discoverable. */
+/* Join / Leave: green to join, red to leave, so the colour says what the
+   click does. Always visible — a control you can't see until you hover
+   it isn't discoverable, and "am I in this call?" is a glanceable fact. */
 body.lobby-selected .chat-ribbon .cr-tab[data-type="voice"] .cr-join-pill{
   opacity:1; transform:none; pointer-events:none;
   font-size:8.5px; font-weight:900; letter-spacing:1.1px;
-  padding:2px 7px;
+  padding:2px 7px; margin-left:2px;
   background:color-mix(in srgb, var(--green) 20%, transparent);
   border:1px solid color-mix(in srgb, var(--green) 42%, transparent);
   color:#8fe3ab;
@@ -47270,19 +47301,23 @@ body.lobby-selected .chat-ribbon .cr-tab[data-type="voice"][data-joined="1"] .cr
   color:#f08a8c;
 }
 
-/* "+ New Lounge" is an action, not a room — so it reads as a ghost
-   button rather than another tab competing with the channels. */
+/* "+ New Lounge" sits OUTSIDE the track — it creates a room rather than
+   being one, so it shouldn't look like a segment you can select. */
 body.lobby-selected .chat-ribbon .cr-tab.add{
+  flex:none;
+  padding:7px 13px;
+  border-radius:8px;
+  border:1px dashed rgba(255,255,255,.16);
+  background:transparent; box-shadow:none;
   color:var(--text-3);
-  font-size:10px; font-weight:900; letter-spacing:1.1px; text-transform:uppercase;
-  border:1px dashed rgba(255,255,255,.14);
-  background:transparent;
-  margin-left:4px;
+  font-size:10px; font-weight:900; letter-spacing:1.2px; text-transform:uppercase;
+  transition:background .16s, color .16s, border-color .16s;
 }
 body.lobby-selected .chat-ribbon .cr-tab.add:hover{
   border-color:color-mix(in srgb, var(--accent) 45%, transparent);
   color:color-mix(in srgb, var(--accent) 95%, white);
   background:color-mix(in srgb, var(--accent) 8%, transparent);
+  transform:none;
 }
 
 /* ══ STRANDED FLOATING CHROME ═══════════════════════════════════════
