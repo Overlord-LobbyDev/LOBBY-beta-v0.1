@@ -19817,8 +19817,21 @@ function renderChannelRibbon(activeId) {
       <button class="cr-action-btn" title="Lobby settings" data-action="settings">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.6 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
       </button>
-      <button class="cr-action-btn" title="Back to Coliseum" data-action="coliseum">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 22V8l9-6 9 6v14"/><path d="M3 10h18"/><path d="M3 14h18"/><path d="M3 18h18"/></svg>
+      <!-- Now the ONLY route back to the Coliseum, so it is deliberately
+           not a plain icon button: accent-filled, labelled, and set apart
+           from the muted utility icons beside it. The icon is an
+           amphitheatre (tiered facade + arches) rather than the generic
+           house glyph it used to share with every other "building". -->
+      <button class="cr-action-btn cr-coliseum-btn" title="Back to the Coliseum" data-action="coliseum">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M3 21V11a9 9 0 0 1 18 0v10"/>
+          <path d="M2 21h20"/>
+          <path d="M3.2 15.5h17.6"/>
+          <path d="M6 21v-2.2a1.75 1.75 0 0 1 3.5 0V21"/>
+          <path d="M10.25 21v-2.2a1.75 1.75 0 0 1 3.5 0V21"/>
+          <path d="M14.5 21v-2.2a1.75 1.75 0 0 1 3.5 0V21"/>
+        </svg>
+        <span>Coliseum</span>
       </button>
     </div>
     <div class="live-roster-overlay" id="liveRosterOverlay"></div>
@@ -43084,10 +43097,10 @@ body:not(.coliseum-mode) .col-sigil{display:none}
     </div>
     <svg class="col-crest-chev" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"/></svg>
   </div>
-  <button class="col-return" id="colReturnBtn" onclick="window.coliseumShow && window.coliseumShow()" title="Return to Coliseum">
-    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M3 9.5L12 3l9 6.5"/><path d="M5 10v10h14V10"/></svg>
-    Coliseum
-  </button>
+  <!-- The floating "Coliseum" pill that used to live here is gone — the
+       channel header's Coliseum button is the single way back, and two
+       controls doing the same job in the same view was clutter. The CSS
+       for .col-return is left in place, unused, in case it's wanted back. -->
 </div>
 
 <div class="col-sigil" id="colSigil" onclick="window.me && typeof openProfilePanel==='function' && openProfilePanel(window.me.id)">
@@ -47193,6 +47206,44 @@ body.lobby-selected .ch-hero{
   backdrop-filter:none !important;
   -webkit-backdrop-filter:none !important;
 }
+
+/* ══ COLISEUM BUTTON ════════════════════════════════════════════════
+   The floating pill in the top row is gone, so this is now the only way
+   back. It has to read as a destination, not another utility icon — so
+   it takes the accent fill and a label, and sits apart from the muted
+   icons next to it. */
+.cr-action-btn.cr-coliseum-btn{
+  width:auto !important; height:30px;
+  display:inline-flex; align-items:center; gap:7px;
+  padding:0 12px 0 10px;
+  margin-left:8px;
+  border-radius:8px;
+  background:color-mix(in srgb, var(--accent) 18%, transparent) !important;
+  border:1px solid color-mix(in srgb, var(--accent) 42%, transparent) !important;
+  color:color-mix(in srgb, var(--accent) 96%, white) !important;
+  font-family:var(--font);
+  font-size:9.5px; font-weight:900; letter-spacing:1.2px; text-transform:uppercase;
+  white-space:nowrap;
+  transition:background .16s, border-color .16s, color .16s, transform .16s;
+}
+.cr-action-btn.cr-coliseum-btn svg{ width:16px !important; height:16px !important; }
+.cr-action-btn.cr-coliseum-btn:hover{
+  background:color-mix(in srgb, var(--accent) 34%, transparent) !important;
+  border-color:color-mix(in srgb, var(--accent) 70%, transparent) !important;
+  color:#fff !important;
+  transform:translateY(-1px);
+}
+.cr-action-btn.cr-coliseum-btn:focus-visible{
+  outline:2px solid var(--accent); outline-offset:2px;
+}
+/* A hairline before it separates "leave this view" from the in-view
+   utilities (roster / search / settings). */
+.cr-action-btn.cr-coliseum-btn::before{
+  content:''; position:absolute; left:-8px; top:50%;
+  width:1px; height:18px; transform:translateY(-50%);
+  background:rgba(255,255,255,.1);
+}
+.cr-action-btn.cr-coliseum-btn{ position:relative; }
 
 /* ══ LOUNGE RIBBON — always visible in a lobby ══════════════════════
    An older rule (~8643) hid the ribbon whenever the feed was closed,
