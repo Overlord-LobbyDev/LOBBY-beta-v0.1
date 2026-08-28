@@ -19751,7 +19751,10 @@ function renderChannelRibbon(activeId) {
   // STRICT semantics: a member is counted as online only if their status is
   // one of online/away/dnd. Missing/null status → offline. This matches the
   // channel hero and the roster overlay so all three never disagree.
-  const onlineMembers = members.filter(m => m && (m.status === 'online' || m.status === 'away' || m.status === 'dnd'));
+  // Presence is not a member field — see _lirPresenceOf. Filtering on
+  // m.status is why the ribbon's roster count always showed 0.
+  const onlineMembers = members.filter(m => m && typeof _lirPresenceOf === 'function'
+                                              && _lirPresenceOf(m) !== 'offline');
   const voiceMembers  = members.filter(m => m && (m.voiceChannelId || m.voice_channel_id));
   // v3: show 5 avatars in the inline roster dock (was 3) so users see
   // who's around without having to click into the overlay.
@@ -19769,9 +19772,16 @@ function renderChannelRibbon(activeId) {
     <span class="cr-roster-count"><span class="dot"></span> ${onlineMembers.length}</span>
   </button>`;
 
-  // Lobby crest — anchors the ribbon visually on the left
-  const lobbyName  = (window.selectedServer && window.selectedServer.name) || '';
-  const lobbyIcon  = (window.selectedServer && (window.selectedServer.icon_url || window.selectedServer.iconUrl)) || '';
+  // Lobby crest — anchors the ribbon visually on the left.
+  // selectedServer is a script-scoped global and is NOT mirrored onto
+  // window, so reading window.selectedServer always yielded undefined and
+  // the crest fell back to the literal string "Lobby" for every lobby.
+  const _srv = (function(){
+    try { if (typeof selectedServer !== 'undefined' && selectedServer) return selectedServer; } catch(e){}
+    return window.selectedServer || null;
+  })();
+  const lobbyName  = (_srv && _srv.name) || '';
+  const lobbyIcon  = (_srv && (_srv.icon_url || _srv.iconUrl)) || '';
   const crestInner = lobbyIcon
     ? `<img src="${escAttr(lobbyIcon)}" alt="">`
     : escAttr((lobbyName || 'L').charAt(0).toUpperCase());
