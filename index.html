@@ -51313,7 +51313,18 @@ body.rail-dm:not(.rail-hidden) #phMessagesBtn .ph-fb-tile{
   'use strict';
 
   function $(id){ return document.getElementById(id); }
-  var busy = false;
+
+  /* `busy` blocks a second transition from interleaving with one already
+     running — but it must never DISCARD the click, which is what made the
+     sidebar need two presses: anything pressed inside the ~480ms settle
+     window was silently dropped. The last press is queued instead and runs
+     as soon as the dock is free.
+     `intent` is where we are HEADING. Mid-transition the DOM still reports
+     the old dock, so pick() has to read intent — otherwise a click during
+     the settle window is judged against a stale state and toggles the
+     wrong way. It is cleared on release so the real DOM governs again
+     (the rail can also be toggled from outside this switch). */
+  var busy = false, pending = null, intent = null;
 
   function doubleDock(){
     try { return localStorage.getItem('lobbyDoubleDock') === '1'; } catch(e){ return false; }
@@ -51363,9 +51374,19 @@ body.rail-dm:not(.rail-hidden) #phMessagesBtn .ph-fb-tile{
   function dmOpen(){ if (window.lobbyRailDM) window.lobbyRailDM.open(); }
   function dmClose(){ if (window.lobbyRailDM) window.lobbyRailDM.close(); }
 
-  function done(){
-    after(SETTLE, function(){ busy = false; sync(); });
+  /* Single exit point from a transition: drop the guard, then run whatever
+     was pressed while it was up. */
+  function release(){
+    busy = false;
+    intent = null;
+    sync();
+    if (pending !== null){
+      var next = pending;
+      pending = null;
+      if (next !== state()) go(next);
+    }
   }
+  function done(){ after(SETTLE, release); }
 
   /* Messages <-> Sidebar are the SAME panel, so sliding it out and back in
      is wrong — it never leaves the screen. Only the contents change, so
@@ -51380,8 +51401,7 @@ body.rail-dm:not(.rail-hidden) #phMessagesBtn .ph-fb-tile{
       sync();
       after(XFADE_IN, function(){
         b.classList.remove('rail-swap-in');
-        busy = false;
-        sync();
+        release();
       });
     });
   }
@@ -51397,10 +51417,11 @@ body.rail-dm:not(.rail-hidden) #phMessagesBtn .ph-fb-tile{
   }
 
   function go(target){
-    if (busy) return;
+    if (busy){ pending = target; return; }   // queue, never discard
     var from = state();
     if (from === target) return;
     busy = true;
+    intent = target;
 
     // Same panel, different contents — crossfade, don't re-slide.
     if (isRail(from) && isRail(target)) { swapRail(target); return; }
@@ -51427,8 +51448,12 @@ body.rail-dm:not(.rail-hidden) #phMessagesBtn .ph-fb-tile{
   }
 
   function pick(target){
-    // Clicking whatever is already active switches it off.
-    go(state() === target ? 'none' : target);
+    // Clicking whatever is already active switches it off. Judge that
+    // against where we're HEADING, not the mid-transition DOM — during a
+    // handoff the old dock is still in the classes, so reading state()
+    // here made a click land backwards.
+    var cur = (pending !== null) ? pending : (intent !== null ? intent : state());
+    go(cur === target ? 'none' : target);
   }
 
   /* Buttons own their own click handlers already; intercept in the
@@ -51446,7 +51471,9 @@ body.rail-dm:not(.rail-hidden) #phMessagesBtn .ph-fb-tile{
   }
 
   function sync(){
-    var s = state();
+    // Reflect where we're heading, so the pressed button responds on the
+    // click rather than after the transition settles.
+    var s = (pending !== null) ? pending : (intent !== null ? intent : state());
     [['phMessagesBtn','messages'], ['phFeedToggleBtn','feed'], ['phRailToggleBtn','sidebar']]
       .forEach(function(p){
         var el = $(p[0]);
