@@ -48815,9 +48815,10 @@ body.lir-resizing #chatPanel{ transition:none !important; }
       if (e.key !== 'b' && e.key !== 'B') return;
       var t = e.target;
       if (t && (t.tagName === 'INPUT' || t.tagName === 'TEXTAREA' || t.isContentEditable)) return;
-      if (!document.body.classList.contains('lobby-selected')) return;
       e.preventDefault();
-      window.lobbyRailToggle();
+      // Hide/show, matching the Sidebar button. (Was lobbyRailToggle,
+      // which collapsed to the icon strip — that state no longer exists.)
+      if (typeof window.toggleLobbyRail === 'function') window.toggleLobbyRail();
     });
 
     // Rail subtree changes (members / channels / events / tournaments
@@ -49311,16 +49312,33 @@ body.layout-hotbar #phRailToggleBtn:hover{
 #phRailToggleBtn .ph-fb-tile svg{ width:15px; height:15px; }
 #phRailToggleBtn:hover .ph-fb-tile{ background:rgba(255,255,255,.1); }
 /* Active state uses the accent, so it never looks like the gold Feed
-   pill — two different panels shouldn't share one "on" colour. It marks
-   EXPANDED, since the rail is always present either way. */
-body.lobby-selected:not(.lir-collapsed) #phRailToggleBtn{
+   pill — two different panels shouldn't share one "on" colour. */
+body:not(.rail-hidden) #phRailToggleBtn{
   background:color-mix(in srgb, var(--accent) 16%, transparent);
   border-color:color-mix(in srgb, var(--accent) 40%, transparent);
   color:color-mix(in srgb, var(--accent) 96%, white);
 }
-body.lobby-selected:not(.lir-collapsed) #phRailToggleBtn .ph-fb-tile{
+body:not(.rail-hidden) #phRailToggleBtn .ph-fb-tile{
   background:color-mix(in srgb, var(--accent) 26%, transparent);
 }
+
+/* ── No collapsed icon-strip state ───────────────────────────────
+   Collapsing swapped the rail for a column of crests, which read as a
+   different page rather than a hidden panel. The rail is either shown in
+   full or hidden; the button does exactly that and nothing else. */
+#lirMini,
+#lirCollapseBtn,
+#lirMiniRecents{ display:none !important; }
+:root, body{ --lir-w: var(--lir-w-full) !important; }
+
+body.rail-hidden #lobbyInfoRail{
+  transform:translateX(100%) !important;
+  pointer-events:none !important;
+}
+body.rail-hidden #homePanel,
+body.rail-hidden #chatPanel,
+body.rail-hidden #profilePage,
+body.rail-hidden #calendarPanel{ right:0 !important; }
 /* ── The rail lives on EVERY page ────────────────────────────────
    It was gated on .lobby-selected, so on Home, DMs, Feed or a profile
    it simply didn't exist — which defeats the point of it being the route
@@ -49452,49 +49470,54 @@ body.lir-collapsed #lirRecents{ display:none; }
      Double Dock is on), so if the Feed is currently covering it, the
      first press closes the Feed to bring the rail back rather than
      collapsing something you cannot see. */
+  /* ── Hide / show. Nothing else. ─────────────────────────────────
+     No collapsed strip: the rail is either shown in full or gone. */
+  var HIDE_KEY = 'lobbyRailHidden';
+  function railHidden(){
+    try { return localStorage.getItem(HIDE_KEY) === '1'; } catch(e){ return false; }
+  }
+  function setHidden(hidden){
+    document.body.classList.toggle('rail-hidden', !!hidden);
+    try { localStorage.setItem(HIDE_KEY, hidden ? '1' : '0'); } catch(e){}
+    syncRailBtn();
+  }
+
   window.toggleLobbyRail = function(){
     var body = document.body;
 
-    // Key off whether the rail is ACTUALLY on screen, not off feed-open.
-    // During startup the body can briefly carry neither feed-open nor
-    // feed-closed, and the rail's CSS requires feed-closed — so the rail
-    // is invisible while `feed-open` is also false. Testing feed-open
-    // alone made the first press toggle the feed instead of the sidebar.
-    var railVisible = doubleDock() || body.classList.contains('feed-closed');
+    // Whether the rail is ACTUALLY on screen — not merely "feed-open is
+    // false". During startup the body can carry neither feed class, and
+    // the rail's CSS requires feed-closed, so it's invisible while
+    // feed-open is false too. Testing feed-open alone made the first
+    // press act on the feed instead of the sidebar.
+    var feedCovering = !doubleDock() && !body.classList.contains('feed-closed');
 
-    if (!railVisible){
+    if (feedCovering){
       if (body.classList.contains('feed-open') && typeof window.toggleFeed === 'function'){
         window.toggleFeed();                 // let the app run its own close
       } else {
         body.classList.add('feed-closed');   // startup case: nothing to close
         body.classList.remove('feed-open');
       }
-      // Come back expanded — you asked for the sidebar, so show it.
-      if (body.classList.contains('lir-collapsed')
-          && typeof window.lobbyRailToggle === 'function'){
-        window.lobbyRailToggle();
-      }
-      syncRailBtn();
+      setHidden(false);                      // you asked for it, so show it
       return;
     }
-    // Rail is on screen: identical to the » arrow.
-    if (typeof window.lobbyRailToggle === 'function') window.lobbyRailToggle();
-    syncRailBtn();
+    setHidden(!body.classList.contains('rail-hidden'));
   };
 
   function syncRailBtn(){
     var b = $('phRailToggleBtn');
     if (!b) return;
-    var expanded = !document.body.classList.contains('lir-collapsed');
-    b.setAttribute('aria-pressed', expanded ? 'true' : 'false');
-    b.title = expanded ? 'Collapse lobby sidebar' : 'Expand lobby sidebar';
+    var shown = !document.body.classList.contains('rail-hidden');
+    b.setAttribute('aria-pressed', shown ? 'true' : 'false');
+    b.title = shown ? 'Hide lobby sidebar' : 'Show lobby sidebar';
   }
 
   /* ── Recent lobbies ─────────────────────────────────────────────
      Up to three, ordered live: an active call outranks an unread, which
      outranks plain recency. The top one is also what opens by default
      when you aren't already inside a lobby. */
-  var REC_KEY = 'lobbyRecents', REC_MAX = 3;
+  var REC_KEY = 'lobbyRecents', REC_MAX = 5;
 
   function loadRecents(){
     try { return JSON.parse(localStorage.getItem(REC_KEY) || '[]') || []; }
@@ -49513,7 +49536,7 @@ body.lir-collapsed #lirRecents{ display:none; }
       ts: Date.now()
     });
     saveRecents(list);
-    renderRecents(); renderMiniRecents(); ensurePreview();
+    renderRecents(); ensurePreview();
   }
 
   function ranked(){
@@ -49688,31 +49711,6 @@ body.lir-collapsed #lirRecents{ display:none; }
     if (top) setPreview(top.r.id);
   }
 
-  /* Collapsed + off-lobby: crests only, so the strip is still a route back. */
-  var miniSig = '';
-  function renderMiniRecents(){
-    var mini = $('lirMini');
-    if (!mini) return;
-    var host = $('lirMiniRecents');
-    if (!host || !host.isConnected){
-      host = document.createElement('div');
-      host.id = 'lirMiniRecents';
-      var div = mini.querySelector('.lirm-div');
-      if (div && div.nextSibling) mini.insertBefore(host, div.nextSibling);
-      else mini.appendChild(host);
-      miniSig = '';
-    }
-    var html = ranked().map(function(x){
-      var cls = x.isCall ? ' call' : (x.unread ? ' unread' : '');
-      var inner = x.r.icon ? '<img src="' + esc(x.r.icon) + '" alt="">'
-                           : esc(String(x.r.name || 'L').charAt(0).toUpperCase());
-      return '<button class="lirm-lobby' + cls + '" data-lobby="' + esc(x.r.id) +
-             '" title="' + esc(x.r.name) + '">' + inner + '</button>';
-    }).join('');
-    if (html === miniSig) return;
-    miniSig = html;
-    host.innerHTML = html;
-  }
 
   /* ── Settings: Double Dock toggle ───────────────────────────── */
   function buildDDToggle(){
@@ -49780,10 +49778,14 @@ body.lir-collapsed #lirRecents{ display:none; }
   function start(){
     if (!document.body){ setTimeout(start, 200); return; }
 
-    document.body.classList.toggle('double-dock', doubleDock());
+    document.body.classList.toggle("double-dock", doubleDock());
+    // No collapsed state any more — clear anything a previous build stored.
+    document.body.classList.remove("lir-collapsed");
+    try { localStorage.setItem("lobbyRailCollapsed", "0"); } catch(e){}
+    document.body.classList.toggle("rail-hidden", railHidden());
     placeButton();
     syncRailBtn();
-    renderRecents(); renderMiniRecents(); ensurePreview();
+    renderRecents(); ensurePreview();
     buildDDToggle();
 
     // Record every lobby you open.
@@ -49802,7 +49804,7 @@ body.lir-collapsed #lirRecents{ display:none; }
     // Unread counts and call state change the ordering, and both are
     // reflected in the rail's DOM, so re-rank when it updates.
     var rail = $('lobbyInfoRail');
-    if (rail) new MutationObserver(function(){ renderRecents(); renderMiniRecents(); ensurePreview(); })
+    if (rail) new MutationObserver(function(){ renderRecents(); ensurePreview(); })
       .observe(rail, { childList:true, subtree:true });
     // The » arrow inside the rail toggles the same state, so keep the
     // button's label and active styling in step with it.
@@ -49815,7 +49817,7 @@ body.lir-collapsed #lirRecents{ display:none; }
     // lobby is often auto-restored a moment later. Without these retries
     // the stored recents render into nothing and appear to have been lost.
     [200, 700, 1800, 4000].forEach(function(ms){
-      setTimeout(function(){ noteVisit(lexServer()); renderRecents(); renderMiniRecents(); ensurePreview(); }, ms);
+      setTimeout(function(){ noteVisit(lexServer()); renderRecents(); ensurePreview(); }, ms);
     });
 
     console.log('[rail] sidebar toggle + recents ready — ' +
