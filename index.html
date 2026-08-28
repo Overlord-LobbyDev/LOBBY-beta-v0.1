@@ -47571,29 +47571,91 @@ body.lobby-selected .msg-body{
 body.lobby-selected .msg-me .msg-body{ align-items:flex-end; }
 body.lobby-selected .msg-me .msg-header{ flex-direction:row-reverse; }
 
-body.lobby-selected .msg-content{
+/* .msg-content is styled in three places, the strongest being
+   `.chat-main:has(.chat-ribbon) .msg-content` at (0,5,0). Anything scoped
+   to .lobby-selected alone scores lower and loses, which is why the
+   bubbles kept ignoring these rules. Matched at (0,5,1) so they win
+   outright, with the plain .chat-main variant as a fallback. */
+body.lobby-selected .chat-main .message-group .msg-content,
+body.lobby-selected .chat-main:has(.chat-ribbon) .message-group .msg-content{
   display:inline-block;
-  padding:11px 15px !important;
-  border-radius:16px 16px 16px 5px;
-  /* Mixed against --bg-2, not transparent. Mixing an accent with
-     transparent over a dark ground just yields a darker grey, which is
-     why the bubbles read as flat boxes rather than bubbles. */
-  background:var(--bg-2) !important;
+  padding:10px 14px !important;
+  border-radius:18px 18px 18px 6px !important;
+  background:color-mix(in srgb, var(--bg-2) 82%, #fff 4%) !important;
   border:0 !important;
   color:var(--text-1) !important;
-  box-shadow:0 2px 6px rgba(0,0,0,.28) !important;
-  font-size:14px !important; line-height:1.5 !important;
+  box-shadow:0 2px 8px rgba(0,0,0,.3) !important;
+  font-size:14px !important;
+  line-height:1.55 !important;
   text-align:left;
   word-break:break-word;
-  max-width:100%;
+  max-width:100% !important;
 }
-/* The corner notch flips to the speaker's side. */
-body.lobby-selected .msg-me .msg-content{
-  border-radius:16px 16px 5px 16px;
+body.lobby-selected .chat-main .message-group:hover .msg-content,
+body.lobby-selected .chat-main:has(.chat-ribbon) .message-group:hover .msg-content{
+  background:color-mix(in srgb, var(--bg-2) 74%, #fff 8%) !important;
+  border:0 !important;
+}
+
+/* Yours: an actually saturated bubble. The previous mix resolved to a
+   near-black wash, so "mine" and "theirs" looked identical. Solid enough
+   to carry dark text, which is what makes the two sides read apart at a
+   glance rather than on close inspection. */
+body.lobby-selected .chat-main .message-group.msg-me .msg-content,
+body.lobby-selected .chat-main:has(.chat-ribbon) .message-group.msg-me .msg-content{
+  border-radius:18px 18px 6px 18px !important;
   background:linear-gradient(180deg,
-    color-mix(in srgb, var(--accent) 46%, var(--bg-2)),
-    color-mix(in srgb, var(--accent) 30%, var(--bg-2))) !important;
-  color:#fff !important;
+    color-mix(in srgb, var(--accent) 88%, #fff),
+    var(--accent)) !important;
+  color:#1c1220 !important;
+  border:0 !important;
+  box-shadow:0 2px 10px color-mix(in srgb, var(--accent) 26%, transparent) !important;
+}
+body.lobby-selected .chat-main .message-group.msg-me:hover .msg-content,
+body.lobby-selected .chat-main:has(.chat-ribbon) .message-group.msg-me:hover .msg-content{
+  background:linear-gradient(180deg, #fff, color-mix(in srgb, var(--accent) 94%, #fff)) !important;
+}
+/* Links inside your own bubble need to work on a light ground. */
+body.lobby-selected .message-group.msg-me .msg-content a{ color:#6d2a52 !important; }
+
+/* ── Spacing rhythm ──────────────────────────────────────────────
+   Runs from one person sit tight together; a change of speaker gets real
+   separation. Previously everything was evenly spaced, so the eye had no
+   grouping to hold on to. */
+body.lobby-selected .message-group{ gap:12px !important; }
+body.lobby-selected .message-group.msg-new-author{ margin-top:20px !important; }
+body.lobby-selected .message-group.msg-continuation{ margin-top:2px !important; }
+body.lobby-selected .msg-header{
+  margin-bottom:5px !important; padding-left:3px !important; gap:8px !important;
+}
+body.lobby-selected .msg-me .msg-header{ padding-left:0 !important; padding-right:3px; }
+body.lobby-selected .msg-username{ font-size:13px !important; font-weight:700 !important; }
+body.lobby-selected .msg-time{ font-size:10.5px !important; }
+body.lobby-selected .msg-avatar{ width:34px !important; height:34px !important; }
+
+/* ── Date dividers ───────────────────────────────────────────────
+   Was a bordered pill floating mid-conversation — heavy for what is just
+   a marker. Now a hairline rule with the date sitting on it: the line
+   does the separating, the type only has to label it. */
+body.lobby-selected .msg-date-divider{
+  display:flex !important; align-items:center !important; gap:16px !important;
+  margin:28px 0 14px !important;
+  padding:0 !important;
+  background:none !important; border:0 !important;
+}
+body.lobby-selected .msg-date-divider::before,
+body.lobby-selected .msg-date-divider::after{
+  content:''; flex:1; height:1px;
+  background:linear-gradient(90deg, transparent, rgba(255,255,255,.11), transparent);
+}
+body.lobby-selected .msg-date-divider span{
+  font-family:var(--font) !important;
+  font-size:10px !important; font-weight:800 !important;
+  letter-spacing:1.5px !important; text-transform:uppercase !important;
+  color:var(--text-3) !important;
+  background:none !important; border:0 !important;
+  padding:0 !important; box-shadow:none !important;
+  white-space:nowrap;
 }
 
 /* The row is no longer a visual unit — the bubble is. chamber-mode gives
