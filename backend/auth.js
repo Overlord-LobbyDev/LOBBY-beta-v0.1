@@ -1836,6 +1836,67 @@ app.get("/servers/:id/members", requireAuth, async (req, res) => {
   })));
 });
 
+// GET /servers/:id/now-playing — who in this lobby is in a game RIGHT NOW.
+//
+// Note this is deliberately NOT /steam/recent: that uses
+// GetRecentlyPlayedGames, which is a two-week play history and cannot
+// answer "who is in a game right now". GetPlayerSummaries returns
+// `gameextrainfo` only while a user is actually in-game, which is what we
+// need. It also accepts up to 100 steamids per call, so an entire lobby
+// costs ONE upstream request rather than one per member.
+//
+// Cached briefly because this is polled by the client and Steam rate-limits.
+const _nowPlayingCache = new Map();   // serverId -> { ts, data }
+const NOW_PLAYING_TTL = 45000;
+
+app.get("/servers/:id/now-playing", requireAuth, async (req, res) => {
+  const serverId = String(req.params.id);
+  const hit = _nowPlayingCache.get(serverId);
+  if (hit && (Date.now() - hit.ts) < NOW_PLAYING_TTL) return res.json(hit.data);
+  if (!STEAM_KEY) return res.json([]);
+
+  try {
+    const r = await pool.query(
+      `SELECT u.id, u.username, u.avatar_url, u.steam_id
+         FROM server_members sm
+         JOIN users u ON u.id = sm.user_id
+        WHERE sm.server_id = $1 AND u.steam_id IS NOT NULL`,
+      [serverId]
+    );
+    const rows = r.rows;
+    if (!rows.length) {
+      _nowPlayingCache.set(serverId, { ts: Date.now(), data: [] });
+      return res.json([]);
+    }
+
+    const ids = rows.map(u => u.steam_id).slice(0, 100).join(",");
+    const sr = await fetch(
+      `https://api.steampowered.com/ISteamUser/GetPlayerSummaries/v2/?key=${STEAM_KEY}&steamids=${ids}`
+    );
+    const sd = await sr.json();
+    const bySteam = {};
+    (sd?.response?.players || []).forEach(p => { bySteam[p.steamid] = p; });
+
+    const data = rows.map(u => {
+      const p = bySteam[u.steam_id];
+      if (!p || !p.gameextrainfo) return null;   // not in a game right now
+      return {
+        userId: u.id,
+        username: u.username,
+        avatar_url: u.avatar_url,
+        game: p.gameextrainfo,
+        gameId: p.gameid || null
+      };
+    }).filter(Boolean);
+
+    _nowPlayingCache.set(serverId, { ts: Date.now(), data });
+    res.json(data);
+  } catch (err) {
+    console.error("[GET /servers/:id/now-playing]", err.message);
+    res.json([]);   // never break the ribbon over a Steam hiccup
+  }
+});
+
 // ── Channels ─────────────────────────────────────────────────
 
 app.get("/servers/:id/channels", requireAuth, async (req, res) => {
