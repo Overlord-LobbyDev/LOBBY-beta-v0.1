@@ -51666,11 +51666,16 @@ body.dock-sidebar:not(.dock-feed)  #phFeedToggleBtn .ph-fb-dot {
    existing layout has to be rebuilt.
    max() means it degrades to a plain 24px gutter on narrow panels rather
    than collapsing to nothing. */
+/* !important is required, not defensive: `.chat-main:has(.chat-ribbon)
+   .messages` sets `padding: 14px 36px 16px !important` as a SHORTHAND, and
+   an important shorthand overwrites a normal longhand no matter the
+   specificity. With both important, specificity decides and this wins
+   ((1,2,1) vs (0,3,0)). Vertical padding is deliberately left alone. */
 body.lobby-selected #chatPanel .messages,
 body.lobby-selected #chatPanel .chat-input-wrap,
 body.lobby-selected #chatPanel #lobbyPulse{
-  padding-left:  max(24px, calc((100% - var(--chat-max, 1040px)) / 2));
-  padding-right: max(24px, calc((100% - var(--chat-max, 1040px)) / 2));
+  padding-left:  max(24px, calc((100% - var(--chat-max, 1040px)) / 2)) !important;
+  padding-right: max(24px, calc((100% - var(--chat-max, 1040px)) / 2)) !important;
 }
 
 #chatCtx{ display:none; }
@@ -51781,12 +51786,26 @@ body.chat-ctx-on #chatCtx{
     return (typeof window._lirPresenceOf === 'function') ? window._lirPresenceOf(m) : 'offline';
   }
 
+  /* `currentView` is a top-level `let`, which lives in the global
+     DECLARATIVE scope — it is reachable lexically from any script block
+     but is NOT a property of window. Reading window.currentView yields
+     undefined, so this returned false every time and the column never
+     rendered at all. Same for vcChannelId. */
+  function view(){
+    try { if (typeof currentView !== 'undefined') return currentView; } catch(e){}
+    return window.currentView || null;
+  }
+  function myVoiceId(){
+    try { if (typeof vcChannelId !== 'undefined') return vcChannelId; } catch(e){}
+    return (typeof window.vcChannelId !== 'undefined') ? window.vcChannelId : null;
+  }
+
   /* Only in a lobby text/voice channel — not DMs, not the Coliseum. */
   function eligible(){
     var b = document.body;
     if (!b.classList.contains('lobby-selected')) return false;
     if (b.classList.contains('coliseum-mode')) return false;
-    var v = window.currentView;
+    var v = view();
     return !!(v && v.type === 'channel');
   }
 
@@ -51830,9 +51849,9 @@ body.chat-ctx-on #chatCtx{
     if (!el) return;
 
     var chs = channels(), mem = members();
-    var activeId = (window.currentView && window.currentView.type === 'channel')
-      ? window.currentView.id : null;
-    var myVc = (typeof window.vcChannelId !== 'undefined') ? window.vcChannelId : null;
+    var v = view();
+    var activeId = (v && v.type === 'channel') ? v.id : null;
+    var myVc = myVoiceId();
     var unread = window.unreadChannels || {};
 
     var inVoice = mem.filter(function(m){ return presence(m) === 'voice'; });
