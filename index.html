@@ -47573,24 +47573,49 @@ body.lobby-selected .msg-me .msg-header{ flex-direction:row-reverse; }
 
 body.lobby-selected .msg-content{
   display:inline-block;
-  padding:9px 13px !important;
-  border-radius:14px 14px 14px 4px;
+  padding:11px 15px !important;
+  border-radius:16px 16px 16px 5px;
+  /* Mixed against --bg-2, not transparent. Mixing an accent with
+     transparent over a dark ground just yields a darker grey, which is
+     why the bubbles read as flat boxes rather than bubbles. */
   background:var(--bg-2) !important;
-  border:1px solid rgba(255,255,255,.06) !important;
+  border:0 !important;
   color:var(--text-1) !important;
-  box-shadow:0 1px 3px rgba(0,0,0,.22) !important;
+  box-shadow:0 2px 6px rgba(0,0,0,.28) !important;
+  font-size:14px !important; line-height:1.5 !important;
   text-align:left;
   word-break:break-word;
+  max-width:100%;
 }
 /* The corner notch flips to the speaker's side. */
 body.lobby-selected .msg-me .msg-content{
-  border-radius:14px 14px 4px 14px;
+  border-radius:16px 16px 5px 16px;
   background:linear-gradient(180deg,
-    color-mix(in srgb, var(--accent) 30%, transparent),
-    color-mix(in srgb, var(--accent) 19%, transparent)) !important;
-  border-color:color-mix(in srgb, var(--accent) 36%, transparent) !important;
+    color-mix(in srgb, var(--accent) 46%, var(--bg-2)),
+    color-mix(in srgb, var(--accent) 30%, var(--bg-2))) !important;
   color:#fff !important;
 }
+
+/* The row is no longer a visual unit — the bubble is. chamber-mode gives
+   .message-group a 16px radius and a hover border, which drew a
+   full-width outline around the whole row and fought the bubble inside
+   it. The hover actions are feedback enough. */
+body.lobby-selected .message-group{
+  border:0 !important;
+  border-radius:0 !important;
+  padding-top:3px !important;
+  padding-bottom:3px !important;
+}
+body.lobby-selected .message-group:hover{
+  background:none !important;
+  border-color:transparent !important;
+  transform:none !important;
+}
+
+/* The decorative timeline thread down the left of the message list made
+   sense when every message was left-aligned. With bubbles on both sides
+   it just cuts through the layout. */
+body.lobby-selected .chat-main .messages::before{ display:none !important; }
 body.lobby-selected .msg-me .msg-attachments{ justify-content:flex-end; }
 
 /* Your own name is redundant — the side already says it's you. */
