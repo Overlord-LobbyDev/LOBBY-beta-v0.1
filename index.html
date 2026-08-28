@@ -31546,17 +31546,31 @@ function _lirRenderMembers() {
   const members = Array.isArray(window.cachedServerMembers) ? window.cachedServerMembers : [];
   if (countEl) countEl.textContent = String(members.length);
 
+  const escAttr = s => String(s == null ? '' : s).replace(/&/g,'&amp;').replace(/"/g,'&quot;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+  const initials = n => (n||'?').trim().split(/\s+/).map(w=>w[0]||'').join('').slice(0,2).toUpperCase() || '?';
+
   if (!members.length) {
     listEl.innerHTML = '<div class="lir-empty">No members yet.</div>';
     return;
   }
 
-  const escAttr = s => String(s == null ? '' : s).replace(/&/g,'&amp;').replace(/"/g,'&quot;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
-  const initials = n => (n||'?').trim().split(/\s+/).map(w=>w[0]||'').join('').slice(0,2).toUpperCase() || '?';
+  // Search filter (the box lives above this list, so it survives re-renders
+  // and keeps focus while typing).
+  const q = String(window._lirMemberQuery || '').trim().toLowerCase();
+  const shown = q
+    ? members.filter(m => m && (
+        String(m.display_name || '').toLowerCase().indexOf(q) >= 0 ||
+        String(m.username || '').toLowerCase().indexOf(q) >= 0))
+    : members;
+
+  if (!shown.length) {
+    listEl.innerHTML = '<div class="lir-empty">No members match “' + escAttr(q) + '”.</div>';
+    return;
+  }
 
   // Bucket members by presence (from onlineUserIds / onlineUserStatus)
   const buckets = { voice: [], online: [], away: [], dnd: [], offline: [] };
-  for (const m of members) {
+  for (const m of shown) {
     if (!m) continue;
     buckets[_lirPresenceOf(m)].push(m);
   }
@@ -47601,9 +47615,41 @@ body.lir-collapsed #lirTabs{ display:none; }
   background:transparent; transition:background .16s;
 }
 #lirResize:hover::after,
+#lirResize:focus-visible::after,
 body.lir-resizing #lirResize::after{
   background:color-mix(in srgb, var(--accent) 65%, transparent);
 }
+#lirResize:focus-visible{ outline:2px solid var(--accent); outline-offset:-2px; }
+
+/* ══ MEMBER SEARCH ══════════════════════════════════════════════════ */
+.lir-memsearch{
+  display:flex; align-items:center; gap:7px;
+  margin:0 0 8px; padding:6px 9px;
+  border-radius:8px;
+  background:rgba(255,255,255,.04);
+  border:1px solid rgba(255,255,255,.07);
+  transition:border-color .16s, background .16s;
+}
+.lir-memsearch:focus-within{
+  border-color:color-mix(in srgb, var(--accent) 45%, transparent);
+  background:rgba(255,255,255,.06);
+}
+.lir-memsearch svg{ width:12px; height:12px; color:var(--text-3); flex:none; }
+.lir-memsearch input{
+  flex:1; min-width:0;
+  background:none; border:0; outline:none; padding:0;
+  font-family:var(--font); font-size:11.5px; font-weight:600;
+  color:var(--text-1);
+}
+.lir-memsearch input::placeholder{ color:var(--text-3); font-weight:600; }
+.lir-memsearch-x{
+  flex:none; width:16px; height:16px; border-radius:50%; cursor:pointer;
+  display:grid; place-items:center;
+  background:rgba(255,255,255,.09); border:0; color:var(--text-2);
+  font-size:13px; line-height:1;
+}
+.lir-memsearch-x:hover{ background:rgba(255,255,255,.18); color:#fff; }
+.lir-memsearch-x:focus-visible{ outline:2px solid var(--accent); outline-offset:1px; }
 body.lir-collapsed #lirResize{ display:none; }
 
 /* While dragging: kill the width transition so the edge tracks the
@@ -47730,6 +47776,20 @@ body.lir-resizing #chatPanel{ transition:none !important; }
         var b = e.target.closest('.lir-tab');
         if (b) setTab(b.dataset.tab);
       });
+      // Standard tablist keyboard model: arrows move between tabs,
+      // Home/End jump to the ends.
+      tabs.addEventListener('keydown', function(e){
+        var keys = { ArrowLeft:-1, ArrowRight:1, Home:'first', End:'last' };
+        if (!(e.key in keys)) return;
+        e.preventDefault();
+        var i = TABS.findIndex(function(t){ return t.key === getTab(); });
+        var next = keys[e.key] === 'first' ? 0
+                 : keys[e.key] === 'last'  ? TABS.length - 1
+                 : (i + keys[e.key] + TABS.length) % TABS.length;
+        setTab(TABS[next].key);
+        var btn = tabs.querySelector('.lir-tab[data-tab="' + TABS[next].key + '"]');
+        if (btn) btn.focus();
+      });
     }
 
     // Tag every section with the tab that owns it.
@@ -47789,7 +47849,52 @@ body.lir-resizing #chatPanel{ transition:none !important; }
     }
 
     buildResizer(rail);
+    buildMemberSearch();
     setTab(getTab());
+  }
+
+  /* ── Member search ──────────────────────────────────────────────
+     Once a lobby passes ~8 members, scanning the list beats reading it.
+     The box sits ABOVE #lirMembersList (which _lirRenderMembers rewrites
+     wholesale), so it survives re-renders and never loses focus mid-type. */
+  function buildMemberSearch(){
+    if ($('lirMemSearch')) return;
+    var body = $('lirMembersBody');
+    var list = $('lirMembersList');
+    if (!body || !list) return;
+
+    var wrap = document.createElement('div');
+    wrap.className = 'lir-memsearch';
+    wrap.innerHTML =
+      '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" ' +
+      'stroke-linecap="round"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg>' +
+      '<input id="lirMemSearch" type="text" placeholder="Search members" ' +
+      'autocomplete="off" spellcheck="false" aria-label="Search members">' +
+      '<button class="lir-memsearch-x" type="button" title="Clear" aria-label="Clear search" hidden>&times;</button>';
+    body.insertBefore(wrap, list);
+
+    var input = wrap.querySelector('input');
+    var clear = wrap.querySelector('.lir-memsearch-x');
+
+    function apply(v){
+      window._lirMemberQuery = v;
+      clear.hidden = !v;
+      if (typeof _lirRenderMembers === 'function') {
+        try { _lirRenderMembers(); } catch(e){}
+      }
+    }
+    input.addEventListener('input', function(){ apply(input.value); });
+    // Matches the channel-sidebar search: Escape clears, then blurs.
+    input.addEventListener('keydown', function(e){
+      if (e.key === 'Escape'){
+        e.stopPropagation();
+        if (input.value){ input.value = ''; apply(''); }
+        else input.blur();
+      }
+    });
+    clear.addEventListener('click', function(){
+      input.value = ''; apply(''); input.focus();
+    });
   }
 
   /* ── Resizable width ────────────────────────────────────────────
@@ -47812,12 +47917,51 @@ body.lir-resizing #chatPanel{ transition:none !important; }
     try { localStorage.setItem(W_KEY, String(px)); } catch(e){}
   }
 
+  function currentWidth(){
+    var v = parseInt(getComputedStyle(document.documentElement)
+      .getPropertyValue('--lir-w-full'), 10);
+    return isNaN(v) ? W_DEFAULT : v;
+  }
+
+  /* Keep the rail from swallowing the window when it gets narrower.
+     Shrinks to fit, but never below the minimum, and never rewrites the
+     user's saved preference — so widening the window restores it. */
+  function clampToWindow(){
+    if (document.body.classList.contains('lir-collapsed')) return;
+    var maxAllowed = Math.max(W_MIN, Math.round(window.innerWidth * 0.6));
+    var saved = W_DEFAULT;
+    try {
+      var v = parseInt(localStorage.getItem(W_KEY), 10);
+      if (!isNaN(v)) saved = v;
+    } catch(e){}
+    applyWidth(Math.min(saved, maxAllowed));
+  }
+
   function buildResizer(rail){
     if ($('lirResize')) return;
     var h = document.createElement('div');
     h.id = 'lirResize';
+    h.tabIndex = 0;
+    h.setAttribute('role', 'separator');
+    h.setAttribute('aria-orientation', 'vertical');
+    h.setAttribute('aria-label', 'Resize rail');
     h.title = 'Drag to resize · double-click to reset';
     rail.appendChild(h);
+
+    // Keyboard-resizable: focus the handle and use the arrow keys.
+    // A drag-only control is unusable without a mouse.
+    h.addEventListener('keydown', function(e){
+      var step = e.shiftKey ? 48 : 16, w = null;
+      if (e.key === 'ArrowLeft')  w = currentWidth() + step;
+      else if (e.key === 'ArrowRight') w = currentWidth() - step;
+      else if (e.key === 'Home')  w = W_MAX;
+      else if (e.key === 'End')   w = W_MIN;
+      else if (e.key === 'Enter' || e.key === ' ') w = W_DEFAULT;
+      else return;
+      e.preventDefault();
+      saveWidth(applyWidth(w));
+      h.setAttribute('aria-valuenow', String(currentWidth()));
+    });
 
     h.addEventListener('mousedown', function(e){
       if (document.body.classList.contains('lir-collapsed')) return;
@@ -48050,8 +48194,28 @@ body.lir-resizing #chatPanel{ transition:none !important; }
     if (!$('lobbyInfoRail')) { setTimeout(start, 400); return; }
 
     loadWidth();
+    clampToWindow();
     document.body.classList.toggle('lir-collapsed', isCollapsed());
     refresh();
+
+    // Re-clamp when the window changes size.
+    var rzT = null;
+    window.addEventListener('resize', function(){
+      clearTimeout(rzT);
+      rzT = setTimeout(clampToWindow, 120);
+    });
+
+    // Ctrl/Cmd+B toggles the rail — same muscle memory as every editor's
+    // sidebar toggle. Ignored while typing so it can't eat a keystroke.
+    document.addEventListener('keydown', function(e){
+      if (!(e.ctrlKey || e.metaKey) || e.shiftKey || e.altKey) return;
+      if (e.key !== 'b' && e.key !== 'B') return;
+      var t = e.target;
+      if (t && (t.tagName === 'INPUT' || t.tagName === 'TEXTAREA' || t.isContentEditable)) return;
+      if (!document.body.classList.contains('lobby-selected')) return;
+      e.preventDefault();
+      window.lobbyRailToggle();
+    });
 
     // Rail subtree changes (members / channels / events / tournaments
     // re-rendering) drive the badge + pulse updates.
