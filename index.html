@@ -49609,6 +49609,18 @@ body.lir-collapsed #lirRecents{ display:none; }
   /* selectServer takes a server OBJECT, not an id — passing a number left
      server.id undefined and the call died silently. That's why none of the
      jump buttons worked. */
+  /* The user's lobbies. _allServers is a script-scoped global, so it has
+     to be read lexically — it isn't on window.
+     (This was defined inside the jump-back panel block and got deleted
+     with it, leaving lobbyById() and restoreLast() calling a function
+     that no longer existed. Every lookup threw, which is exactly why the
+     rail never left its placeholder.) */
+  function allLobbies(){
+    try { if (typeof _allServers !== 'undefined' && Array.isArray(_allServers)) return _allServers; }
+    catch(e){}
+    return [];
+  }
+
   function lobbyById(id){
     var srv = allLobbies().find(function(s){ return s && String(s.id) === String(id); });
     if (srv) return srv;
