@@ -47141,10 +47141,37 @@ body.bracket-active .chamber-back{ display:none !important; }
    fell back to its base 320px while the page still gave up 360px, leaving
    a dead strip between them. It also meant dragging to resize did nothing
    off-lobby, since the width was pinned. */
+/* Fades AND slides, matching the Feed rather than snapping in. The base
+   rule only transitions transform and box-shadow, so opacity changed
+   instantly — a slide with a hard-cut alpha reads as a snap even though
+   the movement itself is animated. */
 #lobbyInfoRail{
   width: var(--lir-w) !important;
-  transition: transform .28s cubic-bezier(.16,1,.3,1),
-              width .26s cubic-bezier(.16,1,.3,1);
+  transition: transform .34s cubic-bezier(.22,1,.36,1),
+              opacity .26s ease,
+              width .26s cubic-bezier(.16,1,.3,1),
+              box-shadow .28s ease;
+}
+body.feed-closed:not(.rail-hidden) #lobbyInfoRail{ opacity:1; }
+body.rail-hidden #lobbyInfoRail,
+body:not(.feed-closed):not(.double-dock) #lobbyInfoRail{ opacity:0; }
+
+/* The overlay pages animate opacity/transform/filter on entry but not
+   `right`, so the page edge jumped to its new position while the rail
+   slid — which is most of what read as snapping. Adding `right` keeps
+   their existing entrance animation intact. */
+.lobby-overlay{
+  transition:
+    opacity .42s cubic-bezier(0.22,1,0.36,1),
+    transform .55s cubic-bezier(0.22,1,0.36,1),
+    filter .35s ease,
+    right .34s cubic-bezier(0.22,1,0.36,1),
+    visibility 0s linear .55s;
+}
+#vcPanel{ transition: right .34s cubic-bezier(0.22,1,0.36,1); }
+
+@media (prefers-reduced-motion: reduce){
+  #lobbyInfoRail, .lobby-overlay, #vcPanel{ transition:none !important; }
 }
 /* Must also stand down when the rail is hidden, or the chat keeps a
    360px gap on its right with nothing in it. */
