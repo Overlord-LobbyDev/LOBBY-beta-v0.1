@@ -47210,6 +47210,89 @@ body.lobby-selected .ch-hero{
   -webkit-backdrop-filter:none !important;
 }
 
+/* ══ CHANNEL TABS ═══════════════════════════════════════════════════
+   The tabs were chunky: gradient fill, a border, an inset highlight AND
+   a drop shadow on every one — five effects fighting for attention on a
+   control that should just say which room you're in. Stripped back to a
+   flat pill that is invisible at rest, tinted on hover, and clearly
+   filled when active. */
+
+/* The strip masked its first 20px to transparent as a scroll hint. With
+   nothing to scroll it simply ate the left edge of the first tab, which
+   is the "overlapping on the left". The fade now only applies on the
+   right, where tabs actually run off. */
+body.lobby-selected .chat-ribbon .cr-strip{
+  padding-left:2px;
+  mask-image:linear-gradient(90deg, #000 0, #000 calc(100% - 24px), transparent 100%);
+  -webkit-mask-image:linear-gradient(90deg, #000 0, #000 calc(100% - 24px), transparent 100%);
+}
+
+body.lobby-selected .chat-ribbon .cr-tab{
+  padding:7px 12px;
+  border-radius:8px;
+  gap:8px;
+  background:transparent;
+  border:1px solid transparent;
+  box-shadow:none;
+  color:var(--text-3);
+  font-size:12.5px; font-weight:700; letter-spacing:.1px;
+  transition:background .16s ease, color .16s ease, border-color .16s ease;
+}
+body.lobby-selected .chat-ribbon .cr-tab:hover{
+  background:rgba(255,255,255,.06);
+  border-color:transparent;
+  color:var(--text-1);
+  transform:none;
+  box-shadow:none;
+}
+body.lobby-selected .chat-ribbon .cr-tab.active{
+  background:color-mix(in srgb, var(--accent) 15%, transparent);
+  border-color:color-mix(in srgb, var(--accent) 32%, transparent);
+  color:#fff;
+  box-shadow:none;
+  transform:none;
+}
+body.lobby-selected .chat-ribbon .cr-tab .cr-tab-ico{
+  opacity:.75; display:inline-flex; align-items:center;
+}
+body.lobby-selected .chat-ribbon .cr-tab .cr-tab-ico svg{ width:15px; height:15px; }
+body.lobby-selected .chat-ribbon .cr-tab.active .cr-tab-ico{ opacity:1; }
+body.lobby-selected .chat-ribbon .cr-tab:focus-visible{
+  outline:2px solid var(--accent); outline-offset:2px;
+}
+
+/* Join / Leave: green to join, red to leave — the colour should say what
+   the click does. Kept visible rather than fading in on hover, since a
+   control you can't see until you touch it isn't discoverable. */
+body.lobby-selected .chat-ribbon .cr-tab[data-type="voice"] .cr-join-pill{
+  opacity:1; transform:none; pointer-events:none;
+  font-size:8.5px; font-weight:900; letter-spacing:1.1px;
+  padding:2px 7px;
+  background:color-mix(in srgb, var(--green) 20%, transparent);
+  border:1px solid color-mix(in srgb, var(--green) 42%, transparent);
+  color:#8fe3ab;
+}
+body.lobby-selected .chat-ribbon .cr-tab[data-type="voice"][data-joined="1"] .cr-join-pill{
+  background:rgba(237,66,69,.16);
+  border-color:rgba(237,66,69,.38);
+  color:#f08a8c;
+}
+
+/* "+ New Lounge" is an action, not a room — so it reads as a ghost
+   button rather than another tab competing with the channels. */
+body.lobby-selected .chat-ribbon .cr-tab.add{
+  color:var(--text-3);
+  font-size:10px; font-weight:900; letter-spacing:1.1px; text-transform:uppercase;
+  border:1px dashed rgba(255,255,255,.14);
+  background:transparent;
+  margin-left:4px;
+}
+body.lobby-selected .chat-ribbon .cr-tab.add:hover{
+  border-color:color-mix(in srgb, var(--accent) 45%, transparent);
+  color:color-mix(in srgb, var(--accent) 95%, white);
+  background:color-mix(in srgb, var(--accent) 8%, transparent);
+}
+
 /* ══ STRANDED FLOATING CHROME ═══════════════════════════════════════
    Two fixed, centred pills were pinned at the very top of the viewport:
      .chamber-nav  (top:84px) — Channels / Voice / Announce /
