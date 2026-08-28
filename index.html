@@ -49441,12 +49441,15 @@ body.layout-hotbar #phRailToggleBtn:hover{
 #phRailToggleBtn:hover .ph-fb-tile{ background:rgba(255,255,255,.1); }
 /* Active state uses the accent, so it never looks like the gold Feed
    pill — two different panels shouldn't share one "on" colour. */
-body:not(.rail-hidden) #phRailToggleBtn{
+/* `:not(.rail-dm)` matters: DM mode reuses the rail, so the rail is
+   visible and .rail-hidden is off while Messages — not Sidebar — is the
+   active dock. Without it both buttons lit at once. */
+body:not(.rail-hidden):not(.rail-dm) #phRailToggleBtn{
   background:color-mix(in srgb, var(--accent) 16%, transparent);
   border-color:color-mix(in srgb, var(--accent) 40%, transparent);
   color:color-mix(in srgb, var(--accent) 96%, white);
 }
-body:not(.rail-hidden) #phRailToggleBtn .ph-fb-tile{
+body:not(.rail-hidden):not(.rail-dm) #phRailToggleBtn .ph-fb-tile{
   background:color-mix(in srgb, var(--accent) 26%, transparent);
 }
 
@@ -50929,12 +50932,15 @@ body.layout-hotbar #phMessagesBtn:hover{
   display:grid; place-items:center; background:rgba(255,255,255,.05);
 }
 #phMessagesBtn .ph-fb-tile svg{ width:15px; height:15px; }
-body.rail-dm #phMessagesBtn{
+/* Mirrors the Sidebar rule's guard, so the two can never light together:
+   Messages is active only while the rail is BOTH in DM mode and visible —
+   matching state() in the dock switch, which requires dmOn && railShown. */
+body.rail-dm:not(.rail-hidden) #phMessagesBtn{
   background:color-mix(in srgb, var(--accent) 16%, transparent);
   border-color:color-mix(in srgb, var(--accent) 40%, transparent);
   color:color-mix(in srgb, var(--accent) 96%, white);
 }
-body.rail-dm #phMessagesBtn .ph-fb-tile{
+body.rail-dm:not(.rail-hidden) #phMessagesBtn .ph-fb-tile{
   background:color-mix(in srgb, var(--accent) 26%, transparent);
 }
 #phMessagesBtn .ph-dm-dot{
