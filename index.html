@@ -48513,8 +48513,16 @@ body.lir-resizing #chatPanel{ transition:none !important; }
 
   function applyWidth(px){
     px = Math.max(W_MIN, Math.min(W_MAX, Math.round(px)));
-    document.documentElement.style.setProperty('--lir-w-full', px + 'px');
-    document.documentElement.style.setProperty('--feed-w', px + 'px');
+    // Must be set on BODY, not just <html>. The stylesheet defines
+    // `body { --feed-w: clamp(...) }`, and a variable redefined on body
+    // shadows the inherited one for body and everything inside it — so a
+    // value written only to documentElement never reached #socialFeed and
+    // the feed simply never resized. Inline on body outranks that rule.
+    [document.documentElement, document.body].forEach(function(el){
+      if (!el) return;
+      el.style.setProperty('--lir-w-full', px + 'px');
+      el.style.setProperty('--feed-w', px + 'px');
+    });
     return px;
   }
   function loadWidth(){
@@ -50281,14 +50289,23 @@ body.feed-resizing .lobby-overlay{ transition:none !important; }
 
   function apply(px){
     px = Math.max(MIN, Math.min(MAX, Math.round(px)));
-    document.documentElement.style.setProperty('--feed-w', px + 'px');
-    document.documentElement.style.setProperty('--lir-w-full', px + 'px');
+    // On BODY as well as <html> — the stylesheet's `body { --feed-w: ... }`
+    // shadows anything inherited from documentElement, so writing only
+    // there had no effect on the feed at all.
+    [document.documentElement, document.body].forEach(function(el){
+      if (!el) return;
+      el.style.setProperty('--feed-w', px + 'px');
+      el.style.setProperty('--lir-w-full', px + 'px');
+    });
     return px;
   }
+  /* Read from BODY — that's where the stylesheet defines --feed-w, so it's
+     the value that actually applies. Reading documentElement returned the
+     unshadowed one, which could disagree with what's on screen. */
   function current(){
-    var v = parseInt(getComputedStyle(document.documentElement)
+    var v = parseInt(getComputedStyle(document.body)
       .getPropertyValue('--feed-w'), 10);
-    return isNaN(v) ? 420 : v;
+    return isNaN(v) ? 360 : v;
   }
   function save(px){ try { localStorage.setItem(KEY, String(px)); } catch(e){} }
   function load(){
