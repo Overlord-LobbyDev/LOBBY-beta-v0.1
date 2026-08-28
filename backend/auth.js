@@ -1836,6 +1836,124 @@ app.get("/servers/:id/members", requireAuth, async (req, res) => {
   })));
 });
 
+// ══════════════════════════════════════════════════════════════════
+// GET /servers/:id/activity — what everyone in this lobby is doing NOW.
+//
+// Provider registry: each entry takes the lobby's members and returns
+// activity rows. Adding a source later (Discord, Spotify, SoundCloud,
+// Xbox) means appending one function here — nothing else changes, and
+// the client renders whatever comes back.
+//
+// Every provider must:
+//   * be BULK where the upstream allows it (one request per lobby, not
+//     one per member) — this is polled, so per-member fans out badly
+//   * never throw; a provider that fails returns [] and the rest survive
+//
+// Row shape (stable contract with the client):
+//   { userId, username, avatar_url, provider, kind, title, detail, artUrl }
+//   kind: 'playing' | 'listening' | 'watching'
+// ══════════════════════════════════════════════════════════════════
+
+const _activityCache = new Map();      // serverId -> { ts, data }
+const ACTIVITY_TTL = 45000;
+
+// ── Steam ── live only: gameextrainfo is present ONLY while in a game.
+// (GetRecentlyPlayedGames is a two-week history and cannot answer this.)
+async function _actSteam(members) {
+  if (!STEAM_KEY) return [];
+  const withSteam = members.filter(m => m.steam_id).slice(0, 100);
+  if (!withSteam.length) return [];
+  const ids = withSteam.map(m => m.steam_id).join(",");
+  const r = await fetch(
+    `https://api.steampowered.com/ISteamUser/GetPlayerSummaries/v2/?key=${STEAM_KEY}&steamids=${ids}`
+  );
+  const d = await r.json();
+  const by = {};
+  (d?.response?.players || []).forEach(p => { by[p.steamid] = p; });
+  return withSteam.map(m => {
+    const p = by[m.steam_id];
+    if (!p || !p.gameextrainfo) return null;
+    return {
+      userId: m.id, username: m.username, avatar_url: m.avatar_url,
+      provider: "steam", kind: "playing",
+      title: p.gameextrainfo,
+      detail: null,
+      artUrl: p.gameid
+        ? `https://cdn.cloudflare.steamstatic.com/steam/apps/${p.gameid}/capsule_sm_120.jpg`
+        : null
+    };
+  }).filter(Boolean);
+}
+
+// ── Lichess ── /api/users/status is bulk (100 ids) and needs no key.
+// `playing: true` means they are in a game right now.
+async function _actLichess(members) {
+  const withL = members.filter(m => m.lichess_username).slice(0, 100);
+  if (!withL.length) return [];
+  const ids = withL.map(m => m.lichess_username).join(",");
+  const r = await fetch(`https://lichess.org/api/users/status?ids=${encodeURIComponent(ids)}`);
+  const rows = await r.json();
+  const by = {};
+  (Array.isArray(rows) ? rows : []).forEach(u => {
+    if (u && u.id) by[String(u.id).toLowerCase()] = u;
+  });
+  return withL.map(m => {
+    const u = by[String(m.lichess_username).toLowerCase()];
+    if (!u || !u.playing) return null;
+    return {
+      userId: m.id, username: m.username, avatar_url: m.avatar_url,
+      provider: "lichess", kind: "playing",
+      title: "Lichess", detail: "In a game", artUrl: null
+    };
+  }).filter(Boolean);
+}
+
+// ── Chess.com ── deliberately inert. Chess.com's public API exposes
+// `last_online` but no "in a game right now" endpoint, so reporting
+// activity from it would be a guess. Left wired so it starts working the
+// moment a real source exists.
+async function _actChessCom(/* members */) { return []; }
+
+const ACTIVITY_PROVIDERS = [_actSteam, _actLichess, _actChessCom];
+
+app.get("/servers/:id/activity", requireAuth, async (req, res) => {
+  const serverId = String(req.params.id);
+  const hit = _activityCache.get(serverId);
+  if (hit && (Date.now() - hit.ts) < ACTIVITY_TTL) return res.json(hit.data);
+
+  try {
+    const r = await pool.query(
+      `SELECT u.id, u.username, u.avatar_url,
+              u.steam_id, u.lichess_username, u.chess_username
+         FROM server_members sm
+         JOIN users u ON u.id = sm.user_id
+        WHERE sm.server_id = $1`,
+      [serverId]
+    );
+    const members = r.rows;
+    if (!members.length) {
+      _activityCache.set(serverId, { ts: Date.now(), data: [] });
+      return res.json([]);
+    }
+
+    // One failing provider must not take the others down with it.
+    const settled = await Promise.all(
+      ACTIVITY_PROVIDERS.map(fn =>
+        fn(members).catch(e => {
+          console.warn("[activity] provider failed:", e.message);
+          return [];
+        })
+      )
+    );
+    const data = settled.flat();
+    _activityCache.set(serverId, { ts: Date.now(), data });
+    res.json(data);
+  } catch (err) {
+    console.error("[GET /servers/:id/activity]", err.message);
+    res.json([]);              // never break the header over an API hiccup
+  }
+});
+
 // ── Channels ─────────────────────────────────────────────────
 
 app.get("/servers/:id/channels", requireAuth, async (req, res) => {
