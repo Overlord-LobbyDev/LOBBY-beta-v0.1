@@ -20197,6 +20197,7 @@ function appendMessage(msg, type) {
   const canDelete = isMe || me.is_admin === true || (currentView.type === "channel" && (myServerRole === "owner" || myServerRole === "moderator"));
 
   // Date divider
+  let insertedDivider = false;
   const lastMsg = container.lastElementChild;
   const lastMsgDate = lastMsg?.dataset?.dateStr;
   const todayStr = msgDate.toDateString();
@@ -20210,11 +20211,17 @@ function appendMessage(msg, type) {
     divider.className = "msg-date-divider";
     divider.innerHTML = `<span>${label}</span>`;
     container.appendChild(divider);
+    insertedDivider = true;
   }
 
   const lastAuthorId = lastMsg?.dataset?.authorId;
   const lastTime = lastMsg?.dataset?.time;
-  const isContinuation = lastAuthorId && parseInt(lastAuthorId) === authorId
+  // A run must not chain across a date divider — lastMsg is captured
+  // before the divider is appended, so without this a message at 23:59
+  // and one at 00:01 from the same person would tuck together underneath
+  // a "Today" heading that sits between them.
+  const isContinuation = !insertedDivider
+    && lastAuthorId && parseInt(lastAuthorId) === authorId
     && lastTime && (msgDate.getTime() - parseInt(lastTime)) < 5 * 60 * 1000;
 
   const div = document.createElement("div");
@@ -47631,7 +47638,34 @@ body.lobby-selected .msg-header{
 body.lobby-selected .msg-me .msg-header{ padding-left:0 !important; padding-right:3px; }
 body.lobby-selected .msg-username{ font-size:13px !important; font-weight:700 !important; }
 body.lobby-selected .msg-time{ font-size:10.5px !important; }
-body.lobby-selected .msg-avatar{ width:34px !important; height:34px !important; }
+/* The avatar was top-aligned, so it lined up with the NAME rather than
+   the bubble — which is what made it look detached from the message.
+   Aligning it to the bottom of the group sits it beside the bubble
+   itself, and keeps it correct when a message runs to several lines. */
+body.lobby-selected .msg-avatar{
+  width:34px !important; height:34px !important;
+  align-self:flex-end !important;
+  margin-bottom:1px;
+}
+
+/* ── Chained messages ────────────────────────────────────────────
+   A run from one person shows ONE avatar and one name, on the first
+   message. The rest keep the avatar's width reserved (visibility, not
+   display) so every bubble in the run stays on the same left edge —
+   collapsing the space instead would make the run stagger. */
+body.lobby-selected .message-group.msg-continuation .msg-avatar{
+  visibility:hidden !important;
+}
+body.lobby-selected .message-group.msg-continuation .msg-header{
+  display:none !important;
+}
+/* Only the message that opens a run gets the notched corner; the rest
+   are fully rounded, so the run reads as one block rather than a stack
+   of separate arrivals. */
+body.lobby-selected .chat-main .message-group.msg-continuation .msg-content,
+body.lobby-selected .chat-main:has(.chat-ribbon) .message-group.msg-continuation .msg-content{
+  border-radius:18px !important;
+}
 
 /* ── Date dividers ───────────────────────────────────────────────
    Was a bordered pill floating mid-conversation — heavy for what is just
