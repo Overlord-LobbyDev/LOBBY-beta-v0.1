@@ -49277,5 +49277,380 @@ body.lir-resizing #chatPanel{ transition:none !important; }
 })();
 </script>
 
+<!-- ══════════════════════════════════════════════════════════════════
+     SIDEBAR TOGGLE + RECENT LOBBIES
+     The lobby rail and the Feed shared one slot and swapped silently,
+     with no control telling you the rail existed. The rail now has its
+     own button beside Feed, and a strip of recent lobbies in its header.
+     ══════════════════════════════════════════════════════════════════ -->
+<style>
+/* ── The sidebar button — mirrors the Feed pill exactly ─────────── */
+#phRailToggleBtn{ display:none; }
+body.layout-hotbar #phRailToggleBtn{
+  display:inline-flex; align-items:center; gap:8px; flex-shrink:0;
+  height:36px; padding:0 13px 0 4px;
+  background:rgba(255,255,255,.025);
+  border:1px solid rgba(255,255,255,.05);
+  border-radius:10px;
+  color:var(--text-3);
+  font-family:var(--font); font-size:12px; font-weight:600; letter-spacing:.2px;
+  cursor:pointer; user-select:none; position:relative;
+  -webkit-app-region:no-drag;
+  margin-left:6px;
+  transition:background .18s, color .18s, border-color .18s, box-shadow .18s;
+}
+body.layout-hotbar #phRailToggleBtn:hover{
+  background:rgba(255,255,255,.06); color:var(--text-1);
+  border-color:rgba(255,255,255,.1);
+}
+#phRailToggleBtn .ph-fb-tile{
+  width:28px; height:28px; border-radius:8px; flex:none;
+  display:grid; place-items:center;
+  background:rgba(255,255,255,.05);
+}
+#phRailToggleBtn .ph-fb-tile svg{ width:15px; height:15px; }
+#phRailToggleBtn:hover .ph-fb-tile{ background:rgba(255,255,255,.1); }
+/* Active state uses the accent, so it never looks like the gold Feed
+   pill — two different panels shouldn't share one "on" colour. */
+body.rail-open #phRailToggleBtn{
+  background:color-mix(in srgb, var(--accent) 16%, transparent);
+  border-color:color-mix(in srgb, var(--accent) 40%, transparent);
+  color:color-mix(in srgb, var(--accent) 96%, white);
+}
+body.rail-open #phRailToggleBtn .ph-fb-tile{
+  background:color-mix(in srgb, var(--accent) 26%, transparent);
+}
+/* Nothing to toggle when you aren't in a lobby. */
+body:not(.lobby-selected) #phRailToggleBtn{ opacity:.4; pointer-events:none; }
+
+/* ── Rail visibility now keys off .rail-open, not "feed happens to be
+      closed" — that coupling is what made the rail vanish silently. ── */
+body.lobby-selected.rail-open #lobbyInfoRail{
+  transform:translateX(0) !important;
+  pointer-events:auto !important;
+}
+body.lobby-selected:not(.rail-open) #lobbyInfoRail{
+  transform:translateX(100%) !important;
+  pointer-events:none !important;
+}
+body.lobby-selected.rail-open #chatPanel{ right:var(--lir-w) !important; }
+body.feed-closed.lobby-selected:not(.rail-open) #chatPanel{ right:0 !important; }
+
+/* ── Recent lobbies strip in the rail header ────────────────────── */
+#lirRecents{
+  display:flex; align-items:center; justify-content:center; gap:7px;
+  padding:10px 12px 2px;
+}
+body.lir-collapsed #lirRecents{ display:none; }
+.lir-recent{
+  position:relative; flex:none;
+  width:30px; height:30px; border-radius:9px;
+  overflow:hidden; cursor:pointer;
+  background:linear-gradient(135deg, var(--accent), var(--accent-h));
+  display:grid; place-items:center;
+  font-family:'Bebas Neue', var(--font), sans-serif;
+  font-size:13px; color:#fff;
+  border:1.5px solid transparent;
+  opacity:.62;
+  transition:opacity .16s, border-color .16s, transform .16s;
+}
+.lir-recent img{ width:100%; height:100%; object-fit:cover; }
+.lir-recent:hover{ opacity:1; transform:translateY(-2px); }
+.lir-recent.active{
+  opacity:1;
+  border-color:color-mix(in srgb, var(--accent) 75%, white);
+  box-shadow:0 0 0 2px color-mix(in srgb, var(--accent) 22%, transparent);
+}
+.lir-recent:focus-visible{ outline:2px solid var(--accent); outline-offset:2px; }
+/* Priority badges — a live call outranks an unread, so only one shows. */
+.lir-recent .lr-flag{
+  position:absolute; top:-3px; right:-3px;
+  min-width:14px; height:14px; padding:0 3px; border-radius:99px;
+  font-family:var(--font); font-size:8.5px; font-weight:900; line-height:14px;
+  text-align:center; box-shadow:0 0 0 2px var(--bg-1);
+}
+.lir-recent .lr-flag.call{ background:var(--green); color:#fff; }
+.lir-recent .lr-flag.unread{ background:var(--accent); color:var(--bg-0); }
+</style>
+
+<script>
+(function () {
+  'use strict';
+
+  function $(id){ return document.getElementById(id); }
+  function esc(s){
+    return String(s == null ? '' : s)
+      .replace(/&/g,'&amp;').replace(/"/g,'&quot;')
+      .replace(/</g,'&lt;').replace(/>/g,'&gt;');
+  }
+  // Script-scoped globals aren't on window in this file.
+  function lexServer(){
+    try { if (typeof selectedServer !== 'undefined' && selectedServer) return selectedServer; }
+    catch(e){}
+    return window.selectedServer || null;
+  }
+  function lexUnread(){
+    try { if (typeof unreadServers !== 'undefined') return unreadServers; } catch(e){}
+    return window.unreadServers || {};
+  }
+  function myCallServerId(){
+    var ch = null, map = null;
+    try { if (typeof vcChannelId !== 'undefined') ch = vcChannelId; } catch(e){}
+    try { if (typeof channelToServer !== 'undefined') map = channelToServer; } catch(e){}
+    if (ch == null || !map) return null;
+    return map[ch] != null ? map[ch] : null;
+  }
+
+  /* ── Double Dock ────────────────────────────────────────────────
+     Off by default: Feed and rail swap, which keeps the chat wide.
+     On, both may sit docked at once. */
+  var DD_KEY = 'lobbyDoubleDock';
+  function doubleDock(){
+    try { return localStorage.getItem(DD_KEY) === '1'; } catch(e){ return false; }
+  }
+  function setDoubleDock(on){
+    try { localStorage.setItem(DD_KEY, on ? '1' : '0'); } catch(e){}
+    document.body.classList.toggle('double-dock', !!on);
+    syncDDToggle();
+  }
+  window.lobbySetDoubleDock = setDoubleDock;
+
+  /* ── Rail open / closed ─────────────────────────────────────── */
+  var RAIL_KEY = 'lobbyRailOpen';
+  function railOpen(){
+    try {
+      var v = localStorage.getItem(RAIL_KEY);
+      return v === null ? true : v === '1';   // default open, so it's discoverable
+    } catch(e){ return true; }
+  }
+  function setRail(open){
+    document.body.classList.toggle('rail-open', !!open);
+    try { localStorage.setItem(RAIL_KEY, open ? '1' : '0'); } catch(e){}
+    var b = $('phRailToggleBtn');
+    if (b) b.setAttribute('aria-pressed', open ? 'true' : 'false');
+    // Feed and rail share the right edge unless Double Dock is on.
+    if (open && !doubleDock() && document.body.classList.contains('feed-open')){
+      if (typeof window.toggleFeed === 'function') window.toggleFeed();
+    }
+  }
+  window.toggleLobbyRail = function(){
+    setRail(!document.body.classList.contains('rail-open'));
+  };
+
+  /* Opening the Feed closes the rail (unless docked together). Wrapping
+     rather than editing toggleFeed keeps that function's own logic intact. */
+  function patchToggleFeed(){
+    if (typeof window.toggleFeed !== 'function' || window.toggleFeed.__railWrapped) return false;
+    var orig = window.toggleFeed;
+    window.toggleFeed = function(){
+      var r = orig.apply(this, arguments);
+      if (!doubleDock() && document.body.classList.contains('feed-open')
+          && document.body.classList.contains('rail-open')){
+        setRail(false);
+      }
+      return r;
+    };
+    window.toggleFeed.__railWrapped = true;
+    return true;
+  }
+
+  /* ── Recent lobbies ─────────────────────────────────────────────
+     Up to three, ordered live: an active call outranks an unread, which
+     outranks plain recency. The top one is also what opens by default
+     when you aren't already inside a lobby. */
+  var REC_KEY = 'lobbyRecents', REC_MAX = 3;
+
+  function loadRecents(){
+    try { return JSON.parse(localStorage.getItem(REC_KEY) || '[]') || []; }
+    catch(e){ return []; }
+  }
+  function saveRecents(list){
+    try { localStorage.setItem(REC_KEY, JSON.stringify(list.slice(0, 8))); } catch(e){}
+  }
+  function noteVisit(srv){
+    if (!srv || srv.id == null) return;
+    var list = loadRecents().filter(function(r){ return String(r.id) !== String(srv.id); });
+    list.unshift({
+      id: srv.id,
+      name: srv.name || 'Lobby',
+      icon: srv.icon_url || srv.iconUrl || null,
+      ts: Date.now()
+    });
+    saveRecents(list);
+    renderRecents();
+  }
+
+  function ranked(){
+    var callId = myCallServerId();
+    var unread = lexUnread() || {};
+    return loadRecents().map(function(r){
+      var isCall = callId != null && String(callId) === String(r.id);
+      var n = unread[r.id] || 0;
+      return {
+        r: r, isCall: isCall, unread: n,
+        // 0 = call, 1 = unread, 2 = plain recency.
+        rank: isCall ? 0 : (n > 0 ? 1 : 2)
+      };
+    }).sort(function(a, b){
+      if (a.rank !== b.rank) return a.rank - b.rank;
+      if (a.rank === 1 && a.unread !== b.unread) return b.unread - a.unread;
+      return (b.r.ts || 0) - (a.r.ts || 0);
+    }).slice(0, REC_MAX);
+  }
+
+  var recSig = '';
+  function renderRecents(){
+    var rail = $('lobbyInfoRail');
+    if (!rail) return;
+    var header = rail.querySelector('.lir-header');
+    if (!header) return;
+
+    var host = $('lirRecents');
+    if (!host){
+      host = document.createElement('div');
+      host.id = 'lirRecents';
+      header.parentNode.insertBefore(host, header);
+    }
+
+    var items = ranked();
+    var cur = lexServer();
+    var html = items.map(function(x){
+      var isCur = cur && String(cur.id) === String(x.r.id);
+      var flag = x.isCall
+        ? '<span class="lr-flag call" title="Active call">●</span>'
+        : (x.unread ? '<span class="lr-flag unread">' + (x.unread > 9 ? '9+' : x.unread) + '</span>' : '');
+      var inner = x.r.icon
+        ? '<img src="' + esc(x.r.icon) + '" alt="">'
+        : esc(String(x.r.name || 'L').charAt(0).toUpperCase());
+      return '<button class="lir-recent' + (isCur ? ' active' : '') + '" data-lobby="' + esc(x.r.id) +
+             '" title="' + esc(x.r.name) + '">' + inner + flag + '</button>';
+    }).join('');
+
+    // Signature guard — this is driven by observers.
+    if (html === recSig) return;
+    recSig = html;
+    host.innerHTML = html;
+    host.style.display = items.length > 1 ? 'flex' : 'none';   // pointless with one
+  }
+
+  document.addEventListener('click', function(e){
+    var b = e.target.closest('.lir-recent');
+    if (!b) return;
+    var id = b.dataset.lobby;
+    // Switch the whole lobby, not just the sidebar — the rail always shows
+    // the lobby you're viewing, so they must never disagree.
+    if (typeof window.selectServer === 'function') window.selectServer(Number(id));
+  });
+
+  /* ── Settings: Double Dock toggle ───────────────────────────── */
+  function buildDDToggle(){
+    if ($('spDoubleDock')) return;
+    var grid = $('spFeedPosGrid');
+    if (!grid) return;
+    var card = grid.closest('.sp-card');
+    if (!card || !card.parentNode) return;
+
+    var wrap = document.createElement('div');
+    wrap.className = 'sp-card';
+    wrap.style.marginTop = '14px';
+    wrap.innerHTML =
+      '<div class="sp-card-row">' +
+        '<div class="sp-card-info">' +
+          '<div class="sp-card-title">Double Dock</div>' +
+          '<div class="sp-card-desc">Keep the Feed and the lobby sidebar open at the same time. ' +
+            'Off, they swap — which leaves the chat wider.</div>' +
+        '</div>' +
+        '<label style="position:relative;display:inline-block;width:42px;height:24px;flex-shrink:0">' +
+          '<input type="checkbox" id="spDoubleDock" style="opacity:0;width:0;height:0">' +
+          '<span id="spDoubleDockTrack" style="position:absolute;cursor:pointer;inset:0;background:var(--bg-1);border-radius:24px;transition:background .2s"></span>' +
+          '<span id="spDoubleDockKnob" style="position:absolute;top:3px;left:3px;width:18px;height:18px;background:#fff;border-radius:50%;transition:transform .2s;pointer-events:none"></span>' +
+        '</label>' +
+      '</div>';
+    card.parentNode.insertBefore(wrap, card.nextSibling);
+    $('spDoubleDock').addEventListener('change', function(){ setDoubleDock(this.checked); });
+    syncDDToggle();
+  }
+
+  function syncDDToggle(){
+    var cb = $('spDoubleDock'); if (!cb) return;
+    var on = doubleDock();
+    cb.checked = on;
+    var t = $('spDoubleDockTrack'), k = $('spDoubleDockKnob');
+    if (t) t.style.background = on ? 'var(--accent)' : 'var(--bg-1)';
+    if (k) k.style.transform = on ? 'translateX(18px)' : 'translateX(0)';
+  }
+
+  /* ── Button creation ────────────────────────────────────────── */
+  function placeButton(){
+    var feed = $('phFeedToggleBtn');
+    if (!feed || !feed.parentNode) return;
+    var btn = $('phRailToggleBtn');
+    if (!btn){
+      btn = document.createElement('button');
+      btn.id = 'phRailToggleBtn';
+      btn.type = 'button';
+      btn.title = 'Toggle lobby sidebar';
+      btn.setAttribute('aria-pressed', 'false');
+      btn.innerHTML =
+        '<span class="ph-fb-tile" aria-hidden="true">' +
+          '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" ' +
+          'stroke-linecap="round" stroke-linejoin="round">' +
+          '<rect x="3" y="4" width="18" height="16" rx="2"/>' +
+          '<line x1="15" y1="4" x2="15" y2="20"/></svg>' +
+        '</span><span class="ph-fb-text">Sidebar</span>';
+      btn.addEventListener('click', function(){ window.toggleLobbyRail(); });
+    }
+    // positionFeedPill() relocates the Feed pill at runtime, so re-seat
+    // ours after it rather than assuming a fixed slot.
+    if (btn.previousElementSibling !== feed) feed.insertAdjacentElement('afterend', btn);
+  }
+
+  function start(){
+    if (!document.body){ setTimeout(start, 200); return; }
+
+    document.body.classList.toggle('double-dock', doubleDock());
+    document.body.classList.toggle('rail-open', railOpen());
+    placeButton();
+    renderRecents();
+    buildDDToggle();
+
+    if (!patchToggleFeed()){
+      var tries = 0;
+      var iv = setInterval(function(){
+        if (patchToggleFeed() || ++tries > 40) clearInterval(iv);
+      }, 250);
+    }
+
+    // Record every lobby you open.
+    (function hookSelect(){
+      if (typeof window.selectServer !== 'function'){ setTimeout(hookSelect, 400); return; }
+      if (window.selectServer.__recentsWrapped) return;
+      var orig = window.selectServer;
+      window.selectServer = function(){
+        var r = orig.apply(this, arguments);
+        setTimeout(function(){ noteVisit(lexServer()); }, 60);
+        return r;
+      };
+      window.selectServer.__recentsWrapped = true;
+    })();
+
+    // Unread counts and call state change the ordering, and both are
+    // reflected in the rail's DOM, so re-rank when it updates.
+    var rail = $('lobbyInfoRail');
+    if (rail) new MutationObserver(function(){ renderRecents(); })
+      .observe(rail, { childList:true, subtree:true });
+    new MutationObserver(function(){ placeButton(); })
+      .observe(document.body, { attributes:true, attributeFilter:['class'] });
+
+    noteVisit(lexServer());
+    console.log('[rail] sidebar toggle + recents ready (double-dock ' +
+                (doubleDock() ? 'on' : 'off') + ')');
+  }
+
+  if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', start);
+  else start();
+})();
+</script>
+
 </body>
 </html>
