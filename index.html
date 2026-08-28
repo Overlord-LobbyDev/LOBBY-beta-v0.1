@@ -49699,11 +49699,17 @@ body.lir-collapsed #lirRecents{ display:none; }
       get(base + '/api/tournaments/lobby/' + id),
       get(base + '/api/events/lobby/' + id)
     ]).then(function(res){
+      // Name/icon come from the stored recent FIRST. lobbyById() reads
+      // _allServers, which is often still empty this early in a boot — and
+      // its `|| 'Lobby'` fallback was writing the literal placeholder name
+      // into the header, overwriting the correct one. So a successful
+      // preview was itself restoring the placeholder.
+      var rec = loadRecents().find(function(x){ return String(x.id) === String(id); }) || {};
       var srv = lobbyById(id) || {};
       window._lirPreview = {
         id: id,
-        name: srv.name || 'Lobby',
-        icon: srv.icon_url || srv.iconUrl || null,
+        name: rec.name || srv.name || 'Lobby',
+        icon: rec.icon || srv.icon_url || srv.iconUrl || null,
         channels:  Array.isArray(res[0]) ? res[0] : [],
         members:   Array.isArray(res[1]) ? res[1] : [],
         tourneys:  Array.isArray(res[2]) ? res[2] : [],
@@ -49785,14 +49791,10 @@ body.lir-collapsed #lirRecents{ display:none; }
     }).join('') : '<div class="lir-empty">No upcoming events.</div>';
   }
 
-  /* Off-lobby, show a recent lobby's sidebar. Prefers whichever you were
-     last looking at, so a reload puts you back where you were rather than
-     silently jumping to a different lobby. */
-  function ensurePreview(){
-    if (document.body.classList.contains('lobby-selected')) return;
+  /* Which lobby should the rail be showing when you're not in one. */
+  function wantedPreviewId(){
     var recents = loadRecents();
-    if (!recents.length) return;
-
+    if (!recents.length) return null;
     var want = null;
     try { want = localStorage.getItem(PV_KEY); } catch(e){}
     var stillThere = want && recents.some(function(r){ return String(r.id) === String(want); });
@@ -49800,7 +49802,40 @@ body.lir-collapsed #lirRecents{ display:none; }
       var top = ranked()[0];
       want = top ? top.r.id : recents[0].id;
     }
-    setPreview(want);
+    return want;
+  }
+
+  /* ── Kill the placeholder immediately ───────────────────────────
+     The rail's "Lobby / Community" header is static markup, and nothing
+     replaced it until a network round-trip finished — so on every launch
+     you saw the placeholder, and if the fetch was slow or failed you kept
+     seeing it. Name and icon are already in localStorage, so paint them
+     synchronously on boot. No request, nothing to fail, no window where
+     the placeholder is what's on screen. */
+  function paintHeaderFromRecent(){
+    if (document.body.classList.contains('lobby-selected')) return false;
+    var id = wantedPreviewId();
+    if (id == null) return false;
+    var r = loadRecents().find(function(x){ return String(x.id) === String(id); });
+    if (!r) return false;
+
+    var name = $('lirName'), icon = $('lirIcon'), meta = $('lirMeta');
+    if (name && name.textContent !== r.name) name.textContent = r.name || 'Lobby';
+    if (icon){
+      var want = r.icon
+        ? '<img src="' + esc(r.icon) + '" alt="" style="width:100%;height:100%;object-fit:cover;border-radius:inherit">'
+        : esc(String(r.name || 'L').charAt(0).toUpperCase());
+      if (icon.innerHTML !== want) icon.innerHTML = want;
+    }
+    if (meta && /community/i.test(meta.textContent || '')) meta.textContent = 'RECENT LOBBY';
+    return true;
+  }
+
+  function ensurePreview(){
+    if (document.body.classList.contains('lobby-selected')) return;
+    paintHeaderFromRecent();          // instant, from storage
+    var id = wantedPreviewId();
+    if (id != null) setPreview(id);   // then fill the sections
   }
 
 
@@ -49918,9 +49953,12 @@ body.lir-collapsed #lirRecents{ display:none; }
     setInterval(function(){
       if (document.hidden) return;
       if (document.body.classList.contains('lobby-selected')) return;
-      // ensurePreview too, not just applyPreview: on a cold boot the
-      // recents list often isn't readable yet when the staged retries run,
-      // so without this the rail keeps its static placeholder forever.
+      // Header first and unconditionally: it's synchronous, needs no
+      // network, and guarantees the placeholder can never be what's on
+      // screen even if every request below fails.
+      paintHeaderFromRecent();
+      // Then the sections. ensurePreview covers the cold-boot case where
+      // recents weren't readable yet when the staged retries ran.
       if (!window._lirPreview) ensurePreview();
       applyPreview();
     }, 2000);
