@@ -47186,7 +47186,10 @@ body.lir-collapsed #lirCollapseBtn{ display:none; }
    this view adopts — hero, pulse and composer included. Nothing here is
    allowed to invent its own inset; that mismatch is what made the view
    look like the pieces belonged to different screens. */
-:root{ --lbv-gut: 20px; }
+/* Now that .messages no longer carries its own 36px side padding, this
+   single value sets the inset for the hero, every message row, the
+   Pulse strip and the composer — one gutter, everything aligned. */
+:root{ --lbv-gut: 28px; }
 
 /* ══ NO BACKDROP-FILTER IN THE CHAT VIEW ════════════════════════════
    This file's own history records backdrop-filter causing white flashes
@@ -47269,7 +47272,23 @@ body.feed-closed.lobby-selected .chat-main:has(.chat-ribbon) .chat-header{
    top of its own 14px. That stacked inset is what opened the gap between
    the nav and the channel name. The hero now sits flush and sets its own
    rhythm. */
-body.lobby-selected .chat-main .messages{ padding-top:0 !important; }
+/* The hero sits INSIDE .messages, so the scroller's own padding
+   (chamber-mode sets 30px 36px 20px) pushed it down from the header
+   above AND inset it from both edges — it read as a floating card
+   rather than the bottom half of the header stack.
+
+   The padding moves off the scroller and onto the rows themselves, so
+   the hero can sit flush edge-to-edge while messages keep their gutter.
+   Both use --lbv-gut, so hero text and message text align exactly. */
+body.lobby-selected .chat-main .messages{
+  padding:0 0 18px !important;
+}
+/* The decorative timeline thread was positioned against the old 36px
+   padding; re-aim it down the avatar column of the new gutter. */
+body.lobby-selected .chat-main .messages::before{
+  left:calc(var(--lbv-gut) + 20px) !important;
+  top:56px !important;
+}
 
 body.lobby-selected .ch-hero{
   position:sticky; top:0; z-index:6;
