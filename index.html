@@ -47210,6 +47210,21 @@ body.lobby-selected .ch-hero{
   -webkit-backdrop-filter:none !important;
 }
 
+/* ══ TOP CHROME CLEARANCE ═══════════════════════════════════════════
+   The panels are pinned with top:calc(72px + var(--ph-row-h)) — two
+   hardcoded numbers that have to match the real height of the topbar
+   plus the hotbar row. When they don't (zoom, a wrapped row, a changed
+   bar height) the panel slides UNDER the fixed chrome and its first row
+   of controls becomes unclickable.
+
+   --app-chrome-h is measured from the live elements instead (see
+   syncChromeHeight), so the panels always start exactly where the bars
+   actually end. Falls back to the old constant if measurement fails. */
+body.lobby-selected #chatPanel,
+body.lobby-selected #lobbyInfoRail{
+  top: var(--app-chrome-h, calc(72px + var(--ph-row-h, 0px))) !important;
+}
+
 /* ══ COLISEUM BUTTON ════════════════════════════════════════════════
    The floating pill in the top row is gone, so this is now the only way
    back. It has to read as a destination, not another utility icon — so
@@ -47280,6 +47295,13 @@ body.feed-closed.lobby-selected .chat-main:has(.chat-ribbon) .chat-header{
    The padding moves off the scroller and onto the rows themselves, so
    the hero can sit flush edge-to-edge while messages keep their gutter.
    Both use --lbv-gut, so hero text and message text align exactly. */
+   The rule at ~8652 sets padding-top:18px !important on
+   `body.feed-closed.lobby-selected .chat-main:has(.chat-ribbon) .messages`.
+   Its :has(.chat-ribbon) counts as a class, giving it (0,5,1) — higher
+   than anything scoped to just .lobby-selected, which is why the hero
+   kept sitting 18px below the header no matter what I set. That exact
+   selector is matched here so source order decides it instead. */
+body.feed-closed.lobby-selected .chat-main:has(.chat-ribbon) .messages,
 body.lobby-selected .chat-main .messages{
   padding:0 0 18px !important;
 }
@@ -48027,6 +48049,26 @@ body.lir-resizing #chatPanel{ transition:none !important; }
     try { localStorage.setItem(W_KEY, String(px)); } catch(e){}
   }
 
+  /* ── Top chrome clearance ───────────────────────────────────────
+     The panels' top offset is hardcoded as 72px + --ph-row-h. If that
+     ever disagrees with the real height of the topbar + hotbar row, the
+     panel tucks under the fixed chrome and its top controls can't be
+     clicked. Measure the bars instead of trusting the constants. */
+  function syncChromeHeight(){
+    var bottom = 0;
+    ['.home-header', '#phHotbarRow'].forEach(function(sel){
+      var el = document.querySelector(sel);
+      if (!el) return;
+      var cs = getComputedStyle(el);
+      if (cs.display === 'none' || cs.visibility === 'hidden' || cs.position === 'static') return;
+      var r = el.getBoundingClientRect();
+      if (r.height > 0) bottom = Math.max(bottom, r.bottom);
+    });
+    if (bottom > 0){
+      document.documentElement.style.setProperty('--app-chrome-h', Math.round(bottom) + 'px');
+    }
+  }
+
   function currentWidth(){
     var v = parseInt(getComputedStyle(document.documentElement)
       .getPropertyValue('--lir-w-full'), 10);
@@ -48303,17 +48345,31 @@ body.lir-resizing #chatPanel{ transition:none !important; }
   function start(){
     if (!$('lobbyInfoRail')) { setTimeout(start, 400); return; }
 
+    syncChromeHeight();
     loadWidth();
     clampToWindow();
     document.body.classList.toggle('lir-collapsed', isCollapsed());
     refresh();
 
-    // Re-clamp when the window changes size.
+    // Re-clamp and re-measure when the window changes size.
     var rzT = null;
     window.addEventListener('resize', function(){
       clearTimeout(rzT);
-      rzT = setTimeout(clampToWindow, 120);
+      rzT = setTimeout(function(){ clampToWindow(); syncChromeHeight(); }, 120);
     });
+
+    // The bars change height on their own too — the hotbar row appears and
+    // disappears with layout-hotbar, and zoom rescales everything. Watch
+    // them directly rather than guessing when to re-measure.
+    if (typeof ResizeObserver === 'function'){
+      var ro = new ResizeObserver(function(){ syncChromeHeight(); });
+      ['.home-header', '#phHotbarRow'].forEach(function(sel){
+        var el = document.querySelector(sel);
+        if (el) ro.observe(el);
+      });
+    }
+    new MutationObserver(function(){ syncChromeHeight(); })
+      .observe(document.body, { attributes:true, attributeFilter:['class'] });
 
     // Ctrl/Cmd+B toggles the rail — same muscle memory as every editor's
     // sidebar toggle. Ignored while typing so it can't eat a keystroke.
