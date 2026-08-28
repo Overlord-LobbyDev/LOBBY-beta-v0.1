@@ -49697,6 +49697,10 @@ body.lir-collapsed #lirRecents{ display:none; }
         tourneys:  Array.isArray(res[2]) ? res[2] : [],
         events:    (res[3] && Array.isArray(res[3].events)) ? res[3].events : []
       };
+      console.log('[rail] previewing "' + window._lirPreview.name + '" — ' +
+        window._lirPreview.channels.length + ' channels, ' +
+        window._lirPreview.members.length + ' members, ' +
+        window._lirPreview.tourneys.length + ' tournaments');
       applyPreview(true);
     }).finally(function(){ previewLoading = null; });
   }
@@ -49707,12 +49711,15 @@ body.lir-collapsed #lirRecents{ display:none; }
     var pv = window._lirPreview;
     if (!pv || applying) return;
 
-    // Navigating home clears these caches, which would blank the previewed
-    // sidebar. Re-assert ours whenever they've been swapped out from under
-    // us — that's why the rail looked empty after a reload.
+    // Navigating home clears these caches AND resets the rail header back
+    // to its static "Lobby / Community" defaults. Checking only the caches
+    // missed the header reset, so the rail sat on the placeholder while we
+    // believed everything was already applied. Check what's on screen too.
+    var nameEl = $('lirName');
     var stale = window.cachedServerMembers !== pv.members
              || window.cachedServerChannels !== pv.channels
-             || window._lirTourneyAll !== pv.tourneys;
+             || window._lirTourneyAll !== pv.tourneys
+             || !nameEl || nameEl.textContent !== pv.name;
     if (!force && !stale) return;
 
     applying = true;
@@ -49900,6 +49907,10 @@ body.lir-collapsed #lirRecents{ display:none; }
     setInterval(function(){
       if (document.hidden) return;
       if (document.body.classList.contains('lobby-selected')) return;
+      // ensurePreview too, not just applyPreview: on a cold boot the
+      // recents list often isn't readable yet when the staged retries run,
+      // so without this the rail keeps its static placeholder forever.
+      if (!window._lirPreview) ensurePreview();
       applyPreview();
     }, 2000);
 
