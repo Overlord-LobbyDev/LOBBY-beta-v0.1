@@ -7857,7 +7857,8 @@
       height:72px;
       width:min(480px, 40vw);
       display:flex; flex-direction:column; align-items:center; justify-content:center;
-      z-index:501;
+      /* v4: bumped 501 → 99998 so dropdown sits ABOVE the secondary hotbar */
+      z-index:99998;
       pointer-events:auto;
       -webkit-app-region:no-drag;
     }
@@ -8287,8 +8288,12 @@
 
     /* ── Lobby Info Rail (shown when feed is closed AND a lobby is selected) ── */
     #lobbyInfoRail {
-      position:fixed; top:72px; right:0; bottom:0;
-      width:280px;
+      position:fixed;
+      /* v4.1: always account for the secondary hotbar height (--ph-row-h)
+         so the rail header isn't tucked behind the bar. */
+      top: calc(72px + var(--ph-row-h, 0px));
+      right:0; bottom:0;
+      width:320px; /* v4: widened from 280 to fit channels */
       display:flex; flex-direction:column;
       background:linear-gradient(180deg, var(--bg-1) 0%, var(--bg-0) 100%);
       border-left:1px solid rgba(255,255,255,.07);
@@ -8305,7 +8310,7 @@
       pointer-events:auto;
     }
     /* When the rail is visible, shrink chat panel to accommodate it */
-    body.feed-closed.lobby-selected #chatPanel { right:280px !important; }
+    body.feed-closed.lobby-selected #chatPanel { right:320px !important; }
     /* Hide the left-sidebar tournaments section when the right rail is showing
        (tournaments live in the right rail instead) */
     body.feed-closed.lobby-selected .channel-section[data-section-key="tournaments"] { display:none !important; }
@@ -8505,6 +8510,290 @@
       bottom: 94px; /* fallback — applyMembersResizeStyles overrides with exact px */
     }
 
+    /* ══════════════════════════════════════════════════════════════════
+       v4 RIGHT-RAIL CHANNELS — premium home for channel navigation
+       ══════════════════════════════════════════════════════════════ */
+    .lir-ch-row {
+      display: flex; align-items: center; gap: 9px;
+      padding: 8px 10px; margin: 1px 0;
+      border-radius: 9px;
+      cursor: pointer;
+      font-size: 12.5px; font-weight: 600;
+      color: var(--text-2);
+      transition: background .14s, color .14s, transform .14s, box-shadow .18s;
+      position: relative;
+    }
+    .lir-ch-row:hover {
+      background: linear-gradient(90deg,
+        rgba(255,255,255,.06) 0%, rgba(255,255,255,.02) 100%);
+      color: var(--text-1);
+      transform: translateX(2px);
+    }
+    .lir-ch-row.active {
+      background: linear-gradient(90deg,
+        color-mix(in srgb, var(--accent) 22%, transparent) 0%,
+        color-mix(in srgb, var(--accent) 8%, transparent) 100%);
+      color: #fff;
+      box-shadow:
+        inset 3px 0 0 var(--accent),
+        0 0 18px color-mix(in srgb, var(--accent) 18%, transparent);
+    }
+    .lir-ch-row[data-type="voice"].joined {
+      background: linear-gradient(90deg,
+        color-mix(in srgb, var(--green) 22%, transparent) 0%,
+        color-mix(in srgb, var(--green) 8%, transparent) 100%);
+      color: color-mix(in srgb, var(--green) 95%, white);
+      box-shadow: inset 3px 0 0 var(--green);
+    }
+    .lir-ch-row[data-type="voice"].joined:hover {
+      background: linear-gradient(90deg,
+        color-mix(in srgb, var(--danger) 22%, transparent) 0%,
+        color-mix(in srgb, var(--danger) 8%, transparent) 100%);
+      color: color-mix(in srgb, var(--danger) 95%, white);
+      box-shadow: inset 3px 0 0 var(--danger);
+    }
+    .lir-ch-icon {
+      width: 22px; height: 22px;
+      border-radius: 7px;
+      display: flex; align-items: center; justify-content: center;
+      background: rgba(255,255,255,.06);
+      color: var(--text-3);
+      flex-shrink: 0;
+      transition: background .14s, color .14s;
+    }
+    .lir-ch-row:hover .lir-ch-icon { color: var(--text-1); }
+    .lir-ch-row[data-type="voice"] .lir-ch-icon {
+      background: color-mix(in srgb, var(--green) 14%, transparent);
+      color: color-mix(in srgb, var(--green) 95%, white);
+    }
+    .lir-ch-row[data-type="announcement"] .lir-ch-icon {
+      background: rgba(250,182,42,.14); color: #fad06a;
+    }
+    .lir-ch-row.active .lir-ch-icon {
+      background: color-mix(in srgb, var(--accent) 36%, transparent); color: #fff;
+    }
+    .lir-ch-icon svg { width: 12px; height: 12px; }
+    .lir-ch-name {
+      flex: 1; min-width: 0;
+      overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+    }
+    .lir-ch-badge {
+      flex-shrink: 0;
+      font-size: 9.5px; font-weight: 800;
+      padding: 2px 7px;
+      border-radius: 999px;
+      background: rgba(255,255,255,.08);
+      color: var(--text-3);
+    }
+    .lir-ch-badge.unread { background: #23a55a; color: #fff; }
+    .lir-ch-badge.live {
+      background: color-mix(in srgb, var(--green) 22%, transparent);
+      color: color-mix(in srgb, var(--green) 95%, white);
+      border: 1px solid color-mix(in srgb, var(--green) 45%, transparent);
+      display: inline-flex; align-items: center; gap: 5px;
+    }
+    .lir-ch-badge.live::before {
+      content: ''; width: 5px; height: 5px; border-radius: 50%;
+      background: var(--green);
+      box-shadow: 0 0 6px var(--green);
+    }
+    .lir-ch-members {
+      display: flex;
+      padding: 2px 10px 6px 42px;
+      gap: 4px; flex-wrap: wrap;
+    }
+    .lir-ch-member {
+      display: flex; align-items: center; gap: 6px;
+      padding: 3px 7px;
+      border-radius: 999px;
+      background: rgba(255,255,255,.04);
+      font-size: 10.5px; color: var(--text-3);
+    }
+    .lir-ch-member .av {
+      width: 14px; height: 14px; border-radius: 50%;
+      background: var(--accent);
+      display: inline-flex; align-items: center; justify-content: center;
+      font-size: 7px; font-weight: 700; color: #fff;
+      overflow: hidden;
+    }
+    .lir-ch-member .av img { width:100%; height:100%; object-fit:cover; }
+    .lir-ch-member.me { color: color-mix(in srgb, var(--green) 90%, white); }
+    .lir-ch-new {
+      display: flex; align-items: center; justify-content: center; gap: 6px;
+      padding: 8px 10px; margin: 6px 0 0;
+      border-radius: 9px;
+      border: 1.5px dashed rgba(255,255,255,.12);
+      background: transparent;
+      color: var(--text-3);
+      font-size: 11px; font-weight: 800;
+      letter-spacing: 1px; text-transform: uppercase;
+      cursor: pointer;
+      transition: border-color .15s, color .15s, background .15s;
+      font-family: var(--font);
+    }
+    .lir-ch-new:hover {
+      border-color: color-mix(in srgb, var(--accent) 55%, transparent);
+      color: color-mix(in srgb, var(--accent) 95%, white);
+      background: color-mix(in srgb, var(--accent) 5%, transparent);
+    }
+
+    /* When right rail is visible, hide the top chat ribbon — channels
+       live in the right rail now. Restore the legacy header so the
+       channel name still shows above the message list. */
+    body.feed-closed.lobby-selected .chat-main:has(.chat-ribbon) .chat-ribbon {
+      display: none;
+    }
+    body.feed-closed.lobby-selected .chat-main:has(.chat-ribbon) .chat-header {
+      display: flex !important;
+    }
+    body.feed-closed.lobby-selected .chat-main:has(.chat-ribbon) .messages {
+      padding-top: 18px !important;
+    }
+
+    /* Pinned section */
+    .lir-pin-row {
+      padding: 9px 10px; margin-bottom: 5px;
+      background: rgba(255,255,255,.03);
+      border-left: 3px solid color-mix(in srgb, var(--accent) 60%, transparent);
+      border-radius: 6px;
+      cursor: pointer;
+      transition: background .15s, transform .12s;
+    }
+    .lir-pin-row:hover { background: rgba(255,255,255,.06); transform: translateX(2px); }
+    .lir-pin-from {
+      font-size: 10.5px; color: var(--text-3); font-weight: 700;
+      margin-bottom: 2px;
+      display: flex; align-items: center; gap: 6px;
+    }
+    .lir-pin-body {
+      font-size: 12px; color: var(--text-1);
+      line-height: 1.4;
+      overflow: hidden;
+      display: -webkit-box;
+      -webkit-line-clamp: 2;
+      -webkit-box-orient: vertical;
+    }
+
+    /* Members section — premium presence list */
+    .lir-mem-group-label {
+      font-size: 9.5px; font-weight: 800; letter-spacing: 1.4px;
+      text-transform: uppercase;
+      color: var(--text-3);
+      margin: 8px 6px 4px;
+      display: flex; align-items: center; gap: 6px;
+    }
+    .lir-mem-group-label::after {
+      content: ''; flex: 1; height: 1px;
+      background: linear-gradient(90deg,
+        rgba(255,255,255,.06),
+        transparent);
+    }
+    .lir-mem-group-label .count {
+      font-size: 9px; font-weight: 700;
+      padding: 1px 6px; border-radius: 999px;
+      background: rgba(255,255,255,.06);
+      color: var(--text-2);
+      letter-spacing: .2px;
+    }
+    .lir-mem-row {
+      display: flex; align-items: center; gap: 9px;
+      padding: 6px 8px; margin: 1px 0;
+      border-radius: 8px;
+      cursor: pointer;
+      transition: background .14s, transform .12s;
+    }
+    .lir-mem-row:hover {
+      background: rgba(255,255,255,.05);
+      transform: translateX(2px);
+    }
+    .lir-mem-av {
+      width: 28px; height: 28px; border-radius: 50%;
+      background: linear-gradient(135deg, var(--accent), color-mix(in srgb, var(--accent) 50%, #000));
+      color: #fff;
+      display: flex; align-items: center; justify-content: center;
+      font-size: 11px; font-weight: 800;
+      flex-shrink: 0;
+      overflow: hidden;
+      position: relative;
+      box-shadow: 0 1px 4px rgba(0,0,0,.3);
+    }
+    .lir-mem-av img { width:100%; height:100%; object-fit:cover; }
+    .lir-mem-av .dot {
+      position: absolute; bottom: -1px; right: -1px;
+      width: 10px; height: 10px; border-radius: 50%;
+      background: var(--green);
+      border: 2px solid var(--bg-1);
+    }
+    .lir-mem-av .dot.away { background: #faa61a; }
+    .lir-mem-av .dot.dnd  { background: var(--danger); }
+    .lir-mem-av .dot.offline,
+    .lir-mem-av .dot.invisible { background: #80848e; }
+    .lir-mem-meta { min-width: 0; flex: 1; }
+    .lir-mem-name {
+      font-size: 12.5px; font-weight: 700; color: var(--text-1);
+      overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+    }
+    .lir-mem-sub {
+      font-size: 10px; color: var(--text-3); font-weight: 600;
+      overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+    }
+    .lir-mem-row.offline .lir-mem-av { filter: grayscale(.6) brightness(.7); }
+    .lir-mem-row.offline .lir-mem-name { color: var(--text-3); font-weight: 600; }
+    .lir-mem-voice-pill {
+      flex-shrink: 0;
+      font-size: 8.5px; font-weight: 800;
+      padding: 2px 6px;
+      border-radius: 999px;
+      background: color-mix(in srgb, var(--green) 22%, transparent);
+      color: color-mix(in srgb, var(--green) 95%, white);
+      letter-spacing: .8px; text-transform: uppercase;
+    }
+
+    /* Files section */
+    .lir-file-row {
+      display: flex; align-items: center; gap: 9px;
+      padding: 8px 10px; margin-bottom: 5px;
+      background: rgba(255,255,255,.03);
+      border-radius: 8px;
+      cursor: pointer;
+      transition: background .15s, transform .12s;
+    }
+    .lir-file-row:hover { background: rgba(255,255,255,.06); transform: translateX(2px); }
+    .lir-file-thumb {
+      width: 36px; height: 36px;
+      border-radius: 8px;
+      background: rgba(255,255,255,.05);
+      display: flex; align-items: center; justify-content: center;
+      color: var(--text-3);
+      flex-shrink: 0;
+      overflow: hidden;
+    }
+    .lir-file-thumb img { width:100%; height:100%; object-fit:cover; }
+    .lir-file-thumb svg { width: 18px; height: 18px; }
+    .lir-file-meta { min-width: 0; flex: 1; }
+    .lir-file-name {
+      font-size: 12px; font-weight: 700; color: var(--text-1);
+      overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+    }
+    .lir-file-sub {
+      font-size: 10px; color: var(--text-3); font-weight: 600;
+      display: flex; align-items: center; gap: 6px;
+      margin-top: 1px;
+    }
+
+    /* v3.3: kill col-amb ambient when not in coliseum-mode */
+    body:not(.coliseum-mode) .col-amb { display: none !important; }
+    body:not(.coliseum-mode) [class*="col-"],
+    body:not(.coliseum-mode) [class*="col-"]::before,
+    body:not(.coliseum-mode) [class*="col-"]::after {
+      animation-play-state: paused !important;
+    }
+    .hidden, .hidden *,
+    [style*="display: none"], [style*="display:none"] {
+      animation-play-state: paused !important;
+    }
+
+
     /* ── Hall of Fame ───────────────────────────────────────── */
 
     /* HOF button — pinned absolutely to the BOTTOM of #lobbyInfoRail so the
@@ -8516,7 +8805,7 @@
       left: 0; right: 0; bottom: 0;
       padding: 12px 14px 16px;
       border-top: 1px solid rgba(255,215,0,.1);
-      background: linear-gradient(to bottom, rgba(184,134,11,.05), transparent);
+      background: linear-gradient(to bottom, rgba(184,134,11,.12), var(--bg-0) 55%, var(--bg-0));
       z-index: 2;
     }
     /* Reserve room at the bottom of the scrollable rail content so tournament
@@ -16785,6 +17074,59 @@
     </div>
   </div>
   <div class="lir-scroll">
+    <!-- v4: Channels (text + voice) — premium nav home -->
+    <div class="lir-section">
+      <div class="lir-section-title lir-collapsible" onclick="lirToggleSection('channels',this)">
+        <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.3" stroke-linecap="round" stroke-linejoin="round"><line x1="9" y1="3" x2="7" y2="21"/><line x1="17" y1="3" x2="15" y2="21"/><line x1="3" y1="9" x2="21" y2="9"/><line x1="3" y1="15" x2="21" y2="15"/></svg>
+        Lounges
+        <span class="count-badge" id="lirChannelsCount">0</span>
+        <button class="lir-new-btn" title="New lounge" onclick="event.stopPropagation();if(typeof openModal==='function')openModal('createChannelModal')">+</button>
+        <svg class="lir-chevron" width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"/></svg>
+      </div>
+      <div class="lir-section-body" id="lirChannelsBody">
+        <div id="lirChannelsList"><div class="lir-empty">No channels yet.</div></div>
+      </div>
+    </div>
+
+    <!-- v4: Pinned messages -->
+    <div class="lir-section">
+      <div class="lir-section-title lir-collapsible" onclick="lirToggleSection('pinned',this)">
+        <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.3" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="17" x2="12" y2="22"/><path d="M5 17h14v0a2 2 0 0 0-2-2H7a2 2 0 0 0-2 2z"/><path d="M9 15V9a3 3 0 1 1 6 0v6"/></svg>
+        Pinned
+        <span class="count-badge" id="lirPinCount">0</span>
+        <svg class="lir-chevron" width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"/></svg>
+      </div>
+      <div class="lir-section-body collapsed" id="lirPinnedBody">
+        <div id="lirPinnedList"><div class="lir-empty">No pinned messages yet.<br><span style="opacity:.7">Right-click a message to pin it.</span></div></div>
+      </div>
+    </div>
+
+    <!-- v4: Shared files -->
+    <div class="lir-section">
+      <div class="lir-section-title lir-collapsible" onclick="lirToggleSection('files',this)">
+        <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.3" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
+        Files
+        <span class="count-badge" id="lirFilesCount">0</span>
+        <svg class="lir-chevron" width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"/></svg>
+      </div>
+      <div class="lir-section-body collapsed" id="lirFilesBody">
+        <div id="lirFilesList"><div class="lir-empty">No files shared yet.<br><span style="opacity:.7">Drag a file into the chat to share.</span></div></div>
+      </div>
+    </div>
+
+    <!-- v4.1: Members — who's around right now -->
+    <div class="lir-section">
+      <div class="lir-section-title lir-collapsible" onclick="lirToggleSection('members',this)">
+        <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.3" stroke-linecap="round" stroke-linejoin="round"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
+        Members
+        <span class="count-badge" id="lirMembersCount">0</span>
+        <svg class="lir-chevron" width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"/></svg>
+      </div>
+      <div class="lir-section-body" id="lirMembersBody">
+        <div id="lirMembersList"><div class="lir-empty">Loading members…</div></div>
+      </div>
+    </div>
+
     <!-- ── Upcoming Events ── -->
     <div class="lir-section">
       <div class="lir-section-title lir-collapsible" onclick="lirToggleSection('events',this)">
@@ -19253,7 +19595,10 @@ function renderChannelHero(activeId, fallbackName) {
   const topic = (ch.topic || ch.description || defaultTopic);
 
   const members = Array.isArray(window.cachedServerMembers) ? window.cachedServerMembers : [];
-  const online  = members.filter(m => m && m.status && m.status !== 'offline' && m.status !== 'invisible').length;
+  // Presence isn't a member field — it lives in onlineUserIds. Filtering
+  // on m.status is why the hero always showed "0 ONLINE".
+  const online  = members.filter(m => m && typeof _lirPresenceOf === 'function'
+                                        && _lirPresenceOf(m) !== 'offline').length;
   const inVoice = members.filter(m => m && (m.voiceChannelId === ch.id || m.voice_channel_id === ch.id)).length;
 
   return `<div class="ch-hero">
@@ -30082,7 +30427,7 @@ window.updateGsInboxBadge = function() {
 // Run once on script load and whenever the user-panel badge changes.
 setTimeout(() => { try { window.updateGsearchStatusIndicator(); window.updateGsInboxBadge(); } catch{} }, 800);
 // Re-poll badge every few seconds so changes elsewhere reflect here too.
-setInterval(() => { try { window.updateGsInboxBadge(); } catch{} }, 4000);
+setInterval(() => { try { window.updateGsInboxBadge(); } catch{} }, 30000); // idle-flash fix
 
 // ── Lobbies horizontal drawer (drawer-nav mode) ───────────────
 // The LOBBIES ▼ pill always drops the lobby picker — both on home and
@@ -31069,6 +31414,292 @@ function _lirSetFilter(key, val, btn) {
 }
 window._lirSetFilter = _lirSetFilter;
 
+/* ═══════════════════════════════════════════════════════════════════
+   v4: Channels list inside the right rail.
+   Pulls from window._lastChannels. Text channels open via openChannel,
+   voice channels via joinVoiceChannel. Joined voice channels show
+   member roster inline.
+   ═══════════════════════════════════════════════════════════════════ */
+function _lirRenderChannels() {
+  const listEl  = document.getElementById('lirChannelsList');
+  const countEl = document.getElementById('lirChannelsCount');
+  if (!listEl) return;
+
+  // v4.1: window._lastChannels is a local let, not on window. Use cachedServerChannels.
+  const channels = Array.isArray(window.cachedServerChannels) ? window.cachedServerChannels : (Array.isArray(window._lastChannels) ? window._lastChannels : []);
+  if (countEl) countEl.textContent = String(channels.length);
+  if (!channels.length) {
+    listEl.innerHTML = '<div class="lir-empty">No channels yet.<br><span style="opacity:.7">Use + to create one.</span></div>';
+    return;
+  }
+
+  const typeRank = { text: 0, announcement: 1, news: 2, calendar: 3, forum: 4, poll: 5, voice: 9 };
+  const sorted = channels.slice().sort((a, b) => {
+    const ra = typeRank[a.type] != null ? typeRank[a.type] : 5;
+    const rb = typeRank[b.type] != null ? typeRank[b.type] : 5;
+    if (ra !== rb) return ra - rb;
+    return (a.name || '').localeCompare(b.name || '');
+  });
+
+  const activeChId = (window.currentView && window.currentView.type === 'channel') ? window.currentView.id : null;
+  const myVcId = (typeof vcChannelId !== 'undefined') ? vcChannelId : null;
+  const me = (typeof window.me !== 'undefined') ? window.me : null;
+  const escAttr = s => String(s == null ? '' : s).replace(/&/g,'&amp;').replace(/"/g,'&quot;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+  const jsEsc = s => String(s||'').replace(/\\/g,'\\\\').replace(/'/g,"\\'");
+
+  function iconSvg(t) {
+    if (t === 'voice') return '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"/><path d="M19.07 4.93a10 10 0 0 1 0 14.14"/><path d="M15.54 8.46a5 5 0 0 1 0 7.07"/></svg>';
+    if (t === 'announcement') return '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M3 11l18-8v18l-18-8z"/></svg>';
+    if (t === 'calendar') return '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="3" y1="10" x2="21" y2="10"/></svg>';
+    return '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><line x1="9" y1="3" x2="7" y2="21"/><line x1="17" y1="3" x2="15" y2="21"/><line x1="3" y1="9" x2="21" y2="9"/><line x1="3" y1="15" x2="21" y2="15"/></svg>';
+  }
+
+  const members = Array.isArray(window.cachedServerMembers) ? window.cachedServerMembers : [];
+
+  const html = sorted.map(c => {
+    const isVoice  = c.type === 'voice';
+    const isActive = String(c.id) === String(activeChId);
+    const isJoined = isVoice && String(c.id) === String(myVcId);
+    const inHere   = isVoice ? members.filter(m => m && (m.voiceChannelId === c.id || m.voice_channel_id === c.id)) : [];
+    const isLive   = isVoice && inHere.length > 0;
+    const unread   = !isVoice ? (window.unreadChannels && window.unreadChannels[c.id]) || 0 : 0;
+    const nameJs   = jsEsc(c.name || 'channel');
+    const safeName = escAttr((c.name || 'channel').replace(/^#/, ''));
+    const clickAction = isVoice
+      ? `if(typeof joinVoiceChannel==='function')joinVoiceChannel(${c.id},'${nameJs}')`
+      : `if(typeof openChannel==='function')openChannel(${c.id},'${nameJs}','${c.type||'text'}')`;
+
+    let badge = '';
+    if (isVoice && isLive) {
+      badge = `<span class="lir-ch-badge live">${inHere.length}</span>`;
+    } else if (unread > 0) {
+      badge = `<span class="lir-ch-badge unread">${unread > 99 ? '99+' : unread}</span>`;
+    }
+
+    let membersHtml = '';
+    if (isVoice && (isLive || isJoined)) {
+      const initials = n => (n||'?').trim().split(/\s+/).map(w=>w[0]||'').join('').slice(0,2).toUpperCase() || '?';
+      const fullList = inHere.slice();
+      if (isJoined && me && !fullList.find(m => (m.id||m.userId) === me.id)) {
+        fullList.unshift({ id: me.id, username: me.username, display_name: me.display_name, avatar_url: me.avatarUrl, isSelf: true });
+      } else if (isJoined && me) {
+        const idx = fullList.findIndex(m => (m.id||m.userId) === me.id);
+        if (idx >= 0) fullList[idx].isSelf = true;
+      }
+      if (fullList.length) {
+        membersHtml = '<div class="lir-ch-members">' + fullList.slice(0, 6).map(m => {
+          const av  = m.avatar_url || m.avatarUrl;
+          const nm  = m.display_name || m.username || '?';
+          const inner = av ? `<img src="${escAttr(av)}" alt="">` : escAttr(initials(nm));
+          const cls = m.isSelf ? ' me' : '';
+          return `<span class="lir-ch-member${cls}"><span class="av">${inner}</span>${escAttr(nm.split(' ')[0])}</span>`;
+        }).join('') + '</div>';
+      }
+    }
+
+    return `<div class="lir-ch-row${isActive?' active':''}${isJoined?' joined':''}" data-type="${c.type||'text'}" data-channel-id="${c.id}" onclick="${clickAction}" title="${safeName}">
+      <span class="lir-ch-icon">${iconSvg(c.type||'text')}</span>
+      <span class="lir-ch-name">${safeName}</span>
+      ${badge}
+    </div>${membersHtml}`;
+  }).join('');
+
+  // idle-flash fix: this renderer is polled every few seconds. Skip the
+  // innerHTML rewrite (which tears down + recreates every row/avatar,
+  // causing a visible flash) when the rendered output hasn't changed.
+  if (listEl.dataset.lirSig === html) return;
+  listEl.dataset.lirSig = html;
+  listEl.innerHTML = html;
+}
+window._lirRenderChannels = _lirRenderChannels;
+
+/* Presence for a lobby member.
+   Members returned by the API carry NO status field — presence lives in
+   the WS-maintained `onlineUserIds` Set and `onlineUserStatus` Map (see
+   the "online-users" handler ~17876), which is what renderMembers() uses.
+   The rail was bucketing on `m.status`, which never exists, so every
+   member fell through to Offline permanently. */
+function _lirPresenceOf(m) {
+  if (!m) return 'offline';
+  if (m.voiceChannelId || m.voice_channel_id) return 'voice';
+  const id = (m.id != null) ? m.id : m.userId;
+  let ids = null, sts = null;
+  try { if (typeof onlineUserIds !== 'undefined') ids = onlineUserIds; } catch (e) {}
+  if (!ids) ids = window.onlineUserIds;
+  try { if (typeof onlineUserStatus !== 'undefined') sts = onlineUserStatus; } catch (e) {}
+  if (!sts) sts = window.onlineUserStatus;
+  if (!ids || typeof ids.has !== 'function' || !ids.has(id)) return 'offline';
+  const st = (sts && typeof sts.get === 'function') ? (sts.get(id) || 'online') : 'online';
+  return (st === 'away' || st === 'dnd') ? st : 'online';
+}
+window._lirPresenceOf = _lirPresenceOf;
+
+/* ═══════════════════════════════════════════════════════════════════
+   v4.1: Members renderer for the right rail.
+   Groups members by presence: In Voice → Online → Away → DND → Offline.
+   ═══════════════════════════════════════════════════════════════════ */
+function _lirRenderMembers() {
+  const listEl  = document.getElementById('lirMembersList');
+  const countEl = document.getElementById('lirMembersCount');
+  if (!listEl) return;
+
+  const members = Array.isArray(window.cachedServerMembers) ? window.cachedServerMembers : [];
+  if (countEl) countEl.textContent = String(members.length);
+
+  if (!members.length) {
+    listEl.innerHTML = '<div class="lir-empty">No members yet.</div>';
+    return;
+  }
+
+  const escAttr = s => String(s == null ? '' : s).replace(/&/g,'&amp;').replace(/"/g,'&quot;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+  const initials = n => (n||'?').trim().split(/\s+/).map(w=>w[0]||'').join('').slice(0,2).toUpperCase() || '?';
+
+  // Bucket members by presence (from onlineUserIds / onlineUserStatus)
+  const buckets = { voice: [], online: [], away: [], dnd: [], offline: [] };
+  for (const m of members) {
+    if (!m) continue;
+    buckets[_lirPresenceOf(m)].push(m);
+  }
+
+  // Sort each bucket alphabetically by display_name/username
+  Object.values(buckets).forEach(b => b.sort((a,c) => (a.display_name||a.username||'').localeCompare(c.display_name||c.username||'')));
+
+  const groupOrder = [
+    ['voice',   'In Voice'],
+    ['online',  'Online'],
+    ['away',    'Away'],
+    ['dnd',     'Do Not Disturb'],
+    ['offline', 'Offline'],
+  ];
+
+  // Member card — mirrors the tournament card's structure: title line,
+  // then a meta row carrying a status pill. The card's left rail is
+  // coloured from data-presence (see the MEMBER CARDS CSS block).
+  const PRESENCE_LABEL = {
+    voice: 'In Voice', online: 'Online', away: 'Away',
+    dnd: 'Do Not Disturb', offline: 'Offline'
+  };
+
+  function renderRow(m, key) {
+    const av = m.avatar_url || m.avatarUrl;
+    const nm = m.display_name || m.username || 'Unknown';
+    const inner = av ? `<img src="${escAttr(av)}" alt="">` : escAttr(initials(nm));
+    // Real presence — being in voice outranks the raw status, since
+    // someone in a call is the most present a member can be.
+    const presence = _lirPresenceOf(m);
+    const dotCls = (presence === 'voice') ? 'online' : presence;
+
+    // Secondary line: the member's lobby tag, plus their role when it's
+    // worth stating. Falls back to @handle / status message.
+    const tag = (typeof lobbyTagFromId === 'function')
+      ? (lobbyTagFromId(m.id != null ? m.id : m.userId) || '') : '';
+    const role = (m.role && m.role !== 'member') ? m.role : '';
+    const handle = (m.username && m.display_name && m.display_name !== m.username)
+      ? `@${m.username}` : '';
+    const sub = tag || handle || m.status_message || '';
+
+    // ── The member's personalised match card ──────────────────────
+    // Same data and the same "has the user actually customised this?"
+    // test the bracket uses (tournaments.js ~452), so untouched defaults
+    // fall back to the plain card instead of being treated as a style.
+    const _mid = (m.id != null) ? m.id : m.userId;
+    const card = m.tournamentCard
+      || (window._lirCardMap && window._lirCardMap[_mid])
+      || {};
+    const hasCard = !!(card.imageUrl
+      || (card.bgColour     && card.bgColour     !== '#2c3440')
+      || (card.borderColour && card.borderColour !== '#f9a8d4'));
+
+    let cardStyle = '';
+    let nameStyle = '';
+    if (hasCard) {
+      cardStyle = card.imageUrl
+        ? `background-image:url(${escAttr(card.imageUrl)});background-size:cover;background-position:${escAttr(card.bgPos || '50% 50%')};`
+        : `background-image:none;background-color:${escAttr(card.bgColour)};`;
+      cardStyle += `border-color:${escAttr(card.borderColour || '#f9a8d4')};`;
+      if (card.nameColour) nameStyle = `color:${escAttr(card.nameColour)};`;
+    }
+
+    const offClass = (key === 'offline') ? ' offline' : '';
+    return `<div class="lir-mem-row${offClass}${hasCard ? ' has-card' : ''}" data-presence="${presence}" style="${cardStyle}" onclick="if(typeof openProfilePanel==='function')openProfilePanel(${m.id||m.userId||0})" title="${escAttr(nm)}${role ? ' (' + escAttr(role) + ')' : ''}">
+      <div class="lir-mem-av">${inner}<span class="dot ${dotCls}"></span></div>
+      <div class="lir-mem-meta">
+        <div class="lir-mem-name" style="${nameStyle}">${escAttr(nm)}</div>
+        <div class="lir-mem-tags">
+          <span class="lir-mem-status ${presence}">${PRESENCE_LABEL[presence] || 'Offline'}</span>
+          ${role ? `<span class="lir-mem-role ${escAttr(role)}">${escAttr(role)}</span>` : ''}
+          ${sub ? `<span class="lir-mem-sub">${escAttr(sub)}</span>` : ''}
+        </div>
+      </div>
+    </div>`;
+  }
+
+  let html = '';
+  for (const [key, label] of groupOrder) {
+    const grp = buckets[key];
+    if (!grp.length) continue;
+    html += `<div class="lir-mem-group-label">${label}<span class="count">${grp.length}</span></div>`;
+    html += grp.slice(0, 50).map(m => renderRow(m, key)).join('');
+  }
+
+  // idle-flash fix: same signature-diff guard as _lirRenderChannels — this
+  // is polled every 4s, so skip the rewrite when nothing actually changed.
+  if (listEl.dataset.lirSig === html) return;
+  listEl.dataset.lirSig = html;
+  listEl.innerHTML = html;
+}
+window._lirRenderMembers = _lirRenderMembers;
+
+// Hook renderChannelList so right-rail Channels + Members stay in sync.
+(function hookChannelRender(){
+  if (typeof window.renderChannelList !== 'function') { setTimeout(hookChannelRender, 400); return; }
+  if (window._lirChannelHookInstalled) return;
+  window._lirChannelHookInstalled = true;
+  const orig = window.renderChannelList;
+  window.renderChannelList = function(channels, members, server) {
+    const r = orig.apply(this, arguments);
+    try { _lirRenderChannels(); } catch (e) { console.warn('[lir] channel render failed', e); }
+    try { _lirRenderMembers(); } catch (e) { console.warn('[lir] members render failed', e); }
+    return r;
+  };
+})();
+(function hookVoiceRender(){
+  if (typeof window.refreshChannelListVc !== 'function') { setTimeout(hookVoiceRender, 400); return; }
+  if (window._lirVcHookInstalled) return;
+  window._lirVcHookInstalled = true;
+  const orig = window.refreshChannelListVc;
+  window.refreshChannelListVc = function() {
+    const r = orig.apply(this, arguments);
+    try { _lirRenderChannels(); } catch (e) {}
+    try { _lirRenderMembers(); } catch (e) {}
+    return r;
+  };
+})();
+// Also re-render members on every presence update (updateOnlineDots fires
+// for every online-users WS message).
+(function hookOnlineDots(){
+  if (typeof window.updateOnlineDots !== 'function') {
+    // updateOnlineDots is a top-level function, not on window. Patch via
+    // setInterval-based polling: every 4 seconds, re-render members.
+    // 4s matches the existing inbox-badge cadence, so this is cheap.
+    if (window._lirMembersPoll) return;
+    window._lirMembersPoll = setInterval(() => {
+      try { _lirRenderMembers(); } catch (e) {}
+    }, 4000);
+    return;
+  }
+  if (window._lirOnlineHookInstalled) return;
+  window._lirOnlineHookInstalled = true;
+  const orig = window.updateOnlineDots;
+  window.updateOnlineDots = function() {
+    const r = orig.apply(this, arguments);
+    try { _lirRenderMembers(); } catch (e) {}
+    return r;
+  };
+})();
+// Render once now in case data is already loaded
+setTimeout(() => { try { _lirRenderMembers(); _lirRenderChannels(); } catch (e) {} }, 1500);
+
 function _lirRenderTourneys() {
   const listEl  = document.getElementById("lirTourneyList");
   const countEl = document.getElementById("lirTourneyCount");
@@ -31133,6 +31764,37 @@ async function _lirLoadTournaments(lobbyId) {
     // Store full list and reset filters
     window._lirTourneyAll = tournaments;
     window._lirTourneyFilter = { fmt: '', type: '', status: '' };
+
+    // ── Harvest match-card styles ────────────────────────────────
+    // The LIVE API (lobby-auth-server.onrender.com) does not return card
+    // data from /servers/:id/members, so this payload is the only source
+    // of other users' cards until that deploy lands. registeredPlayers[]
+    // already carries a full tournamentCard per player, so we build a
+    // userId → card map here at zero extra request cost.
+    if (!window._lirCardMap) window._lirCardMap = {};
+    let cardsChanged = false;
+    (tournaments || []).forEach(t => {
+      (t.registeredPlayers || []).forEach(p => {
+        if (!p || p.userId == null || !p.tournamentCard) return;
+        const prev = window._lirCardMap[p.userId];
+        if (!prev || JSON.stringify(prev) !== JSON.stringify(p.tournamentCard)) {
+          window._lirCardMap[p.userId] = p.tournamentCard;
+          cardsChanged = true;
+        }
+      });
+    });
+    // Our own card comes from /me, which always includes it.
+    try {
+      const meId = window.me && window.me.id;
+      const meCard = window.me && window.me.tournamentCard;
+      if (meId != null && meCard && !window._lirCardMap[meId]) {
+        window._lirCardMap[meId] = meCard;
+        cardsChanged = true;
+      }
+    } catch (e) {}
+    if (cardsChanged && typeof _lirRenderMembers === 'function') {
+      try { _lirRenderMembers(); } catch (e) {}
+    }
     // Reset all pills to "All"
     document.querySelectorAll('.lir-filter-pill').forEach(p => {
       p.classList.toggle('active', p.dataset.val === '');
@@ -38707,26 +39369,46 @@ setTimeout(() => { updateMyStatusUI(); }, 100);
     var url  = u && (u.avatar_url || u.avatar) || '';
     var init = (name.charAt(0) || 'U').toUpperCase();
 
-    if (url) {
-      av.innerHTML  = '<img src="' + _ppEsc(url) + '" alt="" style="width:100%;height:100%;object-fit:cover;border-radius:50%;display:block">';
-      if (hav) hav.innerHTML = '<img src="' + _ppEsc(url) + '" alt="" style="width:100%;height:100%;object-fit:cover;border-radius:50%;display:block">';
-    } else {
-      av.textContent = init;
-      if (hav) hav.textContent = init;
+    // Idle-flash fix: syncProfilePill runs on a 4s setInterval. Without
+    // these idempotency guards, every tick was rewriting the avatar
+    // innerHTML — which tears down + recreates the <img>, causing a
+    // visible flash. We now diff the rendered signature and skip writes
+    // when nothing changed. Functional behaviour is identical.
+    var avSig = url ? ('img:' + url) : ('init:' + init);
+    if (av.dataset.ppAvSig !== avSig) {
+      if (url) {
+        av.innerHTML = '<img src="' + _ppEsc(url) + '" alt="" style="width:100%;height:100%;object-fit:cover;border-radius:50%;display:block">';
+      } else {
+        av.textContent = init;
+      }
+      av.dataset.ppAvSig = avSig;
     }
-    if (lbl)   lbl.textContent   = name;
-    if (hname) hname.textContent = name;
+    if (hav && hav.dataset.ppAvSig !== avSig) {
+      if (url) {
+        hav.innerHTML = '<img src="' + _ppEsc(url) + '" alt="" style="width:100%;height:100%;object-fit:cover;border-radius:50%;display:block">';
+      } else {
+        hav.textContent = init;
+      }
+      hav.dataset.ppAvSig = avSig;
+    }
+    if (lbl   && lbl.textContent   !== name) lbl.textContent   = name;
+    if (hname && hname.textContent !== name) hname.textContent = name;
 
     // Banner — push the user's profile banner image / colour into
     // (a) CSS variables on the pill for the :hover background effect, and
     // (b) the ppHeaderBanner div inside the dropdown header.
     var bannerUrl    = u && (u.banner_url    || u.bannerUrl)    || '';
     var bannerColour = u && (u.banner_colour || u.banner_color || u.bannerColour) || '';
-    pill.style.setProperty('--tba-profile-banner-img',
-      bannerUrl ? 'url("' + bannerUrl.replace(/"/g, '\\"') + '")' : 'none');
-    pill.style.setProperty('--tba-profile-banner-color',
-      bannerColour || 'transparent');
-    if (hbanner) {
+    // Idle-flash fix: skip CSS writes when banner state is unchanged.
+    var bannerSig = 'b:' + bannerUrl + '|c:' + bannerColour;
+    if (pill.dataset.ppBannerSig !== bannerSig) {
+      pill.style.setProperty('--tba-profile-banner-img',
+        bannerUrl ? 'url("' + bannerUrl.replace(/"/g, '\\"') + '")' : 'none');
+      pill.style.setProperty('--tba-profile-banner-color',
+        bannerColour || 'transparent');
+      pill.dataset.ppBannerSig = bannerSig;
+    }
+    if (hbanner && hbanner.dataset.ppBannerSig !== bannerSig) {
       if (bannerUrl) {
         hbanner.style.backgroundImage = 'url("' + bannerUrl.replace(/"/g, '\\"') + '")';
         hbanner.style.backgroundColor = 'transparent';
@@ -38740,6 +39422,7 @@ setTimeout(() => { updateMyStatusUI(); }, 100);
         hbanner.style.backgroundColor = 'transparent';
         hbanner.style.opacity = '0';
       }
+      hbanner.dataset.ppBannerSig = bannerSig;
     }
 
     // Status
@@ -39039,7 +39722,7 @@ setTimeout(() => { updateMyStatusUI(); }, 100);
       };
     }
     // Sync periodically as a safety net for anyone who mutates `me` directly
-    setInterval(function() { window.syncProfilePill(); }, 4000);
+    setInterval(function() { window.syncProfilePill(); }, 30000); // idle-flash fix: 4s → 30s
   })();
 
   // ── Appearance accordion toggle ──────────────────────────────
@@ -43795,22 +44478,13 @@ body.voice-room-mode .vc-ctrl-btn.danger:hover{
     }
   }, 2500);
 
-  // Detect when we're inside a lobby channel and apply chamber-mode.
-  // We watch the chat panel's visibility + the active server's state.
-  function tickChamber(){
-    var lobby = window.coliseumGetLobby && window.coliseumGetLobby();
-    var chatVisible = !!(document.getElementById('chatPanel') && !document.getElementById('chatPanel').classList.contains('hidden'));
-    var coliseumOpen = document.body.classList.contains('coliseum-mode');
-    var inChamber = !!lobby && chatVisible && !coliseumOpen;
-    document.body.classList.toggle('chamber-mode', inChamber);
-
-    // Voice-room mode: when #vcPanel is visible (not hidden)
-    var vcEl = document.getElementById('vcPanel');
-    var vcVisible = !!(vcEl && !vcEl.classList.contains('hidden'));
-    document.body.classList.toggle('voice-room-mode', vcVisible && !coliseumOpen);
-  }
-  setInterval(tickChamber, 400);
-  tickChamber();
+  // chamber-mode / voice-room-mode toggling lives in the "Atelier glue"
+  // block's tickModes() (below, ~line 45109) — that's the single source of
+  // truth now. This block used to run its own competing tickChamber() timer
+  // on a different cadence with a different (DOM-lookup-based) truth source,
+  // which raced with tickModes() and caused chamber-mode to flicker on/off
+  // every few seconds — visible as a white flash from the backdrop-filter/
+  // background swap on .chat-header.
 
   console.log('[Chamber] initialized');
 })();
@@ -44516,21 +45190,22 @@ body.voice-room-mode .chamber-back{ top:12px; }
   patchLounges();
   setInterval(patchLounges, 1500);
 
-  // Ensure chamber-mode and voice-room-mode are accurate based on actual visible panels.
-  function tickModes(){
-    var coliseumOpen = document.body.classList.contains('coliseum-mode');
-    var chatPanel = $('chatPanel');
-    var vcPanel = $('vcPanel');
-    // chat-panel is visible when it doesn't have .hidden AND coliseum is closed
-    var chatVisible = !!(chatPanel && !chatPanel.classList.contains('hidden'));
-    var vcVisible = !!(vcPanel && !vcPanel.classList.contains('hidden'));
-    // We're in the Chamber when: a chat panel is visible AND we have a current channel-view
-    var inChannel = !!(window.currentView && window.currentView.type === 'channel');
-    document.body.classList.toggle('chamber-mode', !coliseumOpen && chatVisible && inChannel);
-    document.body.classList.toggle('voice-room-mode', !coliseumOpen && vcVisible);
-  }
-  setInterval(tickModes, 350);
-  tickModes();
+  // ── tickModes() REMOVED — this was the white flash. ──────────────
+  // It ran every 350ms and derived chamber-mode from
+  // `window.currentView`, which is NOT mirrored onto window in this file
+  // (currentView is a script-scoped global). So it always evaluated
+  // false and REMOVED chamber-mode on every tick — while tickModesV2
+  // (~line 45727, the DOM-based replacement whose own comment reads
+  // "Better mode detection — DOM based instead of window.currentView")
+  // ADDED it back 350ms later, forever.
+  //
+  // chamber-mode swaps .chat-main's whole background and the chat
+  // header's styling, so the class churning ~3x/second repainted the
+  // entire chat area continuously — which read as a random white flash
+  // "as though the page is refreshing".
+  //
+  // tickModesV2 is now the single owner of chamber-mode /
+  // voice-room-mode. Do not reintroduce a second writer.
 
   console.log('[Atelier] initialized');
 })();
@@ -45144,7 +45819,15 @@ body.voice-room-mode .chamber-nav{ display:inline-flex; }
   }
 
   // Better mode detection — DOM based instead of window.currentView
+  // SINGLE OWNER of chamber-mode / voice-room-mode. Never add a second
+  // periodic writer for these classes — two writers with different truth
+  // sources is exactly what caused the white flash (see the note where
+  // tickModes was removed, ~line 45100).
   function tickModesV2(){
+    // The bracket view deliberately clears chamber-mode to take the full
+    // area. Without this guard we'd re-add it 350ms later and reproduce
+    // the same flicker inside the bracket.
+    if (document.body.classList.contains('bracket-active')) return;
     var inChannel = isInLobbyChannel();
     var inVoice = isInVoiceCall();
     document.body.classList.toggle('chamber-mode', inChannel);
@@ -46151,6 +46834,995 @@ body.bracket-active .chamber-back{ display:none !important; }
   }
 
   console.log('[Atelier] theatre filters + bracket fix loaded');
+})();
+</script>
+
+
+<!-- ════════════════════════════════════════════════════════════════
+     ZOOM HUD — appears briefly when the user adjusts zoom with
+     Ctrl+Scroll, Ctrl+=, Ctrl+-, or Ctrl+0. Auto-fades after 1.4s.
+     ════════════════════════════════════════════════════════════ -->
+<div id="zoomHud" aria-live="polite">
+  <div class="zoom-hud-icon">
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/><line x1="11" y1="8" x2="11" y2="14"/><line x1="8" y1="11" x2="14" y2="11"/></svg>
+  </div>
+  <div class="zoom-hud-meta">
+    <div class="zoom-hud-pct" id="zoomHudPct">100%</div>
+    <div class="zoom-hud-bar"><div class="zoom-hud-fill" id="zoomHudFill"></div></div>
+  </div>
+  <div class="zoom-hud-hint"><kbd>Ctrl</kbd>+<kbd>0</kbd> reset</div>
+</div>
+<style>
+  #zoomHud {
+    position: fixed;
+    bottom: 56px;
+    left: 50%;
+    transform: translateX(-50%) translateY(8px);
+    display: flex; align-items: center; gap: 12px;
+    padding: 10px 16px;
+    background: linear-gradient(180deg,
+      rgba(28,28,38,.94) 0%,
+      rgba(18,18,28,.94) 100%);
+    border: 1px solid rgba(255,255,255,.08);
+    border-radius: 14px;
+    box-shadow:
+      0 1px 0 rgba(255,255,255,.06) inset,
+      0 12px 36px rgba(0,0,0,.6);
+    color: var(--text-1, #fff);
+    font-family: var(--font, -apple-system, BlinkMacSystemFont, sans-serif);
+    z-index: 99999;
+    pointer-events: none;
+    opacity: 0;
+    transition: opacity .18s ease, transform .25s cubic-bezier(.22,1,.36,1);
+    -webkit-app-region: no-drag;
+    min-width: 220px;
+  }
+  #zoomHud.show {
+    opacity: 1;
+    transform: translateX(-50%) translateY(0);
+  }
+  .zoom-hud-icon {
+    width: 30px; height: 30px;
+    border-radius: 9px;
+    background: color-mix(in srgb, var(--accent, #5865f2) 18%, transparent);
+    color: color-mix(in srgb, var(--accent, #5865f2) 95%, white);
+    display: flex; align-items: center; justify-content: center;
+    flex-shrink: 0;
+  }
+  .zoom-hud-meta {
+    display: flex; flex-direction: column; gap: 4px;
+    min-width: 90px;
+  }
+  .zoom-hud-pct {
+    font-size: 13px; font-weight: 800;
+    font-variant-numeric: tabular-nums;
+    color: var(--text-1, #fff);
+    line-height: 1;
+    letter-spacing: .2px;
+  }
+  .zoom-hud-bar {
+    height: 4px; border-radius: 2px;
+    background: rgba(255,255,255,.08);
+    overflow: hidden;
+    width: 100%;
+  }
+  .zoom-hud-fill {
+    height: 100%;
+    background: linear-gradient(90deg,
+      color-mix(in srgb, var(--accent, #5865f2) 90%, white),
+      var(--accent, #5865f2));
+    width: 33.3%;
+    transition: width .18s cubic-bezier(.22,1,.36,1);
+    border-radius: 2px;
+  }
+  .zoom-hud-hint {
+    font-size: 10px; font-weight: 700; letter-spacing: .6px;
+    text-transform: uppercase;
+    color: var(--text-3, #80848e);
+    display: flex; align-items: center; gap: 4px;
+  }
+  .zoom-hud-hint kbd {
+    background: rgba(255,255,255,.08);
+    border: 1px solid rgba(255,255,255,.1);
+    padding: 1px 5px; border-radius: 4px;
+    font-family: ui-monospace, SFMono-Regular, Consolas, monospace;
+    font-size: 9px; color: var(--text-2, #b9bbbe);
+  }
+</style>
+
+<script>
+/* ═══════════════════════════════════════════════════════════════════
+   ZOOM CONTROLLER — Ctrl+Scroll, Ctrl+=, Ctrl+-, Ctrl+0
+   Uses electronAPI.setZoomFactor when available (crisp, native), with
+   a CSS `zoom` fallback for browser-only contexts. Persists the user's
+   choice in localStorage so it sticks between sessions.
+   ═══════════════════════════════════════════════════════════════════ */
+(function(){
+  'use strict';
+  const MIN = 0.5, MAX = 2.0, STEP = 0.1;
+  const STORAGE_KEY = 'lobby_zoom_factor';
+  const hud = document.getElementById('zoomHud');
+  const pctEl = document.getElementById('zoomHudPct');
+  const fillEl = document.getElementById('zoomHudFill');
+  let hudTimer = null;
+  let currentZoom = 1.0;
+
+  function clamp(z) { return Math.max(MIN, Math.min(MAX, Math.round(z * 100) / 100)); }
+
+  function applyZoom(z) {
+    z = clamp(z);
+    currentZoom = z;
+    try {
+      if (window.electronAPI && typeof window.electronAPI.setZoomFactor === 'function') {
+        window.electronAPI.setZoomFactor(z);
+      } else {
+        // CSS fallback — works in dev / browser contexts
+        document.documentElement.style.zoom = String(z);
+      }
+    } catch (e) { console.warn('[zoom] setZoomFactor failed', e); }
+    try { localStorage.setItem(STORAGE_KEY, String(z)); } catch (e) {}
+    updateHud(z);
+  }
+
+  function updateHud(z) {
+    if (!hud || !pctEl || !fillEl) return;
+    pctEl.textContent = Math.round(z * 100) + '%';
+    // Fill bar: maps MIN..MAX → 0..100%
+    const pct = ((z - MIN) / (MAX - MIN)) * 100;
+    fillEl.style.width = pct.toFixed(1) + '%';
+    hud.classList.add('show');
+    if (hudTimer) clearTimeout(hudTimer);
+    hudTimer = setTimeout(() => hud.classList.remove('show'), 1400);
+  }
+
+  function readPersistedZoom() {
+    try {
+      const v = parseFloat(localStorage.getItem(STORAGE_KEY) || '1');
+      if (!Number.isFinite(v)) return 1;
+      return clamp(v);
+    } catch { return 1; }
+  }
+
+  // Bootstrap — restore persisted zoom on load (without showing the HUD)
+  function bootstrap() {
+    const z = readPersistedZoom();
+    currentZoom = z;
+    try {
+      if (window.electronAPI && typeof window.electronAPI.setZoomFactor === 'function') {
+        window.electronAPI.setZoomFactor(z);
+      } else if (z !== 1) {
+        document.documentElement.style.zoom = String(z);
+      }
+    } catch (e) {}
+  }
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', bootstrap, { once: true });
+  } else {
+    bootstrap();
+  }
+
+  // ── Ctrl+Scroll handler ────────────────────────────────────────
+  // Capture phase + passive:false so we can preventDefault and block
+  // the page from scrolling while the user is zooming.
+  window.addEventListener('wheel', function(e) {
+    if (!(e.ctrlKey || e.metaKey)) return;
+    e.preventDefault();
+    e.stopPropagation();
+    // deltaY > 0  = scroll down = zoom out
+    // deltaY < 0  = scroll up   = zoom in
+    const direction = e.deltaY > 0 ? -1 : 1;
+    applyZoom(currentZoom + direction * STEP);
+  }, { passive: false, capture: true });
+
+  // ── Keyboard shortcuts ─────────────────────────────────────────
+  window.addEventListener('keydown', function(e) {
+    if (!(e.ctrlKey || e.metaKey)) return;
+    // Ignore when the user is typing in an input/textarea/contenteditable
+    // (except for Ctrl+0 which is uncommon to type by accident)
+    const tag = (e.target && e.target.tagName || '').toLowerCase();
+    const isEditable = tag === 'input' || tag === 'textarea' ||
+                       (e.target && e.target.isContentEditable);
+    if (e.key === '=' || e.key === '+') {
+      if (isEditable && e.key !== '+') return;
+      e.preventDefault();
+      applyZoom(currentZoom + STEP);
+    } else if (e.key === '-' || e.key === '_') {
+      if (isEditable && e.key !== '_') return;
+      e.preventDefault();
+      applyZoom(currentZoom - STEP);
+    } else if (e.key === '0') {
+      if (isEditable) return;
+      e.preventDefault();
+      applyZoom(1.0);
+    }
+  }, { capture: true });
+
+  // Expose for debugging / external callers
+  window.zoomControl = {
+    set: applyZoom,
+    get: () => currentZoom,
+    reset: () => applyZoom(1.0),
+  };
+  console.log('[zoom] controller ready — Ctrl+Scroll, Ctrl+=, Ctrl+-, Ctrl+0');
+})();
+</script>
+
+<!-- ══════════════════════════════════════════════════════════════════
+     LOBBY VIEW REFRESH  (v5)
+     Direction B (slim hero, capped message column, real empty state,
+     Lobby Pulse) + Direction C's collapsible icon rail.
+     The top bar and server-icon row are deliberately NOT touched.
+     Self-contained layer — delete this block to revert everything.
+     ══════════════════════════════════════════════════════════════════ -->
+<style>
+:root{
+  --lir-w-full: 320px;
+  --lir-w-mini: 56px;
+  --lir-w: var(--lir-w-full);
+  /* No cap. Capping the column left everything to its right as dead space,
+     which is worse than long lines — especially on a wide window. The chat
+     fills the width it's given, like every other chat app. */
+  --lbv-col: 100%;
+}
+
+/* ── Rail width is driven by one variable so the chat reflows with it ── */
+body.feed-closed.lobby-selected #lobbyInfoRail{
+  width: var(--lir-w);
+  transition: transform .28s cubic-bezier(.16,1,.3,1),
+              width .26s cubic-bezier(.16,1,.3,1);
+}
+body.feed-closed.lobby-selected #chatPanel{
+  right: var(--lir-w) !important;
+  transition: right .26s cubic-bezier(.16,1,.3,1);
+}
+body.lir-collapsed{ --lir-w: var(--lir-w-mini); }
+
+/* ── The mini icon rail (Direction C) ─────────────────────────────── */
+#lirMini{ display:none; }
+body.lir-collapsed #lirMini{
+  display:flex; flex-direction:column; align-items:center;
+  gap:6px; padding:10px 0 12px; height:100%; overflow:hidden;
+}
+body.lir-collapsed .lir-header,
+body.lir-collapsed .lir-scroll,
+body.lir-collapsed #lirHofFooter{ display:none !important; }
+
+.lirm-btn{
+  position:relative; width:34px; height:34px; flex:none;
+  display:grid; place-items:center; cursor:pointer;
+  border-radius:9px; border:1px solid rgba(255,255,255,.07);
+  background:rgba(255,255,255,.035); color:var(--text-3);
+  transition:background .16s, color .16s, border-color .16s, transform .16s;
+}
+.lirm-btn svg{ width:15px; height:15px; }
+.lirm-btn:hover{
+  background:color-mix(in srgb, var(--accent) 16%, transparent);
+  border-color:color-mix(in srgb, var(--accent) 45%, transparent);
+  color:var(--text-1); transform:translateY(-1px);
+}
+.lirm-btn:focus-visible{ outline:2px solid var(--accent); outline-offset:2px; }
+.lirm-btn.is-empty{ opacity:.4; }
+.lirm-btn.gold{
+  color:#FFD700; border-color:rgba(255,215,0,.34);
+  background:linear-gradient(135deg, rgba(184,134,11,.22), rgba(240,178,50,.1));
+}
+.lirm-btn.gold:hover{ border-color:rgba(255,215,0,.62); background:rgba(240,178,50,.24); }
+.lirm-badge{
+  position:absolute; top:-4px; right:-4px; min-width:15px; height:15px;
+  padding:0 4px; border-radius:99px; background:var(--accent); color:var(--bg-0);
+  font-family:var(--font); font-size:9px; font-weight:900; line-height:15px;
+  text-align:center; box-shadow:0 0 0 2px var(--bg-1);
+}
+.lirm-badge.green{ background:var(--green); color:#fff; }
+.lirm-sp{ flex:1; }
+.lirm-div{ width:22px; height:1px; background:rgba(255,255,255,.09); flex:none; margin:2px 0; }
+
+/* Collapse / expand affordance in the expanded rail header */
+#lirCollapseBtn{
+  position:absolute; top:10px; right:10px; z-index:5;
+  width:26px; height:26px; display:grid; place-items:center; cursor:pointer;
+  border-radius:7px; border:1px solid rgba(255,255,255,.08);
+  background:rgba(255,255,255,.04); color:var(--text-3);
+  transition:background .16s, color .16s, transform .16s;
+}
+#lirCollapseBtn:hover{ background:rgba(255,255,255,.1); color:var(--text-1); }
+#lirCollapseBtn:focus-visible{ outline:2px solid var(--accent); outline-offset:2px; }
+body.lir-collapsed #lirCollapseBtn{ display:none; }
+
+/* ══ ALIGNMENT ══════════════════════════════════════════════════════
+   ONE gutter for the whole chat column. .message-group already ships
+   with padding:3px 20px, so 20px is the number every other element in
+   this view adopts — hero, pulse and composer included. Nothing here is
+   allowed to invent its own inset; that mismatch is what made the view
+   look like the pieces belonged to different screens. */
+:root{ --lbv-gut: 20px; }
+
+/* ══ NO BACKDROP-FILTER IN THE CHAT VIEW ════════════════════════════
+   This file's own history records backdrop-filter causing white flashes
+   here repeatedly ("v3.2 unflash: removed backdrop-filter — it caused
+   white flashes during..."). Two large blurred layers were still live on
+   this exact view: .chat-ribbon at blur(28px) and the composer at
+   blur(24px). A blurred layer that size is re-rastered constantly and is
+   the remaining candidate for the flash. Opaque surfaces also read far
+   cleaner than frosted slabs at this scale. */
+body.lobby-selected .chat-ribbon,
+body.lobby-selected .chat-main .chat-input-box,
+body.lobby-selected .chat-main .chat-input-wrap,
+body.lobby-selected .messages,
+body.lobby-selected .message-group,
+body.lobby-selected .msg-quick-actions,
+body.lobby-selected .ch-hero{
+  backdrop-filter:none !important;
+  -webkit-backdrop-filter:none !important;
+}
+
+/* ══ CHANNEL HERO — flush under the nav ═════════════════════════════
+   .messages carried padding-top:18px (from the rail rule at ~8649) on
+   top of its own 14px. That stacked inset is what opened the gap between
+   the nav and the channel name. The hero now sits flush and sets its own
+   rhythm. */
+body.lobby-selected .chat-main .messages{ padding-top:0 !important; }
+
+body.lobby-selected .ch-hero{
+  position:sticky; top:0; z-index:6;
+  margin:0 0 6px !important;
+  padding:0 var(--lbv-gut) !important;
+  height:46px; min-height:46px !important;
+  display:flex !important; align-items:center !important;
+  border:0 !important;
+  border-bottom:1px solid rgba(255,255,255,.055) !important;
+  border-radius:0 !important;
+  background:var(--bg-0) !important;      /* opaque — nothing bleeds through */
+  box-shadow:none !important;
+}
+body.lobby-selected .ch-hero::before,
+body.lobby-selected .ch-hero::after{ display:none !important; }
+body.lobby-selected .ch-hero-row{
+  display:flex !important; align-items:center !important;
+  gap:9px !important; width:100%; min-width:0;
+}
+body.lobby-selected .ch-hero-emblem{
+  width:22px !important; height:22px !important;
+  border-radius:6px !important; flex:none;
+  background:color-mix(in srgb, var(--accent) 16%, transparent) !important;
+  border:1px solid color-mix(in srgb, var(--accent) 30%, transparent) !important;
+  color:var(--accent) !important; box-shadow:none !important;
+}
+body.lobby-selected .ch-hero-emblem svg{ width:12px !important; height:12px !important; }
+body.lobby-selected .ch-hero-emblem::before,
+body.lobby-selected .ch-hero-emblem::after{ display:none !important; }
+body.lobby-selected .ch-hero-meta{
+  display:flex !important; flex-direction:row !important;
+  align-items:baseline !important; gap:0 !important; flex:1; min-width:0;
+}
+body.lobby-selected .ch-hero-name{
+  order:1; margin:0 !important; line-height:1 !important;
+  font-family:'Bebas Neue', var(--font), sans-serif;
+  font-size:19px !important; letter-spacing:.6px; color:var(--text-1) !important;
+}
+body.lobby-selected .ch-hero-topic{ display:none !important; }
+
+/* Meta reads as quiet running text, not a row of pills. Bordered chips at
+   9px stack up as visual noise — the eye should land on the channel name
+   first and find the counts only when it looks for them. */
+body.lobby-selected .ch-hero-eyebrow{
+  order:2; margin:0 0 0 12px !important;
+  font-family:var(--font); font-size:9px !important; font-weight:800;
+  letter-spacing:1.4px; text-transform:uppercase; color:var(--text-3) !important;
+  background:none !important; border:0 !important; padding:0 !important;
+}
+/* Stats sit with the name, not flung to the far edge. margin-left:auto
+   opened a canyon between the channel name and the counts on a wide
+   window — the header read as two unrelated fragments. */
+body.lobby-selected .ch-hero-stats{
+  order:3; display:flex !important; align-items:baseline !important;
+  gap:0 !important; margin:0 0 0 4px !important;
+}
+body.lobby-selected .ch-hero-stat{
+  font-family:var(--font); font-size:9px !important; font-weight:800;
+  letter-spacing:1.3px; text-transform:uppercase; color:var(--text-3) !important;
+  background:none !important; border:0 !important;
+  padding:0 0 0 16px !important; position:relative;
+}
+body.lobby-selected .ch-hero-stat + .ch-hero-stat::before{
+  content:''; position:absolute; left:8px; top:50%;
+  width:2px; height:2px; border-radius:50%; background:var(--text-3);
+  opacity:.5; transform:translateY(-50%);
+}
+body.lobby-selected .ch-hero-stat b{
+  font-size:11px !important; color:var(--text-2);
+  font-variant-numeric:tabular-nums;
+}
+body.lobby-selected .ch-hero-stat svg{ display:none !important; }
+
+/* ══ MESSAGE COLUMN ═════════════════════════════════════════════════
+   Left-anchored, not centred: a centred column reads as a document, not
+   a chat log. Capped so lines don't run the full 1900px. */
+body.lobby-selected .messages > *:not(.ch-hero){
+  max-width: var(--lbv-col);
+  margin-left:0 !important; margin-right:auto !important;
+  width:100%;
+}
+body.lobby-selected .message-group{
+  padding-left:var(--lbv-gut) !important;
+  padding-right:var(--lbv-gut) !important;
+}
+
+/* ══ OWN MESSAGES ═══════════════════════════════════════════════════
+   The previous treatment put a tinted, bordered box around .msg-content
+   only — which read as a stray outline floating inside the row, not as
+   authorship. Instead the whole row is claimed: a 2px accent rail on the
+   left edge plus a faint accent wash. Familiar (it's a highlighted row,
+   not a speech bubble) and unmistakable at a glance. */
+body.lobby-selected .message-group.msg-me{
+  background:color-mix(in srgb, var(--accent) 6%, transparent) !important;
+  box-shadow:inset 2px 0 0 color-mix(in srgb, var(--accent) 70%, transparent) !important;
+}
+body.lobby-selected .message-group.msg-me:hover{
+  background:color-mix(in srgb, var(--accent) 10%, transparent) !important;
+}
+body.lobby-selected .message-group.msg-me .msg-content{
+  background:none !important; border:0 !important;
+  box-shadow:none !important; padding:0 !important;
+  color:var(--text-1) !important;
+}
+
+/* ══ COMPOSER ═══════════════════════════════════════════════════════
+   Was a frosted, heavily-shadowed 18px-radius slab spanning the full
+   width, floating free of everything above it. Now opaque, on the same
+   gutter and the same measure as the messages, with a restrained focus
+   state instead of a permanent glow. */
+body.lobby-selected .chat-main .chat-input-wrap{
+  padding:6px var(--lbv-gut) 14px !important;
+  background:none !important; box-shadow:none !important;
+}
+body.lobby-selected .chat-main .chat-input-box{
+  max-width:var(--lbv-col); margin:0 !important;
+  background:var(--bg-1) !important;
+  border:1px solid rgba(255,255,255,.08) !important;
+  border-radius:10px !important;
+  padding:6px 6px 6px 12px !important;
+  box-shadow:none !important;
+  transition:border-color .18s ease, background .18s ease;
+}
+body.lobby-selected .chat-main .chat-input-box:focus-within{
+  border-color:color-mix(in srgb, var(--accent) 45%, transparent) !important;
+  background:var(--bg-2) !important;
+}
+
+/* ── Real empty state for a quiet room ───────────────────────────── */
+.lbv-empty{
+  display:flex; flex-direction:column; align-items:center; justify-content:center;
+  gap:10px; text-align:center; padding:38px 20px 30px; margin:0 auto;
+  max-width:var(--lbv-col);
+}
+.lbv-empty-ico{
+  width:56px; height:56px; border-radius:16px; display:grid; place-items:center;
+  background:color-mix(in srgb, var(--accent) 12%, transparent);
+  border:1px solid color-mix(in srgb, var(--accent) 26%, transparent);
+  color:var(--accent);
+}
+.lbv-empty-ico svg{ width:24px; height:24px; }
+.lbv-empty-t{
+  font-family:'Bebas Neue', var(--font), sans-serif;
+  font-size:21px; letter-spacing:1px; color:var(--text-1); line-height:1;
+}
+.lbv-empty-s{
+  font-family:var(--font); font-size:12.5px; line-height:1.55;
+  color:var(--text-3); max-width:34ch; margin:0;
+}
+.lbv-empty-acts{ display:flex; gap:8px; margin-top:4px; flex-wrap:wrap; justify-content:center; }
+.lbv-empty-btn{
+  font-family:var(--font); font-size:10px; font-weight:900; letter-spacing:1.2px;
+  text-transform:uppercase; cursor:pointer; padding:8px 14px; border-radius:8px;
+  background:color-mix(in srgb, var(--accent) 18%, transparent);
+  border:1px solid color-mix(in srgb, var(--accent) 42%, transparent);
+  color:var(--accent); transition:background .16s, transform .16s, border-color .16s;
+}
+.lbv-empty-btn:hover{
+  background:color-mix(in srgb, var(--accent) 30%, transparent);
+  border-color:color-mix(in srgb, var(--accent) 65%, transparent);
+  transform:translateY(-1px);
+}
+.lbv-empty-btn.ghost{
+  background:rgba(255,255,255,.04); border-color:rgba(255,255,255,.1); color:var(--text-2);
+}
+.lbv-empty-btn.ghost:hover{ background:rgba(255,255,255,.09); }
+.lbv-empty-btn:focus-visible{ outline:2px solid var(--accent); outline-offset:2px; }
+
+/* ══ LOBBY PULSE ════════════════════════════════════════════════════
+   Four bordered cards with 20px display numerals read as a dashboard
+   bolted onto a chat window — far too loud for a strip that sits
+   directly above the composer, and it fought the composer for weight.
+   It's now a single quiet line on the same gutter: small-caps label,
+   tabular value, hairline dividers. There when you look for it, silent
+   when you don't. */
+#lobbyPulse{
+  flex:none;
+  padding:7px var(--lbv-gut) 8px;
+  background:none;
+  border-top:1px solid rgba(255,255,255,.045);
+}
+/* The row is self-evident — a "LOBBY PULSE" header doubled its height. */
+.lbp-h{ display:none; }
+.lbp-row{
+  display:flex; align-items:baseline; gap:0;
+  max-width:var(--lbv-col); flex-wrap:wrap;
+}
+.lbp-card{
+  display:flex; align-items:baseline; gap:7px;
+  margin-right:20px; padding:0; position:relative;
+  background:none; border:0; border-radius:0;
+}
+.lbp-card + .lbp-card::before{
+  content:''; position:absolute; left:-10px; top:0;
+  width:1px; height:10px; background:rgba(255,255,255,.1);
+}
+.lbp-card:last-child{ margin-right:0; }
+.lbp-l{
+  font-family:var(--font); font-size:9px; font-weight:800; letter-spacing:1.3px;
+  text-transform:uppercase; color:var(--text-3); white-space:nowrap;
+}
+.lbp-v{
+  font-family:var(--font); font-size:12px; font-weight:800; line-height:1;
+  color:var(--text-2); font-variant-numeric:tabular-nums; white-space:nowrap;
+}
+.lbp-v .of{ color:var(--text-3); font-weight:600; }
+.lbp-v.sm{ font-size:11px; font-weight:700; color:var(--text-3); }
+.lbp-v.acc{ color:var(--accent); }
+.lbp-v.grn{ color:var(--green); }
+.lbp-v.gld{ color:#f0b232; }
+
+/* ══ MEMBER CARDS ═══════════════════════════════════════════════════
+   Adopts the tournament card's language — gradient fill, hairline frame,
+   a 3px rail on the left edge, lift-and-slide on hover — so the rail
+   reads as one family instead of cards in one section and bare rows in
+   the next. The rail colour encodes PRESENCE here, exactly as the
+   tournament card's rail encodes tournament status, so the same visual
+   device carries the same kind of meaning in both places. */
+#lobbyInfoRail .lir-mem-row{
+  position:relative; overflow:hidden;
+  display:flex; align-items:center; gap:10px;
+  padding:9px 11px 9px 14px; margin:0 0 6px;
+  border-radius:10px;
+  background:linear-gradient(135deg,
+    color-mix(in srgb, var(--accent) 6%, rgba(255,255,255,.02)),
+    rgba(255,255,255,.015));
+  border:1px solid rgba(255,255,255,.05);
+  /* The presence rail is an INSET SHADOW, not border-left, so a member's
+     own card border colour can own all four sides without wiping it. */
+  box-shadow:inset 3px 0 0 var(--mem-rail, rgba(255,255,255,.1)),
+             0 2px 6px rgba(0,0,0,.18);
+  transition:background .18s, transform .15s, box-shadow .18s,
+             border-color .18s, opacity .18s;
+}
+#lobbyInfoRail .lir-mem-row:hover{
+  background:linear-gradient(135deg,
+    color-mix(in srgb, var(--accent) 14%, rgba(255,255,255,.03)),
+    rgba(255,255,255,.03));
+  transform:translateX(3px);
+  box-shadow:inset 3px 0 0 var(--mem-rail, rgba(255,255,255,.1)),
+             0 6px 16px rgba(0,0,0,.28),
+             0 0 18px color-mix(in srgb, var(--accent) 18%, transparent);
+}
+
+/* ── The member's personalised match card ─────────────────────────
+   Image / colours come in as inline style from renderRow. A scrim keeps
+   the name and pills legible over arbitrary user artwork — the bracket
+   gets away with just a text-shadow on a small card, but a full-width
+   row over a busy GIF needs more. */
+#lobbyInfoRail .lir-mem-row.has-card::before{
+  content:''; position:absolute; inset:0; pointer-events:none;
+  background:linear-gradient(90deg,
+    rgba(0,0,0,.78) 0%, rgba(0,0,0,.55) 50%, rgba(0,0,0,.3) 100%);
+  transition:background .18s;
+}
+#lobbyInfoRail .lir-mem-row.has-card > *{ position:relative; z-index:1; }
+#lobbyInfoRail .lir-mem-row.has-card .lir-mem-name{
+  text-shadow:0 1px 4px rgba(0,0,0,.85);
+}
+#lobbyInfoRail .lir-mem-row.has-card .lir-mem-sub{
+  color:rgba(255,255,255,.75); text-shadow:0 1px 3px rgba(0,0,0,.85);
+}
+/* The inline background wins over any hover rule, so hover feedback on a
+   custom card comes from lifting the scrim instead. */
+#lobbyInfoRail .lir-mem-row.has-card:hover::before{
+  background:linear-gradient(90deg,
+    rgba(0,0,0,.66) 0%, rgba(0,0,0,.4) 50%, rgba(0,0,0,.15) 100%);
+}
+
+/* Presence drives the left rail */
+#lobbyInfoRail .lir-mem-row[data-presence="voice"]  { --mem-rail:#4caf50; }
+#lobbyInfoRail .lir-mem-row[data-presence="online"] { --mem-rail:var(--green); }
+#lobbyInfoRail .lir-mem-row[data-presence="away"]   { --mem-rail:#faa61a; }
+#lobbyInfoRail .lir-mem-row[data-presence="dnd"]    { --mem-rail:var(--danger); }
+#lobbyInfoRail .lir-mem-row[data-presence="offline"]{ --mem-rail:rgba(255,255,255,.1); }
+
+#lobbyInfoRail .lir-mem-name{
+  font-family:var(--font);
+  font-size:12.5px; font-weight:800; color:#fff; letter-spacing:.1px;
+  margin-bottom:4px;
+  overflow:hidden; text-overflow:ellipsis; white-space:nowrap;
+}
+#lobbyInfoRail .lir-mem-tags{
+  display:flex; align-items:center; gap:6px; min-width:0;
+}
+#lobbyInfoRail .lir-mem-sub{
+  font-size:10px; color:var(--text-3); font-weight:700; letter-spacing:.4px;
+  overflow:hidden; text-overflow:ellipsis; white-space:nowrap; min-width:0;
+}
+
+/* Status pill — same shape and weight as .lir-tourney-status */
+#lobbyInfoRail .lir-mem-status{
+  font-family:var(--font);
+  font-size:8.5px; font-weight:900; text-transform:uppercase; letter-spacing:1.2px;
+  padding:2px 7px; border-radius:99px; border:1px solid transparent;
+  white-space:nowrap; flex:none;
+}
+#lobbyInfoRail .lir-mem-status.voice,
+#lobbyInfoRail .lir-mem-status.online{
+  background:rgba(76,175,80,.18); border-color:rgba(76,175,80,.4); color:#7fcd84;
+}
+/* Reuses the tournament card's live-pulse dot for anyone actually here */
+#lobbyInfoRail .lir-mem-status.voice::before,
+#lobbyInfoRail .lir-mem-status.online::before{
+  content:''; display:inline-block;
+  width:5px; height:5px; border-radius:50%;
+  background:#4caf50; box-shadow:0 0 6px #4caf50;
+  margin-right:5px; vertical-align:middle;
+  animation:tourneyLivePulse 1.4s ease-in-out infinite;
+}
+#lobbyInfoRail .lir-mem-status.away{
+  background:rgba(250,166,26,.16); border-color:rgba(250,166,26,.38); color:#f0b45f;
+}
+#lobbyInfoRail .lir-mem-status.dnd{
+  background:rgba(237,66,69,.16); border-color:rgba(237,66,69,.38); color:#f08a8c;
+}
+#lobbyInfoRail .lir-mem-status.offline{
+  background:rgba(255,255,255,.05); border-color:rgba(255,255,255,.1); color:var(--text-3);
+}
+
+/* Role pill — only rendered for owner / moderator, so it stays meaningful
+   rather than tagging every member with "MEMBER". */
+#lobbyInfoRail .lir-mem-role{
+  font-family:var(--font);
+  font-size:8.5px; font-weight:900; text-transform:uppercase; letter-spacing:1.2px;
+  padding:2px 7px; border-radius:99px; white-space:nowrap; flex:none;
+  background:color-mix(in srgb, var(--accent) 14%, transparent);
+  border:1px solid color-mix(in srgb, var(--accent) 34%, transparent);
+  color:color-mix(in srgb, var(--accent) 95%, white);
+}
+#lobbyInfoRail .lir-mem-role.owner{
+  background:rgba(240,178,50,.16);
+  border-color:rgba(240,178,50,.38);
+  color:#f0b232;
+}
+
+/* Offline keeps the same shape but recedes, and comes back on hover. */
+#lobbyInfoRail .lir-mem-row.offline{ opacity:.62; }
+#lobbyInfoRail .lir-mem-row.offline:hover{ opacity:1; }
+#lobbyInfoRail .lir-mem-row.offline .lir-mem-name{ color:var(--text-2); }
+
+#lobbyInfoRail .lir-mem-group-label{
+  color:var(--text-3); font-weight:900; letter-spacing:1.5px;
+}
+
+@media (prefers-reduced-motion: reduce){
+  #lobbyInfoRail .lir-mem-status::before{ animation:none !important; }
+  #lobbyInfoRail .lir-mem-row{ transition:none !important; }
+}
+
+/* ── Section label contrast (was all one grey) ───────────────────── */
+#lobbyInfoRail .lir-section-title{ color:var(--text-2); }
+#lobbyInfoRail .lir-section-title.lir-collapsible:hover{ color:var(--text-1); }
+
+/* Sections auto-hidden when they hold nothing */
+#lobbyInfoRail .lir-section.lbv-hide{ display:none; }
+
+@media (prefers-reduced-motion: reduce){
+  #lobbyInfoRail, #chatPanel, .lirm-btn, .lbv-empty-btn{ transition:none !important; }
+}
+</style>
+
+<script>
+/* ══════════════════════════════════════════════════════════════════
+   LOBBY VIEW REFRESH — behaviour
+   Everything here is event-driven (MutationObserver) with signature
+   guards. Deliberately NO polling that rewrites DOM: unconditional
+   interval re-renders are what caused the historic flash bugs.
+   ══════════════════════════════════════════════════════════════════ */
+(function () {
+  'use strict';
+
+  var SECTIONS = [
+    { key:'channels', label:'Lounges',     count:'lirChannelsCount' },
+    { key:'members',  label:'Members',     count:'lirMembersCount', green:true },
+    { key:'pinned',   label:'Pinned',      count:'lirPinCount',     hideEmpty:true },
+    { key:'files',    label:'Files',       count:'lirFilesCount',   hideEmpty:true },
+    { key:'events',   label:'Upcoming',    count:'lirEventCount',   hideEmpty:true },
+    { key:'tourney',  label:'Tournaments', count:'lirTourneyCount' }
+  ];
+
+  var ICONS = {
+    channels:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><line x1="9" y1="3" x2="7" y2="21"/><line x1="17" y1="3" x2="15" y2="21"/><line x1="3" y1="9" x2="21" y2="9"/><line x1="3" y1="15" x2="21" y2="15"/></svg>',
+    members:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/></svg>',
+    pinned:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="17" x2="12" y2="22"/><path d="M5 17h14l-1.7-3.4a2 2 0 0 1-.3-1V4H7v8.6a2 2 0 0 1-.3 1L5 17z"/></svg>',
+    files:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>',
+    events:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>',
+    tourney:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>',
+    hof:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 9H4.5a2.5 2.5 0 0 1 0-5H6"/><path d="M18 9h1.5a2.5 2.5 0 0 0 0-5H18"/><path d="M4 22h16"/><path d="M10 14.66V17c0 .55-.47.98-.97 1.21C7.85 18.75 7 20.24 7 22"/><path d="M14 14.66V17c0 .55.47.98.97 1.21C16.15 18.75 17 20.24 17 22"/><path d="M18 2H6v7a6 6 0 0 0 12 0V2Z"/></svg>',
+    collapse:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><polyline points="13 17 18 12 13 7"/><polyline points="6 17 11 12 6 7"/></svg>'
+  };
+
+  function $(id){ return document.getElementById(id); }
+  function countOf(id){
+    var el = $(id); if (!el) return 0;
+    var n = parseInt(String(el.textContent).replace(/\D/g,''), 10);
+    return isNaN(n) ? 0 : n;
+  }
+
+  /* currentView is a script-scoped global in this file and is NOT reliably
+     mirrored onto window — reading only window.currentView silently made the
+     Pulse strip and the empty state never render. Try the lexical global
+     first, then fall back to the window copy. */
+  function getView(){
+    try { if (typeof currentView !== 'undefined' && currentView) return currentView; } catch(e){}
+    return window.currentView || null;
+  }
+
+  /* ── Collapse state ─────────────────────────────────────────── */
+  var KEY = 'lobbyRailCollapsed';
+  function isCollapsed(){
+    // Direction C: the rail starts as the slim icon strip. The choice is
+    // remembered once the user expands or collapses it themselves.
+    try {
+      var v = localStorage.getItem(KEY);
+      return v === null ? true : v === '1';
+    } catch(e){ return true; }
+  }
+  function setCollapsed(v){
+    document.body.classList.toggle('lir-collapsed', !!v);
+    try { localStorage.setItem(KEY, v ? '1' : '0'); } catch(e){}
+    if (!v) syncMini();
+  }
+  window.lobbyRailToggle = function(){ setCollapsed(!document.body.classList.contains('lir-collapsed')); };
+
+  /* ── Build the mini icon rail + the collapse button ─────────── */
+  function build(){
+    var rail = $('lobbyInfoRail');
+    if (!rail || $('lirMini')) return;
+
+    var mini = document.createElement('div');
+    mini.id = 'lirMini';
+
+    var html = '<button class="lirm-btn" data-lirm="expand" title="Expand rail" aria-label="Expand rail">' +
+               '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round">' +
+               '<polyline points="11 17 6 12 11 7"/><polyline points="18 17 13 12 18 7"/></svg></button>' +
+               '<div class="lirm-div"></div>';
+
+    SECTIONS.forEach(function(s){
+      html += '<button class="lirm-btn" data-lirm="' + s.key + '" title="' + s.label + '" aria-label="' + s.label + '">' +
+              ICONS[s.key] + '<span class="lirm-badge' + (s.green ? ' green' : '') +
+              '" data-badge="' + s.key + '" hidden></span></button>';
+    });
+
+    html += '<div class="lirm-sp"></div>' +
+            '<button class="lirm-btn gold" data-lirm="hof" title="Hall of Fame" aria-label="Hall of Fame">' +
+            ICONS.hof + '</button>';
+
+    mini.innerHTML = html;
+    rail.insertBefore(mini, rail.firstChild);
+
+    mini.addEventListener('click', function(e){
+      var btn = e.target.closest('.lirm-btn'); if (!btn) return;
+      var k = btn.dataset.lirm;
+      if (k === 'expand'){ setCollapsed(false); return; }
+      if (k === 'hof'){
+        if (typeof window.toggleHofPanel === 'function') window.toggleHofPanel();
+        return;
+      }
+      // Expand the rail and reveal that section, even if it's empty.
+      setCollapsed(false);
+      revealSection(k);
+    });
+
+    // Collapse control inside the expanded header
+    if (!$('lirCollapseBtn')){
+      var cb = document.createElement('button');
+      cb.id = 'lirCollapseBtn';
+      cb.type = 'button';
+      cb.title = 'Collapse rail';
+      cb.setAttribute('aria-label','Collapse rail');
+      cb.innerHTML = ICONS.collapse;
+      cb.addEventListener('click', function(){ setCollapsed(true); });
+      rail.appendChild(cb);
+    }
+  }
+
+  /* Expand a section by key and scroll it into view. */
+  function revealSection(key){
+    var body = $('lir' + key.charAt(0).toUpperCase() + key.slice(1) + 'Body');
+    if (!body) return;
+    var sec = body.closest('.lir-section');
+    if (sec) sec.classList.remove('lbv-hide');
+    body.classList.remove('collapsed');
+    var title = sec && sec.querySelector('.lir-section-title');
+    if (title) title.classList.remove('collapsed');
+    if (sec && sec.scrollIntoView) {
+      try { sec.scrollIntoView({ block:'nearest', behavior:'smooth' }); } catch(e){ sec.scrollIntoView(); }
+    }
+  }
+
+  /* ── Keep mini badges + empty-section hiding in sync ────────── */
+  var lastSig = '';
+  function syncMini(){
+    var sig = SECTIONS.map(function(s){ return countOf(s.count); }).join('|');
+    if (sig === lastSig) return;         // signature guard — no needless writes
+    lastSig = sig;
+
+    SECTIONS.forEach(function(s){
+      var n = countOf(s.count);
+      var badge = document.querySelector('[data-badge="' + s.key + '"]');
+      if (badge){
+        if (n > 0){ badge.textContent = n > 99 ? '99+' : String(n); badge.hidden = false; }
+        else badge.hidden = true;
+      }
+      var btn = document.querySelector('.lirm-btn[data-lirm="' + s.key + '"]');
+      if (btn) btn.classList.toggle('is-empty', n === 0);
+
+      // Hide the zero-count noise sections in the expanded rail.
+      if (s.hideEmpty){
+        var body = $('lir' + s.key.charAt(0).toUpperCase() + s.key.slice(1) + 'Body');
+        var sec = body && body.closest('.lir-section');
+        if (sec) sec.classList.toggle('lbv-hide', n === 0);
+      }
+    });
+  }
+
+  /* ── Lobby Pulse ────────────────────────────────────────────── */
+  var pulseSig = '';
+  function pulseStats(){
+    var members = Array.isArray(window.cachedServerMembers) ? window.cachedServerMembers : [];
+    var online = 0, inVoice = 0;
+    // m.status doesn't exist on lobby members — presence comes from
+    // _lirPresenceOf (onlineUserIds / onlineUserStatus). Counting on
+    // m.status is why this always read 0.
+    members.forEach(function(m){
+      if (!m) return;
+      var p = (typeof window._lirPresenceOf === 'function')
+        ? window._lirPresenceOf(m) : 'offline';
+      if (p === 'voice') inVoice++;
+      if (p !== 'offline') online++;
+    });
+    return {
+      online: online,
+      total: members.length,
+      voice: inVoice,
+      tourneys: countOf('lirTourneyCount'),
+      events: countOf('lirEventCount')
+    };
+  }
+
+  function renderPulse(){
+    var main = $('chatMain');
+    if (!main) return;
+
+    var view = getView();
+    var inChannel = !!(view && view.type === 'channel');
+    var host = $('lobbyPulse');
+
+    // Only in a lobby channel — never in DMs.
+    if (!inChannel || !document.body.classList.contains('lobby-selected')){
+      if (host) host.remove();
+      pulseSig = '';
+      return;
+    }
+
+    var wrap = main.querySelector('.chat-input-wrap');
+    if (!host){
+      host = document.createElement('div');
+      host.id = 'lobbyPulse';
+      if (wrap && wrap.parentNode === main) main.insertBefore(host, wrap);
+      else main.appendChild(host);
+      pulseSig = '';
+    } else if (wrap && host.nextSibling !== wrap){
+      main.insertBefore(host, wrap);      // keep it directly above the composer
+    }
+
+    var s = pulseStats();
+    var sig = [s.online, s.total, s.voice, s.tourneys, s.events].join('|');
+    if (sig === pulseSig) return;         // signature guard
+    pulseSig = sig;
+
+    host.innerHTML =
+      '<div class="lbp-h">Lobby Pulse</div>' +
+      '<div class="lbp-row">' +
+        '<div class="lbp-card"><div class="lbp-l">Online now</div>' +
+          '<div class="lbp-v ' + (s.online ? 'grn' : '') + '">' + s.online +
+          '<span class="of">/' + s.total + '</span></div></div>' +
+        '<div class="lbp-card"><div class="lbp-l">In voice</div>' +
+          '<div class="lbp-v ' + (s.voice ? 'acc' : '') + '">' + s.voice + '</div></div>' +
+        '<div class="lbp-card"><div class="lbp-l">Tournaments</div>' +
+          '<div class="lbp-v ' + (s.tourneys ? 'acc' : '') + '">' + s.tourneys + '</div></div>' +
+        '<div class="lbp-card"><div class="lbp-l">Upcoming</div>' +
+          (s.events
+            ? '<div class="lbp-v gld">' + s.events + '</div>'
+            : '<div class="lbp-v sm">None set</div>') +
+        '</div>' +
+      '</div>';
+  }
+
+  /* ── Empty state for a quiet room ───────────────────────────── */
+  function renderEmptyState(){
+    var c = $('msgContainer');
+    if (!c) return;
+    var view = getView();
+    if (!(view && view.type === 'channel')) return;
+
+    var hasMsgs = !!c.querySelector('.message-group');
+    var existing = c.querySelector('.lbv-empty');
+
+    if (hasMsgs){ if (existing) existing.remove(); return; }
+    if (existing) return;                 // already there — don't rewrite
+
+    var name = (view.name || 'this lounge').replace(/^#/, '');
+    var el = document.createElement('div');
+    el.className = 'lbv-empty';
+    el.innerHTML =
+      '<div class="lbv-empty-ico">' + ICONS.channels + '</div>' +
+      '<div class="lbv-empty-t">The room is quiet</div>' +
+      '<p class="lbv-empty-s">Nothing in #' + name +
+        ' yet. Say something below, invite people, or spin up a tournament to get it going.</p>' +
+      '<div class="lbv-empty-acts">' +
+        '<button class="lbv-empty-btn" data-lbv="invite">Invite people</button>' +
+        '<button class="lbv-empty-btn ghost" data-lbv="tourney">Start a tournament</button>' +
+      '</div>';
+    c.appendChild(el);
+
+    el.addEventListener('click', function(e){
+      var b = e.target.closest('[data-lbv]'); if (!b) return;
+      if (b.dataset.lbv === 'invite'){
+        var iv = $('lirInviteBtn');
+        if (iv) iv.click();
+        else if (typeof window.openInviteModal === 'function') window.openInviteModal();
+      } else {
+        if (typeof window.openTournamentModal === 'function') window.openTournamentModal();
+      }
+    });
+  }
+
+  /* ── Wire it up — event-driven, no DOM-rewriting polls ──────── */
+  function refresh(){
+    build();
+    syncMini();
+    renderPulse();
+    renderEmptyState();
+  }
+
+  function start(){
+    if (!$('lobbyInfoRail')) { setTimeout(start, 400); return; }
+
+    document.body.classList.toggle('lir-collapsed', isCollapsed());
+    refresh();
+
+    // Rail subtree changes (members / channels / events / tournaments
+    // re-rendering) drive the badge + pulse updates.
+    var rail = $('lobbyInfoRail');
+    if (rail) new MutationObserver(function(){ syncMini(); renderPulse(); })
+      .observe(rail, { childList:true, subtree:true, characterData:true });
+
+    // Chat area re-renders wipe #chatMain, so re-inject after each render.
+    var main = $('chatMain');
+    if (main) new MutationObserver(function(){ renderPulse(); renderEmptyState(); })
+      .observe(main, { childList:true, subtree:true });
+
+    console.log('[lobby-v5] refresh layer ready — rail ' +
+                (isCollapsed() ? 'collapsed' : 'expanded') +
+                ' (window.lobbyRailToggle() to flip)');
+  }
+
+  if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', start);
+  else start();
 })();
 </script>
 

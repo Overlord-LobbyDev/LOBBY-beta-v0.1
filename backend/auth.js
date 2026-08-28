@@ -1808,14 +1808,32 @@ app.delete("/servers/:id/members/:userId", requireAuth, async (req, res) => {
 });
 
 app.get("/servers/:id/members", requireAuth, async (req, res) => {
+  // Includes each member's personalised tournament ("match") card so the
+  // lobby member list can render it. Same shape and defaults as the
+  // tournamentCard object built in backend/tournaments.js.
   const r = await pool.query(`
-    SELECT u.id, u.username, u.avatar_url, sm.role
+    SELECT u.id, u.username, u.avatar_url, sm.role,
+           u.tournament_card_image_url, u.tournament_card_bg_colour,
+           u.tournament_card_border_colour, u.tournament_card_name_colour,
+           u.tournament_card_bg_pos
     FROM server_members sm
     JOIN users u ON u.id = sm.user_id
     WHERE sm.server_id = $1
     ORDER BY CASE sm.role WHEN 'owner' THEN 0 WHEN 'moderator' THEN 1 ELSE 2 END, u.username
   `, [req.params.id]);
-  res.json(r.rows);
+  res.json(r.rows.map(u => ({
+    id: u.id,
+    username: u.username,
+    avatar_url: u.avatar_url,
+    role: u.role,
+    tournamentCard: {
+      imageUrl:     u.tournament_card_image_url     || null,
+      bgColour:     u.tournament_card_bg_colour     || '#2c3440',
+      borderColour: u.tournament_card_border_colour || '#f9a8d4',
+      nameColour:   u.tournament_card_name_colour   || '#fdf2f8',
+      bgPos:        u.tournament_card_bg_pos        || '50% 50%'
+    }
+  })));
 });
 
 // ── Channels ─────────────────────────────────────────────────

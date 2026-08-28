@@ -93,12 +93,24 @@ function createWindow() {
     autoHideMenuBar: true,
     frame: false,
     resizable: true,
+    // The window's native background. Electron defaults this to WHITE, which
+    // is what caused the random white flashes: this app is entirely dark, so
+    // any frame where the compositor hasn't finished painting (a layer being
+    // rebuilt, a raster stall, a loadFile navigation between pages) let the
+    // white ground show through for a frame or two. Painting it --bg-0 means
+    // there is no white anywhere in the stack to flash.
+    backgroundColor: "#141820",
+    // Don't show the window until it has something painted — kills the white
+    // rectangle on launch before the first frame lands.
+    show: false,
     webPreferences: {
       preload: path.join(__dirname, "preload.js"),
       contextIsolation: true,
       nodeIntegration: false,
     }
   });
+
+  win.once("ready-to-show", () => win.show());
 
   session.defaultSession.setPermissionRequestHandler((webContents, permission, callback) => {
     const allowed = ["media", "audioCapture", "videoCapture"];
@@ -168,6 +180,7 @@ ipcMain.handle("open-call-window", (event) => {
   callWindow = new BrowserWindow({
     width: 320, height: 380, resizable: false, minimizable: false, maximizable: false,
     alwaysOnTop: true, frame: true, title: "Incoming Call",
+    backgroundColor: "#141820",
     webPreferences: { preload: path.join(__dirname, "preload.js"), contextIsolation: true, nodeIntegration: false }
   });
   callWindow.loadFile("incomingcall.html");
@@ -183,6 +196,7 @@ ipcMain.handle("open-outgoing-call-window", (event) => {
   outgoingCallWindow = new BrowserWindow({
     width: 320, height: 380, resizable: false, minimizable: false, maximizable: false,
     alwaysOnTop: true, frame: true, title: "Calling…",
+    backgroundColor: "#141820",
     webPreferences: { preload: path.join(__dirname, "preload.js"), contextIsolation: true, nodeIntegration: false }
   });
   outgoingCallWindow.loadFile("outgoingcall.html");
