@@ -51462,30 +51462,34 @@ body.dock-sidebar:not(.dock-feed)  #phFeedToggleBtn .ph-fb-dot {
     if (isRail(from) && isRail(target)) { swapRail(target); return; }
 
     if (isRail(target)){
-      /* Read this BEFORE touching DM mode: lobbyRailDM.open() un-hides the
-         rail itself, and toggleLobbyRail() decides by TOGGLING what it
-         sees — so opening DM first would leave it looking at an already
-         un-hidden rail and it would hide it again. Same reason the reveal
-         runs before dmOpen() rather than after. */
-      var wasShown = railShown();
+      /* Revealing the rail is toggleLobbyRail()'s job, and it must be
+         called EXACTLY ONCE. It already sequences the feed->rail handoff
+         properly: toggleFeed() does not add .feed-closed until 360ms after
+         it is called and the rail's show rule REQUIRES that class, so it
+         closes the feed itself and waits for the class before playing the
+         entrance. Calling it twice makes the second call see a feed that
+         has not finished leaving, take its feed-covering branch, and run
+         toggleFeed() AGAIN — reopening the feed that was on its way out.
 
-      /* Hand the whole feed->rail handoff to toggleLobbyRail(). It already
-         does this correctly: toggleFeed() does not add .feed-closed until
-         360ms after it is called, and the rail's show rule REQUIRES that
-         class, so toggleLobbyRail closes the feed itself and waits for the
-         class before playing the entrance.
-         Closing the feed here and then calling it was the bug behind both
-         symptoms. If .rail-hidden happened to be off, the rail
-         counted as "visible" and nothing ran — so it popped in unanimated
-         when .feed-closed finally landed (the stutter). If .rail-hidden
-         was on, toggleLobbyRail still saw a feed that had not finished
-         leaving, took its feed-covering branch and called toggleFeed()
-         again — REOPENING the feed, which is why the sidebar needed a
-         second press. */
-      if (!wasShown && typeof window.toggleLobbyRail === 'function')
-        window.toggleLobbyRail();
+         That second call was hiding in lobbyRailDM.open(), which reveals
+         the rail itself when .rail-hidden is set. So who reveals depends
+         on WHY the rail is off screen, and only one of them may act:
+           .rail-hidden set  -> dmOpen() does it (Sidebar has no dmOpen,
+                                so it calls directly)
+           feed covering     -> .rail-hidden is NOT set, dmOpen() won't
+                                act, so the call here is the one that runs */
+      var wasShown  = railShown();
+      var railClass = document.body.classList.contains('rail-hidden');
+      var toggleRail = (typeof window.toggleLobbyRail === 'function')
+        ? window.toggleLobbyRail : null;
 
-      target === 'messages' ? dmOpen() : dmClose();
+      if (target === 'messages'){
+        dmOpen();
+        if (!wasShown && !railClass && toggleRail) toggleRail();
+      } else {
+        dmClose();
+        if (!wasShown && toggleRail) toggleRail();
+      }
     } else if (target === 'feed'){
       dmClose();
       // Not in Double Dock the rail must go; its exit and the feed's
