@@ -48506,11 +48506,15 @@ body.lir-resizing #chatPanel{ transition:none !important; }
   /* ── Resizable width ────────────────────────────────────────────
      The rail is anchored right and its width drives #chatPanel's right
      offset through --lir-w, so setting the one variable reflows both. */
-  var W_KEY = 'lobbyRailWidth', W_MIN = 280, W_MAX = 560, W_DEFAULT = 360;
+  /* One width for both panels. They occupy the same slot and swap with
+     each other, so different widths made the swap jump. Shared key and
+     shared clamp — resizing either resizes both. */
+  var W_KEY = 'lobbyPanelWidth', W_MIN = 300, W_MAX = 640, W_DEFAULT = 360;
 
   function applyWidth(px){
     px = Math.max(W_MIN, Math.min(W_MAX, Math.round(px)));
     document.documentElement.style.setProperty('--lir-w-full', px + 'px');
+    document.documentElement.style.setProperty('--feed-w', px + 'px');
     return px;
   }
   function loadWidth(){
@@ -49561,6 +49565,20 @@ body.lir-collapsed #lirRecents{ display:none; }
   function railHidden(){
     try { return localStorage.getItem(HIDE_KEY) === '1'; } catch(e){ return false; }
   }
+  /* Resolve once a body class appears, so the two panels hand off on the
+     real transition rather than on a hardcoded delay that drifts if the
+     Feed's timings ever change. */
+  function waitForClass(cls, done){
+    if (document.body.classList.contains(cls)){ done(); return; }
+    var tries = 0;
+    var iv = setInterval(function(){
+      if (document.body.classList.contains(cls) || ++tries > 40){
+        clearInterval(iv);
+        done();
+      }
+    }, 25);
+  }
+
   /* Sequenced exactly like toggleFeed: the exit animation plays BEFORE the
      resting hidden state is applied, otherwise .rail-hidden would translate
      the rail off-screen in one frame and there'd be nothing left to
@@ -49615,7 +49633,13 @@ body.lir-collapsed #lirRecents{ display:none; }
         body.classList.add('feed-closed');   // startup case: nothing to close
         body.classList.remove('feed-open');
       }
-      setHidden(false);                      // you asked for it, so show it
+      /* Wait for the Feed to actually finish leaving. toggleFeed only
+         applies .feed-closed after its 360ms exit, and the rail's show
+         rule requires that class — so firing the entrance now played the
+         animation while the rail was still parked off-screen, and it then
+         popped into place with nothing left to animate. That was the ugly
+         swap. Watch for the class rather than guessing a delay. */
+      waitForClass('feed-closed', function(){ setHidden(false); });
       return;
     }
     setHidden(!body.classList.contains('rail-hidden'));
@@ -50122,6 +50146,30 @@ body.lir-collapsed #lirRecents{ display:none; }
     syncRailBtn();
     renderRecents(); ensurePreview();
     buildDDToggle();
+    /* The other half of the swap. When the Feed opens, the rail's show
+       rule stops matching the instant .feed-closed is dropped, so it used
+       to vanish in one frame while the Feed animated in. Wrapping
+       toggleFeed (never editing it) lets the rail play its exit at the
+       same moment the Feed plays its entrance, so they cross cleanly. */
+    (function hookFeed(){
+      if (typeof window.toggleFeed !== 'function'){ setTimeout(hookFeed, 300); return; }
+      if (window.toggleFeed.__railSwapWrapped) return;
+      var orig = window.toggleFeed;
+      window.toggleFeed = function(){
+        var body = document.body;
+        var feedWasOpen = body.classList.contains('feed-open');
+        var railShowing = !body.classList.contains('rail-hidden');
+        // Feed is about to OPEN over a visible rail — send the rail out now.
+        if (!feedWasOpen && railShowing && !doubleDock()){
+          body.classList.remove('rail-anim-in');
+          body.classList.add('rail-anim-out');
+          setTimeout(function(){ body.classList.remove('rail-anim-out'); }, 300);
+        }
+        return orig.apply(this, arguments);
+      };
+      window.toggleFeed.__railSwapWrapped = true;
+    })();
+
     // Record every lobby you open.
     (function hookSelect(){
       if (typeof window.selectServer !== 'function'){ setTimeout(hookSelect, 400); return; }
@@ -50226,11 +50274,15 @@ body.feed-resizing .lobby-overlay{ transition:none !important; }
 <script>
 (function () {
   'use strict';
-  var KEY = 'lobbyFeedWidth', MIN = 300, MAX = 720;
+  /* Shares its width with the lobby rail — same key, same clamp, and both
+     variables written together. The two panels occupy the same slot and
+     swap with each other, so differing widths made the handoff jump. */
+  var KEY = 'lobbyPanelWidth', MIN = 300, MAX = 640;
 
   function apply(px){
     px = Math.max(MIN, Math.min(MAX, Math.round(px)));
     document.documentElement.style.setProperty('--feed-w', px + 'px');
+    document.documentElement.style.setProperty('--lir-w-full', px + 'px');
     return px;
   }
   function current(){
@@ -50299,11 +50351,12 @@ body.feed-resizing .lobby-overlay{ transition:none !important; }
       save(apply(w));
     });
 
-    // Double-click clears the override so the stylesheet's
-    // clamp(360px, 26vw, 540px) default takes over again.
+    // Double-click resets BOTH back to the shared default — clearing only
+    // --feed-w would drop the feed to the stylesheet's clamp() while the
+    // rail stayed where it was, which is exactly the mismatch we're
+    // removing.
     h.addEventListener('dblclick', function(){
-      document.documentElement.style.removeProperty('--feed-w');
-      try { localStorage.removeItem(KEY); } catch(e){}
+      save(apply(360));
     });
   }
 
