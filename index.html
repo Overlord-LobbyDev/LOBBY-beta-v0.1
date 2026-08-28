@@ -51642,5 +51642,300 @@ body.dock-sidebar:not(.dock-feed)  #phFeedToggleBtn .ph-fb-dot {
 })();
 </script>
 
+<!-- ══════════════════════════════════════════════════════════════════
+     CHAT CONTEXT COLUMN  +  CENTRED CONVERSATION
+
+     The conversation was stretched across the full panel, so short
+     messages sat marooned at opposite edges. It is now capped and
+     centred, which leaves two gutters.
+
+     The left gutter earns its keep instead of just being empty: when the
+     rail is closed there is NO way to switch channels, so the column
+     carries the lounges, plus who is in voice and who is online. It
+     appears ONLY when the width is genuinely spare — open the Feed or the
+     Sidebar and the panel narrows below the threshold and the column
+     stands down, giving the conversation the room back.
+
+     All of it is existing data: cachedServerChannels, cachedServerMembers
+     and _lirPresenceOf, with the same openChannel / joinVoiceChannel
+     actions the rail uses.
+     ══════════════════════════════════════════════════════════════════ -->
+<style>
+/* Centring is padding, not a wrapper: the messages scroller and composer
+   keep their own structure and absolute positioning, so nothing about the
+   existing layout has to be rebuilt.
+   max() means it degrades to a plain 24px gutter on narrow panels rather
+   than collapsing to nothing. */
+body.lobby-selected #chatPanel .messages,
+body.lobby-selected #chatPanel .chat-input-wrap,
+body.lobby-selected #chatPanel #lobbyPulse{
+  padding-left:  max(24px, calc((100% - var(--chat-max, 1040px)) / 2));
+  padding-right: max(24px, calc((100% - var(--chat-max, 1040px)) / 2));
+}
+
+#chatCtx{ display:none; }
+body.chat-ctx-on #chatCtx{
+  display:flex;
+  flex-direction:column;
+  gap:14px;
+  position:absolute;
+  left:28px;
+  width:240px;
+  /* Sits between the channel ribbon and the composer. */
+  top:76px;
+  bottom:96px;
+  overflow-y:auto;
+  overflow-x:hidden;
+  z-index:3;
+  animation: chatCtxIn .34s cubic-bezier(.22,1,.36,1) both;
+}
+@keyframes chatCtxIn{
+  0%   { opacity:0; transform:translateX(-10px); }
+  100% { opacity:1; transform:translateX(0); }
+}
+@media (prefers-reduced-motion: reduce){
+  body.chat-ctx-on #chatCtx{ animation:none; }
+}
+#chatCtx::-webkit-scrollbar{ width:6px; }
+#chatCtx::-webkit-scrollbar-thumb{ background:rgba(255,255,255,.08); border-radius:3px; }
+
+.cctx-sec{
+  background:rgba(255,255,255,.022);
+  border:1px solid rgba(255,255,255,.06);
+  border-radius:12px;
+  padding:10px 10px 8px;
+}
+.cctx-h{
+  display:flex; align-items:center; justify-content:space-between;
+  font-size:10px; font-weight:800; letter-spacing:.09em;
+  text-transform:uppercase; color:var(--text-3);
+  margin:0 2px 8px;
+}
+.cctx-h .n{
+  font-size:10px; font-weight:800;
+  background:rgba(255,255,255,.07); color:var(--text-2);
+  border-radius:20px; padding:1px 6px;
+}
+.cctx-row{
+  display:flex; align-items:center; gap:8px;
+  padding:6px 8px; border-radius:8px;
+  cursor:pointer; color:var(--text-2);
+  font-size:13px; line-height:1.2;
+  border:1px solid transparent;
+  transition:background .13s, color .13s, border-color .13s;
+}
+.cctx-row:hover{ background:rgba(255,255,255,.055); color:var(--text-1); }
+.cctx-row.active{
+  background:color-mix(in srgb, var(--accent) 13%, transparent);
+  border-color:color-mix(in srgb, var(--accent) 30%, transparent);
+  color:color-mix(in srgb, var(--accent) 96%, white);
+}
+.cctx-row .ico{ width:14px; height:14px; flex:0 0 14px; opacity:.75; }
+.cctx-row .ico svg{ width:14px; height:14px; display:block; }
+.cctx-row .nm{ flex:1; min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+.cctx-row .badge{
+  flex:0 0 auto; font-size:10px; font-weight:800;
+  background:#23a55a; color:#fff; border-radius:20px; padding:1px 6px;
+}
+.cctx-row .live{
+  flex:0 0 auto; width:7px; height:7px; border-radius:50%;
+  background:#23a55a; box-shadow:0 0 8px #23a55a;
+}
+.cctx-people{ display:flex; flex-wrap:wrap; gap:6px; padding:2px; }
+.cctx-av{
+  width:26px; height:26px; border-radius:50%;
+  background:rgba(255,255,255,.08); color:var(--text-2);
+  font-size:10px; font-weight:800;
+  display:flex; align-items:center; justify-content:center;
+  overflow:hidden; border:1px solid rgba(255,255,255,.1);
+}
+.cctx-av img{ width:100%; height:100%; object-fit:cover; display:block; }
+.cctx-av.voice{ border-color:color-mix(in srgb, var(--accent) 55%, transparent); }
+.cctx-empty{ font-size:11.5px; color:var(--text-3); padding:2px 4px 4px; }
+</style>
+<script>
+(function () {
+  'use strict';
+
+  /* The column needs the full message column PLUS both gutters wide enough
+     to hold it (240 + 28 left inset + 24 breathing room). Below that the
+     conversation is better off with the room. */
+  var CHAT_MAX = 1040, CTX_W = 240, CTX_NEED = CHAT_MAX + 2 * (CTX_W + 52);
+
+  function $(id){ return document.getElementById(id); }
+  function esc(s){
+    return String(s == null ? '' : s)
+      .replace(/&/g,'&amp;').replace(/"/g,'&quot;')
+      .replace(/</g,'&lt;').replace(/>/g,'&gt;');
+  }
+  function initials(n){
+    return String(n || '?').trim().slice(0, 2).toUpperCase();
+  }
+  function members(){
+    return Array.isArray(window.cachedServerMembers) ? window.cachedServerMembers : [];
+  }
+  function channels(){
+    return Array.isArray(window.cachedServerChannels) ? window.cachedServerChannels : [];
+  }
+  function presence(m){
+    return (typeof window._lirPresenceOf === 'function') ? window._lirPresenceOf(m) : 'offline';
+  }
+
+  /* Only in a lobby text/voice channel — not DMs, not the Coliseum. */
+  function eligible(){
+    var b = document.body;
+    if (!b.classList.contains('lobby-selected')) return false;
+    if (b.classList.contains('coliseum-mode')) return false;
+    var v = window.currentView;
+    return !!(v && v.type === 'channel');
+  }
+
+  /* Lives on #chatPanel, not #chatMain. .chat-main is not a positioning
+     context, and making it one would re-anchor any other absolutely
+     positioned descendant to it. #chatPanel is already positioned (its
+     right: offsets drive the feed/rail layout), and an absolutely
+     positioned child is removed from flex layout — so this adds a column
+     to the panel without becoming a flex item in its row. */
+  function host(){
+    var panel = $('chatPanel');
+    if (!panel) return null;
+    var el = $('chatCtx');
+    if (!el || !el.isConnected){
+      el = document.createElement('div');
+      el.id = 'chatCtx';
+      panel.appendChild(el);
+    }
+    return el;
+  }
+
+  function icon(t){
+    if (t === 'voice') return '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"/><path d="M19.07 4.93a10 10 0 0 1 0 14.14"/></svg>';
+    if (t === 'announcement') return '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M3 11l18-8v18l-18-8z"/></svg>';
+    if (t === 'calendar') return '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="3" y1="10" x2="21" y2="10"/></svg>';
+    return '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><line x1="9" y1="3" x2="7" y2="21"/><line x1="17" y1="3" x2="15" y2="21"/><line x1="3" y1="9" x2="21" y2="9"/><line x1="3" y1="15" x2="21" y2="15"/></svg>';
+  }
+
+  function avatar(m, cls){
+    var name = m.display_name || m.username || '?';
+    var url  = m.avatar_url || m.avatarUrl;
+    return '<div class="cctx-av ' + (cls || '') + '" title="' + esc(name) + '">' +
+      (url ? '<img src="' + esc(url) + '" alt="">' : esc(initials(name))) +
+      '</div>';
+  }
+
+  var sig = '';
+
+  function render(){
+    var el = host();
+    if (!el) return;
+
+    var chs = channels(), mem = members();
+    var activeId = (window.currentView && window.currentView.type === 'channel')
+      ? window.currentView.id : null;
+    var myVc = (typeof window.vcChannelId !== 'undefined') ? window.vcChannelId : null;
+    var unread = window.unreadChannels || {};
+
+    var inVoice = mem.filter(function(m){ return presence(m) === 'voice'; });
+    var online  = mem.filter(function(m){ var p = presence(m); return p !== 'offline'; });
+
+    /* Signature guard — this runs on a poll, and rewriting innerHTML every
+       tick would drop hover states and restart the entrance animation. */
+    var next = [chs.length, mem.length, activeId, myVc, inVoice.length, online.length,
+                chs.map(function(c){ return c.id + ':' + (unread[c.id] || 0); }).join(',')].join('|');
+    if (next === sig) return;
+    sig = next;
+
+    var rank = { text:0, announcement:1, news:2, calendar:3, forum:4, poll:5, voice:9 };
+    var sorted = chs.slice().sort(function(a, b){
+      var ra = rank[a.type] != null ? rank[a.type] : 5;
+      var rb = rank[b.type] != null ? rank[b.type] : 5;
+      if (ra !== rb) return ra - rb;
+      return String(a.name || '').localeCompare(String(b.name || ''));
+    });
+
+    var rows = sorted.map(function(c){
+      var isVoice = c.type === 'voice';
+      var here = isVoice
+        ? mem.filter(function(m){ return m && (m.voiceChannelId === c.id || m.voice_channel_id === c.id); })
+        : [];
+      var n = isVoice ? 0 : (unread[c.id] || 0);
+      return '<div class="cctx-row' + (String(c.id) === String(activeId) ? ' active' : '') + '"' +
+        ' data-id="' + esc(c.id) + '" data-type="' + esc(c.type || 'text') +
+        '" data-name="' + esc(c.name || 'channel') + '">' +
+        '<span class="ico">' + icon(c.type) + '</span>' +
+        '<span class="nm">' + esc(String(c.name || 'channel').replace(/^#/, '')) + '</span>' +
+        (here.length ? '<span class="live" title="' + here.length + ' in voice"></span>' : '') +
+        (n ? '<span class="badge">' + n + '</span>' : '') +
+        '</div>';
+    }).join('');
+
+    var html =
+      '<div class="cctx-sec">' +
+        '<div class="cctx-h"><span>Lounges</span><span class="n">' + sorted.length + '</span></div>' +
+        (rows || '<div class="cctx-empty">No channels yet.</div>') +
+      '</div>' +
+      '<div class="cctx-sec">' +
+        '<div class="cctx-h"><span>In voice</span><span class="n">' + inVoice.length + '</span></div>' +
+        (inVoice.length
+          ? '<div class="cctx-people">' + inVoice.slice(0, 12).map(function(m){ return avatar(m, 'voice'); }).join('') + '</div>'
+          : '<div class="cctx-empty">Nobody in voice yet.</div>') +
+      '</div>' +
+      '<div class="cctx-sec">' +
+        '<div class="cctx-h"><span>Online</span><span class="n">' + online.length + '/' + mem.length + '</span></div>' +
+        (online.length
+          ? '<div class="cctx-people">' + online.slice(0, 12).map(function(m){ return avatar(m, ''); }).join('') +
+            (online.length > 12 ? '<div class="cctx-av">+' + (online.length - 12) + '</div>' : '') + '</div>'
+          : '<div class="cctx-empty">Nobody online right now.</div>') +
+      '</div>';
+
+    el.innerHTML = html;
+  }
+
+  /* One delegated listener on the column, so re-rendering never has to
+     rebind anything. Uses the same actions the rail uses. */
+  function wire(){
+    var el = host();
+    if (!el || el.__wired) return;
+    el.addEventListener('click', function(e){
+      var row = e.target.closest ? e.target.closest('.cctx-row') : null;
+      if (!row) return;
+      var id = row.getAttribute('data-id');
+      var nm = row.getAttribute('data-name');
+      var tp = row.getAttribute('data-type');
+      if (tp === 'voice'){
+        if (typeof window.joinVoiceChannel === 'function') window.joinVoiceChannel(id, nm);
+      } else if (typeof window.openChannel === 'function'){
+        window.openChannel(id, nm, tp || 'text');
+      }
+    });
+    el.__wired = true;
+  }
+
+  /* Width decides visibility, so the column stands down the moment the
+     Feed or the Sidebar takes the space — no coordination with either. */
+  function measure(){
+    var main = $('chatMain') || $('chatPanel');
+    var on = !!main && eligible() && main.clientWidth >= CTX_NEED;
+    document.body.classList.toggle('chat-ctx-on', on);
+    if (on){ wire(); render(); }
+  }
+
+  function start(){
+    document.documentElement.style.setProperty('--chat-max', CHAT_MAX + 'px');
+    var main = $('chatMain') || $('chatPanel');
+    if (main && typeof ResizeObserver === 'function'){
+      new ResizeObserver(measure).observe(main);
+    }
+    window.addEventListener('resize', measure);
+    setInterval(measure, 1500);      // presence and unread arrive over the socket
+    measure();
+    console.log('[chat-ctx] context column ready — shows above ' + CTX_NEED + 'px');
+  }
+
+  if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', start);
+  else start();
+})();
+</script>
+
 </body>
 </html>
