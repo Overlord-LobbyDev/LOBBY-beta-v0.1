@@ -51255,5 +51255,141 @@ body.rail-dm #phMessagesBtn .ph-fb-tile{
 })();
 </script>
 
+<!-- ══════════════════════════════════════════════════════════════════
+     RIGHT-DOCK SWITCH  —  Messages | Feed | Sidebar
+     All three share the right edge, so they behave as ONE switch with
+     exactly one active state (or none). Activating any deactivates the
+     others; clicking the active one turns it off.
+
+       messages -> rail visible, showing DMs      (feed closed)
+       sidebar  -> rail visible, showing the lobby(feed closed)
+       feed     -> feed open, rail hidden
+     Double Dock is respected: with it on, the feed and rail may coexist,
+     so choosing one no longer closes the other.
+
+     This only calls the existing toggles (toggleFeed, toggleLobbyRail,
+     lobbyRailDM) — none of their internals are touched.
+     ══════════════════════════════════════════════════════════════════ -->
+<script>
+(function () {
+  'use strict';
+
+  function $(id){ return document.getElementById(id); }
+  var busy = false;
+
+  function doubleDock(){
+    try { return localStorage.getItem('lobbyDoubleDock') === '1'; } catch(e){ return false; }
+  }
+  function feedOpen(){ return document.body.classList.contains('feed-open'); }
+  function railShown(){ return !document.body.classList.contains('rail-hidden'); }
+  function dmOn(){ return document.body.classList.contains('rail-dm'); }
+
+  function state(){
+    if (dmOn() && railShown()) return 'messages';
+    if (feedOpen()) return 'feed';
+    if (railShown()) return 'sidebar';
+    return 'none';
+  }
+
+  function closeFeed(){
+    if (feedOpen() && typeof window.toggleFeed === 'function') window.toggleFeed();
+  }
+  function showRail(){
+    if (!railShown() && typeof window.toggleLobbyRail === 'function') window.toggleLobbyRail();
+  }
+  function hideRail(){
+    if (railShown() && typeof window.toggleLobbyRail === 'function') window.toggleLobbyRail();
+  }
+
+  function go(target){
+    if (busy) return;
+    busy = true;
+    try {
+      if (target === 'messages'){
+        if (!doubleDock()) closeFeed();
+        if (window.lobbyRailDM) window.lobbyRailDM.open();   // also un-hides the rail
+        showRail();
+      } else if (target === 'sidebar'){
+        if (!doubleDock()) closeFeed();
+        if (window.lobbyRailDM) window.lobbyRailDM.close();  // leave DM mode
+        showRail();
+      } else if (target === 'feed'){
+        if (window.lobbyRailDM) window.lobbyRailDM.close();
+        if (!doubleDock()) hideRail();
+        if (!feedOpen() && typeof window.toggleFeed === 'function') window.toggleFeed();
+      } else {                                              // 'none'
+        if (window.lobbyRailDM) window.lobbyRailDM.close();
+        closeFeed();
+        hideRail();
+      }
+    } finally {
+      // Release after the toggles' own animations have settled, so a fast
+      // second click can't interleave two transitions.
+      setTimeout(function(){ busy = false; sync(); }, 380);
+    }
+    sync();
+  }
+
+  function pick(target){
+    // Clicking whatever is already active switches it off.
+    go(state() === target ? 'none' : target);
+  }
+
+  /* Buttons own their own click handlers already; intercept in the
+     CAPTURE phase so the switch decides, rather than each button acting
+     alone and leaving two of them lit at once. */
+  function intercept(id, target){
+    var el = $(id);
+    if (!el || el.__dockSwitch) return;
+    el.addEventListener('click', function(e){
+      e.preventDefault();
+      e.stopImmediatePropagation();
+      pick(target);
+    }, true);
+    el.__dockSwitch = true;
+  }
+
+  function sync(){
+    var s = state();
+    [['phMessagesBtn','messages'], ['phFeedToggleBtn','feed'], ['phRailToggleBtn','sidebar']]
+      .forEach(function(p){
+        var el = $(p[0]);
+        if (el) el.setAttribute('aria-pressed', s === p[1] ? 'true' : 'false');
+      });
+  }
+
+  /* Order: Messages, Feed, Sidebar. positionFeedPill() relocates the Feed
+     pill at runtime per the Feed Position setting, which is what kept
+     shuffling these — so the order is re-asserted rather than set once. */
+  function order(){
+    var feed = $('phFeedToggleBtn');
+    if (!feed || !feed.parentNode) return;
+    var msg = $('phMessagesBtn'), rail = $('phRailToggleBtn');
+    if (msg && msg.nextElementSibling !== feed) feed.parentNode.insertBefore(msg, feed);
+    if (rail && feed.nextElementSibling !== rail) feed.parentNode.insertBefore(rail, feed.nextSibling);
+  }
+
+  function tick(){
+    order();
+    intercept('phMessagesBtn', 'messages');
+    intercept('phFeedToggleBtn', 'feed');
+    intercept('phRailToggleBtn', 'sidebar');
+    if (!busy) sync();
+  }
+
+  function start(){
+    tick();
+    // Permanent, not a fixed number of retries: the Feed pill can move at
+    // any time (Feed Position is a live setting), and the buttons are
+    // rebuilt by their own modules.
+    setInterval(tick, 500);
+    console.log('[dock] Messages | Feed | Sidebar switch active');
+  }
+
+  if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', start);
+  else start();
+})();
+</script>
+
 </body>
 </html>
