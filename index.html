@@ -47718,7 +47718,30 @@ body.lobby-selected .msg-me .msg-attachments{ justify-content:flex-end; }
 body.lobby-selected .msg-me .msg-username{ display:none; }
 
 /* Hover actions belong on the outside of the bubble, so they flip too. */
-body.lobby-selected .msg-me .msg-quick-actions{ left:14px; right:auto; }
+/* ── Per-message action shelf ────────────────────────────────────
+   It was `top:-14px`, i.e. floating ABOVE the message it belongs to.
+   With chained messages only 2px apart, hovering the second message
+   popped a shelf sitting on top of the FIRST one — and moving the mouse
+   toward it hovered that first message instead, which swapped the shelf
+   out. The net effect was that only the top of a chain could be acted on.
+
+   Now vertically centred on its own row and parked in the empty half
+   opposite the bubble (bubbles cap at 68%, so that space is always
+   free). It can never overlap a neighbouring message or its own bubble,
+   so every message in a run can be deleted individually. */
+body.lobby-selected .message-group .msg-quick-actions{
+  top:50% !important;
+  bottom:auto !important;
+  transform:translateY(-50%);
+  right:20px !important; left:auto !important;
+  z-index:6 !important;
+}
+body.lobby-selected .message-group.msg-me .msg-quick-actions{
+  left:20px !important; right:auto !important;
+}
+/* Keyboard users need it too — it can't be hover-only. */
+body.lobby-selected .message-group:focus-within .msg-quick-actions{ display:flex; }
+
 body.lobby-selected .msg-me .msg-compact-time{ left:auto; right:0; text-align:right; }
 
 /* ══ COMPOSER ═══════════════════════════════════════════════════════
