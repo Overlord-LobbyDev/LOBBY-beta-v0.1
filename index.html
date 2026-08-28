@@ -50307,7 +50307,10 @@ body.lir-collapsed #lirRecents{ display:none; }
     }
     // positionFeedPill() relocates the Feed pill at runtime, so re-seat
     // ours after it rather than assuming a fixed slot.
-    if (btn.previousElementSibling !== feed) feed.insertAdjacentElement('afterend', btn);
+    // Append once; never reposition. Visual order is CSS flex `order`.
+    // Repositioning here tripped _positionFeedPill()'s MutationObserver,
+    // which re-seated the Feed pill and shuffled these every time.
+    if (btn.parentNode !== feed.parentNode) feed.parentNode.appendChild(btn);
   }
 
   function start(){
@@ -50942,6 +50945,20 @@ body.rail-dm #phMessagesBtn .ph-fb-tile{
   text-align:center; display:none;
 }
 #phMessagesBtn .ph-dm-dot.on{ display:block; }
+
+/* ── Right-dock button order: Messages | Feed | Sidebar ───────────
+   Done with flex `order` rather than by moving DOM nodes.
+   _positionFeedPill() runs a MutationObserver over the hotbar row and
+   re-seats the Feed pill whenever `pill.previousSibling !== friends`, so
+   inserting Messages before Feed made the two fight on every mutation —
+   which is why the order kept ending up wrong. Reordering visually
+   leaves the DOM exactly as that observer expects, so it never fires.
+   #phHotbarRowInner is display:flex, and default order is 0, so these
+   sit after everything else in the row while sequencing among
+   themselves. */
+#phHotbarRowInner > #phMessagesBtn    { order: 10; }
+#phHotbarRowInner > #phFeedToggleBtn  { order: 11; }
+#phHotbarRowInner > #phRailToggleBtn  { order: 12; }
 </style>
 
 <script>
@@ -51210,9 +51227,11 @@ body.rail-dm #phMessagesBtn .ph-fb-tile{
         '<span class="ph-dm-dot" aria-hidden="true"></span>';
       btn.addEventListener('click', toggle);
     }
-    // BEFORE Feed, as asked. positionFeedPill() moves the Feed pill at
-    // runtime, so re-seat ours against it rather than a fixed slot.
-    if (btn.nextElementSibling !== feed) feed.parentNode.insertBefore(btn, feed);
+    // Append once; never reposition. It renders LEFT of Feed via CSS flex
+    // `order`, which leaves DOM order untouched — repositioning here
+    // tripped _positionFeedPill()'s MutationObserver, and the two of us
+    // then fought over the pill's slot on every mutation.
+    if (btn.parentNode !== feed.parentNode) feed.parentNode.appendChild(btn);
   }
 
   document.addEventListener('click', function(e){
@@ -51358,16 +51377,17 @@ body.rail-dm #phMessagesBtn .ph-fb-tile{
       });
   }
 
-  /* Order: Messages, Feed, Sidebar. positionFeedPill() relocates the Feed
-     pill at runtime per the Feed Position setting, which is what kept
-     shuffling these — so the order is re-asserted rather than set once. */
-  function order(){
-    var feed = $('phFeedToggleBtn');
-    if (!feed || !feed.parentNode) return;
-    var msg = $('phMessagesBtn'), rail = $('phRailToggleBtn');
-    if (msg && msg.nextElementSibling !== feed) feed.parentNode.insertBefore(msg, feed);
-    if (rail && feed.nextElementSibling !== rail) feed.parentNode.insertBefore(rail, feed.nextSibling);
-  }
+  /* Ordering is done in CSS, NOT by moving DOM nodes — see the flex
+     `order` rules below. _positionFeedPill() watches the hotbar with a
+     MutationObserver and re-seats the Feed pill whenever
+     `pill.previousSibling !== friends`. Inserting Messages before Feed
+     therefore tripped that observer, which moved Feed back in front of
+     Messages — the two of us fighting each other on every mutation, and
+     the reason the order kept coming out wrong.
+
+     Flex `order` changes the visual sequence while leaving DOM order
+     exactly as the app wants it, so the observer never fires. */
+  function order(){ /* handled by CSS */ }
 
   function tick(){
     order();
