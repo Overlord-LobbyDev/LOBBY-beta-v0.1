@@ -43410,7 +43410,17 @@ body:not(.coliseum-mode) .col-sigil{display:none}
     if (!lobby){ console.warn('[Coliseum] cannot show - no lobby is selected'); return; }
     window._coliseumLobby = lobby;
     document.body.classList.add('coliseum-mode','coliseum-can-return');
-    populate(lobby);
+    /* populate() must never be able to strand the app. body.coliseum-mode
+       CSS-hides #homePanel, #chatPanel, #profilePage and #calendarPanel, so
+       a throw in here previously left EVERY page hidden behind a
+       half-rendered Coliseum — which is what "the page hangs / won't
+       change" looked like. One bad render section can no longer take
+       navigation down with it. */
+    try {
+      populate(lobby);
+    } catch (e) {
+      console.error('[Coliseum] populate failed — showing it anyway', e);
+    }
   }
   function coliseumHide(){
     document.body.classList.remove('coliseum-mode');
@@ -43649,9 +43659,20 @@ body:not(.coliseum-mode) .col-sigil{display:none}
   function renderConstellation(members){
     var inVoice = members.filter(function(m){return m.voiceChannelId || m.voice_channel_id;});
     var online = members.filter(function(m){return inVoice.indexOf(m)<0 && m.status && m.status !== 'offline';});
-    $('colConstCount').textContent = fmtN(online.length + inVoice.length);
-    $('colConstOnlineN').textContent = '- ' + (online.length + inVoice.length);
+    var countEl = $('colConstCount');
+    if (countEl) countEl.textContent = fmtN(online.length + inVoice.length);
+    /* #colConstOnlineN was written here, but it lives INSIDE #colConstBody
+       (see the static markup ~43325) and the innerHTML assignment at the
+       bottom of this function destroys it. So the first call succeeded and
+       deleted the element; every call after that threw
+       "Cannot set properties of null" on this line — before reaching the
+       render, so the constellation never drew again either.
+
+       Removing the write rather than null-guarding it, because it was
+       always redundant: the group labels built below carry their own
+       "Online - N" counts, which is what replaces that placeholder. */
     var body = $('colConstBody');
+    if (!body) return;
     var html = '';
     if (inVoice.length){
       html += '<div class="col-const-group"><div class="col-const-group-label">In Voice <span class="n">- '+inVoice.length+'</span><span class="dash"></span></div><div class="col-const-orbs">' + inVoice.slice(0,24).map(function(m){return orbHtml(m,true);}).join('') + '</div></div>';
