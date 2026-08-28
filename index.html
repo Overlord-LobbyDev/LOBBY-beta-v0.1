@@ -47519,6 +47519,70 @@ body.lobby-selected .chat-main .chat-input-box:focus-within{
 /* Sections auto-hidden when they hold nothing */
 #lobbyInfoRail .lir-section.lbv-hide{ display:none; }
 
+/* ══ RAIL TABS ══════════════════════════════════════════════════════
+   Lounge / Members / Activities. Replaces the single stacked scroll —
+   each tab owns its sections, so the rail shows one concern at a time
+   instead of six headers competing for the same column. */
+#lirTabs{
+  display:flex; gap:4px;
+  padding:10px 12px;
+  border-bottom:1px solid rgba(255,255,255,.055);
+  flex:none;
+}
+body.lir-collapsed #lirTabs{ display:none; }
+
+.lir-tab{
+  flex:1 1 0; min-width:0;
+  display:flex; align-items:center; justify-content:center; gap:5px;
+  padding:7px 4px; border-radius:8px; cursor:pointer;
+  background:rgba(255,255,255,.03);
+  border:1px solid rgba(255,255,255,.06);
+  color:var(--text-3);
+  font-family:var(--font);
+  font-size:9px; font-weight:900; letter-spacing:1.1px; text-transform:uppercase;
+  transition:background .16s, color .16s, border-color .16s;
+}
+.lir-tab-l{ overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+.lir-tab:hover{
+  background:rgba(255,255,255,.07);
+  color:var(--text-1);
+}
+.lir-tab.active{
+  background:color-mix(in srgb, var(--accent) 16%, transparent);
+  border-color:color-mix(in srgb, var(--accent) 42%, transparent);
+  color:color-mix(in srgb, var(--accent) 96%, white);
+}
+.lir-tab:focus-visible{ outline:2px solid var(--accent); outline-offset:2px; }
+.lir-tab-n{
+  flex:none;
+  font-size:8.5px; font-weight:900; line-height:1;
+  padding:2px 5px; border-radius:99px;
+  background:rgba(255,255,255,.09); color:var(--text-2);
+  font-variant-numeric:tabular-nums;
+}
+.lir-tab.active .lir-tab-n{
+  background:color-mix(in srgb, var(--accent) 28%, transparent);
+  color:#fff;
+}
+.lir-tab-n.green{ background:color-mix(in srgb, var(--green) 26%, transparent); color:#8fe3ab; }
+.lir-tab.active .lir-tab-n.green{ background:color-mix(in srgb, var(--green) 40%, transparent); color:#fff; }
+
+/* Sections not owned by the active tab */
+#lobbyInfoRail .lir-section.lir-tab-hidden{ display:none !important; }
+
+/* The tab already names the section, so drop the duplicate header on
+   single-section tabs. Lounge and Activities keep theirs — they hold
+   more than one section and need the separation. */
+#lobbyInfoRail .lir-section[data-lir-tab="members"] > .lir-section-title{ display:none; }
+#lobbyInfoRail .lir-section[data-lir-tab="members"]{ padding-top:8px; }
+
+/* The mini rail's icon for the active tab */
+.lirm-btn.on{
+  background:color-mix(in srgb, var(--accent) 18%, transparent);
+  border-color:color-mix(in srgb, var(--accent) 45%, transparent);
+  color:color-mix(in srgb, var(--accent) 96%, white);
+}
+
 @media (prefers-reduced-motion: reduce){
   #lobbyInfoRail, #chatPanel, .lirm-btn, .lbv-empty-btn{ transition:none !important; }
 }
@@ -47542,6 +47606,31 @@ body.lobby-selected .chat-main .chat-input-box:focus-within{
     { key:'events',   label:'Upcoming',    count:'lirEventCount',   hideEmpty:true },
     { key:'tourney',  label:'Tournaments', count:'lirTourneyCount' }
   ];
+
+  /* ── Tabs ────────────────────────────────────────────────────────
+     Three tabs replace the single stacked scroll. Every existing
+     section is assigned to exactly one tab so nothing is orphaned:
+       Lounge     — the current room: channels, plus its pinned msgs
+                    and shared files, which are per-lounge content
+       Members    — who's here
+       Activities — things happening: tournaments now, events too,
+                    and the natural home for whatever comes next
+     `badge` lists the counts that roll up into the tab's own number. */
+  var TABS = [
+    { key:'lounge',     label:'Lounge',     icon:'channels',
+      sections:['channels','pinned','files'], badge:['lirChannelsCount'] },
+    { key:'members',    label:'Members',    icon:'members',
+      sections:['members'],                  badge:['lirMembersCount'], green:true },
+    { key:'activities', label:'Activities', icon:'tourney',
+      sections:['tourney','events'],         badge:['lirTourneyCount','lirEventCount'] }
+  ];
+
+  var TAB_KEY = 'lobbyRailTab';
+  function bodyIdFor(k){ return 'lir' + k.charAt(0).toUpperCase() + k.slice(1) + 'Body'; }
+  function sectionFor(k){
+    var b = document.getElementById(bodyIdFor(k));
+    return b ? b.closest('.lir-section') : null;
+  }
 
   var ICONS = {
     channels:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><line x1="9" y1="3" x2="7" y2="21"/><line x1="17" y1="3" x2="15" y2="21"/><line x1="3" y1="9" x2="21" y2="9"/><line x1="3" y1="15" x2="21" y2="15"/></svg>',
@@ -47587,11 +47676,41 @@ body.lobby-selected .chat-main .chat-input-box:focus-within{
   }
   window.lobbyRailToggle = function(){ setCollapsed(!document.body.classList.contains('lir-collapsed')); };
 
-  /* ── Build the mini icon rail + the collapse button ─────────── */
+  /* ── Build the tab bar, the mini icon rail, the collapse button ── */
   function build(){
     var rail = $('lobbyInfoRail');
     if (!rail || $('lirMini')) return;
 
+    // ── Tab bar, directly under the Calendar / Invite header ──
+    if (!$('lirTabs')){
+      var header = rail.querySelector('.lir-header');
+      var tabs = document.createElement('div');
+      tabs.id = 'lirTabs';
+      tabs.setAttribute('role', 'tablist');
+      tabs.innerHTML = TABS.map(function(t){
+        return '<button class="lir-tab" type="button" role="tab" data-tab="' + t.key +
+               '" aria-selected="false" title="' + t.label + '">' +
+               '<span class="lir-tab-l">' + t.label + '</span>' +
+               '<span class="lir-tab-n' + (t.green ? ' green' : '') +
+               '" data-tabcount="' + t.key + '" hidden></span></button>';
+      }).join('');
+      if (header && header.nextSibling) rail.insertBefore(tabs, header.nextSibling);
+      else rail.insertBefore(tabs, rail.firstChild);
+      tabs.addEventListener('click', function(e){
+        var b = e.target.closest('.lir-tab');
+        if (b) setTab(b.dataset.tab);
+      });
+    }
+
+    // Tag every section with the tab that owns it.
+    TABS.forEach(function(t){
+      t.sections.forEach(function(sk){
+        var sec = sectionFor(sk);
+        if (sec) sec.setAttribute('data-lir-tab', t.key);
+      });
+    });
+
+    // ── Mini icon rail — one icon per TAB now, not per section ──
     var mini = document.createElement('div');
     mini.id = 'lirMini';
 
@@ -47600,10 +47719,11 @@ body.lobby-selected .chat-main .chat-input-box:focus-within{
                '<polyline points="11 17 6 12 11 7"/><polyline points="18 17 13 12 18 7"/></svg></button>' +
                '<div class="lirm-div"></div>';
 
-    SECTIONS.forEach(function(s){
-      html += '<button class="lirm-btn" data-lirm="' + s.key + '" title="' + s.label + '" aria-label="' + s.label + '">' +
-              ICONS[s.key] + '<span class="lirm-badge' + (s.green ? ' green' : '') +
-              '" data-badge="' + s.key + '" hidden></span></button>';
+    TABS.forEach(function(t){
+      html += '<button class="lirm-btn" data-lirm="' + t.key + '" title="' + t.label +
+              '" aria-label="' + t.label + '">' + ICONS[t.icon] +
+              '<span class="lirm-badge' + (t.green ? ' green' : '') +
+              '" data-badge="' + t.key + '" hidden></span></button>';
     });
 
     html += '<div class="lirm-sp"></div>' +
@@ -47621,9 +47741,9 @@ body.lobby-selected .chat-main .chat-input-box:focus-within{
         if (typeof window.toggleHofPanel === 'function') window.toggleHofPanel();
         return;
       }
-      // Expand the rail and reveal that section, even if it's empty.
+      // Expand the rail straight onto that tab.
       setCollapsed(false);
-      revealSection(k);
+      setTab(k);
     });
 
     // Collapse control inside the expanded header
@@ -47637,45 +47757,89 @@ body.lobby-selected .chat-main .chat-input-box:focus-within{
       cb.addEventListener('click', function(){ setCollapsed(true); });
       rail.appendChild(cb);
     }
+
+    setTab(getTab());
   }
 
-  /* Expand a section by key and scroll it into view. */
-  function revealSection(key){
-    var body = $('lir' + key.charAt(0).toUpperCase() + key.slice(1) + 'Body');
-    if (!body) return;
-    var sec = body.closest('.lir-section');
-    if (sec) sec.classList.remove('lbv-hide');
-    body.classList.remove('collapsed');
-    var title = sec && sec.querySelector('.lir-section-title');
-    if (title) title.classList.remove('collapsed');
-    if (sec && sec.scrollIntoView) {
-      try { sec.scrollIntoView({ block:'nearest', behavior:'smooth' }); } catch(e){ sec.scrollIntoView(); }
-    }
+  /* ── Tab state ──────────────────────────────────────────────── */
+  function getTab(){
+    try {
+      var v = localStorage.getItem(TAB_KEY);
+      if (v && TABS.some(function(t){ return t.key === v; })) return v;
+    } catch(e){}
+    return TABS[0].key;
   }
 
-  /* ── Keep mini badges + empty-section hiding in sync ────────── */
+  function setTab(key){
+    if (!TABS.some(function(t){ return t.key === key; })) key = TABS[0].key;
+    try { localStorage.setItem(TAB_KEY, key); } catch(e){}
+
+    var tabs = $('lirTabs');
+    if (tabs) Array.prototype.forEach.call(tabs.querySelectorAll('.lir-tab'), function(b){
+      var on = (b.dataset.tab === key);
+      b.classList.toggle('active', on);
+      b.setAttribute('aria-selected', on ? 'true' : 'false');
+    });
+    Array.prototype.forEach.call(document.querySelectorAll('.lirm-btn[data-lirm]'), function(b){
+      b.classList.toggle('on', b.dataset.lirm === key);
+    });
+
+    var rail = $('lobbyInfoRail');
+    if (rail) Array.prototype.forEach.call(
+      rail.querySelectorAll('.lir-section[data-lir-tab]'), function(sec){
+        sec.classList.toggle('lir-tab-hidden', sec.getAttribute('data-lir-tab') !== key);
+      });
+
+    // Guarantee the tab's PRIMARY section is open — landing on a tab
+    // whose main content is collapsed would look empty. Secondary
+    // sections (Pinned, Files, Upcoming) keep whatever the user set,
+    // so collapsing them still sticks.
+    TABS.forEach(function(t){
+      if (t.key !== key) return;
+      var primary = t.sections[0];
+      var body = $(bodyIdFor(primary));
+      if (body) body.classList.remove('collapsed');
+      var sec = sectionFor(primary);
+      var title = sec && sec.querySelector('.lir-section-title');
+      if (title) title.classList.remove('collapsed');
+    });
+
+    var sc = rail && rail.querySelector('.lir-scroll');
+    if (sc) sc.scrollTop = 0;
+  }
+  window.lobbyRailTab = setTab;
+
+  /* ── Keep tab counts, mini badges + empty-section hiding in sync ── */
   var lastSig = '';
   function syncMini(){
     var sig = SECTIONS.map(function(s){ return countOf(s.count); }).join('|');
     if (sig === lastSig) return;         // signature guard — no needless writes
     lastSig = sig;
 
+    // Per-section: hide the zero-count noise sections inside their tab.
     SECTIONS.forEach(function(s){
-      var n = countOf(s.count);
-      var badge = document.querySelector('[data-badge="' + s.key + '"]');
+      if (!s.hideEmpty) return;
+      var sec = sectionFor(s.key);
+      if (sec) sec.classList.toggle('lbv-hide', countOf(s.count) === 0);
+    });
+
+    // Per-tab: roll the owned counts up into the tab and its mini icon.
+    TABS.forEach(function(t){
+      var n = t.badge.reduce(function(sum, id){ return sum + countOf(id); }, 0);
+      var txt = n > 99 ? '99+' : String(n);
+
+      var tabN = document.querySelector('[data-tabcount="' + t.key + '"]');
+      if (tabN){
+        if (n > 0){ tabN.textContent = txt; tabN.hidden = false; }
+        else tabN.hidden = true;
+      }
+      var badge = document.querySelector('[data-badge="' + t.key + '"]');
       if (badge){
-        if (n > 0){ badge.textContent = n > 99 ? '99+' : String(n); badge.hidden = false; }
+        if (n > 0){ badge.textContent = txt; badge.hidden = false; }
         else badge.hidden = true;
       }
-      var btn = document.querySelector('.lirm-btn[data-lirm="' + s.key + '"]');
+      var btn = document.querySelector('.lirm-btn[data-lirm="' + t.key + '"]');
       if (btn) btn.classList.toggle('is-empty', n === 0);
-
-      // Hide the zero-count noise sections in the expanded rail.
-      if (s.hideEmpty){
-        var body = $('lir' + s.key.charAt(0).toUpperCase() + s.key.slice(1) + 'Body');
-        var sec = body && body.closest('.lir-section');
-        if (sec) sec.classList.toggle('lbv-hide', n === 0);
-      }
     });
   }
 
