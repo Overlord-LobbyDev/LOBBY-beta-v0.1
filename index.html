@@ -50535,5 +50535,114 @@ body.feed-resizing .lobby-overlay{ transition:none !important; }
 })();
 </script>
 
+<!-- ══════════════════════════════════════════════════════════════════
+     SINGLE OWNER FOR PAGE SWITCHING
+     Every page-switch site hid a DIFFERENT subset of the panels, so
+     residue accumulated and you'd eventually land on a previous page.
+     This makes "show exactly one page" one function that every switch
+     goes through, so no site can forget a panel again.
+     ══════════════════════════════════════════════════════════════════ -->
+<script>
+(function () {
+  'use strict';
+
+  // Every full-page container in the app.
+  var PANELS = ['homePanel', 'chatPanel', 'profilePage', 'calendarPanel', 'vcPanel'];
+
+  /* Close everything, then open exactly one thing.
+     Before this, the three switch sites each hid their own subset:
+       showHomePanel   hid chat/profile/calendar   — NOT vcPanel, NO overlays
+       showChatPanel   hid home/profile/calendar   — NOT vcPanel
+       openProfilePanel hid home/chat/calendar     — NOT vcPanel, NO overlays
+     So #vcPanel was never hidden by ANY page switch, and overlays were only
+     closed on two of the paths. Whatever was left visible underneath became
+     "it loaded a previous page". */
+  window._showOnlyPage = function (showId) {
+    try {
+      // Full-page overlays (Discover / Tournaments / Leaderboards / Queue /
+      // Speedrun) sit at z-index 9000 and would otherwise cover the new page.
+      if (typeof window.hideOverlay === 'function') window.hideOverlay();
+      else document.querySelectorAll('.lobby-overlay.open')
+                   .forEach(function (o) { o.classList.remove('open'); });
+    } catch (e) {}
+
+    try {
+      // coliseum-mode CSS-hides every panel, so leaving it on makes any
+      // destination look blank.
+      if (typeof window.exitColiseumMode === 'function') window.exitColiseumMode();
+    } catch (e) {}
+
+    PANELS.forEach(function (id) {
+      var el = document.getElementById(id);
+      if (!el) return;
+      if (id === showId) el.classList.remove('hidden');
+      else el.classList.add('hidden');
+    });
+  };
+
+  /* Route the existing switch sites through it. Wrapping rather than
+     editing each one keeps their own logic (titles, sidebar state, voice
+     PiP) intact — this only guarantees the panel set is correct. */
+  function wrap(name, target){
+    var orig = window[name];
+    if (typeof orig !== 'function' || orig.__showOnlyWrapped) return false;
+    window[name] = function () {
+      var r = orig.apply(this, arguments);
+      // AFTER the original, so it wins over whatever partial set that
+      // function applied. Handles async originals too.
+      try { window._showOnlyPage(target); } catch (e) {}
+      if (r && typeof r.then === 'function'){
+        return r.then(function (v) {
+          try { window._showOnlyPage(target); } catch (e) {}
+          return v;
+        });
+      }
+      return r;
+    };
+    window[name].__showOnlyWrapped = true;
+    return true;
+  }
+
+  var TARGETS = [
+    ['showHomePanel',   'homePanel'],
+    ['showChatPanel',   'chatPanel'],
+    ['openProfilePanel','profilePage'],
+    ['showVcPanel',     'vcPanel'],
+  ];
+
+  function install(){
+    var pending = 0;
+    TARGETS.forEach(function (t) { if (!wrap(t[0], t[1])) pending++; });
+    return pending === 0;
+  }
+
+  function start(){
+    install();
+    /* Keep re-checking rather than stopping at the first success.
+       openProfilePanel is reassigned in five different places, and other
+       blocks monkey-patch these too — a wrapper installed once can simply
+       be replaced later, silently losing the guarantee. wrap() is a no-op
+       once the CURRENT value carries the flag, so re-running is free. */
+    var tries = 0;
+    var iv = setInterval(function () {
+      install();
+      if (++tries > 60) { clearInterval(iv); }
+    }, 250);
+    setTimeout(ready, 1200);
+  }
+
+  function ready(){
+    var wrapped = TARGETS.filter(function (t) {
+      return typeof window[t[0]] === 'function' && window[t[0]].__showOnlyWrapped;
+    }).map(function (t) { return t[0]; });
+    console.log('[nav] single-owner page switching active — ' +
+      (wrapped.length ? wrapped.join(', ') : 'none wrapped (all are non-global)'));
+  }
+
+  if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', start);
+  else start();
+})();
+</script>
+
 </body>
 </html>
