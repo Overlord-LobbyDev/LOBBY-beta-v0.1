@@ -47056,7 +47056,10 @@ body.bracket-active .chamber-back{ display:none !important; }
      ══════════════════════════════════════════════════════════════════ -->
 <style>
 :root{
-  --lir-w-full: 320px;
+  /* Default expanded width. Overridden inline on <html> by the resizer,
+     which persists the user's choice. 320px cramped the three tabs
+     ("ACTIVIT…"); 360 gives them room and still leaves the chat wide. */
+  --lir-w-full: 360px;
   --lir-w-mini: 56px;
   --lir-w: var(--lir-w-full);
   /* No cap. Capping the column left everything to its right as dead space,
@@ -47539,7 +47542,9 @@ body.lir-collapsed #lirTabs{ display:none; }
   border:1px solid rgba(255,255,255,.06);
   color:var(--text-3);
   font-family:var(--font);
-  font-size:9px; font-weight:900; letter-spacing:1.1px; text-transform:uppercase;
+  /* Sized so "ACTIVITIES" + its count still fit when the rail is dragged
+     down to its 280px minimum. */
+  font-size:8.5px; font-weight:900; letter-spacing:.9px; text-transform:uppercase;
   transition:background .16s, color .16s, border-color .16s;
 }
 .lir-tab-l{ overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
@@ -47582,6 +47587,31 @@ body.lir-collapsed #lirTabs{ display:none; }
   border-color:color-mix(in srgb, var(--accent) 45%, transparent);
   color:color-mix(in srgb, var(--accent) 96%, white);
 }
+
+/* ══ RESIZE HANDLE ══════════════════════════════════════════════════
+   Sits on the rail's left edge. Invisible until hovered so it doesn't
+   add another line to the chrome, but has a 6px grab area — a 1px
+   target is miserable to hit. */
+#lirResize{
+  position:absolute; left:0; top:0; bottom:0; width:6px;
+  cursor:col-resize; z-index:9; background:transparent;
+}
+#lirResize::after{
+  content:''; position:absolute; left:2px; top:0; bottom:0; width:2px;
+  background:transparent; transition:background .16s;
+}
+#lirResize:hover::after,
+body.lir-resizing #lirResize::after{
+  background:color-mix(in srgb, var(--accent) 65%, transparent);
+}
+body.lir-collapsed #lirResize{ display:none; }
+
+/* While dragging: kill the width transition so the edge tracks the
+   cursor exactly instead of lagging behind it, and stop the drag from
+   selecting text across the app. */
+body.lir-resizing{ cursor:col-resize; user-select:none; }
+body.lir-resizing #lobbyInfoRail,
+body.lir-resizing #chatPanel{ transition:none !important; }
 
 @media (prefers-reduced-motion: reduce){
   #lobbyInfoRail, #chatPanel, .lirm-btn, .lbv-empty-btn{ transition:none !important; }
@@ -47758,7 +47788,60 @@ body.lir-collapsed #lirTabs{ display:none; }
       rail.appendChild(cb);
     }
 
+    buildResizer(rail);
     setTab(getTab());
+  }
+
+  /* ── Resizable width ────────────────────────────────────────────
+     The rail is anchored right and its width drives #chatPanel's right
+     offset through --lir-w, so setting the one variable reflows both. */
+  var W_KEY = 'lobbyRailWidth', W_MIN = 280, W_MAX = 560, W_DEFAULT = 360;
+
+  function applyWidth(px){
+    px = Math.max(W_MIN, Math.min(W_MAX, Math.round(px)));
+    document.documentElement.style.setProperty('--lir-w-full', px + 'px');
+    return px;
+  }
+  function loadWidth(){
+    try {
+      var v = parseInt(localStorage.getItem(W_KEY), 10);
+      if (!isNaN(v)) applyWidth(v);
+    } catch(e){}
+  }
+  function saveWidth(px){
+    try { localStorage.setItem(W_KEY, String(px)); } catch(e){}
+  }
+
+  function buildResizer(rail){
+    if ($('lirResize')) return;
+    var h = document.createElement('div');
+    h.id = 'lirResize';
+    h.title = 'Drag to resize · double-click to reset';
+    rail.appendChild(h);
+
+    h.addEventListener('mousedown', function(e){
+      if (document.body.classList.contains('lir-collapsed')) return;
+      e.preventDefault();
+      document.body.classList.add('lir-resizing');
+      var last = W_DEFAULT;
+
+      function move(ev){
+        // Anchored to the right edge, so width == distance from it.
+        last = applyWidth(window.innerWidth - ev.clientX);
+      }
+      function up(){
+        document.body.classList.remove('lir-resizing');
+        document.removeEventListener('mousemove', move);
+        document.removeEventListener('mouseup', up);
+        saveWidth(last);
+      }
+      document.addEventListener('mousemove', move);
+      document.addEventListener('mouseup', up);
+    });
+
+    h.addEventListener('dblclick', function(){
+      saveWidth(applyWidth(W_DEFAULT));
+    });
   }
 
   /* ── Tab state ──────────────────────────────────────────────── */
@@ -47966,6 +48049,7 @@ body.lir-collapsed #lirTabs{ display:none; }
   function start(){
     if (!$('lobbyInfoRail')) { setTimeout(start, 400); return; }
 
+    loadWidth();
     document.body.classList.toggle('lir-collapsed', isCollapsed());
     refresh();
 
