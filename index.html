@@ -51377,24 +51377,36 @@ body.dock-sidebar:not(.dock-feed)  #phFeedToggleBtn .ph-fb-dot {
 
   function $(id){ return document.getElementById(id); }
 
-  /* `busy` blocks a second transition from interleaving with one already
-     running — but it must never DISCARD the click, which is what made the
-     sidebar need two presses: anything pressed inside the ~480ms settle
-     window was silently dropped. The last press is queued instead and runs
-     as soon as the dock is free.
-     `intent` is where we are HEADING. Mid-transition the DOM still reports
-     the old dock, so pick() has to read intent — otherwise a click during
-     the settle window is judged against a stale state and toggles the
-     wrong way. It is cleared on release so the real DOM governs again
-     (the rail can also be toggled from outside this switch). */
-  var busy = false, pending = null, intent = null;
+  /* There is no `busy` lock any more. It was the delay: it held for
+     ~480ms after every switch, and toggleFeed() and setHidden() BOTH
+     already cancel their own in-flight timers ("so rapid toggles can never
+     desync state"), so nothing needed protecting — the lock only added
+     dead time and swallowed clicks.
+
+     `intent` is just for the lights: it records where we're heading so the
+     pressed pill responds immediately, and clears once the DOM has caught
+     up, after which the real state governs again (the rail can also be
+     toggled from outside this switch). */
+  var intent = null, intentTimer = null;
 
   function doubleDock(){
     try { return localStorage.getItem('lobbyDoubleDock') === '1'; } catch(e){ return false; }
   }
   function feedOpen(){ return document.body.classList.contains('feed-open'); }
-  function railShown(){ return !document.body.classList.contains('rail-hidden'); }
   function dmOn(){ return document.body.classList.contains('rail-dm'); }
+
+  /* Whether the rail is ACTUALLY on screen. `.rail-hidden` alone is not
+     enough: the rail's CSS also requires `.feed-closed`, so an open feed
+     covers the rail without ever setting .rail-hidden. Testing the class
+     alone reported the rail as visible while the feed was over it — which
+     is exactly the check toggleLobbyRail() makes internally, and why the
+     two disagreed. */
+  function railShown(){
+    var b = document.body;
+    if (b.classList.contains('rail-hidden')) return false;
+    if (!doubleDock() && !b.classList.contains('feed-closed')) return false;
+    return true;
+  }
 
   function state(){
     if (dmOn() && railShown()) return 'messages';
@@ -51403,33 +51415,12 @@ body.dock-sidebar:not(.dock-feed)  #phFeedToggleBtn .ph-fb-dot {
     return 'none';
   }
 
-  function closeFeed(){
-    if (feedOpen() && typeof window.toggleFeed === 'function') window.toggleFeed();
-  }
-  function showRail(){
-    if (!railShown() && typeof window.toggleLobbyRail === 'function') window.toggleLobbyRail();
-  }
-  function hideRail(){
-    if (railShown() && typeof window.toggleLobbyRail === 'function') window.toggleLobbyRail();
-  }
-
-  /* Exit durations, matched to the CSS above. The outgoing panel must be
-     GONE before the incoming one starts: all three share one slot, and the
-     page's own `right:` edge is driven off .feed-open / .rail-hidden, so
-     overlapping them made the edge jump mid-flight while two panels slid
-     across each other. That was the jank — not the durations, which
-     already match (.46s in / .30s out, same curves). */
-  var RAIL_OUT = 300, FEED_OUT = 300, FEED_OUT_SPLIT = 340;
-  var SETTLE   = 480;                       // longest entrance + headroom
-  var XFADE_OUT = 130, XFADE_IN = 190;      // rail content crossfade
+  var XFADE_OUT = 130, XFADE_IN = 190;   // rail content crossfade
+  var INTENT_MS = 700;                   // long enough for the DOM to catch up
 
   function reduced(){
     try { return matchMedia('(prefers-reduced-motion: reduce)').matches; }
     catch(e){ return false; }
-  }
-  function feedOutMs(){
-    return document.body.getAttribute('data-feed-position') === 'split'
-      ? FEED_OUT_SPLIT : FEED_OUT;
   }
   function after(ms, fn){ if (reduced() || !ms) fn(); else setTimeout(fn, ms); }
   function isRail(s){ return s === 'messages' || s === 'sidebar'; }
@@ -51437,19 +51428,16 @@ body.dock-sidebar:not(.dock-feed)  #phFeedToggleBtn .ph-fb-dot {
   function dmOpen(){ if (window.lobbyRailDM) window.lobbyRailDM.open(); }
   function dmClose(){ if (window.lobbyRailDM) window.lobbyRailDM.close(); }
 
-  /* Single exit point from a transition: drop the guard, then run whatever
-     was pressed while it was up. */
-  function release(){
-    busy = false;
-    intent = null;
-    sync();
-    if (pending !== null){
-      var next = pending;
-      pending = null;
-      if (next !== state()) go(next);
-    }
+  /* Where the switch believes it is: the target while a transition is in
+     flight, the real DOM once it has settled. */
+  function current(){ return intent !== null ? intent : state(); }
+
+  function aimAt(target){
+    intent = target;
+    sync();                                  // light the pill on the click
+    clearTimeout(intentTimer);
+    intentTimer = setTimeout(function(){ intent = null; sync(); }, INTENT_MS);
   }
-  function done(){ after(SETTLE, release); }
 
   /* Messages <-> Sidebar are the SAME panel, so sliding it out and back in
      is wrong — it never leaves the screen. Only the contents change, so
@@ -51461,53 +51449,58 @@ body.dock-sidebar:not(.dock-feed)  #phFeedToggleBtn .ph-fb-dot {
       target === 'messages' ? dmOpen() : dmClose();
       b.classList.remove('rail-swap-out');
       b.classList.add('rail-swap-in');
-      sync();
-      after(XFADE_IN, function(){
-        b.classList.remove('rail-swap-in');
-        release();
-      });
+      after(XFADE_IN, function(){ b.classList.remove('rail-swap-in'); sync(); });
     });
   }
 
-  function enter(target){
-    if (target === 'messages'){ dmOpen(); showRail(); }
-    else if (target === 'sidebar'){ dmClose(); showRail(); }
-    else if (target === 'feed'){
-      if (!feedOpen() && typeof window.toggleFeed === 'function') window.toggleFeed();
-    }
-    sync();
-    done();
-  }
-
   function go(target){
-    if (busy){ pending = target; return; }   // queue, never discard
-    var from = state();
+    var from = current();
     if (from === target) return;
-    busy = true;
-    intent = target;
+    aimAt(target);
 
     // Same panel, different contents — crossfade, don't re-slide.
     if (isRail(from) && isRail(target)) { swapRail(target); return; }
 
-    if (target === 'none'){
-      dmClose(); closeFeed(); hideRail();
-      sync(); done();
-      return;
-    }
+    if (isRail(target)){
+      /* Read this BEFORE touching DM mode: lobbyRailDM.open() un-hides the
+         rail itself, and toggleLobbyRail() decides by TOGGLING what it
+         sees — so opening DM first would leave it looking at an already
+         un-hidden rail and it would hide it again. Same reason the reveal
+         runs before dmOpen() rather than after. */
+      var wasShown = railShown();
 
-    // With Double Dock the feed and rail coexist, so nothing has to leave.
-    if (doubleDock()){ enter(target); return; }
+      /* Hand the whole feed->rail handoff to toggleLobbyRail(). It already
+         does this correctly: toggleFeed() does not add .feed-closed until
+         360ms after it is called, and the rail's show rule REQUIRES that
+         class, so toggleLobbyRail closes the feed itself and waits for the
+         class before playing the entrance.
+         Closing the feed here and then calling it was the bug behind both
+         symptoms. If .rail-hidden happened to be off, the rail
+         counted as "visible" and nothing ran — so it popped in unanimated
+         when .feed-closed finally landed (the stutter). If .rail-hidden
+         was on, toggleLobbyRail still saw a feed that had not finished
+         leaving, took its feed-covering branch and called toggleFeed()
+         again — REOPENING the feed, which is why the sidebar needed a
+         second press. */
+      if (!wasShown && typeof window.toggleLobbyRail === 'function')
+        window.toggleLobbyRail();
 
-    var wait = 0;
-    if (from === 'feed' && isRail(target)){
-      closeFeed();
-      wait = feedOutMs();
-    } else if (isRail(from) && target === 'feed'){
+      target === 'messages' ? dmOpen() : dmClose();
+    } else if (target === 'feed'){
       dmClose();
-      hideRail();
-      wait = RAIL_OUT;
+      // Not in Double Dock the rail must go; its exit and the feed's
+      // entrance share the slot and simply crossfade — no wait, because
+      // each toggle cancels its own in-flight timers.
+      if (!doubleDock() && railShown() && typeof window.toggleLobbyRail === 'function')
+        window.toggleLobbyRail();
+      if (!feedOpen() && typeof window.toggleFeed === 'function') window.toggleFeed();
+    } else {                                   // 'none'
+      dmClose();
+      if (feedOpen() && typeof window.toggleFeed === 'function') window.toggleFeed();
+      if (railShown() && typeof window.toggleLobbyRail === 'function')
+        window.toggleLobbyRail();
     }
-    after(wait, function(){ enter(target); });
+    sync();
   }
 
   function pick(target){
@@ -51515,8 +51508,7 @@ body.dock-sidebar:not(.dock-feed)  #phFeedToggleBtn .ph-fb-dot {
     // against where we're HEADING, not the mid-transition DOM — during a
     // handoff the old dock is still in the classes, so reading state()
     // here made a click land backwards.
-    var cur = (pending !== null) ? pending : (intent !== null ? intent : state());
-    go(cur === target ? 'none' : target);
+    go(current() === target ? 'none' : target);
   }
 
   /* Buttons own their own click handlers already; intercept in the
@@ -51536,7 +51528,7 @@ body.dock-sidebar:not(.dock-feed)  #phFeedToggleBtn .ph-fb-dot {
   function sync(){
     // Reflect where we're heading, so the pressed button responds on the
     // click rather than after the transition settles.
-    var s = (pending !== null) ? pending : (intent !== null ? intent : state());
+    var s = current();
     /* ONE source of truth for the three lights. They each used to key off
        their own body class (.feed-open / .rail-dm / .rail-hidden), and
        those flip at different points in a handoff — .feed-open drops on
@@ -51580,7 +51572,7 @@ body.dock-sidebar:not(.dock-feed)  #phFeedToggleBtn .ph-fb-dot {
     intercept('phMessagesBtn', 'messages');
     intercept('phFeedToggleBtn', 'feed');
     intercept('phRailToggleBtn', 'sidebar');
-    if (!busy) sync();
+    sync();
   }
 
   function start(){
