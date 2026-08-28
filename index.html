@@ -49321,8 +49321,107 @@ body.lobby-selected:not(.lir-collapsed) #phRailToggleBtn{
 body.lobby-selected:not(.lir-collapsed) #phRailToggleBtn .ph-fb-tile{
   background:color-mix(in srgb, var(--accent) 26%, transparent);
 }
-/* Nothing to toggle when you aren't in a lobby. */
-body:not(.lobby-selected) #phRailToggleBtn{ opacity:.4; pointer-events:none; }
+/* ── The rail lives on EVERY page ────────────────────────────────
+   It was gated on .lobby-selected, so on Home, DMs, Feed or a profile
+   it simply didn't exist — which defeats the point of it being the route
+   BACK to a lobby. Now it shows wherever the feed isn't occupying the
+   slot, and carries a jump-back panel when you aren't inside a lobby. */
+body.feed-closed #lobbyInfoRail{
+  transform:translateX(0) !important;
+  pointer-events:auto !important;
+}
+body.feed-closed:not(.lobby-selected) #homePanel,
+body.feed-closed:not(.lobby-selected) #chatPanel,
+body.feed-closed:not(.lobby-selected) #profilePage,
+body.feed-closed:not(.lobby-selected) #calendarPanel{
+  right:var(--lir-w) !important;
+}
+/* The lobby-scoped sections have nothing to show without a lobby. */
+body:not(.lobby-selected) #lobbyInfoRail .lir-header,
+body:not(.lobby-selected) #lobbyInfoRail .lir-scroll,
+body:not(.lobby-selected) #lobbyInfoRail #lirTabs,
+body:not(.lobby-selected) #lobbyInfoRail #lirHofFooter,
+body:not(.lobby-selected) #lobbyInfoRail #lirRecents{ display:none !important; }
+body.lobby-selected #lirJump{ display:none !important; }
+body.lir-collapsed #lirJump{ display:none !important; }
+
+/* ── Jump-back panel ─────────────────────────────────────────────── */
+#lirJump{ display:flex; flex-direction:column; height:100%; overflow:hidden; }
+.lj-head{
+  padding:16px 16px 12px;
+  border-bottom:1px solid rgba(255,255,255,.055);
+}
+.lj-eyebrow{
+  font-family:var(--font); font-size:8.5px; font-weight:900;
+  letter-spacing:1.7px; text-transform:uppercase; color:var(--text-3);
+}
+.lj-title{
+  font-family:'Bebas Neue', var(--font), sans-serif;
+  font-size:19px; letter-spacing:.6px; color:var(--text-1); margin-top:3px;
+}
+.lj-body{ flex:1; overflow-y:auto; padding:10px; }
+.lj-sec{
+  font-family:var(--font); font-size:8.5px; font-weight:900;
+  letter-spacing:1.5px; text-transform:uppercase; color:var(--text-3);
+  padding:10px 6px 7px;
+}
+.lj-row{
+  display:flex; align-items:center; gap:10px; width:100%;
+  padding:8px 9px; margin-bottom:5px;
+  border-radius:10px; cursor:pointer; text-align:left;
+  background:rgba(255,255,255,.03);
+  border:1px solid rgba(255,255,255,.05);
+  border-left:3px solid transparent;
+  transition:background .16s, border-color .16s, transform .16s;
+}
+.lj-row:hover{
+  background:color-mix(in srgb, var(--accent) 12%, transparent);
+  border-color:color-mix(in srgb, var(--accent) 30%, transparent);
+  transform:translateX(3px);
+}
+.lj-row:focus-visible{ outline:2px solid var(--accent); outline-offset:2px; }
+.lj-row.call{ border-left-color:var(--green); }
+.lj-row.unread{ border-left-color:var(--accent); }
+.lj-ico{
+  width:30px; height:30px; border-radius:9px; flex:none; overflow:hidden;
+  background:linear-gradient(135deg, var(--accent), var(--accent-h));
+  display:grid; place-items:center;
+  font-family:'Bebas Neue', var(--font), sans-serif; font-size:13px; color:#fff;
+}
+.lj-ico img{ width:100%; height:100%; object-fit:cover; }
+.lj-meta{ min-width:0; flex:1; }
+.lj-name{
+  font-family:var(--font); font-size:12.5px; font-weight:800; color:#fff;
+  overflow:hidden; text-overflow:ellipsis; white-space:nowrap;
+}
+.lj-sub{
+  font-family:var(--font); font-size:9.5px; font-weight:700; color:var(--text-3);
+  margin-top:2px;
+}
+.lj-sub.call{ color:var(--green); }
+.lj-sub.unread{ color:color-mix(in srgb, var(--accent) 95%, white); }
+.lj-empty{
+  padding:20px 14px; text-align:center;
+  font-family:var(--font); font-size:11.5px; color:var(--text-3); line-height:1.6;
+}
+
+/* Collapsed rail off-lobby: crests only, so it's still a jump-back. */
+#lirMiniRecents{ display:none; flex-direction:column; align-items:center; gap:6px; }
+body:not(.lobby-selected) #lirMiniRecents{ display:flex; }
+body:not(.lobby-selected) #lirMini .lirm-btn[data-lirm]:not([data-lirm="expand"]){ display:none; }
+.lirm-lobby{
+  width:34px; height:34px; border-radius:9px; flex:none; overflow:hidden;
+  cursor:pointer; border:1.5px solid transparent;
+  background:linear-gradient(135deg, var(--accent), var(--accent-h));
+  display:grid; place-items:center;
+  font-family:'Bebas Neue', var(--font), sans-serif; font-size:14px; color:#fff;
+  opacity:.7; transition:opacity .16s, transform .16s, border-color .16s;
+  position:relative;
+}
+.lirm-lobby img{ width:100%; height:100%; object-fit:cover; }
+.lirm-lobby:hover{ opacity:1; transform:translateY(-2px); }
+.lirm-lobby.call{ border-color:var(--green); opacity:1; }
+.lirm-lobby.unread{ border-color:var(--accent); opacity:1; }
 
 /* ── Recent lobbies strip in the rail header ────────────────────── */
 #lirRecents{
@@ -49473,7 +49572,7 @@ body.lir-collapsed #lirRecents{ display:none; }
       ts: Date.now()
     });
     saveRecents(list);
-    renderRecents();
+    renderRecents(); renderJump(); renderMiniRecents();
   }
 
   function ranked(){
@@ -49535,13 +49634,104 @@ body.lir-collapsed #lirRecents{ display:none; }
   }
 
   document.addEventListener('click', function(e){
-    var b = e.target.closest('.lir-recent');
+    var b = e.target.closest('.lir-recent, .lj-row, .lirm-lobby');
     if (!b) return;
     var id = b.dataset.lobby;
+    if (id == null) return;
     // Switch the whole lobby, not just the sidebar — the rail always shows
     // the lobby you're viewing, so they must never disagree.
     if (typeof window.selectServer === 'function') window.selectServer(Number(id));
   });
+
+  /* ── Jump-back panel, shown on every non-lobby page ──────────────
+     The rail's whole purpose off-lobby is getting you back in, so it
+     lists the ranked recents first and then everything else. */
+  function allLobbies(){
+    try { if (typeof _allServers !== 'undefined' && Array.isArray(_allServers)) return _allServers; }
+    catch(e){}
+    return [];
+  }
+
+  var jumpSig = '';
+  function renderJump(){
+    var rail = $('lobbyInfoRail');
+    if (!rail) return;
+
+    var host = $('lirJump');
+    if (!host || !host.isConnected){
+      host = document.createElement('div');
+      host.id = 'lirJump';
+      rail.appendChild(host);
+      jumpSig = '';
+    }
+
+    var top = ranked();
+    var topIds = top.map(function(x){ return String(x.r.id); });
+    var others = allLobbies().filter(function(s){
+      return s && topIds.indexOf(String(s.id)) < 0;
+    });
+
+    function row(id, name, icon, isCall, unread){
+      var cls = isCall ? ' call' : (unread ? ' unread' : '');
+      var sub = isCall ? '<div class="lj-sub call">● In a call</div>'
+              : (unread ? '<div class="lj-sub unread">' + unread + ' unread</div>' : '');
+      var inner = icon ? '<img src="' + esc(icon) + '" alt="">'
+                       : esc(String(name || 'L').charAt(0).toUpperCase());
+      return '<button class="lj-row' + cls + '" data-lobby="' + esc(id) + '">' +
+        '<span class="lj-ico">' + inner + '</span>' +
+        '<span class="lj-meta"><span class="lj-name">' + esc(name || 'Lobby') + '</span>' +
+        sub + '</span></button>';
+    }
+
+    var html =
+      '<div class="lj-head"><div class="lj-eyebrow">Jump back in</div>' +
+        '<div class="lj-title">Your Lobbies</div></div><div class="lj-body">';
+
+    if (top.length){
+      html += '<div class="lj-sec">Recent</div>' + top.map(function(x){
+        return row(x.r.id, x.r.name, x.r.icon, x.isCall, x.unread);
+      }).join('');
+    }
+    if (others.length){
+      html += '<div class="lj-sec">All lobbies</div>' + others.map(function(s){
+        return row(s.id, s.name, s.icon_url || s.iconUrl, false, 0);
+      }).join('');
+    }
+    if (!top.length && !others.length){
+      html += '<div class="lj-empty">No lobbies yet.<br>Create or join one to see it here.</div>';
+    }
+    html += '</div>';
+
+    if (html === jumpSig) return;
+    jumpSig = html;
+    host.innerHTML = html;
+  }
+
+  /* Collapsed + off-lobby: crests only, so the strip is still a route back. */
+  var miniSig = '';
+  function renderMiniRecents(){
+    var mini = $('lirMini');
+    if (!mini) return;
+    var host = $('lirMiniRecents');
+    if (!host || !host.isConnected){
+      host = document.createElement('div');
+      host.id = 'lirMiniRecents';
+      var div = mini.querySelector('.lirm-div');
+      if (div && div.nextSibling) mini.insertBefore(host, div.nextSibling);
+      else mini.appendChild(host);
+      miniSig = '';
+    }
+    var html = ranked().map(function(x){
+      var cls = x.isCall ? ' call' : (x.unread ? ' unread' : '');
+      var inner = x.r.icon ? '<img src="' + esc(x.r.icon) + '" alt="">'
+                           : esc(String(x.r.name || 'L').charAt(0).toUpperCase());
+      return '<button class="lirm-lobby' + cls + '" data-lobby="' + esc(x.r.id) +
+             '" title="' + esc(x.r.name) + '">' + inner + '</button>';
+    }).join('');
+    if (html === miniSig) return;
+    miniSig = html;
+    host.innerHTML = html;
+  }
 
   /* ── Settings: Double Dock toggle ───────────────────────────── */
   function buildDDToggle(){
@@ -49612,7 +49802,7 @@ body.lir-collapsed #lirRecents{ display:none; }
     document.body.classList.toggle('double-dock', doubleDock());
     placeButton();
     syncRailBtn();
-    renderRecents();
+    renderRecents(); renderJump(); renderMiniRecents();
     buildDDToggle();
 
     // Record every lobby you open.
@@ -49631,7 +49821,7 @@ body.lir-collapsed #lirRecents{ display:none; }
     // Unread counts and call state change the ordering, and both are
     // reflected in the rail's DOM, so re-rank when it updates.
     var rail = $('lobbyInfoRail');
-    if (rail) new MutationObserver(function(){ renderRecents(); })
+    if (rail) new MutationObserver(function(){ renderRecents(); renderJump(); renderMiniRecents(); })
       .observe(rail, { childList:true, subtree:true });
     // The » arrow inside the rail toggles the same state, so keep the
     // button's label and active styling in step with it.
@@ -49644,7 +49834,7 @@ body.lir-collapsed #lirRecents{ display:none; }
     // lobby is often auto-restored a moment later. Without these retries
     // the stored recents render into nothing and appear to have been lost.
     [200, 700, 1800, 4000].forEach(function(ms){
-      setTimeout(function(){ noteVisit(lexServer()); renderRecents(); }, ms);
+      setTimeout(function(){ noteVisit(lexServer()); renderRecents(); renderJump(); renderMiniRecents(); }, ms);
     });
 
     console.log('[rail] sidebar toggle + recents ready — ' +
