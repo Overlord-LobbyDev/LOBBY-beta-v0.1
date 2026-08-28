@@ -49513,6 +49513,19 @@ body.rail-anim-out #lobbyInfoRail{
   body.rail-anim-in #lobbyInfoRail,
   body.rail-anim-out #lobbyInfoRail{ animation:none; }
 }
+
+/* ── Messages <-> Sidebar: crossfade the CONTENTS, not the panel ──
+   Both live in the rail, so the rail never leaves the screen when you
+   switch between them — sliding it out and back would be a lie. Opacity
+   only, no transform, so nothing shifts while the contents change. */
+@keyframes railXfadeOut { to   { opacity:0; } }
+@keyframes railXfadeIn  { from { opacity:0; } }
+body.rail-swap-out #lobbyInfoRail > *{ animation: railXfadeOut .13s ease both; }
+body.rail-swap-in  #lobbyInfoRail > *{ animation: railXfadeIn  .19s ease both; }
+@media (prefers-reduced-motion: reduce){
+  body.rail-swap-out #lobbyInfoRail > *,
+  body.rail-swap-in  #lobbyInfoRail > *{ animation:none; }
+}
 /* The rail must reserve its width on EVERY page, not just the four panel
    ids I originally listed. The app's own _enforceFeedLayout() shrinks
    homePanel, chatPanel, profilePage, calendarPanel, vcPanel AND every
@@ -51326,33 +51339,91 @@ body.rail-dm:not(.rail-hidden) #phMessagesBtn .ph-fb-tile{
     if (railShown() && typeof window.toggleLobbyRail === 'function') window.toggleLobbyRail();
   }
 
-  function go(target){
-    if (busy) return;
-    busy = true;
-    try {
-      if (target === 'messages'){
-        if (!doubleDock()) closeFeed();
-        if (window.lobbyRailDM) window.lobbyRailDM.open();   // also un-hides the rail
-        showRail();
-      } else if (target === 'sidebar'){
-        if (!doubleDock()) closeFeed();
-        if (window.lobbyRailDM) window.lobbyRailDM.close();  // leave DM mode
-        showRail();
-      } else if (target === 'feed'){
-        if (window.lobbyRailDM) window.lobbyRailDM.close();
-        if (!doubleDock()) hideRail();
-        if (!feedOpen() && typeof window.toggleFeed === 'function') window.toggleFeed();
-      } else {                                              // 'none'
-        if (window.lobbyRailDM) window.lobbyRailDM.close();
-        closeFeed();
-        hideRail();
-      }
-    } finally {
-      // Release after the toggles' own animations have settled, so a fast
-      // second click can't interleave two transitions.
-      setTimeout(function(){ busy = false; sync(); }, 380);
+  /* Exit durations, matched to the CSS above. The outgoing panel must be
+     GONE before the incoming one starts: all three share one slot, and the
+     page's own `right:` edge is driven off .feed-open / .rail-hidden, so
+     overlapping them made the edge jump mid-flight while two panels slid
+     across each other. That was the jank — not the durations, which
+     already match (.46s in / .30s out, same curves). */
+  var RAIL_OUT = 300, FEED_OUT = 300, FEED_OUT_SPLIT = 340;
+  var SETTLE   = 480;                       // longest entrance + headroom
+  var XFADE_OUT = 130, XFADE_IN = 190;      // rail content crossfade
+
+  function reduced(){
+    try { return matchMedia('(prefers-reduced-motion: reduce)').matches; }
+    catch(e){ return false; }
+  }
+  function feedOutMs(){
+    return document.body.getAttribute('data-feed-position') === 'split'
+      ? FEED_OUT_SPLIT : FEED_OUT;
+  }
+  function after(ms, fn){ if (reduced() || !ms) fn(); else setTimeout(fn, ms); }
+  function isRail(s){ return s === 'messages' || s === 'sidebar'; }
+
+  function dmOpen(){ if (window.lobbyRailDM) window.lobbyRailDM.open(); }
+  function dmClose(){ if (window.lobbyRailDM) window.lobbyRailDM.close(); }
+
+  function done(){
+    after(SETTLE, function(){ busy = false; sync(); });
+  }
+
+  /* Messages <-> Sidebar are the SAME panel, so sliding it out and back in
+     is wrong — it never leaves the screen. Only the contents change, so
+     they crossfade in place while the rail itself stays put. */
+  function swapRail(target){
+    var b = document.body;
+    b.classList.add('rail-swap-out');
+    after(XFADE_OUT, function(){
+      target === 'messages' ? dmOpen() : dmClose();
+      b.classList.remove('rail-swap-out');
+      b.classList.add('rail-swap-in');
+      sync();
+      after(XFADE_IN, function(){
+        b.classList.remove('rail-swap-in');
+        busy = false;
+        sync();
+      });
+    });
+  }
+
+  function enter(target){
+    if (target === 'messages'){ dmOpen(); showRail(); }
+    else if (target === 'sidebar'){ dmClose(); showRail(); }
+    else if (target === 'feed'){
+      if (!feedOpen() && typeof window.toggleFeed === 'function') window.toggleFeed();
     }
     sync();
+    done();
+  }
+
+  function go(target){
+    if (busy) return;
+    var from = state();
+    if (from === target) return;
+    busy = true;
+
+    // Same panel, different contents — crossfade, don't re-slide.
+    if (isRail(from) && isRail(target)) { swapRail(target); return; }
+
+    if (target === 'none'){
+      dmClose(); closeFeed(); hideRail();
+      sync(); done();
+      return;
+    }
+
+    // With Double Dock the feed and rail coexist, so nothing has to leave.
+    if (doubleDock()){ enter(target); return; }
+
+    var wait = 0;
+    if (from === 'feed' && isRail(target)){
+      closeFeed();
+      wait = feedOutMs();
+    } else if (isRail(from) && target === 'feed'){
+      dmClose();
+      hideRail();
+      wait = RAIL_OUT;
+    }
+    after(wait, function(){ enter(target); });
   }
 
   function pick(target){
