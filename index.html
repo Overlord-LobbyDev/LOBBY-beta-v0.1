@@ -19799,9 +19799,9 @@ function renderChannelRibbon(activeId) {
       <!-- Live region. The channel tabs moved out of the ribbon (the rail's
            Lounge tab owns navigation, and its Lounges header carries the +),
            freeing the widest strip in the app for live state instead of a
-           duplicate nav. Filled by the crLive module: voice > now-playing >
-           lobby pulse. tabsHtml/addBtn are kept as a fallback for when that
-           module hasn't initialised yet. -->
+           duplicate nav. Filled by the crLive module: voice strip when
+           you're in a call, otherwise the live lobby bar. tabsHtml/addBtn
+           are kept as a fallback for before that module initialises. -->
       <div class="cr-live" id="crLive" data-state="init">
         <div class="cr-strip">${tabsHtml}${addBtn}</div>
       </div>
@@ -48301,36 +48301,19 @@ body.lir-resizing #chatPanel{ transition:none !important; }
   animation:crlPulse 1.6s ease-in-out infinite; }
 @keyframes crlPulse{ 0%,100%{opacity:1} 50%{opacity:.35} }
 
-/* ── Now Playing ─────────────────────────────────────────────── */
-.crl-games{ display:flex; align-items:center; gap:8px; min-width:0; overflow:hidden; }
-.crl-game{
-  display:flex; align-items:center; gap:8px; flex:none;
-  padding:5px 11px 5px 5px; border-radius:99px;
-  background:rgba(255,255,255,.04);
-  border:1px solid rgba(255,255,255,.07);
-  transition:background .16s, border-color .16s, transform .16s;
-  cursor:default; max-width:280px;
+/* ── Lobby live segments ─────────────────────────────────────── */
+.crl-seg{ display:flex; align-items:center; gap:9px; flex:none; min-width:0; }
+.crl-div{
+  width:1px; height:16px; flex:none; margin:0 4px;
+  background:rgba(255,255,255,.1);
 }
-.crl-game:hover{
-  background:color-mix(in srgb, var(--accent) 12%, transparent);
-  border-color:color-mix(in srgb, var(--accent) 32%, transparent);
-  transform:translateY(-1px);
+.crl-seg-v{
+  font-family:var(--font); font-size:12px; font-weight:800; color:#fff;
+  font-variant-numeric:tabular-nums;
+  overflow:hidden; text-overflow:ellipsis; white-space:nowrap; max-width:240px;
 }
-.crl-art{
-  width:26px; height:26px; border-radius:50%; flex:none; overflow:hidden;
-  background:var(--bg-3); display:grid; place-items:center;
-  font-size:10px; font-weight:800; color:var(--text-2);
-}
-.crl-art img{ width:100%; height:100%; object-fit:cover; }
-.crl-game-meta{ min-width:0; display:flex; flex-direction:column; gap:1px; line-height:1; }
-.crl-game-name{
-  font-family:var(--font); font-size:11.5px; font-weight:800; color:#fff;
-  overflow:hidden; text-overflow:ellipsis; white-space:nowrap;
-}
-.crl-game-who{
-  font-family:var(--font); font-size:9px; font-weight:700; color:var(--text-3);
-  overflow:hidden; text-overflow:ellipsis; white-space:nowrap;
-}
+.crl-seg-v.grn{ color:var(--green); }
+.crl-seg-v.dim{ color:var(--text-3); }
 .crl-more{
   font-family:var(--font); font-size:9.5px; font-weight:800; letter-spacing:.6px;
   color:var(--text-3); white-space:nowrap; flex:none;
@@ -48388,31 +48371,9 @@ body.lir-resizing #chatPanel{ transition:none !important; }
 }
 .crl-join:hover{ background:color-mix(in srgb, var(--green) 34%, transparent); color:#fff; }
 
-/* ── Pulse fallback ──────────────────────────────────────────── */
-.crl-stats{ display:flex; align-items:baseline; gap:0; min-width:0; }
-.crl-stat{
-  display:flex; align-items:baseline; gap:6px; flex:none;
-  margin-right:20px; position:relative;
-}
-.crl-stat + .crl-stat::before{
-  content:''; position:absolute; left:-10px; top:1px;
-  width:1px; height:10px; background:rgba(255,255,255,.1);
-}
-.crl-stat-l{
-  font-family:var(--font); font-size:8.5px; font-weight:900; letter-spacing:1.2px;
-  text-transform:uppercase; color:var(--text-3); white-space:nowrap;
-}
-.crl-stat-v{
-  font-family:var(--font); font-size:12px; font-weight:800; color:var(--text-2);
-  font-variant-numeric:tabular-nums; white-space:nowrap;
-}
-.crl-stat-v.grn{ color:var(--green); }
-.crl-stat-v.acc{ color:var(--accent); }
-.crl-stat-v.dim{ color:var(--text-3); font-weight:700; font-size:11px; }
-
 @media (prefers-reduced-motion: reduce){
   .crl-dot.live{ animation:none; }
-  .crl-game, .crl-orb{ transition:none; }
+  .crl-orb{ transition:none; }
 }
 </style>
 
@@ -48442,29 +48403,6 @@ body.lir-resizing #chatPanel{ transition:none !important; }
   }
   function presenceOf(m){
     return (typeof window._lirPresenceOf === 'function') ? window._lirPresenceOf(m) : 'offline';
-  }
-
-  /* ── Now-playing data ──────────────────────────────────────── */
-  var npData = [], npFetching = false, npLastServer = null, npLastAt = 0;
-
-  function fetchNowPlaying(force){
-    var srv = server();
-    if (!srv || !srv.id) { npData = []; return; }
-    if (npFetching) return;
-    if (!force && srv.id === npLastServer && (Date.now() - npLastAt) < 45000) return;
-    npFetching = true;
-    var token = localStorage.getItem('vh_token');
-    var base = (typeof AUTH_URL !== 'undefined') ? AUTH_URL : (window.AUTH_URL || '');
-    fetch(base + '/servers/' + srv.id + '/now-playing', {
-      headers: { Authorization: 'Bearer ' + token }
-    })
-      .then(function(r){ return r.ok ? r.json() : []; })
-      .then(function(d){
-        npData = Array.isArray(d) ? d : [];
-        npLastServer = srv.id; npLastAt = Date.now();
-      })
-      .catch(function(){ npData = []; })
-      .finally(function(){ npFetching = false; render(); });
   }
 
   /* ── State 1: voice ────────────────────────────────────────── */
@@ -48522,78 +48460,106 @@ body.lir-resizing #chatPanel{ transition:none !important; }
     '</div>';
   }
 
-  /* ── State 2: now playing ──────────────────────────────────── */
-  function nowPlayingHtml(){
-    if (!npData.length) return null;
+  /* ── State 2: lobby live bar ───────────────────────────────────
+     Segments only render when they have something to say, in order of
+     how actionable they are: voice you could join > a tournament running
+     right now > the next event > who's around. The last one always
+     renders, so the bar is never blank. */
 
-    // Group players by game so "3 in Valorant" reads as one chip.
-    var byGame = {};
-    npData.forEach(function(p){
-      if (!p || !p.game) return;
-      (byGame[p.game] = byGame[p.game] || []).push(p);
-    });
-    var games = Object.keys(byGame).sort(function(a,b){
-      return byGame[b].length - byGame[a].length;
-    });
-
-    var chips = games.slice(0, 3).map(function(g){
-      var list = byGame[g];
-      var gid = list[0].gameId;
-      var art = gid
-        ? 'https://cdn.cloudflare.steamstatic.com/steam/apps/' + esc(gid) + '/capsule_sm_120.jpg'
-        : '';
-      var names = list.map(function(p){ return p.username; }).join(', ');
-      var who = list.length === 1 ? esc(list[0].username)
-                                  : list.length + ' playing';
-      return '<span class="crl-game" title="' + esc(names) + ' — ' + esc(g) + '">' +
-        '<span class="crl-art">' +
-          (art ? '<img src="' + art + '" alt="" onerror="this.remove()">' : esc(g.charAt(0).toUpperCase())) +
-        '</span>' +
-        '<span class="crl-game-meta">' +
-          '<span class="crl-game-name">' + esc(g) + '</span>' +
-          '<span class="crl-game-who">' + who + '</span>' +
-        '</span>' +
-      '</span>';
-    }).join('');
-
-    var restGames = games.length - Math.min(games.length, 3);
-    return '<div class="crl">' +
-      '<span class="crl-eyebrow"><span class="crl-dot live"></span>Now Playing</span>' +
-      '<span class="crl-games">' + chips +
-        (restGames > 0 ? '<span class="crl-more">+' + restGames + ' more</span>' : '') +
-      '</span>' +
-    '</div>';
+  function countdown(ms){
+    if (ms <= 0) return 'now';
+    var m = Math.round(ms / 60000);
+    if (m < 60) return 'in ' + m + 'm';
+    var h = Math.floor(m / 60), rm = m % 60;
+    if (h < 24) return 'in ' + h + 'h' + (rm ? ' ' + rm + 'm' : '');
+    var d = Math.floor(h / 24);
+    return 'in ' + d + 'd' + (h % 24 ? ' ' + (h % 24) + 'h' : '');
   }
 
-  /* ── State 3: pulse fallback ───────────────────────────────── */
-  function pulseHtml(){
+  function lobbyLiveHtml(){
+    var segs = [];
     var ms = members();
-    var online = 0, inVoice = 0;
-    ms.forEach(function(m){
-      var p = presenceOf(m);
-      if (p === 'voice') inVoice++;
-      if (p !== 'offline') online++;
-    });
-    function n(id){
-      var el = $(id); if (!el) return 0;
-      var v = parseInt(String(el.textContent).replace(/\D/g,''), 10);
-      return isNaN(v) ? 0 : v;
-    }
-    var tourneys = n('lirTourneyCount'), events = n('lirEventCount');
 
-    return '<div class="crl">' +
-      '<span class="crl-stats">' +
-        '<span class="crl-stat"><span class="crl-stat-l">Online</span>' +
-          '<span class="crl-stat-v ' + (online ? 'grn' : '') + '">' + online + '/' + ms.length + '</span></span>' +
-        '<span class="crl-stat"><span class="crl-stat-l">In voice</span>' +
-          '<span class="crl-stat-v ' + (inVoice ? 'acc' : '') + '">' + inVoice + '</span></span>' +
-        '<span class="crl-stat"><span class="crl-stat-l">Tournaments</span>' +
-          '<span class="crl-stat-v ' + (tourneys ? 'acc' : '') + '">' + tourneys + '</span></span>' +
-        '<span class="crl-stat"><span class="crl-stat-l">Upcoming</span>' +
-          (events ? '<span class="crl-stat-v">' + events + '</span>'
-                  : '<span class="crl-stat-v dim">None set</span>') + '</span>' +
-      '</span>' +
-    '</div>';
+    // ── Voice happening without you — the most actionable thing here.
+    var voiceGroups = {};
+    ms.forEach(function(m){
+      var id = m && (m.voiceChannelId || m.voice_channel_id);
+      if (id) (voiceGroups[id] = voiceGroups[id] || []).push(m);
+    });
+    var vcIds = Object.keys(voiceGroups).sort(function(a,b){
+      return voiceGroups[b].length - voiceGroups[a].length;
+    });
+    if (vcIds.length){
+      var top = vcIds[0], list = voiceGroups[top];
+      var chans = Array.isArray(window.cachedServerChannels) ? window.cachedServerChannels : [];
+      var ch = chans.find(function(c){ return String(c.id) === String(top); });
+      var chName = (ch && ch.name) ? String(ch.name).replace(/^#/,'') : 'Voice';
+      var orbs = list.slice(0, 4).map(function(m){
+        var av = m.avatar_url || m.avatarUrl;
+        var nm = m.display_name || m.username || '?';
+        return '<span class="crl-orb" title="' + esc(nm) + '">' +
+          (av ? '<img src="' + esc(av) + '" alt="">' : esc(nm.charAt(0).toUpperCase())) + '</span>';
+      }).join('');
+      var extra = list.length - Math.min(list.length, 4);
+      segs.push(
+        '<span class="crl-seg">' +
+          '<span class="crl-eyebrow"><span class="crl-dot live"></span>' +
+            list.length + ' in ' + esc(chName) + '</span>' +
+          '<span class="crl-orbs">' + orbs +
+            (extra > 0 ? '<span class="crl-orb">+' + extra + '</span>' : '') + '</span>' +
+          '<button class="crl-join" data-crl="join" data-vc-id="' + esc(top) + '" ' +
+            'data-vc-name="' + esc(chName) + '">Join</button>' +
+        '</span>');
+    }
+
+    // ── A tournament actually in progress.
+    var tourneys = Array.isArray(window._lirTourneyAll) ? window._lirTourneyAll : [];
+    var live = tourneys.filter(function(t){ return t && t.status === 'in_progress'; });
+    if (live.length){
+      var t = live[0];
+      segs.push(
+        '<span class="crl-seg">' +
+          '<span class="crl-eyebrow"><span class="crl-dot live"></span>Live now</span>' +
+          '<span class="crl-seg-v">' + esc(t.name || 'Tournament') +
+            (live.length > 1 ? ' <span class="crl-more">+' + (live.length - 1) + '</span>' : '') +
+          '</span>' +
+        '</span>');
+    }
+
+    // ── The next scheduled event, as a countdown rather than a date.
+    var srv = server();
+    var evs = (window._calendarState
+               && srv && window._calendarState.lobbyId === srv.id
+               && Array.isArray(window._calendarState.events))
+              ? window._calendarState.events : [];
+    var meId = (window.me && window.me.id) || null;
+    var now = Date.now();
+    var next = evs
+      .filter(function(e){ return e && new Date(e.event_date).getTime() >= now - 3600000; })
+      .filter(function(e){ return !e.is_private || e.created_by === meId; })
+      .sort(function(a,b){ return new Date(a.event_date) - new Date(b.event_date); })[0];
+    if (next){
+      segs.push(
+        '<span class="crl-seg">' +
+          '<span class="crl-eyebrow">Next up</span>' +
+          '<span class="crl-seg-v">' + esc(next.title || 'Event') +
+            ' <span class="crl-more">' +
+              esc(countdown(new Date(next.event_date).getTime() - now)) + '</span>' +
+          '</span>' +
+        '</span>');
+    }
+
+    // ── Always present, so the bar never renders empty.
+    var online = 0;
+    ms.forEach(function(m){ if (presenceOf(m) !== 'offline') online++; });
+    segs.push(
+      '<span class="crl-seg">' +
+        '<span class="crl-eyebrow">Online</span>' +
+        '<span class="crl-seg-v ' + (online ? 'grn' : 'dim') + '">' +
+          online + '<span class="crl-more"> / ' + ms.length + '</span></span>' +
+      '</span>');
+
+    return '<div class="crl">' + segs.join('<span class="crl-div"></span>') + '</div>';
   }
 
   /* ── Render ────────────────────────────────────────────────── */
@@ -48602,13 +48568,9 @@ body.lir-resizing #chatPanel{ transition:none !important; }
     var host = $('crLive');
     if (!host) return;
 
-    var state = 'pulse', html = voiceHtml();
-    if (html) state = 'voice';
-    else {
-      html = nowPlayingHtml();
-      if (html) state = 'nowplaying';
-      else html = pulseHtml();
-    }
+    var html = voiceHtml();
+    var state = html ? 'voice' : 'lobby';
+    if (!html) html = lobbyLiveHtml();
 
     // Signature guard — this is called from observers and a poll, and
     // rewriting the ribbon every tick is exactly what caused the flash.
@@ -48632,6 +48594,11 @@ body.lir-resizing #chatPanel{ transition:none !important; }
       if (typeof window.leaveVoiceChannel === 'function') window.leaveVoiceChannel();
       else if (typeof leaveVoiceChannel === 'function') leaveVoiceChannel();
       setTimeout(function(){ lastHtml = ''; render(); }, 60);
+    } else if (b.dataset.crl === 'join'){
+      var id = b.dataset.vcId, nm = b.dataset.vcName || 'Voice';
+      if (typeof window.joinVoiceChannel === 'function') window.joinVoiceChannel(Number(id), nm);
+      else if (typeof joinVoiceChannel === 'function') joinVoiceChannel(Number(id), nm);
+      setTimeout(function(){ lastHtml = ''; render(); }, 80);
     }
   });
 
@@ -48648,19 +48615,18 @@ body.lir-resizing #chatPanel{ transition:none !important; }
     if (rail) new MutationObserver(function(){ render(); })
       .observe(rail, { childList:true, subtree:true, characterData:true });
 
-    // Steam presence has to be polled — there is no push channel for it.
-    // 45s matches the server-side cache, so this costs one upstream call
-    // per lobby per 45s no matter how many clients are watching.
-    fetchNowPlaying(true);
+    // Everything the bar shows is already in memory (members, channels,
+    // _lirTourneyAll, _calendarState) and the observers above catch every
+    // change to it — no polling. The one exception is the event countdown,
+    // which has to tick on its own; 30s is plenty for minute resolution.
     setInterval(function(){
       if (document.hidden) return;
       if (!document.body.classList.contains('lobby-selected')) return;
-      fetchNowPlaying(false);
-    }, 45000);
-    window.addEventListener('focus', function(){ fetchNowPlaying(false); });
+      if ($('crLive') && $('crLive').dataset.state === 'lobby') render();
+    }, 30000);
 
     render();
-    console.log('[cr-live] ribbon live bar ready (voice > now-playing > pulse)');
+    console.log('[cr-live] ribbon live bar ready (voice > lobby live)');
   }
 
   if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', start);
