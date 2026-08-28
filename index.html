@@ -49371,9 +49371,15 @@ body:not(.rail-hidden) #phRailToggleBtn .ph-fb-tile{
 #lirMiniRecents{ display:none !important; }
 :root, body{ --lir-w: var(--lir-w-full) !important; }
 
-body.rail-hidden #lobbyInfoRail{
-  transform:translateX(100%) !important;
-  pointer-events:none !important;
+/* NO !important on transform anywhere here. An !important author
+   declaration outranks BOTH animations and transitions, so while it was
+   present the rail could never animate — the transform jumped in one
+   frame and only opacity moved. That is what read as a snap regardless
+   of how the timing was tuned. Specificity alone is enough. */
+body.rail-hidden #lobbyInfoRail,
+body.feed-closed.rail-hidden #lobbyInfoRail{
+  transform:translateX(100%);
+  pointer-events:none;
 }
 body.rail-hidden #homePanel,
 body.rail-hidden #chatPanel,
@@ -49389,8 +49395,32 @@ body.rail-hidden #calendarPanel{ right:0 !important; }
    !important, so source order decided — and this one is later, meaning
    the sidebar could never actually be hidden. */
 body.feed-closed:not(.rail-hidden) #lobbyInfoRail{
-  transform:translateX(0) !important;
-  pointer-events:auto !important;
+  transform:translateX(0);
+  pointer-events:auto;
+}
+
+/* ── The Feed's own animation, applied to the rail ────────────────
+   Copied from feedSlideInRight / feedSlideOutRight rather than
+   approximated: same offsets, same scale, same blur, same durations,
+   same easing — including the faster, sharper exit curve. Driven by
+   transient body classes exactly as the Feed drives its own. */
+@keyframes railSlideIn {
+  0%   { opacity:0; transform:translateX(26px) scale(.985); filter:blur(8px); }
+  100% { opacity:1; transform:translateX(0)    scale(1);    filter:blur(0); }
+}
+@keyframes railSlideOut {
+  0%   { opacity:1; transform:translateX(0)    scale(1);    filter:blur(0); }
+  100% { opacity:0; transform:translateX(22px) scale(.985); filter:blur(8px); }
+}
+body.rail-anim-in  #lobbyInfoRail{
+  animation: railSlideIn .46s var(--feed-ease, cubic-bezier(.22,1,.36,1)) both;
+}
+body.rail-anim-out #lobbyInfoRail{
+  animation: railSlideOut .30s cubic-bezier(.5,.05,.7,.2) both;
+}
+@media (prefers-reduced-motion: reduce){
+  body.rail-anim-in #lobbyInfoRail,
+  body.rail-anim-out #lobbyInfoRail{ animation:none; }
 }
 /* The rail must reserve its width on EVERY page, not just the four panel
    ids I originally listed. The app's own _enforceFeedLayout() shrinks
@@ -49531,9 +49561,40 @@ body.lir-collapsed #lirRecents{ display:none; }
   function railHidden(){
     try { return localStorage.getItem(HIDE_KEY) === '1'; } catch(e){ return false; }
   }
-  function setHidden(hidden){
-    document.body.classList.toggle('rail-hidden', !!hidden);
+  /* Sequenced exactly like toggleFeed: the exit animation plays BEFORE the
+     resting hidden state is applied, otherwise .rail-hidden would translate
+     the rail off-screen in one frame and there'd be nothing left to
+     animate. Entry is the reverse — reveal first, then play the entrance. */
+  var railAnimTimer = null;
+  function setHidden(hidden, instant){
+    var body = document.body;
     try { localStorage.setItem(HIDE_KEY, hidden ? '1' : '0'); } catch(e){}
+
+    clearTimeout(railAnimTimer);
+    body.classList.remove('rail-anim-in', 'rail-anim-out');
+
+    var reduced = false;
+    try { reduced = window.matchMedia('(prefers-reduced-motion: reduce)').matches; } catch(e){}
+
+    if (instant || reduced){
+      body.classList.toggle('rail-hidden', !!hidden);
+      syncRailBtn();
+      return;
+    }
+
+    if (hidden){
+      body.classList.add('rail-anim-out');          // .rail-hidden stays OFF
+      railAnimTimer = setTimeout(function(){
+        body.classList.add('rail-hidden');
+        body.classList.remove('rail-anim-out');
+      }, 300);                                       // matches railSlideOut
+    } else {
+      body.classList.remove('rail-hidden');          // reveal, then animate
+      body.classList.add('rail-anim-in');
+      railAnimTimer = setTimeout(function(){
+        body.classList.remove('rail-anim-in');
+      }, 460);                                       // matches railSlideIn
+    }
     syncRailBtn();
   }
 
@@ -50055,7 +50116,8 @@ body.lir-collapsed #lirRecents{ display:none; }
     // No collapsed state any more — clear anything a previous build stored.
     document.body.classList.remove("lir-collapsed");
     try { localStorage.setItem("lobbyRailCollapsed", "0"); } catch(e){}
-    document.body.classList.toggle("rail-hidden", railHidden());
+    // instant: no entrance animation on boot, only on user toggles.
+    setHidden(railHidden(), true);
     placeButton();
     syncRailBtn();
     renderRecents(); ensurePreview();
