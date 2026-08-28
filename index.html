@@ -47173,6 +47173,25 @@ body.lobby-selected .ch-hero{
   -webkit-backdrop-filter:none !important;
 }
 
+/* ══ LOUNGE RIBBON — always visible in a lobby ══════════════════════
+   An older rule (~8643) hid the ribbon whenever the feed was closed,
+   reasoning that "channels live in the right rail now". That held while
+   the rail was a permanent 320px panel listing channels. It stopped
+   being true when the rail became a 56px icon strip by default, so
+   closing the feed silently removed the channel tabs, + New Lounge, and
+   the roster / search / settings actions — with nothing replacing them.
+
+   The ribbon is the primary channel switcher AND the only home for
+   those actions, so it stays regardless of feed state. Scoped to
+   :has(.chat-ribbon), so when no ribbon exists the legacy .chat-header
+   still renders as before. */
+body.feed-closed.lobby-selected .chat-main:has(.chat-ribbon) .chat-ribbon{
+  display:flex !important;
+}
+body.feed-closed.lobby-selected .chat-main:has(.chat-ribbon) .chat-header{
+  display:none !important;
+}
+
 /* ══ CHANNEL HERO — flush under the nav ═════════════════════════════
    .messages carried padding-top:18px (from the rail rule at ~8649) on
    top of its own 14px. That stacked inset is what opened the gap between
