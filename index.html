@@ -8249,9 +8249,11 @@
     /* ── Full-page panels keep their natural footprint in SPLIT ───── */
     body[data-feed-position="split"].feed-open #notifPanel,
     body[data-feed-position="split"].feed-open .members-sidebar { right: 0; }
-    /* Lobby info rail (feed closed + a lobby selected) keeps its 280px. */
-    body.feed-closed.lobby-selected #chatPanel,
-    body.feed-closed.lobby-selected .members-sidebar {
+    /* Lobby info rail (feed closed + a lobby selected) keeps its 280px.
+       Stands down when the rail is hidden — same specificity trap as the
+       320px rule below. */
+    body.feed-closed.lobby-selected:not(.rail-hidden) #chatPanel,
+    body.feed-closed.lobby-selected:not(.rail-hidden) .members-sidebar {
       right: 280px !important;
     }
 
@@ -8313,7 +8315,9 @@
       pointer-events:auto;
     }
     /* When the rail is visible, shrink chat panel to accommodate it */
-    body.feed-closed.lobby-selected #chatPanel { right:320px !important; }
+    /* :not(.rail-hidden) — this outranks the hide rule on specificity, so
+       without it the chat keeps a rail-width gap after hiding the rail. */
+    body.feed-closed.lobby-selected:not(.rail-hidden) #chatPanel { right:320px !important; }
     /* Hide the left-sidebar tournaments section when the right rail is showing
        (tournaments live in the right rail instead) */
     body.feed-closed.lobby-selected .channel-section[data-section-key="tournaments"] { display:none !important; }
@@ -47137,11 +47141,12 @@ body.feed-closed.lobby-selected #lobbyInfoRail{
   transition: transform .28s cubic-bezier(.16,1,.3,1),
               width .26s cubic-bezier(.16,1,.3,1);
 }
-body.feed-closed.lobby-selected #chatPanel{
+/* Must also stand down when the rail is hidden, or the chat keeps a
+   360px gap on its right with nothing in it. */
+body.feed-closed.lobby-selected:not(.rail-hidden) #chatPanel{
   right: var(--lir-w) !important;
   transition: right .26s cubic-bezier(.16,1,.3,1);
 }
-body.lir-collapsed{ --lir-w: var(--lir-w-mini); }
 
 /* ── The mini icon rail (Direction C) ─────────────────────────────── */
 #lirMini{ display:none; }
@@ -49344,14 +49349,18 @@ body.rail-hidden #calendarPanel{ right:0 !important; }
    it simply didn't exist — which defeats the point of it being the route
    BACK to a lobby. Now it shows wherever the feed isn't occupying the
    slot, and carries a jump-back panel when you aren't inside a lobby. */
-body.feed-closed #lobbyInfoRail{
+/* :not(.rail-hidden) is load-bearing. Without it this rule and the
+   .rail-hidden one above had identical specificity and both carried
+   !important, so source order decided — and this one is later, meaning
+   the sidebar could never actually be hidden. */
+body.feed-closed:not(.rail-hidden) #lobbyInfoRail{
   transform:translateX(0) !important;
   pointer-events:auto !important;
 }
-body.feed-closed:not(.lobby-selected) #homePanel,
-body.feed-closed:not(.lobby-selected) #chatPanel,
-body.feed-closed:not(.lobby-selected) #profilePage,
-body.feed-closed:not(.lobby-selected) #calendarPanel{
+body.feed-closed:not(.rail-hidden):not(.lobby-selected) #homePanel,
+body.feed-closed:not(.rail-hidden):not(.lobby-selected) #chatPanel,
+body.feed-closed:not(.rail-hidden):not(.lobby-selected) #profilePage,
+body.feed-closed:not(.rail-hidden):not(.lobby-selected) #calendarPanel{
   right:var(--lir-w) !important;
 }
 /* Off-lobby the rail shows a RECENT lobby's real sidebar — its channels,
