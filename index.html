@@ -49441,15 +49441,16 @@ body.layout-hotbar #phRailToggleBtn:hover{
 #phRailToggleBtn:hover .ph-fb-tile{ background:rgba(255,255,255,.1); }
 /* Active state uses the accent, so it never looks like the gold Feed
    pill — two different panels shouldn't share one "on" colour. */
-/* `:not(.rail-dm)` matters: DM mode reuses the rail, so the rail is
-   visible and .rail-hidden is off while Messages — not Sidebar — is the
-   active dock. Without it both buttons lit at once. */
-body:not(.rail-hidden):not(.rail-dm) #phRailToggleBtn{
+/* Driven by .dock-sidebar, which the dock switch sets on the click — see
+   sync() in the RIGHT-DOCK SWITCH block. Keying off .rail-hidden instead
+   meant this lit 300ms late during a handoff, and lit alongside Messages,
+   since DM mode reuses the rail and so also clears .rail-hidden. */
+body.dock-sidebar #phRailToggleBtn{
   background:color-mix(in srgb, var(--accent) 16%, transparent);
   border-color:color-mix(in srgb, var(--accent) 40%, transparent);
   color:color-mix(in srgb, var(--accent) 96%, white);
 }
-body:not(.rail-hidden):not(.rail-dm) #phRailToggleBtn .ph-fb-tile{
+body.dock-sidebar #phRailToggleBtn .ph-fb-tile{
   background:color-mix(in srgb, var(--accent) 26%, transparent);
 }
 
@@ -49503,11 +49504,18 @@ body.feed-closed:not(.rail-hidden) #lobbyInfoRail{
   0%   { opacity:1; transform:translateX(0)    scale(1);    filter:blur(0); }
   100% { opacity:0; transform:translateX(22px) scale(.985); filter:blur(8px); }
 }
+/* will-change only WHILE animating, never at rest: it promotes the rail to
+   its own layer so the blur and transform run on the compositor instead of
+   repainting a panel full of avatars and cards each frame. Left on
+   permanently it would pin that layer in memory for a panel that is
+   usually static. */
 body.rail-anim-in  #lobbyInfoRail{
   animation: railSlideIn .46s var(--feed-ease, cubic-bezier(.22,1,.36,1)) both;
+  will-change: transform, opacity, filter;
 }
 body.rail-anim-out #lobbyInfoRail{
   animation: railSlideOut .30s cubic-bezier(.5,.05,.7,.2) both;
+  will-change: transform, opacity, filter;
 }
 @media (prefers-reduced-motion: reduce){
   body.rail-anim-in #lobbyInfoRail,
@@ -49520,8 +49528,8 @@ body.rail-anim-out #lobbyInfoRail{
    only, no transform, so nothing shifts while the contents change. */
 @keyframes railXfadeOut { to   { opacity:0; } }
 @keyframes railXfadeIn  { from { opacity:0; } }
-body.rail-swap-out #lobbyInfoRail > *{ animation: railXfadeOut .13s ease both; }
-body.rail-swap-in  #lobbyInfoRail > *{ animation: railXfadeIn  .19s ease both; }
+body.rail-swap-out #lobbyInfoRail > *{ animation: railXfadeOut .13s ease both; will-change:opacity; }
+body.rail-swap-in  #lobbyInfoRail > *{ animation: railXfadeIn  .19s ease both; will-change:opacity; }
 @media (prefers-reduced-motion: reduce){
   body.rail-swap-out #lobbyInfoRail > *,
   body.rail-swap-in  #lobbyInfoRail > *{ animation:none; }
@@ -50945,15 +50953,14 @@ body.layout-hotbar #phMessagesBtn:hover{
   display:grid; place-items:center; background:rgba(255,255,255,.05);
 }
 #phMessagesBtn .ph-fb-tile svg{ width:15px; height:15px; }
-/* Mirrors the Sidebar rule's guard, so the two can never light together:
-   Messages is active only while the rail is BOTH in DM mode and visible —
-   matching state() in the dock switch, which requires dmOn && railShown. */
-body.rail-dm:not(.rail-hidden) #phMessagesBtn{
+/* Same single source of truth as the Sidebar pill — see sync() in the
+   RIGHT-DOCK SWITCH block. */
+body.dock-messages #phMessagesBtn{
   background:color-mix(in srgb, var(--accent) 16%, transparent);
   border-color:color-mix(in srgb, var(--accent) 40%, transparent);
   color:color-mix(in srgb, var(--accent) 96%, white);
 }
-body.rail-dm:not(.rail-hidden) #phMessagesBtn .ph-fb-tile{
+body.dock-messages #phMessagesBtn .ph-fb-tile{
   background:color-mix(in srgb, var(--accent) 26%, transparent);
 }
 #phMessagesBtn .ph-dm-dot{
@@ -50978,6 +50985,62 @@ body.rail-dm:not(.rail-hidden) #phMessagesBtn .ph-fb-tile{
 #phHotbarRowInner > #phMessagesBtn    { order: 10; }
 #phHotbarRowInner > #phFeedToggleBtn  { order: 11; }
 #phHotbarRowInner > #phRailToggleBtn  { order: 12; }
+
+/* ── Feed pill: same single source of truth as the other two ──────
+   Its own rules (body.feed-open, ~line 13012) are left untouched and
+   still supply the gold styling — this only re-points WHEN it applies.
+   .feed-open drops the instant Feed starts closing, while the incoming
+   dock doesn't light for another 300ms, so a handoff went through a gap
+   with nothing lit. .dock-feed flips on the click, in step with the
+   Messages and Sidebar pills.
+   Specificity: (0,3,1) here vs (0,2,1) on the .feed-open rules, so this
+   wins without !important — which would have blocked the dot's pulse
+   animation. */
+body.dock-feed #phFeedToggleBtn {
+  background: linear-gradient(180deg, rgba(246,180,80,.18), rgba(246,180,80,.06));
+  border-color: rgba(246,180,80,.42);
+  color: #f6b450;
+  box-shadow:
+    0 0 0 1px rgba(246,180,80,.18) inset,
+    0 1px 0 rgba(255,255,255,.06) inset,
+    0 6px 18px -10px rgba(246,180,80,.55);
+}
+body.dock-feed #phFeedToggleBtn .ph-fb-tile {
+  background: rgba(246,180,80,.20);
+  color: #f6b450;
+  box-shadow: 0 0 0 1px rgba(246,180,80,.28) inset;
+}
+body.dock-feed #phFeedToggleBtn .ph-fb-dot {
+  background: #f6b450;
+  box-shadow: 0 0 6px rgba(246,180,80,.7);
+  animation: phFbPulse 2.4s ease-in-out infinite;
+}
+/* Feed still carries .feed-open on the way out, so the old rules would
+   keep it lit after the switch has moved on. Only suppress once the
+   switch is actually driving the lights.
+   `:not(.dock-feed)` is required for Double Dock, where the feed and rail
+   are both open and both classes are set: without it this rule ties with
+   the active one on specificity and wins on source order, darkening a
+   feed that is plainly on screen. */
+body.dock-messages:not(.dock-feed) #phFeedToggleBtn,
+body.dock-sidebar:not(.dock-feed)  #phFeedToggleBtn {
+  background: rgba(255,255,255,.04);
+  border-color: rgba(255,255,255,.09);
+  color: var(--text-2);
+  box-shadow: none;
+}
+body.dock-messages:not(.dock-feed) #phFeedToggleBtn .ph-fb-tile,
+body.dock-sidebar:not(.dock-feed)  #phFeedToggleBtn .ph-fb-tile {
+  background: rgba(255,255,255,.06);
+  color: var(--text-2);
+  box-shadow: none;
+}
+body.dock-messages:not(.dock-feed) #phFeedToggleBtn .ph-fb-dot,
+body.dock-sidebar:not(.dock-feed)  #phFeedToggleBtn .ph-fb-dot {
+  background: rgba(255,255,255,.25);
+  box-shadow: none;
+  animation: none;
+}
 </style>
 
 <script>
@@ -51474,6 +51537,25 @@ body.rail-dm:not(.rail-hidden) #phMessagesBtn .ph-fb-tile{
     // Reflect where we're heading, so the pressed button responds on the
     // click rather than after the transition settles.
     var s = (pending !== null) ? pending : (intent !== null ? intent : state());
+    /* ONE source of truth for the three lights. They each used to key off
+       their own body class (.feed-open / .rail-dm / .rail-hidden), and
+       those flip at different points in a handoff — .feed-open drops on
+       the click, .rail-hidden not until 300ms later — so mid-switch NO
+       button was lit, then the new one snapped on. That gap was the
+       stutter. These flip once, together, on the click.
+
+       Under Double Dock the feed and rail coexist, so "active" is not a
+       single value there — anything actually open stays lit as well. */
+    var lit = { messages:false, feed:false, sidebar:false };
+    if (s !== 'none') lit[s] = true;
+    if (doubleDock()){
+      if (feedOpen()) lit.feed = true;
+      if (railShown()) lit[dmOn() ? 'messages' : 'sidebar'] = true;
+    }
+    var cl = document.body.classList;
+    cl.toggle('dock-messages', lit.messages);
+    cl.toggle('dock-feed',     lit.feed);
+    cl.toggle('dock-sidebar',  lit.sidebar);
     [['phMessagesBtn','messages'], ['phFeedToggleBtn','feed'], ['phRailToggleBtn','sidebar']]
       .forEach(function(p){
         var el = $(p[0]);
