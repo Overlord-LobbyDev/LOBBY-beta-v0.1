@@ -49612,7 +49612,7 @@ body.lir-collapsed #lirRecents{ display:none; }
   /* The user's lobbies. _allServers is a script-scoped global, so it has
      to be read lexically — it isn't on window.
      (This was defined inside the jump-back panel block and got deleted
-     with it, leaving lobbyById() and restoreLast() calling a function
+     with it, leaving lobbyById() and the launch restore calling a function
      that no longer existed. Every lookup threw, which is exactly why the
      rail never left its placeholder.) */
   function allLobbies(){
@@ -49879,39 +49879,6 @@ body.lir-collapsed #lirRecents{ display:none; }
     syncRailBtn();
     renderRecents(); ensurePreview();
     buildDDToggle();
-
-    /* ── Restore the last lobby on launch ─────────────────────────
-       The preview path had to borrow the app's shared caches and kept
-       losing them to code that clears state on Home — which is why the
-       rail sat on its "Lobby / Community" placeholder. Rather than keep
-       fighting for those globals, just select the most recent lobby the
-       way clicking it would. That's the app's own proven path, so the
-       rail populates with real data instead of an approximation of it.
-
-       One shot per launch, and only if the app hasn't already restored a
-       lobby itself — never overrides where the user actually is. */
-    (function restoreLast(){
-      var tries = 0;
-      var iv = setInterval(function(){
-        tries++;
-        if (document.body.classList.contains('lobby-selected')){ clearInterval(iv); return; }
-        var recents = loadRecents();
-        if (!recents.length){ if (tries > 30) clearInterval(iv); return; }
-        // Wait until selectServer and the lobby list are actually ready.
-        if (typeof window.selectServer !== 'function' || !allLobbies().length){
-          if (tries > 30) clearInterval(iv);
-          return;
-        }
-        var top = ranked()[0];
-        var id = top ? top.r.id : recents[0].id;
-        if (lobbyById(id)){
-          clearInterval(iv);
-          console.log('[rail] restoring last lobby on launch');
-          gotoLobby(id);
-        } else if (tries > 30) clearInterval(iv);
-      }, 400);
-    })();
-
     // Record every lobby you open.
     (function hookSelect(){
       if (typeof window.selectServer !== 'function'){ setTimeout(hookSelect, 400); return; }
