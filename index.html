@@ -50697,13 +50697,21 @@ body.feed-resizing .lobby-overlay{ transition:none !important; }
     wrapAfter('openProfilePanel', function(){ enterPanel('profilePage'); });
     wrapAfter('showVcPanel',      function(){ enterPanel('vcPanel'); });
     wrapAfter('openLobbyCalendar',function(){ enterPanel('calendarPanel'); });
+    /* selectServer and openDM do their OWN panel switching and were never
+       wired in. From an overlay page they revealed #chatPanel UNDERNEATH
+       the still-open overlay (z-index 9000), so clicking a lobby or a
+       friend looked like nothing happened at all. They land on the chat
+       panel, so they go through the same door as everything else. */
+    wrapAfter('selectServer',     function(){ enterPanel('chatPanel'); });
+    wrapAfter('openDM',           function(){ enterPanel('chatPanel'); });
     wrapBefore('showOverlay',     enterOverlay);
     wrapAfter('hideOverlay',      leaveOverlay);
     wrapBefore('coliseumShow',    enterColiseum);
   }
 
   var NAMES = ['showHomePanel','showChatPanel','openProfilePanel','showVcPanel',
-               'openLobbyCalendar','showOverlay','hideOverlay','coliseumShow'];
+               'openLobbyCalendar','selectServer','openDM',
+               'showOverlay','hideOverlay','coliseumShow'];
 
   function start(){
     install();
