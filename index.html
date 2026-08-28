@@ -49455,6 +49455,50 @@ body.rail-hidden .lobby-overlay{ right:0 !important; }
    members and activities, loaded for preview — rather than a stand-in
    list. So every section stays visible; only the data source changes.
    The crest strip is how you switch which lobby is being previewed. */
+/* ══ LOBBY BANNER BEHIND THE HEADER ═════════════════════════════════
+   servers.banner_url already exists and has upload endpoints, but it was
+   barely surfaced. It now sits behind the crest, name and actions.
+
+   The scrim is not optional: this is arbitrary user artwork sitting
+   under white text and two buttons, and a bright banner would make all
+   of it unreadable. Darkened toward the bottom where the type and
+   controls are, lighter at the top where the image can breathe. */
+#lobbyInfoRail .lir-header[data-banner]{
+  position:relative;
+  background:var(--bg-1);   /* base under the image, so no bleed-through */
+}
+#lobbyInfoRail .lir-header[data-banner]::before{
+  content:''; position:absolute; inset:0; z-index:0; pointer-events:none;
+  background-image:
+    linear-gradient(180deg,
+      rgba(0,0,0,.30) 0%,
+      rgba(0,0,0,.62) 55%,
+      color-mix(in srgb, var(--bg-1) 92%, transparent) 100%),
+    var(--lir-banner);
+  background-size:cover, cover;
+  background-position:50% 50%, 50% 50%;
+  background-repeat:no-repeat, no-repeat;
+}
+/* The header's own hairline sits above the artwork. */
+#lobbyInfoRail .lir-header[data-banner]::after{ z-index:2; }
+#lobbyInfoRail .lir-header[data-banner] > *{ position:relative; z-index:1; }
+/* Type and controls need a touch more weight over a photo. */
+#lobbyInfoRail .lir-header[data-banner] .lir-name{
+  text-shadow:0 1px 6px rgba(0,0,0,.85);
+}
+#lobbyInfoRail .lir-header[data-banner] .lir-meta{
+  text-shadow:0 1px 4px rgba(0,0,0,.9);
+  color:rgba(255,255,255,.72);
+}
+#lobbyInfoRail .lir-header[data-banner] .lir-action-btn{
+  background:rgba(0,0,0,.42);
+  border-color:rgba(255,255,255,.16);
+  backdrop-filter:none;
+}
+#lobbyInfoRail .lir-header[data-banner] .lir-action-btn:hover{
+  background:color-mix(in srgb, var(--accent) 32%, rgba(0,0,0,.42));
+}
+
 /* A quiet marker that you're looking at a lobby you aren't currently in. */
 body:not(.lobby-selected) #lirRecents{
   border-bottom:1px solid rgba(255,255,255,.05);
@@ -49681,6 +49725,9 @@ body.lir-collapsed #lirRecents{ display:none; }
       id: srv.id,
       name: srv.name || 'Lobby',
       icon: srv.icon_url || srv.iconUrl || null,
+      // Cached so the header can paint the banner instantly on boot,
+      // before any request — same reason name and icon are stored.
+      banner: srv.banner_url || srv.bannerUrl || null,
       ts: Date.now()
     });
     saveRecents(list);
@@ -49899,6 +49946,7 @@ body.lir-collapsed #lirRecents{ display:none; }
         // 'Lobby' fallback would write the placeholder into the header.
         name: pvName,
         icon: rec.icon || srv.icon_url || srv.iconUrl || null,
+        banner: rec.banner || srv.banner_url || srv.bannerUrl || null,
         channels: Array.isArray(res[0]) ? res[0] : [],
         members:  Array.isArray(res[1]) ? res[1] : []
       };
@@ -49975,6 +50023,7 @@ body.lir-collapsed #lirRecents{ display:none; }
           : esc(String(pv.name || 'L').charAt(0).toUpperCase());
       }
       if (meta) meta.textContent = pv.members.length + ' MEMBERS';
+      setHeaderBanner(pv.banner || bannerFor(pv.id));
 
       try { if (typeof window._lirRenderChannels === 'function') window._lirRenderChannels(); } catch(e){}
       try { if (typeof window._lirRenderMembers  === 'function') window._lirRenderMembers();  } catch(e){}
@@ -50043,6 +50092,29 @@ body.lir-collapsed #lirRecents{ display:none; }
     return !ch || !ch.querySelector('.lir-ch-row');
   }
 
+  /* The lobby's own banner (servers.banner_url) behind the header, so that
+     upload does something in more than one place. Falls back to the live
+     server record when a stored recent predates banner caching. */
+  function bannerFor(id){
+    var s = lobbyById(id);
+    return (s && (s.banner_url || s.bannerUrl)) || null;
+  }
+
+  function setHeaderBanner(url){
+    var header = document.querySelector('#lobbyInfoRail .lir-header');
+    if (!header) return;
+    if (url){
+      var want = 'url("' + String(url).replace(/"/g, '\\"') + '")';
+      if (header.style.getPropertyValue('--lir-banner') !== want){
+        header.style.setProperty('--lir-banner', want);
+      }
+      if (!header.hasAttribute('data-banner')) header.setAttribute('data-banner', '1');
+    } else if (header.hasAttribute('data-banner')){
+      header.removeAttribute('data-banner');
+      header.style.removeProperty('--lir-banner');
+    }
+  }
+
   function paintHeaderFromRecent(){
     var id = targetLobbyId();
     if (id == null) return false;
@@ -50060,6 +50132,7 @@ body.lir-collapsed #lirRecents{ display:none; }
         : esc(String(src.name || 'L').charAt(0).toUpperCase());
       if (icon.innerHTML !== want) icon.innerHTML = want;
     }
+    setHeaderBanner(src.banner || bannerFor(id));
     if (meta && /community/i.test(meta.textContent || '')){
       meta.textContent = (sel && String(sel.id) === String(id)) ? 'LOBBY' : 'RECENT LOBBY';
     }
