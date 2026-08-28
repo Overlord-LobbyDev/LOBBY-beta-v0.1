@@ -49360,12 +49360,23 @@ body.feed-closed:not(.rail-hidden) #lobbyInfoRail{
   transform:translateX(0) !important;
   pointer-events:auto !important;
 }
-body.feed-closed:not(.rail-hidden):not(.lobby-selected) #homePanel,
-body.feed-closed:not(.rail-hidden):not(.lobby-selected) #chatPanel,
-body.feed-closed:not(.rail-hidden):not(.lobby-selected) #profilePage,
-body.feed-closed:not(.rail-hidden):not(.lobby-selected) #calendarPanel{
+/* The rail must reserve its width on EVERY page, not just the four panel
+   ids I originally listed. The app's own _enforceFeedLayout() shrinks
+   homePanel, chatPanel, profilePage, calendarPanel, vcPanel AND every
+   .lobby-overlay — which is exactly why Feed behaves correctly on
+   Discover / Tournaments / Leaderboards / Queue while the rail overlapped
+   them. Those pages ARE .lobby-overlay elements. Same set, same result. */
+body.feed-closed:not(.rail-hidden) #homePanel,
+body.feed-closed:not(.rail-hidden) #chatPanel,
+body.feed-closed:not(.rail-hidden) #profilePage,
+body.feed-closed:not(.rail-hidden) #calendarPanel,
+body.feed-closed:not(.rail-hidden) #vcPanel,
+body.feed-closed:not(.rail-hidden) .lobby-overlay{
   right:var(--lir-w) !important;
 }
+/* And release it again when hidden. */
+body.rail-hidden #vcPanel,
+body.rail-hidden .lobby-overlay{ right:0 !important; }
 /* Off-lobby the rail shows a RECENT lobby's real sidebar — its channels,
    members and activities, loaded for preview — rather than a stand-in
    list. So every section stays visible; only the data source changes.
@@ -49799,6 +49810,15 @@ body.lir-collapsed #lirRecents{ display:none; }
     // populated it — that gap is what left sections empty.
     var pv = window._lirPreview;
     if (!pv || applying) return;
+
+    // NEVER apply a preview for a lobby other than the one the rail should
+    // currently be showing. Removing the .lobby-selected bail left nothing
+    // enforcing this, so after switching lobbies the 2s tick happily
+    // repainted the PREVIOUS lobby's channels and members over the new one
+    // — which is what made switching land somewhere unexpected and made
+    // channel clicks fire against the wrong lobby.
+    if (String(pv.id) !== String(targetLobbyId())) return;
+
     // If the app has genuinely filled the rail for this same lobby, leave
     // its work alone rather than overwriting it with our copy.
     var sel = lexServer();
@@ -50014,8 +50034,12 @@ body.lir-collapsed #lirRecents{ display:none; }
       if (window.selectServer.__recentsWrapped) return;
       var orig = window.selectServer;
       window.selectServer = function(){
+        // Drop the old preview immediately. Leaving it in place meant the
+        // rail kept re-asserting the previous lobby's data over the one
+        // you just switched to.
+        window._lirPreview = null;
         var r = orig.apply(this, arguments);
-        setTimeout(function(){ noteVisit(lexServer()); }, 60);
+        setTimeout(function(){ noteVisit(lexServer()); ensurePreview(); }, 60);
         return r;
       };
       window.selectServer.__recentsWrapped = true;
