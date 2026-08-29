@@ -63802,5 +63802,298 @@ async function reactComment(ev, id, btn){
 })();
 </script>
 
+
+<!-- ══════════════════════════════════════════════════════════════════
+     SPEEDRUN ON THE HUB ENGINE
+
+     The page had three tabs: Leaderboards, Live, Racing. Two of those
+     are collections of things happening — exactly what a rail is — and
+     they were hidden behind tabs, so the page opened on a grid of game
+     covers and you had to know to click "Live" to find out that
+     somebody was running right now.
+
+     Live, Races and Scheduled become rails and are visible on arrival.
+     The tab bar goes with them.
+
+     LEADERBOARDS IS NOT A RAIL AND IS NOT PRETENDED TO BE. A world
+     record table is read down a column: rank, runner, time, date. A
+     deck of cards is a worse way to show that, not a better one. It
+     keeps its game picker and its table, and simply moves below the
+     rails — browse what is happening, then dig into the records.
+
+     THESE RAILS DO NOT PAGE. /speedrun/live and /speedrun/scheduled cap
+     at 20 rows server-side and take no offset, and /speedrun/races
+     answers with { active, upcoming } rather than a list. They are
+     declared single so the engine loads them once and says the list is
+     complete, instead of showing a "loading more" that would never
+     resolve. When these grow enough to need paging, the endpoints get
+     limit and offset and the flag comes off.
+     ══════════════════════════════════════════════════════════════════ -->
+<style>
+#speedrunOverlay #srTabs,
+#speedrunOverlay #srTabLive,
+#speedrunOverlay #srTabRacing{ display:none !important; }
+/* The leaderboards tab is no longer a tab — it is the section under the
+   rails, and its own script toggles display, so it is forced open. */
+#speedrunOverlay #srTabLeaderboards{ display:block !important; }
+#speedrunOverlay > .sr-hero,
+#speedrunOverlay > #srScroller{ position:relative; z-index:1; }
+#srHubFilters{ margin-bottom:18px; }
+#srHubStage{ margin-bottom:34px; }
+#speedrunOverlay #srTabLeaderboards{
+  max-width:1820px; margin:0 auto;
+  padding-top:26px;
+  border-top:1px solid rgba(255,255,255,.07);
+}
+</style>
+<script>
+(function () {
+  'use strict';
+
+  function jsStr(v){ return JSON.stringify(String(v == null ? '' : v)).replace(/"/g,'&quot;'); }
+
+  var ICO = {
+    all:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><polygon points="15.6 8.4 13.5 13.5 8.4 15.6 10.5 10.5 15.6 8.4"/></svg>',
+    live:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3.2"/><path d="M5.6 5.6a9 9 0 0 0 0 12.8"/><path d="M18.4 18.4a9 9 0 0 0 0-12.8"/></svg>',
+    race:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 21V4"/><path d="M4 4h13l-2 4 2 4H4"/></svg>',
+    clock:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3.2 1.9"/></svg>',
+  };
+
+  /* The speedrun tables store a game NAME, not one of GT_GAMES' ids, so
+     the cover has to be found by matching text. Exact first, then a
+     containment pass either way round -- "Tekken 8" against "TEKKEN". */
+  function artFor(name){
+    var q = String(name || '').trim().toLowerCase();
+    if (!q) return {};
+    var list = null;
+    try { if (typeof GT_GAMES !== 'undefined') list = GT_GAMES; } catch (e){}
+    if (!list) return {};
+    var exact = null, loose = null;
+    for (var i = 0; i < list.length; i++){
+      var g = list[i], gn = String(g.name || '').toLowerCase();
+      if (!gn || g.id === 'other') continue;
+      if (gn === q){ exact = g; break; }
+      if (!loose && (gn.indexOf(q) !== -1 || q.indexOf(gn) !== -1)) loose = g;
+    }
+    return exact || loose || {};
+  }
+
+  function hueOf(str){
+    var h = 0, s = String(str || '');
+    for (var i = 0; i < s.length; i++) h = (h * 31 + s.charCodeAt(i)) % 360;
+    return h;
+  }
+  function tint(name){
+    var h = hueOf(name);
+    return 'linear-gradient(140deg, hsl(' + h + ' 62% 32%) 0%, hsl(' + ((h + 28) % 360) + ' 66% 11%) 100%)';
+  }
+
+  function whenText(iso){
+    if (!iso) return 'Soon';
+    var t = Date.parse(iso);
+    if (!isFinite(t)) return 'Soon';
+    var mins = Math.round((t - Date.now()) / 60000);
+    if (mins <= 0) return 'Now';
+    if (mins < 60) return mins + 'm';
+    if (mins < 1440) return Math.round(mins / 60) + 'h';
+    return Math.round(mins / 1440) + 'd';
+  }
+
+  function base(name, game){
+    var g = artFor(game);
+    return {
+      art:g.heroHi || g.header || g.cover || '',
+      fallback:g.fallback || tint(game || name),
+      glyph:g.initial || '⏱',
+      genre:String(game || '').toLowerCase(),
+    };
+  }
+
+  function liveCard(x){
+    var b = base(x.game, x.game);
+    return Object.assign(b, {
+      key:'srlive-' + x.id,
+      name:(x.game || 'Run') + (x.category ? ' · ' + x.category : ''),
+      desc:(x.runner ? x.runner + ' is running this right now.' : 'Running right now.') +
+           (x.viewerCount ? ' ' + x.viewerCount + ' watching.' : ''),
+      badge:'live', badgeText:'Live run',
+      chips:[x.category, x.game].filter(Boolean),
+      stats:[
+        { v:String(x.viewerCount || 0), l:'Watching' },
+        { v:x.category || 'Any%', l:'Category' },
+        { v:'Live', l:'Status' },
+      ],
+      faces:x.runner ? [{ name:x.runner, avatar:x.runnerAvatar || null }] : [],
+      faceTotal:1, faceLabel:'Running',
+      cta:{ label:x.videoUrl ? 'Watch run' : 'Open speedrun hub',
+            js:x.videoUrl
+              ? 'window.open(' + jsStr(x.videoUrl) + ',"_blank")'
+              : 'window.HUB("speedrun").clear()' },
+      live:true, weight:(x.viewerCount || 0),
+    });
+  }
+
+  function raceCard(x){
+    var live = String(x.status || '').toLowerCase() === 'live';
+    var b = base(x.title, x.game);
+    return Object.assign(b, {
+      key:'srrace-' + x.id,
+      name:x.title || ((x.game || 'Speedrun') + ' race'),
+      desc:(x.game || 'Any game') + (x.category ? ' · ' + x.category : '') + ' — ' +
+           (live ? 'under way now.' : 'starts in ' + whenText(x.scheduledFor) + '.') +
+           (x.host ? ' Hosted by ' + x.host + '.' : ''),
+      badge:live ? 'live' : 'race', badgeText:live ? 'Race running' : 'Race',
+      chips:[x.category, x.game, x.prize ? '💰 ' + x.prize : null].filter(Boolean),
+      stats:[
+        { v:String(x.runners || 0), l:'Runners' },
+        { v:x.prize || '—', l:'Prize' },
+        { v:live ? 'Live' : whenText(x.scheduledFor), l:live ? 'Status' : 'Starts in' },
+      ],
+      faces:[], faceTotal:x.runners || 0, faceLabel:'On the start line',
+      cta:{ label:live ? 'Join race' : 'View race',
+            js:'window.srOpenRace(' + Number(x.id) + ')' },
+      live:live, weight:(x.runners || 0),
+    });
+  }
+
+  function schedCard(x){
+    var b = base(x.game, x.game);
+    return Object.assign(b, {
+      key:'srsched-' + x.id,
+      name:(x.game || 'Run') + (x.category ? ' · ' + x.category : ''),
+      desc:(x.runner ? x.runner + ' is going for this' : 'Scheduled attempt') +
+           ' in ' + whenText(x.scheduledFor) + '.',
+      badge:'race', badgeText:'Scheduled',
+      chips:[x.category, x.game].filter(Boolean),
+      stats:[
+        { v:whenText(x.scheduledFor), l:'Starts in' },
+        { v:String(x.rsvps || 0), l:'Going' },
+        { v:x.category || 'Any%', l:'Category' },
+      ],
+      faces:x.runner ? [{ name:x.runner, avatar:x.runnerAvatar || null }] : [],
+      faceTotal:1, faceLabel:'Runner',
+      cta:{ label:'I will watch', js:'window.srRsvp(' + Number(x.id) + ')' },
+      live:false, weight:(x.rsvps || 0),
+    });
+  }
+
+  window.srOpenRace = function (id){
+    if (typeof window.srJoinRace === 'function') return window.srJoinRace(id);
+    if (typeof showToast === 'function') showToast('Opening race…', 'info');
+  };
+  window.srRsvp = async function (id){
+    try {
+      var r = await window.api('/speedrun/scheduled/' + id + '/rsvp', { method:'POST' });
+      if (typeof showToast === 'function'){
+        showToast(r && r.going ? 'You are on the list' : 'Taken off the list', 'success');
+      }
+      var h = window.LobbyHub && window.LobbyHub.get('speedrun');
+      if (h){ h.store.scheduled.done = false; h.store.scheduled.items = [];
+              h.store.scheduled.offset = 0; h.loadPage('scheduled').then(function (){ h.render(); }); }
+    } catch (e){
+      if (typeof showToast === 'function') showToast('Could not RSVP', 'error');
+    }
+  };
+
+  function once(fn){
+    return function (){
+      return Promise.resolve().then(fn).catch(function (){ return []; });
+    };
+  }
+
+  function mount(){
+    var sc = document.getElementById('srScroller');
+    if (!sc) return null;
+    if (!document.getElementById('srHubStage')){
+      var f = document.createElement('div');
+      f.id = 'srHubFilters'; f.className = 'hub-filters';
+      var st = document.createElement('div');
+      st.id = 'srHubStage'; st.className = 'hub-stage';
+      sc.insertBefore(f, sc.firstChild);
+      sc.insertBefore(st, f.nextSibling);
+    }
+    return sc;
+  }
+
+  function start(){
+    if (!window.LobbyHub || typeof window.api !== 'function'){ setTimeout(start, 250); return; }
+    if (!mount()){ setTimeout(start, 250); return; }
+
+    var hub = window.LobbyHub.create({
+      key:'speedrun',
+      overlayId:'speedrunOverlay',
+      stageSel:'#srHubStage',
+      filterSel:'#srHubFilters',
+      scrollSel:'#srScroller',
+      searchSel:'#srSearchInput',
+      titleSel:'#speedrunOverlay .sr-hero-title',
+      titleAccentClass:'sr-hero-accent',
+      titleLead:'SPEED',
+      titleAll:'RUN',
+      genreLabel:'Game',
+      allIco:ICO.all,
+      prefKey:'speedrun_rail_order',
+      rails:{
+        live:{
+          title:'Live runs', sub:'Runners going for it right now',
+          label:'On air', word:'runs', ico:ICO.live, single:true,
+          load:once(function (){ return window.api('/speedrun/live'); }),
+          map:liveCard,
+          empty:{ ico:'📺', title:'Nobody is running',
+            sub:'Announce your own attempt and it shows up here the moment you go live.',
+            cta:{ label:'Submit a run', js:'window.openSubmitRunModal()' } },
+        },
+        races:{
+          title:'Races', sub:'Head to head, live and upcoming',
+          label:'Start line', word:'races', ico:ICO.race, single:true,
+          load:once(function (){
+            /* This one answers with { active, upcoming } rather than a
+               list, so it is flattened here instead of the engine
+               learning about a shape only this endpoint has. */
+            return window.api('/speedrun/races').then(function (r){
+              return ((r && r.active) || []).concat((r && r.upcoming) || []);
+            });
+          }),
+          map:raceCard,
+          empty:{ ico:'🏁', title:'No races on',
+            sub:'Nobody has set one up. It takes about twenty seconds, and anyone can enter once it is up.',
+            cta:{ label:'Host a race', js:'window.openCreateRace()' } },
+        },
+        scheduled:{
+          title:'Scheduled', sub:'Attempts announced for later',
+          label:'On the clock', word:'attempts', ico:ICO.clock, single:true,
+          load:once(function (){ return window.api('/speedrun/scheduled'); }),
+          map:schedCard,
+          empty:{ ico:'🗓', title:'Nothing on the calendar',
+            sub:'Announce an attempt with a time and people can say they will watch.',
+            cta:{ label:'Submit a run', js:'window.openSubmitRunModal()' } },
+        },
+      },
+    });
+
+    var origSearch = window.srSearch;
+    window.srSearch = function (q){
+      try { if (typeof origSearch === 'function') origSearch(q); } catch (e){}
+      hub.setSearch(q);
+    };
+
+    var origOpen = window.openSpeedrunHub;
+    if (typeof origOpen === 'function' && !origOpen.__hubWrapped){
+      var wrapped = function (){
+        var out = origOpen.apply(this, arguments);
+        mount();
+        hub.open();
+        return out;
+      };
+      wrapped.__hubWrapped = true;
+      window.openSpeedrunHub = wrapped;
+    }
+  }
+
+  if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', start);
+  else start();
+})();
+</script>
+
 </body>
 </html>
