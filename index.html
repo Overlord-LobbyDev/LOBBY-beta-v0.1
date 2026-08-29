@@ -52231,5 +52231,108 @@ body.feed-anim-out #socialFeed{
   console.log('[lobby-nav] entering a lobby opens its last/first channel');
 })();
 </script>
+
+<!-- ══════════════════════════════════════════════════════════════════
+     DISMISS STRAY SCRIMS ON NAVIGATION
+
+     Symptom: after switching pages the app looks dimmed/"inactive" and
+     the first click does nothing.
+
+     Cause: modals and drawers put a full-screen backdrop over the app
+     (.modal-overlay is rgba(0,0,0,.75), the drawer and profile backdrops
+     are lighter). The navigation authority closes overlays, panels and
+     the Coliseum -- but nothing ever closed these. Open a modal or a
+     drawer, navigate away by any route, and the backdrop stays: it dims
+     the page and swallows clicks.
+
+     "Click twice" is the giveaway. .modal-overlay closes itself when you
+     click the backdrop, so the first click is spent dismissing something
+     invisible and the second one finally reaches the page.
+
+     Driven by a MutationObserver on the panels' `hidden` class rather
+     than by wrapping navigation functions: every route -- wrapped or not,
+     including ones that bypass the authority -- ends in a panel being
+     shown or hidden, so this catches all of them. It cannot fight a modal
+     opened WITHOUT navigating, because then no panel class changes.
+     ══════════════════════════════════════════════════════════════════ -->
+<script>
+(function () {
+  'use strict';
+
+  var PANELS = ['homePanel','chatPanel','profilePage','calendarPanel','vcPanel'];
+
+  /* Class-driven scrims. Each pairs with a panel/drawer that must go too,
+     or the drawer is left floating over the page with nothing behind it. */
+  var SCRIMS = [
+    { scrim: '#settingsPanelBackdrop', partner: '#settingsDrawer' },
+    { scrim: '#profileBackdrop',       partner: null },
+    { scrim: '#sidebarBackdrop',       partner: null },
+    { scrim: '.col-switcher',          partner: null },
+    { scrim: '.hof-add-modal-overlay', partner: null }
+  ];
+
+  function clear(){
+    var n = 0;
+    SCRIMS.forEach(function(s){
+      document.querySelectorAll(s.scrim).forEach(function(el){
+        if (el.classList.contains('open') || el.classList.contains('visible')){
+          el.classList.remove('open', 'visible');
+          n++;
+        }
+      });
+      if (s.partner) document.querySelectorAll(s.partner).forEach(function(el){
+        el.classList.remove('open');
+      });
+    });
+    // Modals are `.modal-overlay.open` and are their own backdrop.
+    document.querySelectorAll('.modal-overlay.open').forEach(function(el){
+      el.classList.remove('open');
+      n++;
+    });
+    if (n) console.log('[scrim] cleared ' + n + ' stray overlay(s) on navigation');
+    return n;
+  }
+
+  /* Diagnostic: if something is STILL covering the page after a
+     navigation, name it. Cheaper than guessing which element it is the
+     next time this comes up — the scrim list above only covers what
+     exists today. */
+  function audit(){
+    var x = Math.round(window.innerWidth / 2);
+    var y = Math.round(window.innerHeight / 2);
+    var el = document.elementFromPoint(x, y);
+    if (!el) return;
+    var r = el.getBoundingClientRect();
+    var covers = r.width >= window.innerWidth * 0.9 && r.height >= window.innerHeight * 0.9;
+    if (!covers) return;
+    var cs = getComputedStyle(el);
+    if (cs.pointerEvents === 'none') return;
+    // A panel filling the page is the normal case, not a scrim.
+    if (PANELS.indexOf(el.id) >= 0 || el.closest('#' + PANELS.join(',#'))) return;
+    console.warn('[scrim] still covering the page after navigation:',
+      el.tagName + (el.id ? '#' + el.id : '') +
+      (el.className && el.className.baseVal === undefined ? '.' + String(el.className).trim().split(/\s+/).join('.') : ''),
+      { zIndex: cs.zIndex, background: cs.backgroundColor });
+  }
+
+  var t = null;
+  function onNav(){
+    clearTimeout(t);
+    t = setTimeout(function(){ clear(); audit(); }, 60);
+  }
+
+  function start(){
+    var obs = new MutationObserver(onNav);
+    PANELS.forEach(function(id){
+      var el = document.getElementById(id);
+      if (el) obs.observe(el, { attributes: true, attributeFilter: ['class'] });
+    });
+    console.log('[scrim] navigation scrim cleanup active');
+  }
+
+  if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', start);
+  else start();
+})();
+</script>
 </body>
 </html>
