@@ -3003,6 +3003,8 @@ app.get("/steam/recent", requireAuth, async (req, res) => {
     // Fetch achievements for all games in parallel
     const enriched = await Promise.all(games.map(async (g) => {
       let achievements = [];
+      let achUnlocked = 0;   // how many this player has
+      let achTotal = 0;      // how many the game has at all
       try {
           const [schemaRes, playerRes] = await Promise.all([
             fetch(`https://api.steampowered.com/ISteamUserStats/GetSchemaForGame/v2/?key=${STEAM_KEY}&appid=${g.appid}`),
@@ -3011,10 +3013,21 @@ app.get("/steam/recent", requireAuth, async (req, res) => {
           const schema = await schemaRes.json();
           const player = await playerRes.json();
           const schemaAchs = schema?.game?.availableGameStats?.achievements || [];
-          const playerAchs = (player?.playerstats?.achievements || [])
+
+          // Count BEFORE slicing. The list is trimmed to five for display,
+          // and the old code sliced first, so the number it reported could
+          // never exceed five however many the player actually had.
+          const unlockedAll = (player?.playerstats?.achievements || [])
             .filter(a => a.achieved === 1)
-            .sort((a, b) => b.unlocktime - a.unlocktime)
-            .slice(0, 5);
+            .sort((a, b) => b.unlocktime - a.unlocktime);
+
+          achUnlocked = unlockedAll.length;
+          // How many the game HAS, from its schema. Needed to know when
+          // someone has the full set -- a completion cannot be inferred
+          // from the unlocked count alone.
+          achTotal = schemaAchs.length;
+
+          const playerAchs = unlockedAll.slice(0, 5);
           achievements = playerAchs.map(pa => {
             const meta = schemaAchs.find(s => s.name === pa.apiname) || {};
             return {
@@ -3040,6 +3053,11 @@ app.get("/steam/recent", requireAuth, async (req, res) => {
         hours_recent: hoursRecent,
         hours_total:  hoursTotal,
         achievements,
+        achievementsUnlocked: achUnlocked,
+        achievementsTotal: achTotal,
+        // Only claimed when the schema actually told us the size of the
+        // set. A game with no achievements must not read as 100%.
+        achievementsComplete: achTotal > 0 && achUnlocked >= achTotal,
       };
     }));
 
@@ -3068,6 +3086,8 @@ app.get("/steam/recent/:userId", requireAuth, async (req, res) => {
     // Fetch achievements for all games in parallel
     const enriched = await Promise.all(games.map(async (g) => {
       let achievements = [];
+      let achUnlocked = 0;   // how many this player has
+      let achTotal = 0;      // how many the game has at all
       try {
           const [schemaRes, playerRes] = await Promise.all([
             fetch(`https://api.steampowered.com/ISteamUserStats/GetSchemaForGame/v2/?key=${STEAM_KEY}&appid=${g.appid}`),
@@ -3076,10 +3096,21 @@ app.get("/steam/recent/:userId", requireAuth, async (req, res) => {
           const schema = await schemaRes.json();
           const player = await playerRes.json();
           const schemaAchs = schema?.game?.availableGameStats?.achievements || [];
-          const playerAchs = (player?.playerstats?.achievements || [])
+
+          // Count BEFORE slicing. The list is trimmed to five for display,
+          // and the old code sliced first, so the number it reported could
+          // never exceed five however many the player actually had.
+          const unlockedAll = (player?.playerstats?.achievements || [])
             .filter(a => a.achieved === 1)
-            .sort((a, b) => b.unlocktime - a.unlocktime)
-            .slice(0, 5);
+            .sort((a, b) => b.unlocktime - a.unlocktime);
+
+          achUnlocked = unlockedAll.length;
+          // How many the game HAS, from its schema. Needed to know when
+          // someone has the full set -- a completion cannot be inferred
+          // from the unlocked count alone.
+          achTotal = schemaAchs.length;
+
+          const playerAchs = unlockedAll.slice(0, 5);
           achievements = playerAchs.map(pa => {
             const meta = schemaAchs.find(s => s.name === pa.apiname) || {};
             return {
@@ -3105,6 +3136,11 @@ app.get("/steam/recent/:userId", requireAuth, async (req, res) => {
         hours_recent: hoursRecent,
         hours_total:  hoursTotal,
         achievements,
+        achievementsUnlocked: achUnlocked,
+        achievementsTotal: achTotal,
+        // Only claimed when the schema actually told us the size of the
+        // set. A game with no achievements must not read as 100%.
+        achievementsComplete: achTotal > 0 && achUnlocked >= achTotal,
       };
     }));
 

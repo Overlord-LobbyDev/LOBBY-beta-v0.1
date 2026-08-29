@@ -55604,13 +55604,23 @@ body.double-dock[data-feed-position="right"].feed-open:not(.rail-hidden) #settin
     }
     var recent = hrs('.game-card-hours');
     var total  = hrs('.game-card-hours-total');
-    var achN   = card.querySelectorAll('.game-card-ach').length;
+    /* From the card, not from the rows: the row list is capped at five
+       for display and would under-report anyone past that. */
+    var achN   = parseInt(card.getAttribute('data-ach-unlocked'), 10);
+    if (!isFinite(achN)) achN = card.querySelectorAll('.game-card-ach').length;
+    var achT   = parseInt(card.getAttribute('data-ach-total'), 10) || 0;
+    var achDone = card.getAttribute('data-ach-complete') === '1';
 
     var out = '<div class="rc-stats">';
     out += '<div class="rc-stat' + (recent ? ' hot' : '') + '"><b>' +
            (recent != null ? recent + 'h' : '—') + '</b><span>2 weeks</span></div>';
     out += '<div class="rc-stat"><b>' + (total != null ? total + 'h' : '—') + '</b><span>Total</span></div>';
-    out += '<div class="rc-stat"><b>' + achN + '</b><span>Achievements</span></div>';
+    /* A full set gets its own treatment rather than just a number: gold,
+       a trophy, and the total spelled out so the claim is checkable. */
+    out += '<div class="rc-stat' + (achDone ? ' rc-stat-100' : '') + '"><b>' +
+           achN + (achT ? '<span class="rc-of">/' + achT + '</span>' : '') +
+           (achDone ? '<span class="rc-trophy">\uD83C\uDFC6</span>' : '') +
+           '</b><span>' + (achDone ? 'Completed' : 'Achievements') + '</span></div>';
     out += '</div>';
 
     /* The share only means something when there IS recent play. At 0h it
@@ -56935,7 +56945,12 @@ body[data-feed-position="split"].feed-open #homeContent > [data-home-slot="col"]
     }
     var recent = hrs('.game-card-hours');
     var total  = hrs('.game-card-hours-total');
-    var achN   = card.querySelectorAll('.game-card-ach').length;
+    /* From the card, not from the rows: the row list is capped at five
+       for display and would under-report anyone past that. */
+    var achN   = parseInt(card.getAttribute('data-ach-unlocked'), 10);
+    if (!isFinite(achN)) achN = card.querySelectorAll('.game-card-ach').length;
+    var achT   = parseInt(card.getAttribute('data-ach-total'), 10) || 0;
+    var achDone = card.getAttribute('data-ach-complete') === '1';
 
     /* The "No public achievements for this game" line is a bare div with
        no class, so there is nothing to hide it by. Mark every stray
@@ -56969,7 +56984,7 @@ body[data-feed-position="split"].feed-open #homeContent > [data-home-slot="col"]
       /* Hours left, achievements right, nothing in the middle. 'played'
          was a word doing no work next to a number already labelled h. */
       var html = '<span class="gc-hours"><b>' + (total != null ? total : '—') + 'h</b></span>';
-      if (achN) html += '<span class="gc-ach"><b>' + achN + '</b> 🏆</span>';
+      if (achN) html += '<span class="gc-ach' + (achDone ? ' is-100' : '') + '"><b>' + achN + '</b> 🏆</span>';
       m.innerHTML = html;
       body.appendChild(m);
     }
@@ -59811,5 +59826,73 @@ async function reactComment(ev, id, btn){
   };
 })();
 </script>
+
+<!-- ══════════════════════════════════════════════════════════════════
+     ACHIEVEMENTS — the true count, and a full set marked
+
+     The number was wrong, not just capped. /steam/recent sliced the
+     unlocked list to five BEFORE anything counted it, so a player with
+     forty achievements read as five. The list is still five — it is a
+     "recent achievements" list and five is the right length for it —
+     but the count now comes from the card rather than from the number
+     of rows on screen.
+
+     A completed set gets gold and a trophy. It also gets the total
+     spelled out (38/38), because "38" alone is a number and "38/38" is
+     a claim you can check. Completion is only ever claimed when Steam's
+     schema actually told us how many the game has: a game with no
+     achievements at all must not read as 100%.
+     ══════════════════════════════════════════════════════════════════ -->
+<style>
+/* The "/38" after the count — present but subordinate. */
+.rc-of{
+  font-size:.52em; font-weight:800; opacity:.55;
+  margin-left:2px; letter-spacing:0;
+}
+.rc-trophy{
+  font-size:.5em; margin-left:6px; vertical-align:.28em;
+  filter:drop-shadow(0 1px 3px rgba(0,0,0,.5));
+}
+
+/* ── Full set ─────────────────────────────────────────────────── */
+#homeContent [data-home-slot="hero"] .rc-stat.rc-stat-100{
+  background:
+    linear-gradient(180deg,
+      color-mix(in srgb, #ffd35c 16%, transparent),
+      color-mix(in srgb, #b8860b 10%, transparent)),
+    #0d0f16 !important;
+  box-shadow:inset 0 0 0 1px color-mix(in srgb, #ffd35c 38%, transparent);
+}
+#homeContent [data-home-slot="hero"] .rc-stat.rc-stat-100 b{
+  /* Gold on the figure itself. A flat colour, not a gradient fill: the
+     stat carries a text-shadow and background-clip:text paints the
+     background BEFORE the shadow, which lands it inside the glyphs. */
+  color:#ffd964 !important;
+  -webkit-text-fill-color:#ffd964 !important;
+  text-shadow:0 0 22px rgba(255,200,60,.45), 0 1px 0 rgba(0,0,0,.5);
+}
+#homeContent [data-home-slot="hero"] .rc-stat.rc-stat-100 span{
+  color:color-mix(in srgb, #ffd35c 72%, #fff) !important;
+  letter-spacing:1.4px;
+}
+#homeContent [data-home-slot="hero"] .rc-stat.rc-stat-100 .rc-of{
+  color:color-mix(in srgb, #ffd35c 60%, transparent) !important;
+  -webkit-text-fill-color:currentColor !important;
+}
+
+/* The small grid card says it too, quietly — there is no room for a
+   total there, so the chip goes gold and the trophy carries it. */
+#homeContent [data-home-slot="col"] .gc-ach.is-100{
+  background:color-mix(in srgb, #ffd35c 15%, transparent) !important;
+  border-color:color-mix(in srgb, #ffd35c 42%, transparent) !important;
+  color:#ffd964 !important;
+}
+#homeContent [data-home-slot="col"] .gc-ach.is-100 b{
+  color:#ffd964 !important;
+}
+#homeContent [data-home-slot="col"] .gc-ach.is-100 .gc-ico{
+  opacity:1; color:#ffd964;
+}
+</style>
 </body>
 </html>
