@@ -55759,6 +55759,20 @@ body.double-dock[data-feed-position="right"].feed-open:not(.rail-hidden) #settin
         return;
       }
 
+      /* Play starts the game, View on Steam opens the store page. Both
+         have to be claimed HERE: this guard runs in the capture phase
+         and calls stopPropagation, so an inline handler on a button
+         inside the card would never be reached. */
+      if (e.target.closest('.rc-play')){
+        e.preventDefault(); e.stopPropagation();
+        var playId = appIdOf(card);
+        var nameEl = card.querySelector('.game-card-name');
+        if (playId && typeof window.lobbyPlayGame === 'function'){
+          window.lobbyPlayGame(playId, nameEl ? nameEl.textContent.trim() : '');
+        }
+        return;
+      }
+
       if (e.target.closest('.rc-cta')){
         e.preventDefault(); e.stopPropagation();
         var appid = appIdOf(card);
@@ -60529,7 +60543,12 @@ async function reactComment(ev, id, btn){
      ══════════════════════════════════════════════════════════════════ -->
 <style>
 /* ── The stage ─────────────────────────────────────────────────── */
-#discoverOverlay{ position:relative; }
+/* NO position here. .lobby-overlay is position:fixed with top/left/right/
+   bottom, and an id selector outranks that class -- setting position:
+   relative dropped the whole overlay out of fixed positioning, so it
+   stopped filling the viewport, took its width from its parent and sat
+   left with a dead column beside it. Fixed already establishes a
+   containing block, so the wash below needs nothing added here. */
 
 /* Ambient wash taken from whatever is in focus, exactly as the front
    page does it — but anchored to the top of the overlay and faded out
@@ -62115,6 +62134,225 @@ async function reactComment(ev, id, btn){
   -webkit-text-stroke:1px rgba(255,255,255,.075);
 }
 </style>
+
+
+<!-- ══════════════════════════════════════════════════════════════════
+     PLAY NOW — launch the game from the card
+
+     Recently Played could tell you about a game and take you to its
+     store page. The one thing you actually want from a card that says
+     you played this for 56 hours last fortnight is to play it again.
+
+     HOW IT LAUNCHES. Steam registers the steam:// protocol with the OS
+     at install time, so steam://rungameid/<appid> starts the game. In
+     the desktop app that goes through a validated IPC channel
+     (launch-steam-game in main.js) which builds the URL itself from an
+     app id -- shell.openExternal will open file:// and every other
+     registered protocol on the machine, so forwarding a
+     renderer-supplied string would be an arbitrary-launch hole in a
+     window that renders other people's lobby names. In a plain browser
+     it navigates to the protocol URL, which the OS hands to Steam the
+     same way.
+
+     WHAT IT CANNOT KNOW. Whether the game is installed, and whether it
+     actually started. Steam answers an uninstalled title by opening its
+     install prompt, which is a perfectly good response to "play this",
+     and nothing reports back either way. So the toast says the true
+     thing -- that Steam has been asked -- rather than claiming a launch
+     it cannot see.
+
+     GREEN, ON EXACTLY ONE CONTROL. The page has no other green. It is
+     the one colour every player already reads as "start", and spending
+     it here is what makes the button findable without a label being
+     read first. View on Steam stands down to a ghost beside it, because
+     between the two, playing is the thing you came for.
+     ══════════════════════════════════════════════════════════════════ -->
+<style>
+/* ── The deck card: Play, then View on Steam ───────────────────── */
+#homeContent [data-home-slot="hero"] .rc-actions{
+  display:flex; align-items:center; gap:9px;
+  margin-top:14px; flex:none;
+}
+#homeContent [data-home-slot="hero"] .rc-actions .rc-cta{
+  margin-top:0 !important;
+}
+/* Demoted: it is no longer the only thing to do with a card. */
+#homeContent [data-home-slot="hero"] .rc-actions .rc-cta{
+  background:rgba(255,255,255,.06) !important;
+  border-color:rgba(255,255,255,.14) !important;
+  color:rgba(255,255,255,.82) !important;
+  font-weight:700 !important;
+}
+#homeContent [data-home-slot="hero"] .rc-actions .rc-cta:hover{
+  background:rgba(255,255,255,.12) !important;
+  color:#fff !important;
+}
+#homeContent [data-home-slot="hero"] .game-card:not(.rc-active) .rc-actions{
+  display:none !important;
+}
+
+.rc-play{
+  display:inline-flex; align-items:center; gap:8px;
+  padding:10px 19px; border-radius:10px; border:0; cursor:pointer;
+  font-family:'Archivo', var(--font), sans-serif;
+  font-size:12.5px; font-weight:900; letter-spacing:.7px;
+  color:#052a10;
+  background:linear-gradient(180deg,#86efac 0%,#3fbf63 100%);
+  box-shadow:0 8px 20px rgba(63,191,99,.34),
+             inset 0 1px 0 rgba(255,255,255,.55);
+  transition:transform .18s cubic-bezier(.22,1,.36,1), filter .18s ease;
+}
+.rc-play:hover{ transform:translateY(-2px); filter:brightness(1.07); }
+.rc-play:active{ transform:translateY(0); }
+.rc-play svg{ width:13px; height:13px; }
+.rc-play[disabled]{ opacity:.6; cursor:default; transform:none; }
+
+/* ── The small grid card: a launch disc over the art ───────────── */
+#homeContent [data-home-slot="col"] .game-card{ position:relative !important; }
+.rc-play-mini{
+  position:absolute; top:9px; right:9px; z-index:7;
+  width:36px; height:36px; border-radius:50%;
+  display:flex; align-items:center; justify-content:center;
+  border:1px solid rgba(255,255,255,.2); cursor:pointer;
+  color:#052a10;
+  background:linear-gradient(180deg,#86efac 0%,#3fbf63 100%);
+  box-shadow:0 6px 16px rgba(0,0,0,.5), inset 0 1px 0 rgba(255,255,255,.5);
+  /* Hidden until wanted: on a grid of ten covers, ten green discs is a
+     row of buttons rather than a shelf of games. */
+  opacity:0; transform:scale(.82) translateY(-3px);
+  transition:opacity .18s ease, transform .18s cubic-bezier(.22,1,.36,1);
+}
+#homeContent [data-home-slot="col"] .game-card:hover .rc-play-mini,
+.rc-play-mini:focus-visible{
+  opacity:1; transform:scale(1) translateY(0);
+}
+.rc-play-mini:hover{ filter:brightness(1.08); }
+.rc-play-mini svg{ width:14px; height:14px; margin-left:1px; }
+/* The deck slot has a full Play button in the card body already. */
+#homeContent [data-home-slot="hero"] .rc-play-mini{ display:none !important; }
+
+@media (prefers-reduced-motion: reduce){
+  .rc-play, .rc-play-mini{ transition:none; }
+}
+</style>
+<script>
+(function () {
+  'use strict';
+
+  var PLAY_SVG = '<svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">' +
+    '<path d="M8 5.14v13.72a1 1 0 0 0 1.52.86l11.14-6.86a1 1 0 0 0 0-1.72L9.52 4.28A1 1 0 0 0 8 5.14z"/></svg>';
+
+  function toast(msg, kind){
+    try { if (typeof showToast === 'function') showToast(msg, kind || 'info'); } catch (e) {}
+  }
+
+  /* The card's inline onclick is the only place the app id is written
+     down, which is also how the deck controller reads it. */
+  function appIdOf(card){
+    var on = card.getAttribute('onclick') || '';
+    var m = on.match(/\/app\/(\d+)/);
+    return m ? m[1] : null;
+  }
+  function nameOf(card){
+    var el = card.querySelector('.game-card-name');
+    return el ? el.textContent.trim() : '';
+  }
+
+  window.lobbyPlayGame = async function (appid, name){
+    var id = String(appid == null ? '' : appid).replace(/[^0-9]/g, '');
+    if (!id) return;
+    var label = name || 'that game';
+
+    var bridge = window.electronAPI;
+    if (bridge && typeof bridge.launchSteamGame === 'function'){
+      var r = null;
+      try { r = await bridge.launchSteamGame(id); } catch (e) {}
+      if (r && r.ok === false){
+        toast('Steam would not take the request for ' + label, 'error');
+        return;
+      }
+    } else {
+      /* No bridge (a browser, or an older shell than the handler). The
+         protocol is registered with the OS regardless of who asks, so
+         navigating to it reaches Steam the same way. */
+      try { window.location.href = 'steam://rungameid/' + id; }
+      catch (e) { toast('Could not reach Steam', 'error'); return; }
+    }
+
+    /* Deliberately not "Launched". Nothing reports back, and if the
+       title is not installed what opens is Steam's install prompt --
+       both are the right answer, neither is visible from here. */
+    toast('Asked Steam to start ' + label, 'success');
+  };
+
+  /* ── Put the buttons on the cards ────────────────────────────── */
+  function enhance(card){
+    var appid = appIdOf(card);
+    if (!appid) return;
+
+    if (card.closest('[data-home-slot="hero"]')){
+      var cta = card.querySelector('.rc-cta');
+      /* enhance() in the deck controller appends .rc-cta, so there is
+         nothing to sit beside until that has run. */
+      if (!cta || card.querySelector('.rc-play')) return;
+      var row = document.createElement('div');
+      row.className = 'rc-actions';
+      cta.parentNode.insertBefore(row, cta);
+      var play = document.createElement('button');
+      play.type = 'button';
+      play.className = 'rc-play';
+      play.innerHTML = PLAY_SVG + 'Play';
+      play.setAttribute('title', 'Launch through Steam');
+      row.appendChild(play);
+      row.appendChild(cta);
+      return;
+    }
+
+    if (card.querySelector('.rc-play-mini')) return;
+    var b = document.createElement('button');
+    b.type = 'button';
+    b.className = 'rc-play-mini';
+    b.innerHTML = PLAY_SVG;
+    b.setAttribute('title', 'Play ' + (nameOf(card) || 'this game'));
+    b.setAttribute('aria-label', 'Play ' + (nameOf(card) || 'this game'));
+    /* A grid card is not covered by the deck's capture guard -- that
+       returns early for anything outside the hero slot -- so stopping
+       propagation here is what keeps the card's own onclick, which
+       opens the store page, from firing underneath. */
+    b.addEventListener('click', function (ev){
+      ev.preventDefault();
+      ev.stopPropagation();
+      window.lobbyPlayGame(appIdOf(card), nameOf(card));
+    });
+    card.appendChild(b);
+  }
+
+  var pending = null;
+  function sweep(){
+    pending = null;
+    var host = document.getElementById('homeContent');
+    if (!host) return;
+    host.querySelectorAll('.game-card').forEach(enhance);
+  }
+  function schedule(){
+    if (pending) return;
+    pending = requestAnimationFrame(sweep);
+  }
+
+  function start(){
+    var host = document.getElementById('homeContent');
+    if (!host) { setTimeout(start, 250); return; }
+    sweep();
+    /* Cards are rebuilt on load, on refresh and every time the sections
+       are reordered, and the deck controller inserts .rc-cta after the
+       card itself exists -- so this watches rather than running once. */
+    new MutationObserver(schedule).observe(host, { childList:true, subtree:true });
+  }
+
+  if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', start);
+  else start();
+})();
+</script>
 
 </body>
 </html>

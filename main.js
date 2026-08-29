@@ -166,6 +166,32 @@ function createWindow() {
   win.loadFile(fs.existsSync(splashPath) ? splashFile : "splash.html");
 }
 
+// Launch a Steam title on the user's own machine.
+//
+// Steam registers the steam:// protocol at install time, so handing
+// the OS steam://rungameid/<id> starts the game -- or, if it is not
+// installed, opens Steam on its install prompt. Either is the right
+// answer to "play this"; neither can be distinguished from here, and
+// the renderer is told as much rather than being given a fake
+// success signal to display.
+//
+// THE RENDERER NEVER NAMES THE URL. It passes an app id, this checks
+// it is a plain positive integer, and the steam:// string is built
+// here. shell.openExternal will open file:// and every other
+// registered protocol on the machine, so forwarding a
+// renderer-supplied string would be an arbitrary-launch hole -- and
+// this renderer displays other people's lobby names and post bodies.
+ipcMain.handle("launch-steam-game", (event, appid) => {
+  const id = String(appid == null ? "" : appid).trim();
+  if (!/^[0-9]{1,10}$/.test(id)) return { ok: false, error: "bad appid" };
+  try {
+    shell.openExternal("steam://rungameid/" + id);
+    return { ok: true };
+  } catch (e) {
+    return { ok: false, error: e.message };
+  }
+});
+
 ipcMain.handle("navigate", (event, page, direction = "fade") => {
   const win = BrowserWindow.fromWebContents(event.sender);
   if (win) win.loadFile(page, { query: { transition: direction } });
