@@ -57931,18 +57931,32 @@ async function reactComment(ev, id, btn){
 }
 #homeContent > section[data-home-slot="hero"] > .hero-wash{
   position:absolute; z-index:0;
-  inset:-26px -18px; pointer-events:none;
-  border-radius:28px; overflow:hidden;
-  /* No findable edge: gone well before the section boundary. */
-  /* Wider solid core to go with the stronger wash — at .34 a tight core
-     made the falloff itself visible as a ring. */
-  -webkit-mask-image:radial-gradient(120% 96% at 50% 46%, #000 34%, transparent 80%);
-  mask-image:radial-gradient(120% 96% at 50% 46%, #000 34%, transparent 80%);
+  /* Ends INSIDE the section's bottom edge. It used to bleed 26px past
+     it, straight into the row beneath. */
+  inset:-30px -18px 4px; pointer-events:none;
+
+  /* overflow:hidden is gone, and it was the hard line. The radial was
+     still about half opaque where it met the container's bottom edge,
+     and clipping a half-opaque mask cuts it straight across. Masks do
+     all the shaping now and nothing is clipped.
+
+     This one runs top to bottom: solid where the card is, gone by the
+     foot of the section, so the colour dissolves into the page instead
+     of stopping at a boundary. */
+  -webkit-mask-image:linear-gradient(180deg, #000 0%, #000 36%, rgba(0,0,0,.42) 72%, transparent 100%);
+  mask-image:linear-gradient(180deg, #000 0%, #000 36%, rgba(0,0,0,.42) 72%, transparent 100%);
 }
 #homeContent > section[data-home-slot="col"] > .hero-wash{ display:none !important; }
 
 .hero-wash > i{
-  position:absolute; inset:-14%;
+  /* inset:0, not a negative bleed: with nothing clipping the container
+     any more, a layer larger than its parent would carry its own soft
+     edge outside the area the vertical fade covers. The 90px blur
+     already softens the boundary from the inside. */
+  position:absolute; inset:0;
+  /* Sides and top only — the container owns the downward blend. */
+  -webkit-mask-image:radial-gradient(112% 108% at 50% 34%, #000 30%, transparent 82%);
+  mask-image:radial-gradient(112% 108% at 50% 34%, #000 30%, transparent 82%);
   background-size:cover; background-position:center;
   filter:blur(90px) saturate(1.85);
   opacity:0; transform:scale(1.06);
