@@ -55748,86 +55748,91 @@ body.lobby-selected #chatPanel .chat-header{ display:none !important; }
 }
 </style>
 
+
 <!-- ══════════════════════════════════════════════════════════════════
-     HOME SECTION TITLES — centred
+     HOME SECTION TITLES — broadcast slate
 
-     Left-aligned with a rule trailing off to one side, these still read
-     as labels attached to the content below. Centred between two rules
-     they read as a title card: the eye lands on the middle of the page
-     and the section announces itself.
+     The centred-title-between-two-hairlines is the default any tool
+     reaches for, and it read that way. It was also never truly centred:
+     the icon sat inside the centred group, so the WORDS landed left of
+     the page's middle while the group as a whole was balanced.
 
-     The wow is doing a few things properly rather than one thing loudly:
-       the name in the display face at 38px, widely letterspaced
-       a vertical gradient through the type, so it catches light at the
-         top and settles into the page at the bottom
-       the glyph in a lit tile with a soft accent bloom
-       rules that fade OUTWARD from the title, so the eye is pulled in
-         rather than led away
-       the action pinned right, out of the symmetry
+     This drops centring entirely and uses the language the app already
+     has — the Coliseum's Control Room. Every section is a slate:
 
-     Built by rearranging the existing markup — the label, subtitle and
-     button are the app's own, only the frame around them is new.
+       a thick accent spine down the left edge
+       a mono index and source line above the name (01 · STEAM)
+       the name flush left in the display face, large and solid
+       a live count on the right, in mono
+
+     The numbers are real, not decoration. The index is the section's
+     ACTUAL position, so it renumbers when they are dragged, and the
+     count is the number of things currently rendered in that section.
+     Density in place of ornament, and it matches the Coliseum rather
+     than looking like a landing page.
      ══════════════════════════════════════════════════════════════════ -->
 <style>
 #homeContent .home-section-header{
-  display:flex !important; flex-direction:column !important;
-  align-items:center !important; justify-content:center !important;
-  gap:0 !important; position:relative;
-  margin:0 0 26px !important; padding:10px 0 !important;
-  text-align:center;
+  display:grid !important;
+  grid-template-columns:auto minmax(0,1fr) auto;
+  grid-template-areas:'spine main action';
+  align-items:center !important;
+  column-gap:20px; gap:0 20px !important;
+  margin:0 0 24px !important; padding:4px 0 !important;
+  text-align:left !important;
 }
-#homeContent .home-section-header::before{ left:2px !important; }
+#homeContent .home-section-header::before{ left:-16px !important; }
 
-.hs-row{
-  display:flex; align-items:center; gap:16px;
-  width:100%; justify-content:center;
+.hs-spine{
+  grid-area:spine;
+  width:5px; align-self:stretch; min-height:74px; border-radius:99px;
+  background:linear-gradient(180deg,
+    color-mix(in srgb, var(--accent) 95%, white),
+    color-mix(in srgb, var(--accent) 55%, transparent) 55%,
+    transparent);
 }
-.hs-ico{
-  width:40px; height:40px; border-radius:12px; flex:none;
-  display:grid; place-items:center;
-  background:linear-gradient(160deg,
-    color-mix(in srgb, var(--accent) 26%, transparent),
-    color-mix(in srgb, var(--accent) 8%, transparent));
-  border:1px solid color-mix(in srgb, var(--accent) 40%, transparent);
-  color:color-mix(in srgb, var(--accent) 94%, white);
-  box-shadow:0 0 26px color-mix(in srgb, var(--accent) 22%, transparent),
-             inset 0 1px 0 rgba(255,255,255,.14);
+.hs-main{ grid-area:main; min-width:0; }
+
+.hs-kicker{
+  display:flex; align-items:center; gap:9px;
+  font-family:'JetBrains Mono', ui-monospace, monospace;
+  font-size:10px; font-weight:700; letter-spacing:2.2px; text-transform:uppercase;
+  color:var(--text-3); margin-bottom:7px;
 }
-.hs-ico svg{ width:20px; height:20px; display:block; }
+.hs-idx{ color:color-mix(in srgb, var(--accent) 92%, white); font-weight:800; }
+.hs-kicker .sep{ color:rgba(255,255,255,.18); }
+.hs-ico{ display:inline-flex; color:color-mix(in srgb, var(--accent) 85%, white); }
+.hs-ico svg{ width:14px; height:14px; display:block; }
+.hs-count{
+  margin-left:auto; display:inline-flex; align-items:center; gap:7px;
+  color:var(--text-2);
+}
+.hs-count b{
+  font-weight:800; color:#fff; font-variant-numeric:tabular-nums;
+}
+.hs-count .dot{
+  width:6px; height:6px; border-radius:50%;
+  background:color-mix(in srgb, var(--accent) 90%, white);
+  box-shadow:0 0 9px color-mix(in srgb, var(--accent) 70%, transparent);
+}
 
 #homeContent .home-section-title{
   font-family:'Bebas Neue', var(--font), sans-serif !important;
-  font-size:38px !important; font-weight:400 !important;
-  letter-spacing:4px !important; line-height:1 !important;
-  white-space:nowrap;
-  /* Light at the top, settling into the page at the bottom. Painted
-     through the glyphs rather than behind them, so there is no box. */
-  background:linear-gradient(180deg,#ffffff 30%, rgba(255,255,255,.58) 100%);
-  -webkit-background-clip:text; background-clip:text;
-  -webkit-text-fill-color:transparent; color:transparent !important;
+  font-size:46px !important; font-weight:400 !important;
+  letter-spacing:1.5px !important; line-height:.92 !important;
+  color:#fff !important;
+  /* Solid, not a gradient fill. The fade read as a shortcut for
+     interest; at this size the type carries itself. */
+  background:none !important; -webkit-text-fill-color:#fff !important;
 }
 #homeContent .home-section-sub{
   font-size:12.5px !important; color:var(--text-3) !important;
-  margin-top:9px !important; letter-spacing:.3px;
+  margin-top:7px !important; letter-spacing:.2px;
 }
 
-/* Fade OUTWARD from the title: strongest beside the words, gone by the
-   edges, so the rules frame the title instead of pointing away from it. */
-.hs-rule{ flex:1; height:1px; min-width:20px; }
-.hs-rule.l{
-  background:linear-gradient(90deg, transparent,
-    rgba(255,255,255,.05) 45%, color-mix(in srgb, var(--accent) 40%, transparent));
-}
-.hs-rule.r{
-  background:linear-gradient(270deg, transparent,
-    rgba(255,255,255,.05) 45%, color-mix(in srgb, var(--accent) 40%, transparent));
-}
-
-/* Out of the symmetry, so the centred title stays centred on the page
-   rather than on the space left over beside a button. */
 #homeContent .home-section-btn{
-  position:absolute !important; right:0; top:50%; transform:translateY(-50%);
-  border-radius:9px !important; padding:8px 14px !important;
+  grid-area:action; position:static !important; transform:none !important;
+  border-radius:9px !important; padding:9px 15px !important;
   font-family:'Archivo', var(--font), sans-serif !important;
   font-size:11.5px !important; font-weight:700 !important; letter-spacing:.5px !important;
   background:rgba(255,255,255,.05) !important;
@@ -55839,66 +55844,101 @@ body.lobby-selected #chatPanel .chat-header{ display:none !important; }
 }
 
 @media (max-width:900px){
-  #homeContent .home-section-title{ font-size:28px !important; letter-spacing:2.5px !important; }
-  #homeContent .home-section-btn{ position:static !important; transform:none; margin-top:12px; }
+  #homeContent .home-section-title{ font-size:34px !important; }
+  .hs-count{ display:none; }
 }
 </style>
 <script>
 (function () {
   'use strict';
 
-  var G = {
-    homeRecents: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="7" width="20" height="11" rx="4"/><line x1="7" y1="11" x2="7" y2="14"/><line x1="5.5" y1="12.5" x2="8.5" y2="12.5"/><circle cx="16" cy="12" r="1"/><circle cx="18.5" cy="14" r="1"/></svg>',
-    homeSpotlight: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3s5 4 5 8a5 5 0 0 1-10 0c0-1.6.8-3 1.6-4.1.5 1 1.2 1.6 2 1.6C12 8.5 12 5.5 12 3z"/><path d="M9 17a3 3 0 0 0 6 0"/></svg>',
-    homeCommunities: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="9" cy="8" r="3.2"/><path d="M3 20v-1.5A4.5 4.5 0 0 1 7.5 14h3A4.5 4.5 0 0 1 15 18.5V20"/><circle cx="17" cy="9" r="2.4"/><path d="M17.5 13.4A4 4 0 0 1 21 17.3V19"/></svg>'
+  /* label is the source line beside the index; countOf reports how many
+     things that section is currently showing. */
+  var SECTIONS = {
+    homeRecents: {
+      label:'Steam', word:'games',
+      ico:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="7" width="20" height="11" rx="4"/><line x1="7" y1="11" x2="7" y2="14"/><line x1="5.5" y1="12.5" x2="8.5" y2="12.5"/><circle cx="16" cy="12" r="1"/><circle cx="18.5" cy="14" r="1"/></svg>',
+      countOf:function(s){ return s.querySelectorAll('.game-card').length; }
+    },
+    homeSpotlight: {
+      label:'Public feed', word:'posts',
+      ico:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3s5 4 5 8a5 5 0 0 1-10 0c0-1.6.8-3 1.6-4.1.5 1 1.2 1.6 2 1.6C12 8.5 12 5.5 12 3z"/><path d="M9 17a3 3 0 0 0 6 0"/></svg>',
+      countOf:function(s){ return s.querySelectorAll('.spotlight-card').length; }
+    },
+    homeCommunities: {
+      label:'Open to join', word:'lobbies',
+      ico:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="9" cy="8" r="3.2"/><path d="M3 20v-1.5A4.5 4.5 0 0 1 7.5 14h3A4.5 4.5 0 0 1 15 18.5V20"/><circle cx="17" cy="9" r="2.4"/><path d="M17.5 13.4A4 4 0 0 1 21 17.3V19"/></svg>',
+      countOf:function(s){ return s.querySelectorAll('.community-card, .lobby-card').length; }
+    }
   };
 
-  /* Rearranges the app's own elements into a centred title card. Left
-     alone once done — these sections are drag-reorderable and get
-     re-inserted, so this runs again and must not stack a second icon or
-     eat the label. */
-  function decorate(){
-    Object.keys(G).forEach(function(id){
-      var sec = document.getElementById(id);
-      if (!sec) return;
+  function build(){
+    var host = document.getElementById('homeContent');
+    if (!host) return;
+
+    /* Index from ACTUAL position, so dragging a section renumbers it
+       rather than leaving a label that lies. */
+    var all = Array.prototype.filter.call(
+      host.querySelectorAll('#homeRecents, #homeSpotlight, #homeCommunities'),
+      function(s){ return !!SECTIONS[s.id]; }
+    );
+
+    all.forEach(function(sec, i){
+      var cfg = SECTIONS[sec.id];
       var head = sec.querySelector('.home-section-header');
-      if (!head || head.querySelector('.hs-row')) return;
+      if (!head) return;
 
       var title = head.querySelector('.home-section-title');
+      var sub   = head.querySelector('.home-section-sub');
       if (!title) return;
-      var sub = head.querySelector('.home-section-sub');
 
-      // The emoji lives in the text node — strip it, keep the words.
-      title.textContent = (title.textContent || '').replace(/^[^A-Za-z0-9]+/, '').trim();
+      var main = head.querySelector('.hs-main');
+      if (!main){
+        title.textContent = (title.textContent || '').replace(/^[^A-Za-z0-9]+/, '').trim();
 
-      var row = document.createElement('div');
-      row.className = 'hs-row';
+        var spine = document.createElement('span');
+        spine.className = 'hs-spine';
 
-      var ruleL = document.createElement('span'); ruleL.className = 'hs-rule l';
-      var ruleR = document.createElement('span'); ruleR.className = 'hs-rule r';
-      var ico = document.createElement('span');
-      ico.className = 'hs-ico';
-      ico.innerHTML = G[id];
+        main = document.createElement('div');
+        main.className = 'hs-main';
 
-      row.appendChild(ruleL);
-      row.appendChild(ico);
-      row.appendChild(title);      // moved, not copied
-      row.appendChild(ruleR);
+        var kicker = document.createElement('div');
+        kicker.className = 'hs-kicker';
+        kicker.innerHTML =
+          '<span class="hs-idx"></span><span class="sep">/</span>' +
+          '<span class="hs-ico">' + cfg.ico + '</span>' +
+          '<span>' + cfg.label + '</span>' +
+          '<span class="hs-count"><span class="dot"></span><b>0</b> ' + cfg.word + '</span>';
 
-      /* The wrapper the title used to sit in is now empty furniture —
-         drop it so it cannot impose its own width on the centred row. */
-      var oldWrap = head.querySelector('div:not(.hs-row)');
-      head.insertBefore(row, head.firstChild);
-      if (sub) head.insertBefore(sub, row.nextSibling);
-      if (oldWrap && !oldWrap.children.length && oldWrap.parentElement === head) oldWrap.remove();
+        var oldWrap = title.parentElement;
+        main.appendChild(kicker);
+        main.appendChild(title);
+        if (sub) main.appendChild(sub);
+
+        head.insertBefore(spine, head.firstChild);
+        head.insertBefore(main, spine.nextSibling);
+        if (oldWrap && oldWrap !== head && !oldWrap.children.length) oldWrap.remove();
+      }
+
+      var idx = main.querySelector('.hs-idx');
+      if (idx) idx.textContent = ('0' + (i + 1)).slice(-2);
+
+      var n = 0;
+      try { n = cfg.countOf(sec) || 0; } catch(e){}
+      var cnt = main.querySelector('.hs-count b');
+      if (cnt && cnt.textContent !== String(n)) cnt.textContent = String(n);
+      var wrap = main.querySelector('.hs-count');
+      // Nothing loaded yet: a live count reading zero is worse than none.
+      if (wrap) wrap.style.visibility = n ? 'visible' : 'hidden';
     });
   }
 
   function start(){
-    decorate();
+    build();
     var host = document.getElementById('homeContent');
-    if (host) new MutationObserver(decorate).observe(host, { childList:true, subtree:true });
-    console.log('[home] centred section titles');
+    if (host) new MutationObserver(build).observe(host, { childList:true, subtree:true });
+    setInterval(build, 2000);   // counts arrive after their fetches
+    console.log('[home] section slates');
   }
 
   if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', start);
