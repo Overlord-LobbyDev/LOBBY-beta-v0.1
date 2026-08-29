@@ -568,6 +568,53 @@ async function initDb() {
       );
     `);
 
+    // ── Matchmaking queue ──────────────────────────────────────────
+    // A session is one group being assembled. People join an existing
+    // searching session rather than being paired off in a separate
+    // step, so "a match" and "a party" are the same row and there is
+    // no window where a match exists but the group does not.
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS queue_sessions (
+        id          SERIAL PRIMARY KEY,
+        game        TEXT NOT NULL,
+        players     INTEGER NOT NULL,
+        skill       TEXT NOT NULL DEFAULT 'plat',
+        state       TEXT NOT NULL DEFAULT 'searching',
+        owner_id    INTEGER REFERENCES users(id) ON DELETE SET NULL,
+        created_at  TIMESTAMPTZ DEFAULT NOW(),
+        matched_at  TIMESTAMPTZ DEFAULT NULL,
+        ended_at    TIMESTAMPTZ DEFAULT NULL,
+        server_id   INTEGER DEFAULT NULL
+      );
+    `);
+
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS queue_members (
+        id         SERIAL PRIMARY KEY,
+        session_id INTEGER REFERENCES queue_sessions(id) ON DELETE CASCADE,
+        user_id    INTEGER REFERENCES users(id) ON DELETE CASCADE,
+        skill      TEXT DEFAULT NULL,
+        proof      TEXT DEFAULT NULL,
+        joined_at  TIMESTAMPTZ DEFAULT NOW(),
+        left_at    TIMESTAMPTZ DEFAULT NULL,
+        kicked     BOOLEAN DEFAULT FALSE,
+        UNIQUE(session_id, user_id)
+      );
+    `);
+
+    // One row per voter per target. The UNIQUE is what stops a member
+    // voting twice to force a kick through on their own.
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS queue_votes (
+        id         SERIAL PRIMARY KEY,
+        session_id INTEGER REFERENCES queue_sessions(id) ON DELETE CASCADE,
+        voter_id   INTEGER REFERENCES users(id) ON DELETE CASCADE,
+        target_id  INTEGER REFERENCES users(id) ON DELETE CASCADE,
+        created_at TIMESTAMPTZ DEFAULT NOW(),
+        UNIQUE(session_id, voter_id, target_id)
+      );
+    `);
+
     // Tournament Invites (for invite-only tournaments)
     await pool.query(`
       CREATE TABLE IF NOT EXISTS tournament_invites (
@@ -617,6 +664,13 @@ async function initDb() {
     // post_reactions — reaction counts and per-user checks
     await pool.query(`CREATE INDEX IF NOT EXISTS idx_post_reactions_post       ON post_reactions(post_id);`).catch(() => {});
     await pool.query(`CREATE INDEX IF NOT EXISTS idx_post_reactions_post_user  ON post_reactions(post_id, user_id);`).catch(() => {});
+
+    // queue — the matcher scans open sessions by game on every intent,
+    // and the roster is read on every status poll.
+    await pool.query(`CREATE INDEX IF NOT EXISTS idx_queue_sessions_open  ON queue_sessions(state, game);`).catch(() => {});
+    await pool.query(`CREATE INDEX IF NOT EXISTS idx_queue_members_session ON queue_members(session_id);`).catch(() => {});
+    await pool.query(`CREATE INDEX IF NOT EXISTS idx_queue_members_user    ON queue_members(user_id);`).catch(() => {});
+    await pool.query(`CREATE INDEX IF NOT EXISTS idx_queue_votes_session   ON queue_votes(session_id);`).catch(() => {});
 
     // post_comments — comment counts per post
     await pool.query(`CREATE INDEX IF NOT EXISTS idx_post_comments_post_id ON post_comments(post_id);`).catch(() => {});

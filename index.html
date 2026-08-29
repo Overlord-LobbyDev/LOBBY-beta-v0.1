@@ -59461,5 +59461,141 @@ async function reactComment(ev, id, btn){
   else start();
 })();
 </script>
+
+<!-- ══════════════════════════════════════════════════════════════════
+     QUEUE — the client half
+
+     The queue UI was written against websocket pushes: it handles
+     queue-matched, queue-member-joined and queue-member-left, and never
+     asks the server anything. That cannot work, and not because the
+     pushes were missing — the websocket lives in a separate process
+     (server.js) from the REST API (auth.js), and that process has no
+     idea the queue exists. There is not even a broadcast helper in the
+     API file to call.
+
+     So /queue/:id/status is authoritative and this polls it, then hands
+     the payload to the very same window._qOnMatched the socket path
+     would have called. Nothing in the existing UI changes. If the two
+     services are ever merged, the push can be added and this can go,
+     without touching the screens.
+
+     Polling only while a queue is actually open — searching or in a
+     session — so an idle app makes no requests at all.
+     ══════════════════════════════════════════════════════════════════ -->
+<style>
+/* The search screen could only ever say "searching". Now that the server
+   reports a roster, it can say how full the group is. */
+.q-fill-line{
+  margin-top:10px; font-size:12px; font-weight:700;
+  color:rgba(255,255,255,.62); letter-spacing:.3px;
+  font-variant-numeric:tabular-nums;
+  display:flex; align-items:center; justify-content:center; gap:8px;
+}
+.q-fill-line b{ color:#fff; }
+.q-fill-pips{ display:inline-flex; gap:4px; }
+.q-fill-pip{
+  width:7px; height:7px; border-radius:50%;
+  background:rgba(255,255,255,.16);
+  transition:background .3s ease, box-shadow .3s ease;
+}
+.q-fill-pip.on{
+  background:var(--hub-accent, #a863ff);
+  box-shadow:0 0 9px color-mix(in srgb, var(--hub-accent, #a863ff) 70%, transparent);
+}
+</style>
+<script>
+(function () {
+  'use strict';
+
+  /* _qState is a top-level let — global lexical scope, not a property of
+     window. Reading window._qState gives undefined, which is the trap
+     this file has been caught by before. */
+  function qs(){
+    try { if (typeof _qState !== 'undefined') return _qState; } catch (e) {}
+    return null;
+  }
+  function apiFn(){
+    return (typeof window.api === 'function') ? window.api : null;
+  }
+
+  var busy = false;
+
+  function paintFill(r){
+    var host = document.getElementById('qSearchMeta');
+    if (!host || !host.parentNode) return;
+    var line = document.getElementById('qFillLine');
+    if (!line){
+      line = document.createElement('div');
+      line.id = 'qFillLine';
+      line.className = 'q-fill-line';
+      host.parentNode.insertBefore(line, host.nextSibling);
+    }
+    var have = r.filled || 0, want = r.players || 0;
+    var pips = '';
+    for (var i = 0; i < want; i++){
+      pips += '<span class="q-fill-pip' + (i < have ? ' on' : '') + '"></span>';
+    }
+    line.innerHTML = '<span class="q-fill-pips">' + pips + '</span>' +
+                     '<span><b>' + have + '</b> of <b>' + want + '</b> found</span>';
+  }
+
+  async function tick(){
+    var st = qs();
+    var api = apiFn();
+    if (!st || !api || !st.queueId || busy) return;
+    if (st.view !== 'searching' && st.view !== 'in-call') return;
+
+    busy = true;
+    try {
+      var r = await api('/queue/' + st.queueId + '/status').catch(function () { return null; });
+      if (!r || r.error) return;
+
+      if (st.view === 'searching'){
+        paintFill(r);
+        if (r.state === 'matched'){
+          /* Straight into the handler the socket would have called, with
+             the same shape it expects. */
+          if (typeof window._qOnMatched === 'function') window._qOnMatched(r);
+          return;
+        }
+        if (r.state === 'expired' || r.state === 'cancelled'){
+          st.queueId = null;
+          if (typeof window.qBackToSetup === 'function') window.qBackToSetup();
+          return;
+        }
+      } else if (st.view === 'in-call'){
+        /* Someone leaving drops the session back to searching, which is
+           the server telling us the roster changed. */
+        var before = (st.callRoster || []).length;
+        st.callRoster = r.members || [];
+        if (r.members && r.members.length !== before &&
+            typeof _qRenderRoster === 'function'){
+          _qRenderRoster();
+        }
+        if (r.state === 'expired'){
+          st.queueId = null;
+          if (typeof window.qBackToSetup === 'function') window.qBackToSetup();
+        }
+      }
+    } finally {
+      busy = false;
+    }
+  }
+
+  /* 2.5s: fast enough that a match feels immediate, slow enough that a
+     full lobby of people waiting is not hammering the API. */
+  setInterval(tick, 2500);
+
+  /* Deliberately NOT wrapping api(). Catching an instant match from the
+     intent response would save one 2.5s tick, but api() is a top-level
+     function declaration -- so it IS on window, and reassigning it would
+     reroute every call in the app through this file. That is not a trade
+     worth making for two and a half seconds. The app already stores
+     queueId from its own intent response, and the next tick picks it up.
+
+     _qRenderRoster is a top-level declaration too, so it is reachable by
+     name; the websocket handlers guard it the same way. */
+})();
+</script>
 </body>
 </html>
