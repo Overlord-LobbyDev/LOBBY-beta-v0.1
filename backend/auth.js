@@ -4110,14 +4110,22 @@ function _tourneyCard(r) {
 }
 
 // GET /tournaments/global — every tournament worth showing, across lobbies.
+// status=live returns brackets in progress, status=open those still
+// taking entrants, anything else both. Filtering server-side matters
+// for paging: a client that pulled a mixed page and split it locally
+// would have an offset that means nothing for either half.
 app.get("/tournaments/global", async (req, res) => {
   try {
     const { limit, offset } = _page(req);
+    const want = String(req.query.status || "").toLowerCase();
+    const statuses = want === "live" ? ["in-progress"]
+                   : want === "open" ? ["setup", "registration"]
+                   : ["setup", "registration", "in-progress"];
     const r = await pool.query(_TOURNEY_SELECT +
-      ` WHERE t.status IN ('setup','registration','in-progress')` +
+      ` WHERE t.status = ANY($3::text[])` +
       `   AND ` + _PUBLIC_TOURNEY_WHERE +
       ` ORDER BY (t.status = 'in-progress') DESC, entrants DESC, t.created_at DESC` +
-      ` LIMIT $1 OFFSET $2`, [limit, offset]);
+      ` LIMIT $1 OFFSET $2`, [limit, offset, statuses]);
     res.json(r.rows.map(_tourneyCard));
   } catch (e) {
     console.error("[tournaments/global]", e.message);
@@ -4143,11 +4151,13 @@ app.get("/featured/tournaments", async (req, res) => {
 // GET /me/tournaments — hosting or entered.
 app.get("/me/tournaments", requireAuth, async (req, res) => {
   try {
+    const { limit, offset } = _page(req);
     const r = await pool.query(_TOURNEY_SELECT +
       ` WHERE t.host_id = $1
          OR EXISTS (SELECT 1 FROM tournament_players tp
                      WHERE tp.tournament_id = t.id AND tp.user_id = $1)
-       ORDER BY t.created_at DESC LIMIT 100`, [req.userId]);
+       ORDER BY t.created_at DESC LIMIT $2 OFFSET $3`,
+      [req.userId, limit, offset]);
     res.json(r.rows.map((row) => Object.assign(_tourneyCard(row), {
       isHost: row.host_id === req.userId,
     })));
