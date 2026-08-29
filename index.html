@@ -52577,7 +52577,99 @@ body.coliseum-mode #coliseumRoot .col-canvas{ display:none !important; }
 /* One prioritised column rather than a type-grouped grid: with 30
    lounges the thing you want is almost never the first one alphabetically
    in its group, and a single ordered list puts it at the top. */
-#crRoot .cr-lounges{ display:flex; flex-direction:column; gap:10px; }
+#crRoot .cr-lounges{ display:flex; flex-direction:column; gap:9px; }
+
+/* ── Lounge rows ─────────────────────────────────────────────────
+   Type is carried by a coloured spine and a tinted glyph tile rather
+   than by a heading, so it stays readable in a single ordered list. */
+#crRoot .cr-lounge{
+  --lg:var(--cr-elec);
+  position:relative; display:flex; align-items:center; gap:13px;
+  padding:13px 16px 13px 15px;
+  border:1px solid var(--cr-line); border-radius:12px;
+  background:linear-gradient(90deg, color-mix(in srgb, var(--lg) 7%, transparent), var(--cr-surface) 42%);
+  cursor:pointer; overflow:hidden;
+  transition:border-color .16s, transform .16s, background .16s;
+}
+#crRoot .cr-lounge::before{                 /* the type spine */
+  content:''; position:absolute; left:0; top:0; bottom:0; width:2px;
+  background:linear-gradient(180deg, var(--lg), color-mix(in srgb, var(--lg) 30%, transparent));
+}
+#crRoot .cr-lounge:hover{
+  border-color:color-mix(in srgb, var(--lg) 55%, transparent);
+  transform:translateX(2px);
+}
+#crRoot .cr-lounge.voice{ --lg:#23a55a; }
+#crRoot .cr-lounge.announcement{ --lg:var(--cr-gold); }
+#crRoot .cr-lounge.text{ --lg:var(--cr-elec); }
+
+#crRoot .cr-lg-tile{
+  position:relative; flex:0 0 38px; width:38px; height:38px; border-radius:10px;
+  display:flex; align-items:center; justify-content:center;
+  background:color-mix(in srgb, var(--lg) 15%, transparent);
+  border:1px solid color-mix(in srgb, var(--lg) 30%, transparent);
+  color:color-mix(in srgb, var(--lg) 92%, white);
+}
+#crRoot .cr-lg-tile svg{ width:17px; height:17px; }
+
+#crRoot .cr-lg-body{ display:flex; flex-direction:column; gap:3px; min-width:0; flex:1; }
+#crRoot .cr-lg-name{
+  font-family:var(--cr-head); font-weight:700; font-size:14px; color:var(--cr-ink);
+  letter-spacing:-.1px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;
+}
+#crRoot .cr-lg-meta{
+  font-family:var(--cr-mono); font-size:9.5px; letter-spacing:1.1px;
+  text-transform:uppercase; color:var(--cr-ink3);
+}
+#crRoot .cr-lounge.live .cr-lg-meta{ color:#5ee08a; }
+
+/* Faces of whoever is in the room, overlapped like a party. */
+#crRoot .cr-lg-faces{ display:flex; flex:0 0 auto; }
+#crRoot .cr-lg-faces .f{
+  width:26px; height:26px; border-radius:50%; overflow:hidden;
+  margin-left:-7px; border:2px solid #0d0f16; background:rgba(255,255,255,.09);
+  display:flex; align-items:center; justify-content:center;
+  font-size:9px; font-weight:800; color:var(--cr-ink2);
+}
+#crRoot .cr-lg-faces .f:first-child{ margin-left:0; }
+#crRoot .cr-lg-faces .f img{ width:100%; height:100%; object-fit:cover; display:block; }
+#crRoot .cr-lg-faces .f.more{ background:rgba(35,165,90,.22); color:#8ff0b4; }
+
+/* Action reads as a label until you hover the row, then it fills. */
+#crRoot .cr-lg-go{
+  flex:0 0 auto; font-family:var(--cr-head); font-size:10.5px; font-weight:800;
+  letter-spacing:1.2px; text-transform:uppercase;
+  padding:6px 12px; border-radius:8px;
+  color:color-mix(in srgb, var(--lg) 90%, white);
+  border:1px solid transparent; background:transparent;
+  transition:background .16s, border-color .16s, color .16s;
+}
+#crRoot .cr-lounge:hover .cr-lg-go{
+  background:color-mix(in srgb, var(--lg) 22%, transparent);
+  border-color:color-mix(in srgb, var(--lg) 45%, transparent);
+  color:#fff;
+}
+#crRoot .cr-lg-unread{
+  flex:0 0 auto; font-family:var(--cr-mono); font-size:10px; font-weight:800;
+  background:var(--cr-elec); color:#fff; border-radius:99px; padding:2px 8px;
+}
+
+/* Live waveform — four bars over the mic tile, only when people talk. */
+#crRoot .crx-wave{
+  position:absolute; inset:0; display:flex; align-items:center; justify-content:center; gap:2px;
+  background:color-mix(in srgb, #23a55a 22%, #0d0f16); border-radius:9px;
+}
+#crRoot .crx-wave i{
+  width:2.5px; height:6px; border-radius:2px; background:#5ee08a;
+  animation:crWave 1s ease-in-out infinite;
+}
+#crRoot .crx-wave i:nth-child(2){ animation-delay:.15s; }
+#crRoot .crx-wave i:nth-child(3){ animation-delay:.3s; }
+#crRoot .crx-wave i:nth-child(4){ animation-delay:.45s; }
+@keyframes crWave{ 0%,100%{ height:6px; opacity:.6 } 50%{ height:16px; opacity:1 } }
+@media (prefers-reduced-motion: reduce){
+  #crRoot .crx-wave i{ animation:none; height:11px; }
+}
 #crRoot .cr-h .n{
   font-family:var(--cr-mono); font-size:9.5px; font-weight:700;
   padding:2px 8px; border-radius:99px;
@@ -52615,8 +52707,23 @@ body.coliseum-mode #coliseumRoot .col-canvas{ display:none !important; }
 #crRoot .cr-around-row{
   display:flex; align-items:center; gap:9px; min-width:0;
   font-size:12.5px; color:var(--cr-ink2);
+  padding:5px 7px; margin:0 -7px; border-radius:8px;
+  transition:background .14s, color .14s;
 }
-#crRoot .cr-around-row .nm{ overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+#crRoot .cr-around-row:hover{ background:rgba(255,255,255,.05); color:var(--cr-ink); }
+#crRoot .cr-around-row .nm{
+  overflow:hidden; text-overflow:ellipsis; white-space:nowrap;
+  font-family:var(--cr-head); font-weight:600; font-size:12.5px;
+}
+/* Status is a dot, so the column stays scannable at a glance instead of
+   repeating a word on every row. */
+#crRoot .cr-around-row .dot{
+  margin-left:auto; flex:0 0 auto; width:7px; height:7px; border-radius:50%;
+  background:#5ee08a; box-shadow:0 0 8px rgba(94,224,138,.55);
+}
+#crRoot .cr-around-row .dot.idle{ background:#e0b45e; box-shadow:0 0 8px rgba(224,180,94,.5); }
+#crRoot .cr-around-row .dot.dnd{ background:#ff6b6b; box-shadow:0 0 8px rgba(255,107,107,.5); }
+#crRoot .cr-around-row .dot.offline{ background:rgba(255,255,255,.22); box-shadow:none; }
 #crRoot .cr-around-row .av{
   width:24px; height:24px; border-radius:50%; overflow:hidden; flex:0 0 24px;
   border:1px solid rgba(255,255,255,.14); background:rgba(255,255,255,.07);
@@ -52995,34 +53102,66 @@ body.coliseum-mode #coliseumRoot .col-canvas{ display:none !important; }
         return m && (m.voiceChannelId === c.id || m.voice_channel_id === c.id);
       });
     }
+    /* Drawn glyphs, not emoji. Emoji render differently on every OS, sit
+       at the wrong optical weight beside Archivo, and are the single
+       thing that made these rows look like a default list. */
+    var GLYPH = {
+      voice: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2a3 3 0 0 0-3 3v6a3 3 0 0 0 6 0V5a3 3 0 0 0-3-3z"/><path d="M19 10v1a7 7 0 0 1-14 0v-1"/><line x1="12" y1="18" x2="12" y2="22"/></svg>',
+      text:  '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><line x1="9" y1="3" x2="7" y2="21"/><line x1="17" y1="3" x2="15" y2="21"/><line x1="3" y1="9" x2="21" y2="9"/><line x1="3" y1="15" x2="21" y2="15"/></svg>',
+      announcement: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 11v2a1 1 0 0 0 1 1h3l5 4V6L7 10H4a1 1 0 0 0-1 1z"/><path d="M17 8.5a5 5 0 0 1 0 7"/><path d="M20 5.5a9 9 0 0 1 0 13"/></svg>'
+    };
+    function kindOf(c){
+      return c.type === 'voice' ? 'voice'
+           : c.type === 'announcement' ? 'announcement' : 'text';
+    }
+    function avatarEl(m, cls){
+      var nm = m.display_name || m.username || '?';
+      var url = m.avatar_url || m.avatarUrl;
+      return '<span class="' + (cls || 'av') + '" title="' + esc(nm) + '">' +
+        (url ? '<img src="' + esc(url) + '" alt="" onerror="this.remove()">' : esc(initials(nm))) +
+        '</span>';
+    }
+
     function vroomCard(c){
       var here = occ(c);
-      return '<div class="cr-vroom ' + (here.length ? 'live' : '') + '" data-ch="' + esc(c.id) +
+      var live = here.length > 0;
+      return '<div class="cr-lounge voice ' + (live ? 'live' : '') + '" data-ch="' + esc(c.id) +
         '" data-type="voice" data-name="' + esc(c.name || 'voice') + '">' +
-        '<div class="cr-vroom-top">' +
-          '<span class="ic">🎙</span>' +
-          '<span class="nm">' + esc(String(c.name || 'voice').replace(/^#/, '')) + '</span>' +
-          '<span class="go">' + (here.length ? 'JOIN THEM' : 'DROP IN') + '</span>' +
-        '</div>' +
-        '<div class="cr-occ">' +
-          (here.length
-            ? here.slice(0, 8).map(function(m){
-                var nm = m.display_name || m.username || '?';
-                var url = m.avatar_url || m.avatarUrl;
-                return '<span class="av" title="' + esc(nm) + '">' +
-                  (url ? '<img src="' + esc(url) + '" alt="" onerror="this.remove()">'
-                       : esc(initials(nm))) + '</span>';
-              }).join('') + (here.length > 8 ? '<span class="av">+' + (here.length - 8) + '</span>' : '')
-            : '<span class="empty">Empty — be the first in</span>') +
-        '</div></div>';
+        '<span class="cr-lg-tile">' + GLYPH.voice +
+          /* Bars only animate when someone is actually talking, so motion
+             on the page always means something is happening. */
+          (live ? '<span class="crx-wave"><i></i><i></i><i></i><i></i></span>' : '') +
+        '</span>' +
+        '<span class="cr-lg-body">' +
+          '<span class="cr-lg-name">' + esc(String(c.name || 'voice').replace(/^#/, '')) + '</span>' +
+          '<span class="cr-lg-meta">' +
+            (live ? here.length + ' talking now' : 'Voice lounge · empty') +
+          '</span>' +
+        '</span>' +
+        (live
+          ? '<span class="cr-lg-faces">' +
+              here.slice(0, 4).map(function(m){ return avatarEl(m, 'f'); }).join('') +
+              (here.length > 4 ? '<span class="f more">+' + (here.length - 4) + '</span>' : '') +
+            '</span>'
+          : '') +
+        '<span class="cr-lg-go">' + (live ? 'Join' : 'Drop in') + '</span>' +
+        '</div>';
     }
+
     function textRow(c){
       var unread = (window.unreadChannels && window.unreadChannels[c.id]) || 0;
-      return '<div class="cr-room" data-ch="' + esc(c.id) +
+      var kind = kindOf(c);
+      return '<div class="cr-lounge ' + kind + (unread ? ' unread' : '') + '" data-ch="' + esc(c.id) +
         '" data-type="' + esc(c.type || 'text') + '" data-name="' + esc(c.name || 'channel') + '">' +
-        '<span class="ic">' + (c.type === 'announcement' ? '📣' : '💬') + '</span>' +
-        '<span>' + esc(String(c.name || 'channel').replace(/^#/, '')) + '</span>' +
-        (unread ? '<span class="who">' + unread + ' new</span>' : '<span class="go">OPEN</span>') +
+        '<span class="cr-lg-tile">' + GLYPH[kind] + '</span>' +
+        '<span class="cr-lg-body">' +
+          '<span class="cr-lg-name">' + esc(String(c.name || 'channel').replace(/^#/, '')) + '</span>' +
+          '<span class="cr-lg-meta">' +
+            (kind === 'announcement' ? 'Announcements' : 'Text lounge') +
+          '</span>' +
+        '</span>' +
+        (unread ? '<span class="cr-lg-unread">' + unread + '</span>' : '') +
+        '<span class="cr-lg-go">Open</span>' +
         '</div>';
     }
 
@@ -53076,12 +53215,11 @@ body.coliseum-mode #coliseumRoot .col-canvas{ display:none !important; }
               ? '<div class="cr-around-list">' +
                   elsewhere.slice(0, 10).map(function(m){
                     var nm = m.display_name || m.username || '?';
-                    var url = m.avatar_url || m.avatarUrl;
-                    return '<div class="cr-around-row" title="' + esc(nm) + '">' +
-                      '<span class="av">' +
-                        (url ? '<img src="' + esc(url) + '" alt="" onerror="this.remove()">'
-                             : esc(initials(nm))) +
-                      '</span><span class="nm">' + esc(nm) + '</span></div>';
+                    var st = presence(m);
+                    return '<div class="cr-around-row">' +
+                      avatarEl(m, 'av') +
+                      '<span class="nm">' + esc(nm) + '</span>' +
+                      '<span class="dot ' + esc(st) + '"></span></div>';
                   }).join('') +
                   (elsewhere.length > 10
                     ? '<div class="cr-around-more">+' + (elsewhere.length - 10) + ' more</div>' : '') +
