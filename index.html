@@ -22336,22 +22336,10 @@ async function joinVoiceChannel(channelId, channelName) {
   const alreadyIn = vcChannelMembers[channelId].find(m => m.userId === me.id);
   if (!alreadyIn) vcChannelMembers[channelId].push({ userId:me.id, username:me.username, avatarUrl:me.avatarUrl||null, muted:!vcStream });
 
-  /* Joining voice no longer takes over the page. Discord's model: you
-     drop into a room and carry on reading whatever you were reading —
-     the connection is a persistent state, not a destination. Taking over
-     the page meant every join threw away where you were, and you had to
-     navigate back to the channel you were in the middle of.
-
-     Everything needed to make this work already existed: showHotbarCall()
-     below puts the live widget in the top bar with mic / expand /
-     disconnect, and its expand button calls showVcPanel(). Clicking a
-     voice lounge you are ALREADY in also opens it (see the top of this
-     function), so the full stage is two obvious clicks away.
-
-     If the voice page happens to be open, keep it in sync rather than
-     leaving it showing the old room. */
-  var vcp = document.getElementById('vcPanel');
-  if (vcp && !vcp.classList.contains('hidden')) showVcPanel(channelName);
+  /* Joining opens the call view. The roster in the sidebar shows who is
+     in the room (see the lounge list), and this puts you in the room
+     itself — both, rather than one or the other. */
+  showVcPanel(channelName);
 
   refreshChannelListVc();
   LobbySound.play("vcJoin");
@@ -44503,7 +44491,12 @@ body.voice-room-mode #vcPanel{
     radial-gradient(1200px 600px at 50% 20%, color-mix(in srgb, var(--accent) 22%, transparent) 0%, transparent 60%),
     radial-gradient(800px 400px at 80% 90%, color-mix(in srgb, var(--accent) 14%, transparent) 0%, transparent 60%),
     linear-gradient(180deg, #050710 0%, #0a0d18 100%);
-  position:relative;overflow:hidden;
+  /* fixed, NOT relative: #vcPanel is `position:fixed` with top/left/
+     right/bottom offsets, and relative discards all four -- the panel
+     then collapsed to whatever width it happened to inherit, which is
+     why the call view rendered as a narrow box with dead space beside
+     it. overflow:hidden is what this rule actually needed. */
+  position:fixed;overflow:hidden;
 }
 body.voice-room-mode #vcPanel::before{
   content:'';position:absolute;inset:0;pointer-events:none;
@@ -45001,7 +44994,7 @@ body.voice-room-mode #vcPanel{
     radial-gradient(1400px 800px at 50% 0%, color-mix(in srgb,var(--accent) 22%, transparent) 0%, transparent 55%),
     radial-gradient(900px 500px at 100% 100%, color-mix(in srgb,var(--accent) 12%, transparent) 0%, transparent 60%),
     linear-gradient(180deg, #040610 0%, #080a14 100%) !important;
-  position:relative;overflow:hidden;
+  position:fixed;overflow:hidden;   /* see the note above -- relative drops the offsets */
 }
 body.voice-room-mode #vcPanel::before{
   content:'';position:absolute;inset:0;pointer-events:none;
