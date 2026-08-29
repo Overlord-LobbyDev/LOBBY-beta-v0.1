@@ -55969,13 +55969,24 @@ body.lobby-selected #chatPanel .chat-header{ display:none !important; }
 }
 
 #homeContent .home-section-title{
-  font-family:'Bebas Neue', var(--font), sans-serif !important;
-  /* 46 -> 37 -> 30 -> 27px. Tracking comes back from 5.5px to 4.2px:
-     it was held at the 46px value through two shrinks, and by 27px that
-     much air between letters was pulling the words apart rather than
-     giving them width. */
-  font-size:27px !important; font-weight:400 !important;
-  letter-spacing:4.2px !important; line-height:.95 !important;
+  /* Archivo, the face the card titles and body copy already use, at its
+     heaviest. Bebas is a condensed display face with a single weight —
+     it was the only thing on the page from its own world, which is what
+     made it read as borrowed. */
+  font-family:'Archivo', var(--font), sans-serif !important;
+
+  /* REQUIRED, not decorative. Bebas has no lowercase glyphs at all, so
+     'Recently Played' only ever LOOKED uppercase — the markup is mixed
+     case and the font had nothing else to draw. Any other face renders
+     it as written. */
+  text-transform:uppercase !important;
+
+  /* 25px against Bebas's 27: a 900-weight grotesk in caps carries far
+     more ink per letter, so it reads at least as large while taking less
+     height. Tracking drops to 2.2px for the same reason — wide letter
+     shapes need much less air between them than condensed ones. */
+  font-size:25px !important; font-weight:900 !important;
+  letter-spacing:2.2px !important; line-height:1.06 !important;
   color:#fff !important;
   /* Solid, not a gradient fill. The fade read as a shortcut for
      interest; at this size the type carries itself. */
