@@ -61148,7 +61148,12 @@ async function reactComment(ev, id, btn){
       .replace(/>/g,'&gt;').replace(/"/g,'&quot;');
   }
   function jsStr(v){ return JSON.stringify(String(v == null ? '' : v)).replace(/"/g,'&quot;'); }
-  function cssUrl(u){ return u ? 'url("' + String(u).replace(/"/g,'\\"') + '")' : ''; }
+  /* SINGLE quotes. This value is written into style="..." and a double
+     quote there closes the attribute, which silently killed the art on
+     every card that had a real image URL. */
+  function cssUrl(u){
+    return u ? "url('" + String(u).replace(/\\/g, '%5C').replace(/'/g, "%27") + "')" : '';
+  }
 
   /* Top-level const/let are in the global LEXICAL scope, NOT on window,
      so these are reached by name behind a typeof guard. Read fresh each
@@ -61160,6 +61165,44 @@ async function reactComment(ev, id, btn){
   function rawTournaments(){
     try { if (typeof _dcTournaments !== 'undefined' && Array.isArray(_dcTournaments)) return _dcTournaments; } catch(e){}
     return [];
+  }
+
+  /* Races and people are held here rather than merged into _dcLobbies.
+     openDiscoverPanel ASSIGNS that array when /lobbies/public resolves,
+     so anything merged in beforehand was silently dropped -- which is
+     why People read 0 with four people to show. Own arrays cannot be
+     overwritten by someone else's response. */
+  var _races = [], _people = [];
+
+  async function loadExtras(){
+    if (typeof window.api !== 'function') return;
+    var jobs = [
+      window.api('/speedrun/races').then(function (r){
+        if (!r) return;
+        _races = (r.active || []).concat(r.upcoming || []).map(function (x){
+          return {
+            id:'race-' + x.id, raceId:x.id, kind:'race',
+            name:x.title || ((x.game || 'Speedrun') + ' race'),
+            game:x.game, category:x.category, prize:x.prize,
+            runners:x.runners, status:x.status, faces:x.faces || [],
+          };
+        });
+      }).catch(function(){}),
+      /* NOT /users/search -- it returns nothing for an empty query by
+         design, so it cannot back a browse surface. */
+      window.api('/users/discover').then(function (r){
+        if (!Array.isArray(r)) return;
+        _people = r.slice(0, 24).map(function (u){
+          return {
+            id:'person-' + u.id, userId:u.id, kind:'person',
+            name:u.display_name || u.username || 'Player',
+            avatar:u.avatar_url || null, sub:u.bio || null,
+          };
+        });
+      }).catch(function(){}),
+    ];
+    await Promise.all(jobs);
+    render();
   }
   function query(){
     try { if (typeof _dcSearch !== 'undefined') return String(_dcSearch || ''); } catch(e){}
@@ -61196,6 +61239,7 @@ async function reactComment(ev, id, btn){
         genre:named ? g.name.toLowerCase() : '',
         chips:[named ? g.name : null,
                it.prize && it.prize !== '—' ? '💰 ' + it.prize : null].filter(Boolean),
+        faces:it.faces || [], faceTotal:(it.entrants || 0), faceLabel:'In the bracket',
         stats:[
           { v:String(it.entrants || 0), l:'Entrants' },
           { v:it.prize && it.prize !== '—' ? String(it.prize) : '—', l:'Prize' },
@@ -61220,6 +61264,7 @@ async function reactComment(ev, id, btn){
         glyph:'🏁',
         genre:String(it.game || '').toLowerCase(),
         chips:[it.category, it.prize].filter(Boolean),
+        faces:it.faces || [], faceTotal:(it.runners || 0), faceLabel:'Running',
         stats:[
           { v:String(it.runners || 0), l:'Runners' },
           { v:it.category || 'Any%', l:'Category' },
@@ -61263,6 +61308,7 @@ async function reactComment(ev, id, btn){
       glyph:it.initial || String(it.name || '?').charAt(0).toUpperCase(),
       genre:String(it.tag || '').toLowerCase(),
       chips:tags.slice(0, 3),
+      faces:it.faces || [], faceTotal:(hasMembers ? it.members : 0), faceLabel:"Who's in",
       stats:[
         { v:hasMembers ? it.members.toLocaleString() : '—', l:'Members' },
         { v:hasOnline ? String(it.online) : '—', l:'Online' },
@@ -61278,6 +61324,8 @@ async function reactComment(ev, id, btn){
     var out = [];
     rawLobbies().forEach(function (x){ var c = toCard(x); if (c) out.push(c); });
     rawTournaments().forEach(function (x){ var c = toCard(x); if (c) out.push(c); });
+    _races.forEach(function (x){ var c = toCard(x); if (c) out.push(c); });
+    _people.forEach(function (x){ var c = toCard(x); if (c) out.push(c); });
     var seen = {};
     return out.filter(function (c){
       var id = c.rail + ':' + c.key;
@@ -61348,19 +61396,30 @@ async function reactComment(ev, id, btn){
     return t;
   }
 
+  /* Ranked by how many things carry the tag and capped at six, so the
+     row is the handful of genres worth filtering on rather than every
+     word anyone has ever typed into a tag box. The label keeps the
+     casing the owner wrote -- lowercasing turned FGC into "fgc". */
   function genresPresent(){
-    var seen = {}, out = [];
+    var count = {}, label = {};
     collect().forEach(function (c){
       if (kind !== 'all' && c.rail !== kind) return;
+      var here = {};
       c.chips.concat([c.genre]).forEach(function (raw){
-        var g = String(raw || '').toLowerCase().trim();
-        if (!g || g.length > 22 || g.charAt(0) === '\uD83D' || g.charAt(0) === '\uD83C') return;
-        if (seen[g]) return;
-        seen[g] = 1;
-        out.push(g);
+        var text = String(raw || '').trim();
+        var g = text.toLowerCase();
+        if (!g || g.length > 18) return;
+        if (/[\uD800-\uDFFF]/.test(text)) return;   /* emoji-led, e.g. a prize chip */
+        if (here[g]) return;
+        here[g] = 1;
+        count[g] = (count[g] || 0) + 1;
+        if (!label[g]) label[g] = text;
       });
     });
-    return out.sort().slice(0, 10);
+    return Object.keys(count)
+      .sort(function (a, b){ return (count[b] - count[a]) || a.localeCompare(b); })
+      .slice(0, 6)
+      .map(function (g){ return { key:g, label:label[g] || g }; });
   }
 
   /* ── Card markup ─────────────────────────────────────────────── */
@@ -61389,6 +61448,30 @@ async function reactComment(ev, id, btn){
         }).join('') + '</div>'
       : '';
 
+    /* The people, not just the headcount. A card saying "2 members"
+       describes the size of a room; this says who is in it. Hero only --
+       at 262px a shelf tile has no room for faces that would still be
+       recognisable. */
+    var who = '';
+    var faces = (c.faces || []).filter(function (f){ return f && (f.avatar || f.name); });
+    if (slot === 'hero' && faces.length){
+      var shown = faces.slice(0, 5);
+      var more  = Math.max(0, (c.faceTotal || faces.length) - shown.length);
+      who = '<div class="dcx-who">' +
+        '<div class="dcx-who-l">' + esc(c.faceLabel || "Who's in") + '</div>' +
+        '<div class="dcx-faces">' +
+          shown.map(function (f){
+            var t = esc(f.name || '');
+            return f.avatar
+              ? '<span class="dcx-face" title="' + t + '"><img src="' + esc(f.avatar) + '" alt="" loading="lazy"></span>'
+              : '<span class="dcx-face" title="' + t + '">' +
+                  esc(String(f.name || '?').trim().charAt(0).toUpperCase()) + '</span>';
+          }).join('') +
+          (more > 0 ? '<span class="dcx-face dcx-face-more">+' + more + '</span>' : '') +
+        '</div>' +
+      '</div>';
+    }
+
     /* On a shelf tile the whole card is the action. In the deck the card
        is a step target and only the button acts, which is what stops a
        click meant to bring a card forward from also joining it. */
@@ -61398,14 +61481,14 @@ async function reactComment(ev, id, btn){
 
     return '<div class="dcx-card" data-key="' + esc(c.rail + ':' + c.key) + '"' +
       ' data-genre="' + esc(c.genre) + '"' +
-      ' style="--dcx-card-art:' + (c.art ? cssUrl(c.art) : 'none') + '"' + cardClick + '>' +
+      ' style="--dcx-card-art:' + (c.art ? cssUrl(c.art) : (c.fallback || 'none')) + '"' + cardClick + '>' +
       '<div class="dcx-art" style="' + artStyle + '">' + inner +
         '<span class="dcx-badge ' + esc(c.badge) + '">' + esc(c.badgeText) + '</span>' +
       '</div>' +
       '<div class="dcx-info">' +
         '<div class="dcx-name">' + esc(c.name) + '</div>' +
         '<div class="dcx-desc">' + esc(c.desc) + '</div>' +
-        stats + chips +
+        stats + chips + who +
         '<div class="dcx-foot">' +
           '<button class="dcx-cta" onclick="event.stopPropagation();' + c.cta.js + '">' +
             esc(c.cta.label) +
@@ -61527,8 +61610,8 @@ async function reactComment(ev, id, btn){
       out += '<button class="dcx-pill' + (genre === 'all' ? ' on' : '') +
              '" onclick="window.dcxGenre(' + jsStr('all') + ')">Any</button>';
       out += gs.map(function (g){
-        return '<button class="dcx-pill' + (genre === g ? ' on' : '') +
-               '" onclick="window.dcxGenre(' + jsStr(g) + ')">' + esc(g) + '</button>';
+        return '<button class="dcx-pill' + (genre === g.key ? ' on' : '') +
+               '" onclick="window.dcxGenre(' + jsStr(g.key) + ')">' + esc(g.label) + '</button>';
       }).join('');
       out += '<span class="dcx-sep"></span>';
     }
@@ -61559,6 +61642,7 @@ async function reactComment(ev, id, btn){
 
     var tabs = document.getElementById('discoverTabs');
     if (tabs) tabs.innerHTML = kindsHtml(g.totals) + refineHtml();
+    setTitle();
 
     var shown = kind === 'all' ? order.slice() : [kind];
     var html = shown.map(function (railId, i){
@@ -61571,6 +61655,19 @@ async function reactComment(ev, id, btn){
     shown.forEach(function (railId, i){ if (i === 0) applyDeck(railId); });
     syncShelfArrows();
     wash();
+  }
+
+  /* The page was called DISCOVER LOBBIES while showing four kinds of
+     thing, and kept saying it after you filtered to Tournaments. The
+     accent word now names what is actually below it. */
+  function setTitle(){
+    var t = document.querySelector('#discoverOverlay .discover-hero-title');
+    if (!t) return;
+    var word = (kind === 'all') ? 'EVERYTHING' : RAILS[kind].title.toUpperCase();
+    if (t.getAttribute('data-word') === word) return;
+    t.setAttribute('data-word', word);
+    t.setAttribute('data-text', 'DISCOVER ' + word);
+    t.innerHTML = 'DISCOVER <span class="discover-hero-accent">' + esc(word) + '</span>';
   }
 
   /* ── The deck ────────────────────────────────────────────────── */
@@ -61610,12 +61707,12 @@ async function reactComment(ev, id, btn){
            see-through card lets the one behind it read straight through
            and the stack looks like it is melting together. */
         s.setProperty('--rc-x', (off * STEP) + 'px'); s.setProperty('--rc-s', '.8');
-        s.setProperty('--rc-o', '1');   s.setProperty('--rc-sat', '.62');
-        s.setProperty('--rc-b', '.52'); s.zIndex = 20;
+        s.setProperty('--rc-o', '1');   s.setProperty('--rc-sat', '.72');
+        s.setProperty('--rc-b', '.66'); s.zIndex = 20;
       } else if (a === 2){
         s.setProperty('--rc-x', (off / a * STEP2) + 'px'); s.setProperty('--rc-s', '.66');
-        s.setProperty('--rc-o', '1');   s.setProperty('--rc-sat', '.42');
-        s.setProperty('--rc-b', '.34'); s.zIndex = 10;
+        s.setProperty('--rc-o', '1');   s.setProperty('--rc-sat', '.54');
+        s.setProperty('--rc-b', '.48'); s.zIndex = 10;
       } else {
         s.setProperty('--rc-x', (off > 0 ? STEP2 + 200 : -(STEP2 + 200)) + 'px');
         s.setProperty('--rc-s', '.6');  s.setProperty('--rc-o', '0');
@@ -61703,7 +61800,8 @@ async function reactComment(ev, id, btn){
     kind = k;
     /* Genre pills are derived from what is in view, so a genre that only
        existed in another kind has to go or it filters everything out. */
-    if (genre !== 'all' && genresPresent().indexOf(genre) === -1) genre = 'all';
+    var keys = genresPresent().map(function (g){ return g.key; });
+    if (genre !== 'all' && keys.indexOf(genre) === -1) genre = 'all';
     render();
   };
   window.dcxGenre = function (g){ genre = g; render(); };
@@ -61902,6 +62000,7 @@ async function reactComment(ev, id, btn){
         render();
         initDrag();
         loadOrder().then(function (changed){ if (changed) render(); });
+        loadExtras();
         return out;
       };
       wrapped.__dcxWrapped = true;
@@ -61914,6 +62013,108 @@ async function reactComment(ev, id, btn){
   else start();
 })();
 </script>
+
+
+<!-- ══════════════════════════════════════════════════════════════════
+     DISCOVER — the second pass
+
+     Four things, all of them visible in the first build:
+
+     THE DEAD SPACE. A deck card is a fixed height, so whatever the item
+     carries, the gap has to land somewhere. It was landing directly
+     above the button, which read as a card that had run out of things
+     to say. The people in the thing now fill it, and the gap moved to
+     where a gap belongs: after the tags, above a dense block of faces
+     and one action.
+
+     THE CARDS BEHIND. The front page dims them to .52 and .34
+     brightness, which works there because every card is full-bleed
+     cover art. A Discover card is mostly dark panel, so the same
+     numbers took it to solid black -- the deck read as one card
+     floating in a void rather than a stack.
+
+     THE TITLE. It said DISCOVER LOBBIES over four kinds of thing, and
+     kept saying it after you filtered to Tournaments. It follows the
+     filter now. Its outline ghost was also anchored left and scaled
+     4.5%, which on a word that wide pushed a visible smudge off the
+     right edge; it is centred and much tighter.
+
+     THE HEIGHT. 420px of card for content that needed about 360.
+     ══════════════════════════════════════════════════════════════════ -->
+<style>
+/* ── Who is in it ──────────────────────────────────────────────── */
+.dcx-rail[data-dcx-slot="hero"] .dcx-who{
+  /* margin-top:auto, not on the button: this and the CTA sit as one
+     dense block at the foot of the card, and the flexible gap lands
+     after the tags where it reads as spacing rather than as absence. */
+  margin-top:auto;
+  display:flex; flex-direction:column; gap:9px;
+  padding-top:15px;
+  border-top:1px solid rgba(255,255,255,.07);
+}
+.dcx-rail[data-dcx-slot="hero"] .dcx-who-l{
+  font-family:'JetBrains Mono', ui-monospace, monospace;
+  font-size:9px; font-weight:700; letter-spacing:2px; text-transform:uppercase;
+  color:var(--text-3);
+}
+.dcx-faces{ display:flex; align-items:center; }
+.dcx-face{
+  position:relative;
+  width:38px; height:38px; flex:0 0 38px;
+  border-radius:50%; overflow:hidden;
+  display:flex; align-items:center; justify-content:center;
+  margin-left:-11px;
+  font-family:'Archivo', var(--font), sans-serif;
+  font-size:14px; font-weight:900; color:#fff;
+  background:linear-gradient(135deg,#3a4a6b,#1a2030);
+  /* The ring is the card's own ground, so overlapping faces read as a
+     stack of discs rather than as one blurred mass. */
+  border:2px solid #12141c;
+  box-shadow:0 3px 10px rgba(0,0,0,.5);
+  transition:transform .18s cubic-bezier(.22,1,.36,1);
+}
+.dcx-face:first-child{ margin-left:0; }
+.dcx-face:hover{ transform:translateY(-3px); z-index:2; }
+.dcx-face img{ width:100%; height:100%; object-fit:cover; display:block; }
+.dcx-face-more{
+  background:rgba(255,255,255,.09);
+  color:var(--text-2);
+  font-family:'JetBrains Mono', ui-monospace, monospace;
+  font-size:11px; font-weight:800; letter-spacing:-.3px;
+}
+.dcx-rail[data-dcx-slot="hero"] .dcx-card:not(.on) .dcx-who{ opacity:0; pointer-events:none; }
+.dcx-rail[data-dcx-slot="hero"] .dcx-foot{ margin-top:14px; }
+
+/* ── Tighter card ──────────────────────────────────────────────── */
+.dcx-rail[data-dcx-slot="hero"] .dcx-body{ height:404px; }
+.dcx-rail[data-dcx-slot="hero"] .dcx-card{ height:384px; }
+.dcx-rail[data-dcx-slot="hero"] .dcx-info{ padding:24px 30px 22px; }
+.dcx-rail[data-dcx-slot="hero"] .dcx-name{ font-size:28px; margin-bottom:7px; }
+.dcx-rail[data-dcx-slot="hero"] .dcx-desc{ margin-bottom:13px; }
+.dcx-rail[data-dcx-slot="hero"] .dcx-stats{ margin-bottom:12px; }
+.dcx-rail[data-dcx-slot="hero"] .dcx-chips{ margin-bottom:0; }
+@media (max-width:1240px){
+  .dcx-rail[data-dcx-slot="hero"] .dcx-card{ height:384px; }
+  .dcx-rail[data-dcx-slot="hero"] .dcx-body{ height:404px; }
+}
+
+/* ── The stack has to read as a stack ──────────────────────────── */
+.dcx-rail[data-dcx-slot="hero"] .dcx-card:not(.on){
+  /* A brighter edge than the front card's, because the card itself is
+     dimmed and the border dims with it -- without this the silhouette
+     dissolves into the page at exactly the moment its only job is to
+     show that there is more behind. */
+  border-color:rgba(255,255,255,.16);
+  box-shadow:0 18px 44px rgba(0,0,0,.62);
+}
+
+/* ── The title's ghost ─────────────────────────────────────────── */
+#discoverOverlay .discover-hero-title::before{
+  transform:translateY(1px) scale(1.018);
+  transform-origin:center center;
+  -webkit-text-stroke:1px rgba(255,255,255,.075);
+}
+</style>
 
 </body>
 </html>

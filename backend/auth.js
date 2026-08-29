@@ -4272,8 +4272,13 @@ app.get("/lobbies/public", async (req, res) => {
           FROM server_members sm
           JOIN users u ON u.id = sm.user_id
           WHERE sm.server_id = s.id
+          -- sm.id, not a timestamp. db.js declares this table with a
+          -- joined_at column but the live table predates it and has
+          -- created_at instead, and CREATE TABLE IF NOT EXISTS never
+          -- reconciles an existing table. id is SERIAL, so ascending id
+          -- IS join order, and it is the one column both versions have.
           ORDER BY CASE sm.role WHEN 'owner' THEN 0 WHEN 'moderator' THEN 1 ELSE 2 END,
-                   sm.joined_at
+                   sm.id
           LIMIT 6
         ) f) AS faces
       FROM servers s
