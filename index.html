@@ -60383,5 +60383,72 @@ async function reactComment(ev, id, btn){
   else start();
 })();
 </script>
+
+<!-- ══════════════════════════════════════════════════════════════════
+     THE COMPLETED STAT CELL
+
+     Both faults were one rule. .rc-stat span is written display:block
+     with font-size:8px — correct for the label underneath the figure,
+     which is what it was written for. But "/41" and the trophy are spans
+     too, so they inherited it: block made them stack under the number
+     instead of sitting beside it, and 8px is why the trophy was a speck.
+
+     Fixed by scoping: spans INSIDE the <b> are part of the figure and go
+     inline; the label span is a direct child of the cell and is left
+     alone.
+
+     And the cell now uses its width. The figure sits left, the trophy is
+     pushed to the right edge, and the whole thing reads as one line
+     rather than a stack in a cell that had room to spare.
+     ══════════════════════════════════════════════════════════════════ -->
+<style>
+/* The figure becomes a row: number, its total, then the trophy pushed
+   out to the far edge. */
+#homeContent [data-home-slot="hero"] .rc-stat b{
+  display:flex !important;
+  align-items:baseline;
+  gap:1px;
+  width:100%;
+}
+
+/* Anything inside the figure is part of the figure — not a label. */
+#homeContent [data-home-slot="hero"] .rc-stat b > span{
+  display:inline !important;
+  margin-top:0 !important;
+  letter-spacing:0 !important;
+  text-transform:none !important;
+}
+
+#homeContent [data-home-slot="hero"] .rc-stat .rc-of{
+  font-family:'JetBrains Mono', ui-monospace, monospace;
+  font-size:14px !important;
+  font-weight:800;
+  opacity:.6;
+}
+
+#homeContent [data-home-slot="hero"] .rc-stat .rc-trophy{
+  /* Pushed to the right edge — that is the space the cell was wasting. */
+  margin-left:auto !important;
+  align-self:center;
+  font-size:21px !important;
+  line-height:1;
+  filter:drop-shadow(0 2px 6px rgba(255,190,60,.45));
+}
+
+/* On a full set the whole cell earns a little more room, since it is now
+   carrying a figure, a total and a mark. */
+#homeContent [data-home-slot="hero"] .rc-stat.rc-stat-100{
+  padding-right:14px;
+}
+#homeContent [data-home-slot="hero"] .rc-stat.rc-stat-100 .rc-of{
+  opacity:.75;
+}
+
+/* Give the strip a little more width to work with, so a three-part
+   figure never has to wrap in the first place. */
+#homeContent [data-home-slot="hero"] .rc-stats{
+  grid-template-columns:repeat(auto-fit, minmax(104px, 1fr)) !important;
+}
+</style>
 </body>
 </html>
