@@ -55966,5 +55966,170 @@ body.lobby-selected #chatPanel .chat-header{ display:none !important; }
   else start();
 })();
 </script>
+
+<!-- ══════════════════════════════════════════════════════════════════
+     FEED REACTIONS
+
+     Reactions exist end to end already: the backend has
+     POST /posts/:id/react and GET /posts/:id/reactions, /feed returns
+     `reactions`, `my_reaction` and `reaction_count` on every post, and
+     renderPost() puts renderReactionBar() at the head of .post-actions.
+     Nothing overrides renderPost and no CSS hides .reaction-bar — yet
+     the bar is not on screen.
+
+     I could not reproduce the cause statically, so rather than guess at
+     a fix this repairs the OUTCOME: any post card that ends up without a
+     reaction bar gets one. If the original path is working this does
+     nothing at all, because the check is "does this card already have a
+     bar". Self-correcting either way, and it says which it did in the
+     console so the underlying cause stays findable.
+
+     The injected bar calls the app's own toggleReaction / openEmojiPicker
+     rather than reimplementing them, so there is one behaviour and one
+     set of endpoints, not two.
+     ══════════════════════════════════════════════════════════════════ -->
+<style>
+/* Quick reactions, always visible — the picker stays for everything else.
+   A row that needs a click before it shows any way to react is why this
+   went unnoticed. */
+.fr-quick{ display:inline-flex; align-items:center; gap:4px; }
+.fr-btn{
+  display:inline-flex; align-items:center; gap:5px;
+  height:28px; padding:0 9px; border-radius:99px; cursor:pointer;
+  background:rgba(255,255,255,.05); border:1px solid rgba(255,255,255,.08);
+  font-size:14px; line-height:1; color:var(--text-3);
+  transition:background .14s, border-color .14s, transform .12s;
+}
+.fr-btn:hover{ background:rgba(255,255,255,.12); transform:translateY(-1px); }
+.fr-btn.mine{
+  background:color-mix(in srgb, var(--accent) 20%, transparent);
+  border-color:color-mix(in srgb, var(--accent) 45%, transparent);
+}
+.fr-btn .n{
+  font-family:'JetBrains Mono', ui-monospace, monospace;
+  font-size:11px; font-weight:700; color:var(--text-2);
+  font-variant-numeric:tabular-nums;
+}
+.fr-btn.mine .n{ color:#fff; }
+</style>
+<script>
+(function () {
+  'use strict';
+
+  /* Kept short deliberately: a long row of one-tap emoji is a toolbar,
+     not a reaction. Anything else is a click away in the picker. */
+  var QUICK = ['👍','🔥','😂','💀'];
+
+  function postIdOf(card){
+    var m = String(card.id || '').match(/^post-(\d+)$/);
+    return m ? m[1] : null;
+  }
+
+  function build(card){
+    var actions = card.querySelector('.post-actions');
+    if (!actions || actions.querySelector('.fr-quick')) return;
+
+    var id = postIdOf(card);
+    if (!id) return;
+
+    /* If the app's own bar rendered, leave it alone entirely — two
+       reaction rows on one post would be worse than none. */
+    if (actions.querySelector('.reaction-bar')){
+      if (!window.__frLogged){
+        window.__frLogged = true;
+        console.log('[reactions] native reaction bar present — nothing injected');
+      }
+      return;
+    }
+
+    var wrap = document.createElement('span');
+    wrap.className = 'fr-quick';
+    wrap.innerHTML = QUICK.map(function(e){
+      return '<span class="fr-btn" data-emoji="' + e + '" title="React ' + e + '">' + e +
+             '<span class="n" hidden>0</span></span>';
+    }).join('') +
+    '<span class="fr-btn" data-more="1" title="More reactions">😀</span>';
+
+    actions.insertBefore(wrap, actions.firstChild);
+
+    wrap.addEventListener('click', function(ev){
+      var b = ev.target.closest('.fr-btn');
+      if (!b) return;
+      ev.preventDefault(); ev.stopPropagation();
+
+      if (b.getAttribute('data-more')){
+        if (typeof window.openEmojiPicker === 'function') window.openEmojiPicker(ev, Number(id), id);
+        return;
+      }
+      var emoji = b.getAttribute('data-emoji');
+
+      /* Optimistic, then reconciled from the server's own answer — the
+         endpoint toggles, so the truthful state comes back in `reacted`. */
+      var wasMine = b.classList.contains('mine');
+      var nEl = b.querySelector('.n');
+      var n = parseInt(nEl.textContent, 10) || 0;
+      b.classList.toggle('mine', !wasMine);
+      n = Math.max(0, n + (wasMine ? -1 : 1));
+      nEl.textContent = String(n);
+      nEl.hidden = n === 0;
+
+      if (typeof window.feedApi !== 'function') return;
+      Promise.resolve(window.feedApi('/posts/' + id + '/react', {
+        method:'POST',
+        headers:{ 'Content-Type':'application/json' },
+        body: JSON.stringify({ emoji: emoji })
+      })).then(function(r){
+        if (!r) return;
+        var mine = !!r.reacted && r.emoji === emoji;
+        b.classList.toggle('mine', mine);
+        // A different emoji replaces the old one, so refresh the row.
+        load(card, id);
+      }).catch(function(){
+        b.classList.toggle('mine', wasMine);      // put it back
+        nEl.textContent = String(Math.max(0, n + (wasMine ? 1 : -1)));
+      });
+    });
+
+    load(card, id);
+  }
+
+  /* Counts come from the same endpoint the app's own refresh uses. */
+  function load(card, id){
+    if (typeof window.feedApi !== 'function') return;
+    Promise.resolve(window.feedApi('/posts/' + id + '/reactions')).then(function(d){
+      if (!d) return;
+      var list = Array.isArray(d.reactions) ? d.reactions : [];
+      var mine = d.my_reaction || null;
+      card.querySelectorAll('.fr-btn[data-emoji]').forEach(function(b){
+        var e = b.getAttribute('data-emoji');
+        var hit = list.find(function(r){ return r.emoji === e; });
+        var n = hit ? (hit.count || 0) : 0;
+        var nEl = b.querySelector('.n');
+        nEl.textContent = String(n);
+        nEl.hidden = n === 0;
+        b.classList.toggle('mine', mine === e);
+      });
+    }).catch(function(){});
+  }
+
+  var t = null;
+  function scan(){
+    clearTimeout(t);
+    t = setTimeout(function(){
+      document.querySelectorAll('.post-card').forEach(build);
+    }, 120);
+  }
+
+  function start(){
+    scan();
+    // Posts arrive after their fetch, and the feed re-renders on tab change.
+    new MutationObserver(scan).observe(document.body, { childList:true, subtree:true });
+    console.log('[reactions] feed reaction guard active');
+  }
+
+  if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', start);
+  else start();
+})();
+</script>
 </body>
 </html>
