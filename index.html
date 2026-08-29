@@ -25420,6 +25420,8 @@ function renderComment(c, allReplies, postId, hasThreading) {
       </div>
       <div class="comment-text">${highlightMentions(escapeHtml(c.content))}</div>
       <div class="comment-actions">
+        <button type="button" class="cmt-react${c.my_reaction ? ' on' : ''}"
+          onclick="reactComment(event,${c.id},this)">${c.my_reaction || '👍'} <span>${c.reaction_count || 0}</span></button>
         <button class="comment-reply-btn" onclick="showReplyBox(${c.id}, ${postId}, '${c.username}')">↩ Reply</button>
       </div>
       <div class="comment-replies" id="replies-${c.id}">
@@ -55693,7 +55695,7 @@ body.double-dock[data-feed-position="right"].feed-open:not(.rail-hidden) #settin
       /* A post card's author chip and GIF tap are its own controls, and
          the CTA opens the focus view. Everything else steps the deck. */
       if (card.classList.contains('spotlight-card')){
-        if (e.target.closest('.spotlight-card-author, .spotlight-gif-overlay')) return;
+        if (e.target.closest('.spotlight-card-author, .spotlight-gif-overlay, .cmt-react')) return;
         e.preventDefault(); e.stopPropagation();
         if (e.target.closest('.rc-cta')){
           try {
@@ -57119,17 +57121,37 @@ body[data-feed-position="split"].feed-open #homeContent > [data-home-slot="col"]
       box.innerHTML = '<div class="sp-c-empty">No comments yet — be the first.</div>';
       return;
     }
-    box.innerHTML = rows.map(function (c) {
+
+    /* The most-reacted comment leads the thread. Ties keep the earlier
+       one, and a thread where nothing has been reacted to has no top
+       comment at all — a badge on an unreacted comment would claim a
+       verdict nobody gave. */
+    var top = null;
+    rows.forEach(function (c) {
+      var n = c.reaction_count || 0;
+      if (n > 0 && (!top || n > (top.reaction_count || 0))) top = c;
+    });
+    var ordered = top
+      ? [top].concat(rows.filter(function (c) { return c !== top; }))
+      : rows;
+
+    box.innerHTML = ordered.map(function (c) {
       var name = c.username || '?';
       var av = c.avatar_url
         ? '<img src="' + esc(c.avatar_url) + '" alt="" />'
         : esc(name.slice(0, 1).toUpperCase());
-      return '<div class="sp-c">' +
+      var n = c.reaction_count || 0;
+      var mine = c.my_reaction;
+      return '<div class="sp-c' + (c === top ? ' is-top' : '') + '">' +
           '<div class="sp-c-av">' + av + '</div>' +
           '<div class="sp-c-b">' +
+            (c === top ? '<div class="sp-top">Top comment</div>' : '') +
             '<div class="sp-c-n">' + esc(name) + '</div>' +
             '<div class="sp-c-t">' + esc(c.content || '') + '</div>' +
           '</div>' +
+          '<button type="button" class="cmt-react' + (mine ? ' on' : '') + '"' +
+            ' onclick="reactComment(event,' + c.id + ',this)">' +
+            (mine || '👍') + ' <span>' + n + '</span></button>' +
         '</div>';
     }).join('');
   }
@@ -57229,6 +57251,100 @@ body[data-feed-position="split"].feed-open #homeContent > [data-home-slot="col"]
     if (gotoOrig) return gotoOrig.apply(this, arguments);
   };
 })();
+</script>
+
+<!-- ══════════════════════════════════════════════════════════════════
+     COMMENT REACTIONS
+
+     Backs the "top comment" on the Spotlight deck card, which needed a
+     way to know which comment is most reacted — there was none, so this
+     is the table, the endpoint and the control that create the data.
+
+     Server side (backend/db.js, backend/auth.js):
+       comment_reactions, shaped exactly like post_reactions — one row
+         per user per comment, emoji on the row, UNIQUE(comment_id,
+         user_id) — so toggle/switch/remove behaves identically
+       POST /comments/:id/react, same contract as /posts/:id/react, and
+         it returns the fresh totals so a caller never re-fetches a whole
+         thread to update one row
+       GET /posts/:id/comments now carries reactions, my_reaction and
+         reaction_count per comment, falling back to a plain thread if
+         the table is not there yet rather than failing the list
+
+     The button is deliberately one-tap 👍 rather than an emoji picker.
+     The ranking only needs a count, and a picker on every comment row
+     would crowd a 12px line — the emoji column exists in the table, so
+     a picker can be added later without another migration.
+
+     Named cmt-react, not cr-react: the chat ribbon owns the cr- prefix
+     in this file and has collided with new code before.
+     ══════════════════════════════════════════════════════════════════ -->
+<style>
+.cmt-react{
+  display:inline-flex; align-items:center; gap:4px; flex:0 0 auto;
+  background:rgba(255,255,255,.05);
+  border:1px solid rgba(255,255,255,.09);
+  color:var(--text-3);
+  font-family:var(--font); font-size:11px; font-weight:700;
+  padding:2px 8px; border-radius:99px; cursor:pointer;
+  transition:background .15s, border-color .15s, color .15s, transform .1s;
+  font-variant-numeric:tabular-nums; line-height:1.6;
+}
+.cmt-react:hover{
+  background:rgba(255,255,255,.09);
+  border-color:rgba(255,255,255,.18);
+  color:var(--text-2);
+}
+.cmt-react:active{ transform:scale(.94); }
+.cmt-react.on{
+  background:color-mix(in srgb, var(--accent) 22%, transparent);
+  border-color:color-mix(in srgb, var(--accent) 55%, transparent);
+  color:#fff;
+}
+.cmt-react span{ min-width:6px; }
+
+/* In the deck's thread the button sits at the end of the row rather than
+   under the text, so a comment stays two lines tall. */
+.sp-c .cmt-react{ align-self:center; margin-left:auto; }
+
+.sp-top{
+  display:inline-block; margin-bottom:3px;
+  font-size:9px; font-weight:800; letter-spacing:.9px; text-transform:uppercase;
+  color:#fff; padding:2px 7px; border-radius:99px;
+  background:color-mix(in srgb, var(--accent) 75%, transparent);
+}
+.sp-c.is-top{
+  background:color-mix(in srgb, var(--accent) 9%, rgba(255,255,255,.035));
+  border-color:color-mix(in srgb, var(--accent) 32%, transparent);
+}
+</style>
+<script>
+/* One tap toggles 👍. The server owns the truth — it returns the new
+   totals and whether this viewer is now reacting — so the button is
+   painted from the response rather than from a guess made here. */
+async function reactComment(ev, id, btn){
+  if (ev) { ev.preventDefault(); ev.stopPropagation(); }
+  if (!btn || btn.dataset.busy === '1') return;
+  btn.dataset.busy = '1';
+  try {
+    const r = await feedApi('/comments/' + id + '/react', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ emoji: '👍' })
+    });
+    if (r && !r.error){
+      btn.classList.toggle('on', !!r.reacted);
+      const n = btn.querySelector('span');
+      if (n) n.textContent = r.reaction_count || 0;
+      /* Leading with a stale order would make the badge jump under the
+         cursor mid-tap, so the thread keeps its order until it is next
+         opened. The count updating in place is the feedback that matters. */
+    }
+  } catch (e) {
+    console.error('[comment-react]', e);
+  }
+  btn.dataset.busy = '0';
+}
 </script>
 </body>
 </html>

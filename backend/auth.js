@@ -2477,6 +2477,49 @@ app.post("/posts/:id/react", requireAuth, async (req, res) => {
   }
 });
 
+// Toggle a reaction on a comment. Same contract as /posts/:id/react:
+// the same emoji again removes it, a different emoji replaces it, and
+// none yet adds it. One row per user per comment, enforced by the
+// UNIQUE on the table.
+app.post("/comments/:id/react", requireAuth, async (req, res) => {
+  const { emoji } = req.body;
+  if (!emoji) return res.status(400).json({ error: "emoji is required" });
+  const commentId = req.params.id;
+
+  try {
+    const existing = await pool.query(
+      "SELECT id, emoji FROM comment_reactions WHERE comment_id=$1 AND user_id=$2",
+      [commentId, req.userId]
+    );
+
+    let reacted, mine;
+    if (existing.rows.length) {
+      if (existing.rows[0].emoji === emoji) {
+        await pool.query("DELETE FROM comment_reactions WHERE comment_id=$1 AND user_id=$2", [commentId, req.userId]);
+        reacted = false; mine = null;
+      } else {
+        await pool.query("UPDATE comment_reactions SET emoji=$1 WHERE comment_id=$2 AND user_id=$3", [emoji, commentId, req.userId]);
+        reacted = true; mine = emoji;
+      }
+    } else {
+      await pool.query("INSERT INTO comment_reactions (comment_id, user_id, emoji) VALUES ($1,$2,$3)", [commentId, req.userId, emoji]);
+      reacted = true; mine = emoji;
+    }
+
+    // Hand back the fresh totals so a caller never has to re-fetch the
+    // whole thread just to update the one row it changed.
+    const counts = await pool.query(
+      "SELECT emoji, COUNT(*)::int AS count FROM comment_reactions WHERE comment_id=$1 GROUP BY emoji ORDER BY count DESC",
+      [commentId]
+    );
+    const total = counts.rows.reduce((a, row) => a + row.count, 0);
+    res.json({ reacted, emoji: mine, reactions: counts.rows, reaction_count: total });
+  } catch (e) {
+    console.error("[comment-react]", e.message);
+    res.status(500).json({ error: "Could not react to comment" });
+  }
+});
+
 // Get reactions summary for a post
 app.get("/posts/:id/reactions", requireAuth, async (req, res) => {
   const postId = req.params.id;
@@ -2495,12 +2538,33 @@ app.get("/posts/:id/reactions", requireAuth, async (req, res) => {
 });
 
 app.get("/posts/:id/comments", requireAuth, async (req, res) => {
-  const r = await pool.query(`
-    SELECT c.*, u.username, u.avatar_url
-    FROM post_comments c JOIN users u ON u.id = c.user_id
-    WHERE c.post_id = $1 ORDER BY c.created_at ASC
-  `, [req.params.id]);
-  res.json(r.rows);
+  // Reaction data per comment, the same three fields the feed already
+  // returns for a post: the emoji breakdown, this viewer's own reaction,
+  // and the total. The total is what "top comment" is ranked on.
+  try {
+    const r = await pool.query(`
+      SELECT c.*, u.username, u.avatar_url,
+        (SELECT COALESCE(json_agg(json_build_object('emoji', sub.emoji, 'count', sub.cnt)), '[]'::json)
+           FROM (SELECT emoji, COUNT(*)::int AS cnt FROM comment_reactions
+                  WHERE comment_id = c.id GROUP BY emoji ORDER BY cnt DESC) sub) AS reactions,
+        (SELECT emoji FROM comment_reactions WHERE comment_id = c.id AND user_id = $2) AS my_reaction,
+        (SELECT COUNT(*)::int FROM comment_reactions WHERE comment_id = c.id) AS reaction_count
+      FROM post_comments c JOIN users u ON u.id = c.user_id
+      WHERE c.post_id = $1 ORDER BY c.created_at ASC
+    `, [req.params.id, req.userId]);
+    res.json(r.rows);
+  } catch (e) {
+    // comment_reactions is created by initDb on boot. If a request lands
+    // before that has run, serve the thread without reaction data rather
+    // than failing the whole list -- comments matter more than counts.
+    console.error("[comments] reaction aggregate failed, serving plain:", e.message);
+    const r = await pool.query(`
+      SELECT c.*, u.username, u.avatar_url
+      FROM post_comments c JOIN users u ON u.id = c.user_id
+      WHERE c.post_id = $1 ORDER BY c.created_at ASC
+    `, [req.params.id]);
+    res.json(r.rows.map(row => ({ ...row, reactions: [], my_reaction: null, reaction_count: 0 })));
+  }
 });
 
 app.post("/posts/:id/comments", requireAuth, async (req, res) => {

@@ -284,6 +284,22 @@ async function initDb() {
       );
     `);
 
+    // Reactions on comments. Deliberately the same shape as
+    // post_reactions -- one row per user per comment with the emoji on
+    // the row, and UNIQUE(comment_id, user_id) -- so the toggle /
+    // switch / remove behaviour and the aggregate queries are identical
+    // to the ones already written for posts.
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS comment_reactions (
+        id         SERIAL PRIMARY KEY,
+        comment_id INTEGER REFERENCES post_comments(id) ON DELETE CASCADE,
+        user_id    INTEGER REFERENCES users(id) ON DELETE CASCADE,
+        emoji      TEXT NOT NULL DEFAULT '👍',
+        created_at TIMESTAMPTZ DEFAULT NOW(),
+        UNIQUE(comment_id, user_id)
+      );
+    `);
+
     // Follows
     await pool.query(`
       CREATE TABLE IF NOT EXISTS follows (
@@ -605,6 +621,11 @@ async function initDb() {
     // post_comments — comment counts per post
     await pool.query(`CREATE INDEX IF NOT EXISTS idx_post_comments_post_id ON post_comments(post_id);`).catch(() => {});
     await pool.query(`CREATE INDEX IF NOT EXISTS idx_post_comments_user_id ON post_comments(user_id);`).catch(() => {});
+
+    // comment_reactions -- the per-comment aggregate runs once for every
+    // comment in a thread, so comment_id is the index that matters.
+    await pool.query(`CREATE INDEX IF NOT EXISTS idx_comment_reactions_comment      ON comment_reactions(comment_id);`).catch(() => {});
+    await pool.query(`CREATE INDEX IF NOT EXISTS idx_comment_reactions_comment_user ON comment_reactions(comment_id, user_id);`).catch(() => {});
 
     // group_members / group_messages — group chat performance
     await pool.query(`CREATE INDEX IF NOT EXISTS idx_group_members_group   ON group_members(group_id);`).catch(() => {});
