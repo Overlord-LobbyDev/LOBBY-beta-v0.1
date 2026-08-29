@@ -3888,6 +3888,57 @@ app.post("/queue/:id/convert-to-lobby", requireAuth, async (req, res) => {
   }
 });
 
+// GET /me/queue/match-finder/:userId — the ribbon on a profile.
+//
+// directMatches: sessions the two of you were both in.
+// halfMatches:   people who have queued with BOTH of you -- a shared
+//                regular. That is a real, checkable relationship;
+//                "nearly matched once" would not be.
+app.get("/me/queue/match-finder/:userId", requireAuth, async (req, res) => {
+  const other = parseInt(req.params.userId, 10);
+  if (!other || other === req.userId) {
+    return res.json({ directMatches: 0, halfMatches: 0 });
+  }
+  try {
+    const direct = await pool.query(`
+      SELECT COUNT(DISTINCT a.session_id)::int AS n, MAX(s.matched_at) AS last_at
+      FROM queue_members a
+      JOIN queue_members b ON b.session_id = a.session_id AND b.user_id = $2
+      JOIN queue_sessions s ON s.id = a.session_id
+      WHERE a.user_id = $1 AND s.matched_at IS NOT NULL
+    `, [req.userId, other]);
+
+    const half = await pool.query(`
+      WITH mine AS (
+        SELECT DISTINCT b.user_id FROM queue_members a
+        JOIN queue_members b ON b.session_id = a.session_id AND b.user_id <> a.user_id
+        JOIN queue_sessions s ON s.id = a.session_id
+        WHERE a.user_id = $1 AND s.matched_at IS NOT NULL
+      ), theirs AS (
+        SELECT DISTINCT b.user_id FROM queue_members a
+        JOIN queue_members b ON b.session_id = a.session_id AND b.user_id <> a.user_id
+        JOIN queue_sessions s ON s.id = a.session_id
+        WHERE a.user_id = $2 AND s.matched_at IS NOT NULL
+      )
+      SELECT COUNT(*)::int AS n FROM mine
+      WHERE user_id IN (SELECT user_id FROM theirs)
+        AND user_id NOT IN ($1, $2)
+    `, [req.userId, other]);
+
+    const u = await pool.query("SELECT username FROM users WHERE id = $1", [other]);
+    const d = direct.rows[0] || {};
+    res.json({
+      directMatches: d.n || 0,
+      halfMatches: (half.rows[0] || {}).n || 0,
+      lastQueuedWith: d.last_at || null,
+      lastQueuedWithUsername: (u.rows[0] || {}).username || null,
+    });
+  } catch (e) {
+    console.error("[queue/match-finder]", e.message);
+    res.json({ directMatches: 0, halfMatches: 0 });
+  }
+});
+
 // GET /me/queue/recent — people you were matched with lately, for the
 // "recently played with" list on the setup screen.
 app.get("/me/queue/recent", requireAuth, async (req, res) => {
