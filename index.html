@@ -52689,5 +52689,238 @@ body.feed-anim-out #socialFeed{
   else start();
 })();
 </script>
+
+<!-- ══════════════════════════════════════════════════════════════════
+     COLISEUM v3 — fix the collapse, then make it look like something
+
+     v2 fixed the structure and left the page flat and broken. Two of
+     those were bugs I introduced:
+
+       .col-row-mid  is `grid-template-columns: 1.4fr 1fr`. Hiding the
+                     member constellation left column 2 EMPTY — that is
+                     the dead space down the right of Tournaments.
+       .col-row-hero is `1fr 360px`. Hiding the Stage dropped the Alter
+                     Ego card into column 1, where it stretched into a
+                     huge empty slab.
+
+     A hidden grid child does not remove its track. So instead of leaving
+     holes, the Alter Ego card is re-parented into a side column beside
+     Tournaments, where it fills the space the constellation left, and the
+     Stage row is dropped entirely when there is no voice.
+
+     The rest is the identity pass: the page had no depth, no accent
+     structure and no hierarchy of surface — every block was the same flat
+     rectangle. Gold is used as structure (rules, edges, seams), not as
+     decoration.
+     ══════════════════════════════════════════════════════════════════ -->
+<style>
+/* ── Layout repair ──────────────────────────────────────────────── */
+#coliseumRoot .col-row-mid{
+  grid-template-columns:minmax(0,1.5fr) 340px !important;
+  align-items:start !important;
+}
+.colv2-side{ display:flex; flex-direction:column; gap:18px; min-width:0; }
+/* Both side cards gone → Tournaments takes the whole width rather than
+   leaving an empty track. */
+#coliseumRoot .col-row-mid.colv2-solo{ grid-template-columns:minmax(0,1fr) !important; }
+#coliseumRoot .col-row-hero{ grid-template-columns:minmax(0,1fr) !important; }
+#coliseumRoot .colv2-side .col-identity-card{ border-radius:16px !important; padding:20px 18px !important; }
+
+/* ── Hero: give it room and layers ──────────────────────────────── */
+#coliseumRoot .col-identity{
+  min-height:340px !important;
+  align-items:flex-end !important;
+  position:relative;
+  background-position:right center !important;
+  background-repeat:no-repeat !important;
+}
+/* Stronger and wider than v2: the LOBBY watermark in the artwork was
+   still reading through behind the stats. */
+#coliseumRoot .col-identity::before{
+  background:
+    linear-gradient(90deg, rgba(6,7,11,.985) 0%, rgba(6,7,11,.95) 42%, rgba(6,7,11,.55) 72%, rgba(6,7,11,.18) 100%),
+    linear-gradient(180deg, rgba(6,7,11,.55) 0%, transparent 30%, rgba(6,7,11,.75) 100%) !important;
+}
+/* A lit top seam and an inner hairline — the edge that makes a surface
+   read as an object rather than a filled rectangle. */
+#coliseumRoot .col-identity::after{
+  display:block !important;
+  content:'' !important;
+  position:absolute !important; inset:0 !important;
+  border-radius:20px;
+  background:
+    linear-gradient(90deg, transparent 0%, color-mix(in srgb, var(--col-gold) 55%, transparent) 18%, color-mix(in srgb, var(--col-gold) 22%, transparent) 52%, transparent 82%) top/100% 1px no-repeat !important;
+  box-shadow:0 0 0 1px rgba(255,255,255,.05) inset !important;
+  mask-image:none !important; -webkit-mask-image:none !important;
+  z-index:2 !important; pointer-events:none !important;
+}
+#coliseumRoot .col-identity-inner{
+  padding:34px 38px 30px !important;
+  align-items:flex-end !important;
+  gap:26px !important;
+  flex-wrap:nowrap !important;
+}
+#coliseumRoot .col-ident-meta{ flex:1 1 auto; min-width:0; }
+/* Was colliding with the title and the stats row. */
+#coliseumRoot .col-ident-actions{
+  position:absolute !important;
+  top:22px; right:26px;
+  align-self:flex-start !important;
+  z-index:3;
+}
+#coliseumRoot .col-ident-emblem{
+  width:112px !important; height:112px !important;
+  border-radius:22px !important;
+  box-shadow:
+    0 18px 44px rgba(0,0,0,.7),
+    0 0 0 1px color-mix(in srgb, var(--col-gold) 45%, transparent),
+    0 0 0 5px rgba(6,7,11,.85) !important;
+}
+#coliseumRoot .col-ident-name{
+  font-size:clamp(34px, 3.4vw, 54px) !important;
+  line-height:.95 !important;
+  letter-spacing:1px !important;
+}
+#coliseumRoot .col-ident-eyebrow{
+  display:inline-flex; align-items:center; gap:7px;
+  padding:4px 10px; border-radius:99px;
+  background:color-mix(in srgb, var(--col-gold) 14%, rgba(0,0,0,.5));
+  border:1px solid color-mix(in srgb, var(--col-gold) 32%, transparent);
+  font-size:9.5px !important;
+}
+#coliseumRoot .col-ident-stat .n{
+  font-size:22px !important;
+  color:#fff !important;
+}
+#coliseumRoot .col-ident-stat .l{
+  font-size:9px !important; letter-spacing:1.6px !important;
+  color:rgba(255,255,255,.45) !important;
+}
+
+/* ── Channel cards: were tall boxes of mostly nothing ───────────── */
+#coliseumRoot .col-lounge-card{
+  padding:14px 16px !important;
+  border-radius:14px !important;
+  background:linear-gradient(180deg, rgba(28,30,40,.9), rgba(13,15,22,.94)) !important;
+  border:1px solid rgba(255,255,255,.07) !important;
+  transition:border-color .18s, transform .18s, box-shadow .18s !important;
+}
+#coliseumRoot .col-lounge-card:hover{
+  border-color:color-mix(in srgb, var(--col-gold) 42%, transparent) !important;
+  transform:translateY(-2px);
+  box-shadow:0 14px 30px rgba(0,0,0,.5) !important;
+}
+/* The body only ever holds voice orbs; empty it collapses to a gap. */
+#coliseumRoot .col-lounge-body:empty{ display:none !important; }
+#coliseumRoot .col-lounge-foot{
+  margin-top:10px !important;
+  padding-top:10px !important;
+  border-top:1px solid rgba(255,255,255,.06) !important;
+}
+/* "Channel" under every card said nothing the icon had not. */
+#coliseumRoot .col-lounge-stat{ opacity:.45; font-size:9.5px !important; }
+#coliseumRoot .col-lounge-card.voice{
+  background:
+    radial-gradient(300px 120px at 100% 0%, color-mix(in srgb, var(--col-gold) 12%, transparent), transparent 70%),
+    linear-gradient(180deg, rgba(28,30,40,.9), rgba(13,15,22,.94)) !important;
+}
+
+/* ── Surfaces: a seam of light on top of every card ─────────────── */
+#coliseumRoot .colv2-channels,
+#coliseumRoot .col-stage,
+#coliseumRoot .col-theatre,
+#coliseumRoot .col-const,
+#coliseumRoot .col-identity-card,
+#coliseumRoot .col-chron-card{
+  position:relative;
+}
+#coliseumRoot .colv2-channels::after,
+#coliseumRoot .col-theatre::after,
+#coliseumRoot .col-const::after,
+#coliseumRoot .col-chron-card::after{
+  content:''; position:absolute; top:0; left:22px; right:22px; height:1px;
+  background:linear-gradient(90deg, transparent, color-mix(in srgb, var(--col-gold) 30%, transparent), transparent);
+  pointer-events:none;
+}
+
+/* ── Tournament rows: were flat bars in a flat box ──────────────── */
+#coliseumRoot .col-theatre{ padding:20px 22px !important; }
+#coliseumRoot .col-t-row{
+  border-radius:10px !important;
+  border:1px solid rgba(255,255,255,.05) !important;
+  transition:border-color .16s, background .16s !important;
+}
+#coliseumRoot .col-t-row:hover{
+  border-color:color-mix(in srgb, var(--col-gold) 34%, transparent) !important;
+  background:color-mix(in srgb, var(--col-gold) 7%, transparent) !important;
+}
+
+/* ── Page ground: the canvas was pure flat black ────────────────── */
+#coliseumRoot .col-amb{
+  background:
+    radial-gradient(1200px 620px at 78% -8%, color-mix(in srgb, var(--col-gold) 9%, transparent) 0%, transparent 62%),
+    radial-gradient(900px 500px at 8% 104%, color-mix(in srgb, var(--accent) 8%, transparent) 0%, transparent 60%) !important;
+}
+#coliseumRoot .col-canvas{ gap:18px !important; }
+</style>
+<script>
+(function () {
+  'use strict';
+
+  function $(id){ return document.getElementById(id); }
+  function q(sel, root){ return (root || document).querySelector(sel); }
+
+  /* Re-parent the Alter Ego card into a side column beside Tournaments.
+     It used to sit next to the Stage, so whenever the Stage was hidden it
+     stretched across a full row on its own. In the side column it fills
+     the track the member constellation leaves empty. */
+  function reflow(){
+    var mid = q('#coliseumRoot .col-row-mid');
+    if (!mid) return;
+
+    var side = q('#coliseumRoot .colv2-side');
+    if (!side){
+      side = document.createElement('div');
+      side.className = 'colv2-side';
+      mid.appendChild(side);
+    }
+
+    var ego = q('#coliseumRoot .col-identity-card');
+    if (ego && ego.parentNode !== side) side.appendChild(ego);
+
+    var con = q('#coliseumRoot .col-const');
+    if (con && con.parentNode !== side) side.appendChild(con);
+
+    // The Stage row now holds only the Stage, so it goes when it does.
+    var stage = q('#coliseumRoot .col-stage');
+    var row   = q('#coliseumRoot .col-row-hero');
+    if (row && stage) row.classList.toggle('colv2-hide', stage.classList.contains('colv2-hide'));
+
+    /* If everything in the side column is hidden, drop the track instead
+       of leaving a 340px hole. */
+    var visible = Array.prototype.filter.call(side.children, function(el){
+      return !el.classList.contains('colv2-hide');
+    }).length;
+    side.classList.toggle('colv2-hide', visible === 0);
+    mid.classList.toggle('colv2-solo', visible === 0);
+  }
+
+  var t = null;
+  function schedule(){ clearTimeout(t); t = setTimeout(function(){
+    if (document.body.classList.contains('coliseum-mode')) reflow();
+  }, 120); }
+
+  function start(){
+    var root = $('coliseumRoot');
+    if (root) new MutationObserver(schedule).observe(root, { childList:true, subtree:true });
+    new MutationObserver(schedule).observe(document.body, { attributes:true, attributeFilter:['class'] });
+    schedule();
+    console.log('[coliseum-v3] grid repair + identity pass');
+  }
+
+  if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', start);
+  else start();
+})();
+</script>
 </body>
 </html>
