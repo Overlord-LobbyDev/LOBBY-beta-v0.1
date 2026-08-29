@@ -58814,5 +58814,63 @@ async function reactComment(ev, id, btn){
   else start();
 })();
 </script>
+
+<!-- ══════════════════════════════════════════════════════════════════
+     DECK SIDE CARDS — show the whole card
+
+     The original deck hid the stat strip and the achievement list on
+     anything that was not the front card, leaving the name and two raw
+     hour lines. That is what looked like data failing to arrive: a card
+     that is clearly a card, mostly empty.
+
+     My last pass fixed the wrong half of it — the orphaned "RECENT
+     ACHIEVEMENTS" heading went, but the list stayed hidden, so the cards
+     behind were still stripped.
+
+     They are complete cards now: strip, share bar, achievements, all of
+     it. Depth in the deck comes from scale, opacity and desaturation,
+     which it already had — it never needed content removed as well.
+
+     Two things stay off. The CTA, because opening Steam belongs to the
+     card in front and a hidden-away button should not be clickable. And
+     the raw hour lines, which the strip already states properly — they
+     were only ever showing because the rule that hid them named
+     .rc-active alone.
+     ══════════════════════════════════════════════════════════════════ -->
+<style>
+#homeContent [data-home-slot="hero"] .game-card:not(.rc-active) .rc-stats,
+#homeContent [data-home-slot="hero"] .game-card:not(.rc-active) .rc-bar,
+#homeContent [data-home-slot="hero"] .game-card:not(.rc-active) .game-card-achievements,
+#homeContent [data-home-slot="hero"] .game-card:not(.rc-active) .game-card-ach-label{
+  display:block !important;
+}
+#homeContent [data-home-slot="hero"] .game-card:not(.rc-active) .rc-stats{
+  display:grid !important;
+}
+#homeContent [data-home-slot="hero"] .game-card:not(.rc-active) .game-card-achievements{
+  display:flex !important;
+}
+
+/* The strip says both of these properly, so the renderer's own lines are
+   redundant on every card, not just the front one. The rule that hid
+   them named .rc-active alone, which is why they came back the moment a
+   card stepped aside. */
+#homeContent [data-home-slot="hero"] .game-card .game-card-hours,
+#homeContent [data-home-slot="hero"] .game-card .game-card-hours-total{
+  display:none !important;
+}
+
+/* Opening Steam belongs to the front card. A back card's button is
+   scaled down and dimmed, and must not be a target. */
+#homeContent [data-home-slot="hero"] .game-card:not(.rc-active) .rc-cta{
+  display:none !important;
+}
+
+/* A back card cannot scroll, so its list simply ends where the card
+   does rather than offering a scrollbar nobody can reach. */
+#homeContent [data-home-slot="hero"] .game-card:not(.rc-active) .game-card-achievements{
+  overflow:hidden !important;
+}
+</style>
 </body>
 </html>
