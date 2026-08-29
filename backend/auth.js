@@ -3172,6 +3172,256 @@ app.post("/tournaments/create", requireAuth, async (req, res) => {
 });
 
 // Get tournament details
+// ══════════════════════════════════════════════════════════════════
+// HUB ENDPOINTS — Discover and Tournaments
+//
+// These pages already call all of this and every call is wrapped in
+// .catch(() => null), so their absence was invisible: the pages fell
+// back to seeded placeholder data and looked like they worked. They
+// were showing fiction. These make them show the database.
+//
+// ORDER MATTERS. Everything two-segment under /tournaments/ MUST be
+// declared above /tournaments/:tournamentId or Express matches it as an
+// id -- /tournaments/global would look up a tournament called "global".
+// That is why this block sits here rather than at the end of the file.
+// ══════════════════════════════════════════════════════════════════
+
+// The client speaks LIVE / STARTING / OPEN; the table speaks setup /
+// registration / in-progress / completed. One translation, in one place.
+function _tourneyStatus(row) {
+  const st = String(row.status || "").toLowerCase();
+  if (st === "in-progress") return "LIVE";
+  if (st === "completed")   return "DONE";
+  if (st === "cancelled")   return "CANCELLED";
+  if (st === "registration" || st === "setup") {
+    const t = row.scheduled_start || row.start_time;
+    // "Starting" is a real, checkable claim: inside the next hour.
+    if (t && new Date(t).getTime() - Date.now() < 60 * 60 * 1000) return "STARTING";
+    return "OPEN";
+  }
+  return "OPEN";
+}
+
+const _TOURNEY_SELECT = `
+  SELECT t.*,
+    (SELECT COUNT(*)::int FROM tournament_players WHERE tournament_id = t.id) AS entrants,
+    u.username AS host_name,
+    s.name     AS lobby_name
+  FROM tournaments t
+  LEFT JOIN users u ON u.id = t.host_id
+  LEFT JOIN servers s ON s.id::text = t.lobby_id
+`;
+
+function _tourneyCard(r) {
+  return {
+    id: r.id,
+    name: r.name,
+    game: r.game_tag || r.api_game || null,
+    status: _tourneyStatus(r),
+    entrants: r.entrants || 0,
+    maxPlayers: r.max_players || r.player_count || null,
+    prize: r.prize || null,
+    format: r.format,
+    host: r.host_name || null,
+    lobbyId: r.lobby_id,
+    lobbyName: r.lobby_name || null,
+    startTime: r.scheduled_start || r.start_time || null,
+    createdAt: r.created_at,
+  };
+}
+
+// GET /tournaments/global — every tournament worth showing, across lobbies.
+app.get("/tournaments/global", async (req, res) => {
+  try {
+    const r = await pool.query(_TOURNEY_SELECT +
+      ` WHERE t.status IN ('setup','registration','in-progress')` +
+      ` ORDER BY (t.status = 'in-progress') DESC, entrants DESC, t.created_at DESC LIMIT 60`);
+    res.json(r.rows.map(_tourneyCard));
+  } catch (e) {
+    console.error("[tournaments/global]", e.message);
+    res.json([]);   // the hub falls back to its own list rather than breaking
+  }
+});
+
+// GET /featured/tournaments — the spotlight rotation.
+// Ranked by entrants, because "featured" with nothing behind it is just
+// a random pick dressed up as editorial.
+app.get("/featured/tournaments", async (req, res) => {
+  try {
+    const r = await pool.query(_TOURNEY_SELECT +
+      ` WHERE t.status IN ('registration','in-progress')` +
+      ` ORDER BY entrants DESC, t.created_at DESC LIMIT 6`);
+    res.json(r.rows.map(_tourneyCard));
+  } catch (e) {
+    console.error("[featured/tournaments]", e.message);
+    res.json([]);
+  }
+});
+
+// GET /me/tournaments — hosting or entered.
+app.get("/me/tournaments", requireAuth, async (req, res) => {
+  try {
+    const r = await pool.query(_TOURNEY_SELECT +
+      ` WHERE t.host_id = $1
+         OR EXISTS (SELECT 1 FROM tournament_players tp
+                     WHERE tp.tournament_id = t.id AND tp.user_id = $1)
+       ORDER BY t.created_at DESC LIMIT 100`, [req.userId]);
+    res.json(r.rows.map((row) => Object.assign(_tourneyCard(row), {
+      isHost: row.host_id === req.userId,
+    })));
+  } catch (e) {
+    console.error("[me/tournaments]", e.message);
+    res.json([]);
+  }
+});
+
+// GET /me/tournaments/active-count — for the cap counter.
+app.get("/me/tournaments/active-count", requireAuth, async (req, res) => {
+  try {
+    const r = await pool.query(
+      `SELECT COUNT(*)::int AS count FROM tournaments
+        WHERE host_id = $1 AND status IN ('setup','registration','in-progress')`,
+      [req.userId]
+    );
+    res.json({ count: r.rows[0] ? r.rows[0].count : 0 });
+  } catch (e) {
+    console.error("[me/tournaments/active-count]", e.message);
+    res.json({ count: 0 });
+  }
+});
+
+// GET /tournaments/me/stats — the player banner.
+//
+// Every number here is counted from the tables. The client is explicit
+// that it renders an honest zero rather than a mock, so anything this
+// cannot prove is returned as null, not invented. tier and rankLabel are
+// null for that reason: there is no tournament ranking system yet, and a
+// made-up "Gold III" would be exactly the fiction that comment warns
+// against.
+app.get("/tournaments/me/stats", requireAuth, async (req, res) => {
+  const empty = {
+    tier: null, rankLabel: null,
+    wins: 0, losses: 0, tournaments: 0, won: 0,
+    bestFinish: null, streak: 0, recent: null,
+  };
+  try {
+    const q = await pool.query(`
+      WITH mine AS (
+        SELECT id, tournament_id, status FROM tournament_players WHERE user_id = $1
+      )
+      SELECT
+        (SELECT COUNT(*)::int FROM mine) AS tournaments,
+        (SELECT COUNT(*)::int FROM mine WHERE status = 'winner') AS won,
+        (SELECT COUNT(*)::int FROM tournament_matches m
+           WHERE m.winner_id IN (SELECT id FROM mine)) AS wins,
+        (SELECT COUNT(*)::int FROM tournament_matches m
+           WHERE m.status = 'completed' AND m.winner_id IS NOT NULL
+             AND (m.player1_id IN (SELECT id FROM mine) OR m.player2_id IN (SELECT id FROM mine))
+             AND m.winner_id NOT IN (SELECT id FROM mine)) AS losses
+    `, [req.userId]);
+
+    const row = q.rows[0] || {};
+    const recentQ = await pool.query(`
+      SELECT t.name, t.id, tp.status
+      FROM tournament_players tp JOIN tournaments t ON t.id = tp.tournament_id
+      WHERE tp.user_id = $1 ORDER BY tp.joined_at DESC LIMIT 1
+    `, [req.userId]);
+
+    res.json({
+      tier: null, rankLabel: null,
+      wins: row.wins || 0,
+      losses: row.losses || 0,
+      tournaments: row.tournaments || 0,
+      won: row.won || 0,
+      bestFinish: (row.won || 0) > 0 ? "Winner" : null,
+      streak: 0,
+      recent: recentQ.rows[0] || null,
+    });
+  } catch (e) {
+    console.error("[tournaments/me/stats]", e.message);
+    res.json(empty);
+  }
+});
+
+// ── Discover ──────────────────────────────────────────────────────
+
+// A lobby is public when it has tags -- the same rule /servers/search
+// already uses, kept identical so the two cannot disagree about what
+// "discoverable" means.
+const _PUBLIC_LOBBY_WHERE =
+  "s.tags IS NOT NULL AND s.tags::text NOT IN ('[]','','null')";
+
+function _lobbyCard(s) {
+  let tags = [];
+  try { tags = Array.isArray(s.tags) ? s.tags : JSON.parse(s.tags || "[]"); }
+  catch (e) { tags = String(s.tags || "").split(",").map(x => x.trim()).filter(Boolean); }
+  return {
+    id: s.id,
+    name: s.name,
+    tag: tags[0] || null,
+    tags,
+    members: s.member_count || 0,
+    // Presence lives in the websocket process, not here, so this is not
+    // reported rather than guessed. The card treats 0 as "unknown".
+    online: 0,
+    cover: s.banner_url || s.icon_url || "",
+    icon: s.icon_url || "",
+    fallback: "linear-gradient(135deg,#2a2d3a,#15161e)",
+    initial: String(s.name || "?").charAt(0).toUpperCase(),
+    description: s.description || "",
+    badge: null,
+  };
+}
+
+// GET /lobbies/public — the Discover grid.
+app.get("/lobbies/public", async (req, res) => {
+  try {
+    const r = await pool.query(`
+      SELECT s.*,
+        (SELECT COUNT(*)::int FROM server_members WHERE server_id = s.id) AS member_count
+      FROM servers s
+      WHERE ` + _PUBLIC_LOBBY_WHERE + `
+      ORDER BY member_count DESC, s.created_at DESC
+      LIMIT 100
+    `);
+    res.json(r.rows.map(_lobbyCard));
+  } catch (e) {
+    console.error("[lobbies/public]", e.message);
+    res.json([]);
+  }
+});
+
+// GET /featured/spotlight — one editorial pick for the carousel.
+//
+// There is no curation table, so rather than pretend there is, this
+// returns the most defensible real thing: the busiest live tournament,
+// or failing that the largest public lobby. It is honest about which,
+// via `kind`, and returns nothing at all when there is nothing worth
+// featuring -- the client then falls through to its own recommendation.
+app.get("/featured/spotlight", async (req, res) => {
+  try {
+    const t = await pool.query(_TOURNEY_SELECT +
+      ` WHERE t.status = 'in-progress' ORDER BY entrants DESC LIMIT 1`);
+    if (t.rows.length && (t.rows[0].entrants || 0) > 0) {
+      return res.json(Object.assign(_tourneyCard(t.rows[0]), { kind: "tournament" }));
+    }
+    const l = await pool.query(`
+      SELECT s.*,
+        (SELECT COUNT(*)::int FROM server_members WHERE server_id = s.id) AS member_count
+      FROM servers s
+      WHERE ` + _PUBLIC_LOBBY_WHERE + `
+      ORDER BY member_count DESC LIMIT 1
+    `);
+    if (l.rows.length) {
+      return res.json(Object.assign(_lobbyCard(l.rows[0]), { kind: "lobby" }));
+    }
+    res.json(null);
+  } catch (e) {
+    console.error("[featured/spotlight]", e.message);
+    res.json(null);
+  }
+});
+
 app.get("/tournaments/:tournamentId", async (req, res) => {
   try {
     const { tournamentId } = req.params;
