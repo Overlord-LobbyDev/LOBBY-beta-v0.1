@@ -64095,5 +64095,270 @@ async function reactComment(ev, id, btn){
 })();
 </script>
 
+
+<!-- ══════════════════════════════════════════════════════════════════
+     QUEUE AND LEADERBOARDS — the language, not the engine
+
+     Neither of these is a browse surface, so neither gets the deck.
+
+     Queue is a FLOW. You pick a game, say who you want, and then wait
+     for the machine to find them. Turning that into rails of cards
+     would be putting a shop window on a doorbell. What it needed was
+     everything else: the numbered steps typeset like the front page's
+     section headers, the panels sitting on the same surface as every
+     other panel in the app, and controls that look like the controls on
+     Discover instead of like a settings dialog.
+
+     Leaderboards is a TABLE. Rank, player, tier, points, read down a
+     column and compared across rows. A deck of cards is a worse way to
+     show that, not a better one -- so it keeps its ladder and takes the
+     type, the segmented control and the surfaces.
+
+     WHAT MAKES THEM FEEL RELATED IS NOT THE LAYOUT. It is the type
+     scale, the panel treatment, one hairline in the accent at the top
+     of each surface, mono for anything numeric, and each page's own
+     --hub-accent doing the accenting. Those are set here for both, and
+     every value is read from the same variables the other hubs use, so
+     there is nothing per-page to keep in sync.
+     ══════════════════════════════════════════════════════════════════ -->
+<style>
+/* ══ Shared surface ═══════════════════════════════════════════════
+   The panel every hub uses: a very slight vertical lift, a hairline
+   that picks up the page's accent across the top, and a radius that
+   matches the cards. */
+#queueOverlay .q-step-card,
+#queueOverlay .q-card,
+#leaderboardOverlay .lb-standings,
+#leaderboardOverlay .lb-featured-card{
+  position:relative;
+  border-radius:16px !important;
+  background:linear-gradient(160deg, rgba(255,255,255,.032), rgba(255,255,255,.012)) !important;
+  border:1px solid rgba(255,255,255,.075) !important;
+  box-shadow:0 10px 30px rgba(0,0,0,.34) !important;
+}
+#queueOverlay .q-step-card::before,
+#leaderboardOverlay .lb-standings::before{
+  content:''; position:absolute; top:0; left:26px; right:26px; height:1px;
+  pointer-events:none;
+  background:linear-gradient(90deg, transparent,
+    color-mix(in srgb, var(--hub-accent) 46%, rgba(255,255,255,.16)) 22%,
+    color-mix(in srgb, var(--hub-accent) 46%, rgba(255,255,255,.16)) 78%, transparent);
+}
+
+/* ══ QUEUE ════════════════════════════════════════════════════════ */
+/* The step number reads as an index in the same voice as the rails'
+   "01 / GLOBAL CIRCUIT", rather than as a bubble. */
+#queueOverlay .q-step-num{
+  font-family:'JetBrains Mono', ui-monospace, monospace !important;
+  font-size:12px !important; font-weight:800 !important;
+  letter-spacing:1px !important;
+  width:34px !important; height:34px !important;
+  border-radius:10px !important;
+  display:flex !important; align-items:center; justify-content:center;
+  color:color-mix(in srgb, var(--hub-accent) 92%, white) !important;
+  background:color-mix(in srgb, var(--hub-accent) 14%, transparent) !important;
+  border:1px solid color-mix(in srgb, var(--hub-accent) 34%, transparent) !important;
+  box-shadow:0 0 20px color-mix(in srgb, var(--hub-accent) 16%, transparent);
+}
+#queueOverlay .q-step-label{
+  font-family:'Archivo', var(--font), sans-serif !important;
+  font-size:17px !important; font-weight:900 !important;
+  letter-spacing:1.5px !important; text-transform:uppercase !important;
+  color:#fff !important;
+  text-shadow:
+    0 -1px 0 rgba(255,255,255,.24),
+    0 1px 0 rgba(0,0,0,.5),
+    0 0 32px color-mix(in srgb, var(--hub-accent) 26%, transparent);
+}
+#queueOverlay .q-step-sub,
+#queueOverlay .q-card-sub{
+  font-size:12.5px !important; color:var(--text-3) !important;
+  letter-spacing:.2px !important;
+}
+#queueOverlay .q-card-label{
+  font-family:'JetBrains Mono', ui-monospace, monospace !important;
+  font-size:9.5px !important; font-weight:700 !important;
+  letter-spacing:1.9px !important; text-transform:uppercase !important;
+  color:var(--text-3) !important;
+}
+
+/* Controls, matching the hub CTA rather than a form. */
+#queueOverlay .q-cta-primary{
+  border-radius:12px !important; border:0 !important;
+  font-family:'Archivo', var(--font), sans-serif !important;
+  font-size:12.5px !important; font-weight:900 !important; letter-spacing:.8px !important;
+  color:#0b0416 !important;
+  background:linear-gradient(180deg,
+    color-mix(in srgb, var(--hub-accent) 92%, white), var(--hub-accent)) !important;
+  box-shadow:0 8px 24px color-mix(in srgb, var(--hub-accent) 34%, transparent),
+             inset 0 1px 0 rgba(255,255,255,.45) !important;
+  transition:transform .18s cubic-bezier(.22,1,.36,1), filter .18s ease !important;
+}
+#queueOverlay .q-cta-primary:hover{ transform:translateY(-2px); filter:brightness(1.07); }
+#queueOverlay .q-cta-secondary,
+#queueOverlay .q-btn-ghost,
+#queueOverlay .q-clear-btn{
+  border-radius:11px !important;
+  font-family:'Archivo', var(--font), sans-serif !important;
+  font-weight:700 !important; letter-spacing:.5px !important;
+  background:rgba(255,255,255,.055) !important;
+  border:1px solid rgba(255,255,255,.11) !important;
+  color:var(--text-2) !important;
+  transition:background .18s ease, color .18s ease, border-color .18s ease !important;
+}
+#queueOverlay .q-cta-secondary:hover,
+#queueOverlay .q-btn-ghost:hover,
+#queueOverlay .q-clear-btn:hover{
+  background:color-mix(in srgb, var(--hub-accent) 15%, transparent) !important;
+  border-color:color-mix(in srgb, var(--hub-accent) 44%, transparent) !important;
+  color:#fff !important;
+}
+
+/* The stepper: a figure with two controls, not three buttons. */
+#queueOverlay .q-stepper{
+  border-radius:12px !important;
+  background:rgba(8,10,16,.5) !important;
+  border:1px solid rgba(255,255,255,.08) !important;
+}
+#queueOverlay .q-step-btn{
+  border-radius:9px !important;
+  background:rgba(255,255,255,.05) !important;
+  border:1px solid rgba(255,255,255,.09) !important;
+  color:var(--text-2) !important;
+  transition:background .16s ease, color .16s ease !important;
+}
+#queueOverlay .q-step-btn:hover{
+  background:color-mix(in srgb, var(--hub-accent) 22%, transparent) !important;
+  color:#fff !important;
+}
+#queueOverlay .q-step-val{
+  font-family:'JetBrains Mono', ui-monospace, monospace !important;
+  font-weight:800 !important; font-variant-numeric:tabular-nums;
+  color:#fff !important;
+}
+#queueOverlay .q-input,
+#queueOverlay .q-game-search input{
+  border-radius:11px !important;
+  background:rgba(8,10,16,.55) !important;
+  border:1px solid rgba(255,255,255,.09) !important;
+  color:#fff !important;
+  transition:border-color .18s ease, box-shadow .18s ease !important;
+}
+#queueOverlay .q-input:focus,
+#queueOverlay .q-game-search input:focus{
+  outline:none !important;
+  border-color:color-mix(in srgb, var(--hub-accent) 54%, transparent) !important;
+  box-shadow:0 0 0 3px color-mix(in srgb, var(--hub-accent) 16%, transparent) !important;
+}
+
+/* The searching state is the whole screen for as long as it lasts, so
+   it carries the accent rather than sitting grey in the middle of it. */
+#queueOverlay .q-search-title{
+  font-family:'Archivo', var(--font), sans-serif !important;
+  font-weight:900 !important; letter-spacing:1.6px !important;
+  text-transform:uppercase !important; color:#fff !important;
+  text-shadow:0 0 42px color-mix(in srgb, var(--hub-accent) 40%, transparent);
+}
+#queueOverlay .q-search-meta,
+#queueOverlay .q-call-timer{
+  font-family:'JetBrains Mono', ui-monospace, monospace !important;
+  font-variant-numeric:tabular-nums;
+  letter-spacing:1.4px !important;
+}
+#queueOverlay .q-search-tip{
+  border-radius:12px !important;
+  background:rgba(255,255,255,.03) !important;
+  border:1px solid rgba(255,255,255,.07) !important;
+}
+
+/* ══ LEADERBOARDS ═════════════════════════════════════════════════ */
+/* Section heads in the rails' voice. */
+#leaderboardOverlay .lb-section-title{
+  font-family:'Archivo', var(--font), sans-serif !important;
+  font-size:20px !important; font-weight:900 !important;
+  letter-spacing:2px !important; text-transform:uppercase !important;
+  color:#fff !important;
+  text-shadow:
+    0 -1px 0 rgba(255,255,255,.26),
+    0 1px 0 rgba(0,0,0,.5),
+    0 0 38px color-mix(in srgb, var(--hub-accent) 30%, transparent);
+}
+#leaderboardOverlay .lb-section-sub{
+  font-size:12.5px !important; color:var(--text-3) !important;
+}
+
+/* The segmented control, built like the hubs' kind row. */
+#leaderboardOverlay .lb-segmented{
+  padding:4px !important; border-radius:14px !important;
+  background:rgba(8,11,16,.55) !important;
+  border:1px solid rgba(255,255,255,.07) !important;
+  box-shadow:inset 0 1px 0 rgba(255,255,255,.04);
+}
+#leaderboardOverlay .lb-seg{
+  border-radius:11px !important; border:0 !important;
+  font-family:'Archivo', var(--font), sans-serif !important;
+  font-size:11.5px !important; font-weight:800 !important;
+  letter-spacing:1.3px !important; text-transform:uppercase !important;
+  color:var(--text-3) !important;
+  background:transparent !important;
+  transition:color .18s ease, background .18s ease !important;
+}
+#leaderboardOverlay .lb-seg:hover{ color:var(--text-1) !important; background:rgba(255,255,255,.045) !important; }
+#leaderboardOverlay .lb-seg.active{
+  color:#1a1405 !important;
+  background:linear-gradient(180deg,
+    color-mix(in srgb, var(--hub-accent) 94%, white), var(--hub-accent)) !important;
+  box-shadow:0 4px 16px color-mix(in srgb, var(--hub-accent) 32%, transparent),
+             inset 0 1px 0 rgba(255,255,255,.45) !important;
+}
+
+/* A table is read down a column, so every figure in it is monospaced
+   and the digits line up. This is the single biggest thing that makes a
+   ranked list legible, and it costs one declaration. */
+#leaderboardOverlay .lb-standings,
+#leaderboardOverlay .lb-standings-bar{
+  font-variant-numeric:tabular-nums;
+}
+#leaderboardOverlay .lb-standings-title{
+  font-family:'Archivo', var(--font), sans-serif !important;
+  font-weight:800 !important; letter-spacing:1.4px !important;
+  text-transform:uppercase !important;
+}
+#leaderboardOverlay .lb-search{
+  border-radius:11px !important;
+  background:rgba(8,10,16,.55) !important;
+  border:1px solid rgba(255,255,255,.09) !important;
+  color:#fff !important;
+}
+#leaderboardOverlay .lb-search:focus{
+  outline:none !important;
+  border-color:color-mix(in srgb, var(--hub-accent) 54%, transparent) !important;
+  box-shadow:0 0 0 3px color-mix(in srgb, var(--hub-accent) 16%, transparent) !important;
+}
+#leaderboardOverlay .lb-featured-card{
+  transition:transform .2s cubic-bezier(.22,1,.36,1),
+             border-color .2s ease, box-shadow .2s ease !important;
+}
+#leaderboardOverlay .lb-featured-card:hover{
+  transform:translateY(-4px);
+  border-color:color-mix(in srgb, var(--hub-accent) 50%, transparent) !important;
+  box-shadow:0 20px 44px rgba(0,0,0,.55),
+             0 0 26px color-mix(in srgb, var(--hub-accent) 15%, transparent) !important;
+}
+#leaderboardOverlay .lb-season-pill{
+  font-family:'JetBrains Mono', ui-monospace, monospace !important;
+  font-size:10px !important; font-weight:700 !important;
+  letter-spacing:1.8px !important; text-transform:uppercase !important;
+  border-radius:99px !important;
+  background:rgba(255,255,255,.035) !important;
+  border:1px solid rgba(255,255,255,.08) !important;
+}
+
+@media (prefers-reduced-motion: reduce){
+  #queueOverlay .q-cta-primary,
+  #leaderboardOverlay .lb-featured-card{ transition:none !important; }
+}
+</style>
+
 </body>
 </html>
