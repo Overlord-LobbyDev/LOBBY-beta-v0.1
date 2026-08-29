@@ -55472,13 +55472,21 @@ body.double-dock[data-feed-position="right"].feed-open:not(.rail-hidden) #settin
        reach. Try those first and keep artUrls() as the fallback for when
        that lookup failed. Deduped, so a URL is never probed twice. */
     var capsuleEl = card.querySelector('.game-card-capsule');
-    var served = [
-      capsuleEl && capsuleEl.getAttribute('src'),
-      hero && hero.getAttribute('src')
-    ].filter(Boolean);
-    var list = served.concat(artUrls(appid)).filter(function (u, n, arr) {
-      return arr.indexOf(u) === n;
-    });
+    var servedPoster = capsuleEl && capsuleEl.getAttribute('src');
+    var servedHeader = hero && hero.getAttribute('src');
+
+    /* Ordered by how well each asset survives this box, which is what
+       artUrls() has always been ordered by — NOT by where the URL came
+       from. The server's poster leads because it is the 600x900 the box
+       is shaped for and, on a hashed app, the only one reachable at all.
+       Its HEADER goes last: header.jpg is 460x215, the weakest asset
+       there is, and putting it second — which is what the previous pass
+       did — meant any game whose portrait art 404d grabbed a blurry wide
+       crop instead of falling through to the 616x353 or the hero. */
+    var list = [servedPoster]
+      .concat(artUrls(appid))
+      .concat([servedHeader])
+      .filter(function (u, n, arr) { return !!u && arr.indexOf(u) === n; });
     var i = 0;
     (function next(){
       if (i >= list.length){ giveUp(); return; }
