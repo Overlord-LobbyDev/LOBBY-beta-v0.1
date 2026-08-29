@@ -58554,5 +58554,50 @@ async function reactComment(ev, id, btn){
      a margin, so a two-line title spaces identically to a one-line one. */
 }
 </style>
+
+<!-- ══════════════════════════════════════════════════════════════════
+     DECK SIDE CARDS — the empty heading
+
+     Nothing failed to load. A side card hides .game-card-achievements,
+     but enhance() lifts the "RECENT ACHIEVEMENTS" label OUT of that
+     container first — deliberately, so rows cannot scroll up over it —
+     and hiding the container therefore leaves the heading standing on
+     its own with nothing beneath it. A heading over blank space is
+     exactly what a failed fetch looks like.
+
+     Same for the "No public achievements for this game" line, which the
+     grid pass tags .gc-hide but which is only hidden in the column slot.
+
+     While they are being fixed, the side cards get a real reduced state
+     rather than the renderer's raw leftovers. A card at 66% scale and
+     26% opacity cannot carry a stat table, so it carries the two things
+     worth reading at that size: the name, and the hours. Which is what
+     it was trying to be already — it just had an orphaned heading and a
+     stray line sitting under it.
+     ══════════════════════════════════════════════════════════════════ -->
+<style>
+#homeContent [data-home-slot="hero"] .game-card:not(.rc-active) .game-card-ach-label,
+#homeContent [data-home-slot="hero"] .game-card:not(.rc-active) .gc-hide,
+#homeContent [data-home-slot="hero"] .game-card:not(.rc-active) .gc-meta,
+#homeContent [data-home-slot="hero"] .game-card:not(.rc-active) .gc-badge{
+  display:none !important;
+}
+
+/* The hours are all that is left, so they are worth setting properly
+   rather than being renderer defaults at whatever size they landed. */
+#homeContent [data-home-slot="hero"] .game-card:not(.rc-active) .game-card-hours,
+#homeContent [data-home-slot="hero"] .game-card:not(.rc-active) .game-card-hours-total{
+  display:block !important;
+  font-size:13px !important; line-height:1.5 !important;
+  color:rgba(255,255,255,.62) !important;
+  letter-spacing:.2px !important;
+}
+#homeContent [data-home-slot="hero"] .game-card:not(.rc-active) .game-card-hours{
+  color:rgba(255,255,255,.8) !important; font-weight:700 !important;
+}
+#homeContent [data-home-slot="hero"] .game-card:not(.rc-active) .game-card-meta{
+  margin-top:6px !important;
+}
+</style>
 </body>
 </html>
