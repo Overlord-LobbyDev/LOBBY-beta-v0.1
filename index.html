@@ -29366,7 +29366,9 @@ function _qRenderGameGrid(query) {
   }
   grid.innerHTML = filtered.map(g => {
     const sel = g.id === _qState.game ? ' is-selected' : '';
-    const cover = g.header || g.cover;
+    // Portrait first, now the tile is 2:3. header is the wide 460x215
+    // store banner and was being letterboxed into a tall box.
+    const cover = g.cover || g.header;
     const art = cover
       ? `<img src="${cover}" alt="" loading="lazy" onerror="this.style.display='none'">`
       : `<div class="q-game-tile-fb" style="background:${g.fallback||'var(--bg-3)'}">${g.initial || g.short || '?'}</div>`;
@@ -59892,6 +59894,237 @@ async function reactComment(ev, id, btn){
 }
 #homeContent [data-home-slot="col"] .gc-ach.is-100 .gc-ico{
   opacity:1; color:#ffd964;
+}
+</style>
+
+<!-- ══════════════════════════════════════════════════════════════════
+     HUB SURFACES — what the home page has that these did not
+
+     The type was brought across already. This is the rest of it, and it
+     is the part that was actually making the difference.
+
+     WHAT WAS WRONG. Every panel on every hub is rgba(255,255,255,.025)
+     with a 1px rgba(255,255,255,.06) border — a barely-there translucent
+     box floating on a gradient. Nothing has a ground, so nothing sits on
+     anything; there is no lit edge, no depth, and no colour belonging to
+     the thing inside it. Home does the opposite: a real dark ground, a
+     lit top edge, a hairline inside the radius, and the subject's own
+     artwork tinting the surface underneath its text.
+
+     Four things carried over:
+
+       A REAL SURFACE. Panels get an opaque ground and a lit top edge, so
+       they read as something the content sits on.
+
+       THE HAIRLINE. Inside the radius, so panels and cards stop meeting
+       the background flat.
+
+       AMBIENT COLOUR. Each hub throws its own accent behind the hero the
+       way the home deck throws the front card's artwork across its
+       section — faint, wide, masked so it has no findable edge.
+
+       POSTER ART. The Queue game picker was showing wide header images
+       in small tiles. It now shows the 2:3 library art, which is the
+       asset the resolver already prefers and the shape home uses.
+     ══════════════════════════════════════════════════════════════════ -->
+<style>
+/* ══ 1. Panels ═══════════════════════════════════════════════════ */
+.lobby-overlay .q-step-card,
+.lobby-overlay .q-card,
+/* The real panel classes on the other three hubs. gt-panel / sr-panel /
+   lb-panel do not exist -- selectors written to an assumed name style
+   nothing at all and look like they worked. */
+.lobby-overlay .gt-hero-stat,
+.lobby-overlay .sr-hero-stat,
+.lobby-overlay .lb-hero-stat,
+.lobby-overlay .gt-player-card,
+.lobby-overlay .lb-mecard,
+.lobby-overlay .lb-featured-card,
+.lobby-overlay .sr-pb-card{
+  position:relative;
+  background:linear-gradient(180deg, #14161d 0%, #0e1015 100%) !important;
+  border:1px solid rgba(255,255,255,.075) !important;
+  box-shadow:0 8px 26px rgba(0,0,0,.34) !important;
+  isolation:isolate;
+}
+/* Lit top edge — the thing that makes a panel a surface rather than a box */
+.lobby-overlay .q-step-card::after,
+.lobby-overlay .q-card::after{
+  content:''; position:absolute; top:0; left:18px; right:18px; height:1px;
+  background:linear-gradient(90deg, transparent,
+    color-mix(in srgb, var(--hub-accent) 42%, rgba(255,255,255,.16)) 22%,
+    color-mix(in srgb, var(--hub-accent) 42%, rgba(255,255,255,.16)) 78%, transparent);
+  pointer-events:none; z-index:2;
+}
+.lobby-overlay .q-card:hover{
+  border-color:color-mix(in srgb, var(--hub-accent) 42%, transparent) !important;
+  background:linear-gradient(180deg, #171a23 0%, #101219 100%) !important;
+}
+
+/* ══ 2. Step numbers ═════════════════════════════════════════════ */
+.lobby-overlay .q-step-num{
+  font-family:'Archivo', var(--font), sans-serif !important;
+  font-weight:900 !important; font-size:14px !important; letter-spacing:0 !important;
+  width:34px !important; height:34px !important;
+  background:color-mix(in srgb, var(--hub-accent) 16%, #0e1015) !important;
+  color:var(--hub-accent) !important;
+  border:1.5px solid color-mix(in srgb, var(--hub-accent) 55%, transparent) !important;
+  box-shadow:0 0 20px color-mix(in srgb, var(--hub-accent) 26%, transparent),
+             inset 0 1px 0 rgba(255,255,255,.1) !important;
+}
+
+/* ══ 3. Hero ambient ═════════════════════════════════════════════ */
+/* The same idea as the home deck's wash: colour thrown wide and faint
+   behind the header, masked so it never shows an edge. */
+.lobby-overlay .q-hero,
+.lobby-overlay .gt-hero,
+.lobby-overlay .sr-hero,
+.lobby-overlay .lb-hero,
+.lobby-overlay .discover-hero{
+  position:relative; isolation:isolate;
+}
+.lobby-overlay .q-hero::after,
+.lobby-overlay .gt-hero::after,
+.lobby-overlay .sr-hero::after,
+.lobby-overlay .discover-hero::after{
+  content:''; position:absolute; inset:-40px -30px -70px; z-index:-1;
+  pointer-events:none;
+  background:radial-gradient(70% 120% at 26% 8%,
+    color-mix(in srgb, var(--hub-accent) 30%, transparent) 0%,
+    transparent 68%);
+  filter:blur(46px);
+  -webkit-mask-image:linear-gradient(180deg, #000 0%, #000 42%, transparent 100%);
+  mask-image:linear-gradient(180deg, #000 0%, #000 42%, transparent 100%);
+}
+
+/* ══ 4. Queue game picker — posters, not wide tiles ══════════════ */
+.lobby-overlay .q-game-grid{
+  grid-template-columns:repeat(auto-fill, minmax(112px, 1fr)) !important;
+  gap:12px !important;
+  max-height:380px !important;
+}
+.lobby-overlay .q-game-tile{
+  position:relative !important;
+  aspect-ratio:2 / 3 !important;
+  height:auto !important;
+  border-radius:12px !important;
+  overflow:hidden !important;
+  background:#0c0e13 !important;
+  border:1px solid rgba(255,255,255,.08) !important;
+  cursor:pointer;
+  transition:transform .18s cubic-bezier(.22,1,.36,1),
+             border-color .18s ease, box-shadow .18s ease !important;
+}
+.lobby-overlay .q-game-tile img{
+  position:absolute; inset:0;
+  width:100% !important; height:100% !important;
+  object-fit:cover !important; display:block;
+  transition:transform .4s cubic-bezier(.22,1,.36,1);
+}
+.lobby-overlay .q-game-tile:hover{
+  transform:translateY(-4px) !important;
+  border-color:color-mix(in srgb, var(--hub-accent) 55%, transparent) !important;
+  box-shadow:0 16px 34px rgba(0,0,0,.55) !important;
+  z-index:2;
+}
+.lobby-overlay .q-game-tile:hover img{ transform:scale(1.06); }
+.lobby-overlay .q-game-tile-fb{
+  position:absolute; inset:0;
+  display:flex; align-items:center; justify-content:center;
+  font-family:'Bebas Neue', var(--font), sans-serif;
+  font-size:26px; letter-spacing:2px; color:rgba(255,255,255,.34);
+}
+.lobby-overlay .q-game-tile-shade{
+  position:absolute; inset:auto 0 0 0; height:62%;
+  background:linear-gradient(180deg, transparent, rgba(6,7,10,.94));
+  pointer-events:none;
+}
+.lobby-overlay .q-game-tile-name{
+  position:absolute; left:0; right:0; bottom:0;
+  padding:8px 9px 9px;
+  font-size:11px; font-weight:800; line-height:1.25;
+  color:#fff; text-shadow:0 1px 3px rgba(0,0,0,.9);
+  display:-webkit-box; -webkit-line-clamp:2; line-clamp:2;
+  -webkit-box-orient:vertical; overflow:hidden;
+}
+/* Selected: the accent does the work, not a colour wash over the art. */
+.lobby-overlay .q-game-tile.is-selected{
+  border-color:var(--hub-accent) !important;
+  box-shadow:0 0 0 1px var(--hub-accent),
+             0 0 26px color-mix(in srgb, var(--hub-accent) 45%, transparent) !important;
+}
+.lobby-overlay .q-game-tile.is-selected::after{
+  content:'✓';
+  position:absolute; top:7px; right:7px; z-index:3;
+  width:20px; height:20px; border-radius:50%;
+  display:flex; align-items:center; justify-content:center;
+  font-size:11px; font-weight:900; color:#fff;
+  background:var(--hub-accent);
+  box-shadow:0 2px 10px rgba(0,0,0,.5);
+}
+
+/* ══ 5. Skill tiles ══════════════════════════════════════════════ */
+.lobby-overlay .q-skill-tile{
+  background:linear-gradient(180deg, #14161d, #0e1015) !important;
+  border:1px solid rgba(255,255,255,.08) !important;
+  border-radius:12px !important;
+  transition:transform .16s cubic-bezier(.22,1,.36,1),
+             border-color .16s, box-shadow .16s !important;
+}
+.lobby-overlay .q-skill-tile:hover{
+  transform:translateY(-3px) !important;
+  border-color:color-mix(in srgb, var(--qst-color, #fff) 55%, transparent) !important;
+}
+.lobby-overlay .q-skill-tile.is-selected{
+  border-color:var(--qst-color, #fff) !important;
+  background:linear-gradient(180deg,
+    color-mix(in srgb, var(--qst-color, #fff) 18%, #14161d),
+    #0e1015) !important;
+  box-shadow:0 0 24px color-mix(in srgb, var(--qst-color, #fff) 30%, transparent) !important;
+}
+.lobby-overlay .q-skill-name{
+  font-family:'Archivo', var(--font), sans-serif !important;
+  font-weight:800 !important; letter-spacing:.4px !important;
+}
+
+/* ══ 6. Inputs ═══════════════════════════════════════════════════ */
+.lobby-overlay .q-input,
+.lobby-overlay .q-game-search input{
+  background:#0a0c11 !important;
+  border:1px solid rgba(255,255,255,.09) !important;
+  transition:border-color .15s, box-shadow .15s !important;
+}
+.lobby-overlay .q-input:focus,
+.lobby-overlay .q-game-search input:focus{
+  outline:none !important;
+  border-color:color-mix(in srgb, var(--hub-accent) 55%, transparent) !important;
+  box-shadow:0 0 0 3px color-mix(in srgb, var(--hub-accent) 14%, transparent) !important;
+}
+
+/* ══ 7. Primary actions ══════════════════════════════════════════ */
+.lobby-overlay .q-cta-primary,
+.lobby-overlay .gt-cta-primary{
+  font-family:'Archivo', var(--font), sans-serif !important;
+  font-weight:900 !important; letter-spacing:1px !important;
+  text-transform:uppercase !important;
+  padding:12px 24px !important;
+  transition:transform .16s cubic-bezier(.22,1,.36,1), box-shadow .2s !important;
+}
+.lobby-overlay .q-cta-primary:hover,
+.lobby-overlay .gt-cta-primary:hover{
+  transform:translateY(-2px) !important;
+}
+
+@media (prefers-reduced-motion: reduce){
+  .lobby-overlay .q-game-tile,
+  .lobby-overlay .q-skill-tile,
+  .lobby-overlay .q-cta-primary,
+  .lobby-overlay .gt-cta-primary{ transition:none !important; }
+  .lobby-overlay .q-game-tile:hover,
+  .lobby-overlay .q-skill-tile:hover,
+  .lobby-overlay .q-cta-primary:hover,
+  .lobby-overlay .gt-cta-primary:hover{ transform:none !important; }
+  .lobby-overlay .q-game-tile:hover img{ transform:none !important; }
 }
 </style>
 </body>
