@@ -55828,9 +55828,10 @@ body.lobby-selected #chatPanel .chat-header{ display:none !important; }
 
 #homeContent .home-section-title{
   font-family:'Bebas Neue', var(--font), sans-serif !important;
-  /* 20% down from 46px, and tracked wider to keep the same presence at
-     the smaller size — less height, more width. */
-  font-size:37px !important; font-weight:400 !important;
+  /* 46 -> 37 -> 30px, two 20% steps down. Tracking stays at 5.5px rather
+     than scaling with the size, so the words keep getting proportionally
+     wider as they get shorter. */
+  font-size:30px !important; font-weight:400 !important;
   letter-spacing:5.5px !important; line-height:.95 !important;
   color:#fff !important;
   /* Solid, not a gradient fill. The fade read as a shortcut for
