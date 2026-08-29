@@ -55093,22 +55093,44 @@ body.double-dock[data-feed-position="right"].feed-open:not(.rail-hidden) #settin
   content:''; position:absolute; inset:-20%;
   background-image:var(--rc-art, none);
   background-size:cover; background-position:center;
-  filter:blur(48px) saturate(2.2) brightness(.85);
-  opacity:var(--rc-art-o, .5);
+  /* Pushed harder than before: the scrim over it was so opaque that the
+     colour never actually arrived, which is why the cards read as flat
+     navy whatever game was showing. */
+  filter:blur(56px) saturate(2.6) brightness(1.05);
+  opacity:var(--rc-art-o, .85);
   z-index:0; pointer-events:none;
   transition:opacity .4s ease;
 }
-/* The detail column needs a floor under it or the tint eats the text. */
+/* The floor under the text is now a DIAGONAL wash rather than a flat
+   sheet: near the art it stays thin so the colour bleeds across the
+   join, and it thickens toward the bottom-right, which is where the
+   text actually sits. Colour where there is nothing to read, contrast
+   where there is. */
 #homeRecents .game-card-body{
-  background:linear-gradient(180deg, rgba(11,13,19,.86), rgba(11,13,19,.94)) !important;
+  background:
+    linear-gradient(112deg,
+      rgba(10,12,18,.28) 0%,
+      rgba(10,12,18,.72) 34%,
+      rgba(9,11,16,.90) 68%,
+      rgba(8,10,14,.95) 100%) !important;
+  box-shadow:inset 0 1px 0 rgba(255,255,255,.05);
+}
+/* A darker pool behind the two blocks of small text, so the wash can
+   stay light without costing legibility where it matters. */
+#homeRecents .game-card-body::before{
+  content:''; position:absolute; inset:0; pointer-events:none; z-index:-1;
+  background:radial-gradient(120% 80% at 100% 100%, rgba(6,8,12,.72), transparent 62%);
 }
 
 /* Art bleeds into the detail column rather than stopping at a hard
    seam — the join is the thing that made the split look pasted. */
+/* Softens the join only. It used to run all the way to solid #0b0d13,
+   which walled the colour off at the seam — the exact place the art and
+   the detail column are supposed to meet. */
 #homeRecents .game-card::after{
-  content:''; position:absolute; top:0; bottom:0; left:42%;
-  width:110px; pointer-events:none; z-index:1;
-  background:linear-gradient(90deg, rgba(11,13,19,0), rgba(11,13,19,.92) 70%, #0b0d13);
+  content:''; position:absolute; top:0; bottom:0; left:calc(42% - 70px);
+  width:140px; pointer-events:none; z-index:2;
+  background:linear-gradient(90deg, rgba(11,13,19,0), rgba(11,13,19,.42) 50%, rgba(11,13,19,0));
 }
 
 /* ── Detail column ──────────────────────────────────────────────── */
@@ -55126,6 +55148,10 @@ body.double-dock[data-feed-position="right"].feed-open:not(.rail-hidden) #settin
   letter-spacing:-.5px !important; line-height:1.12 !important;
   color:#fff !important; white-space:normal !important;
   display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical; overflow:hidden;
+  /* The wash is deliberately thin at the top-left, where the title
+     sits over the brightest part of the tint — a shadow keeps it
+     readable against light artwork without darkening the panel. */
+  text-shadow:0 2px 18px rgba(0,0,0,.75);
 }
 #homeRecents .game-card.rc-active .game-card-hours,
 #homeRecents .game-card.rc-active .game-card-hours-total{ display:none !important; }
