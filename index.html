@@ -61179,15 +61179,23 @@ async function reactComment(ev, id, btn){
       var g = gtGame(it.gameId);
       var live = String(it.status || '').toLowerCase() === 'in-progress'
               || String(it.status || '').toLowerCase() === 'live';
+      /* Most rows carry no game id, so _gtGame falls through to its
+         catch-all "Other Games" entry. That is a sentinel, not a fact
+         about this bracket, so it is not printed as one. */
+      var named = !!it.gameId && g.id !== 'other';
       return {
         key:String(it.id), rail:'tournaments', badge:live ? 'live' : 'tournament',
         badgeText:live ? 'Live now' : 'Tournament',
         name:it.name || 'Tournament',
-        desc:(g.name ? g.name + ' · ' : '') + 'Bracket on the global circuit. Entries are open while seats last.',
-        art:g.heroHi || g.header || g.cover || '',
-        glyph:g.initial || (it.name || '?').charAt(0).toUpperCase(),
-        genre:(g.name || '').toLowerCase(),
-        chips:[g.name, it.prize && it.prize !== '—' ? '💰 ' + it.prize : null].filter(Boolean),
+        desc:(named ? g.name + ' · ' : '')
+             + (live ? 'Running right now on the global circuit.'
+                     : 'Open on the global circuit — entries while seats last.'),
+        art:named ? (g.heroHi || g.header || g.cover || '') : '',
+        fallback:g.fallback || '',
+        glyph:named ? (g.initial || '•') : '🏆',
+        genre:named ? g.name.toLowerCase() : '',
+        chips:[named ? g.name : null,
+               it.prize && it.prize !== '—' ? '💰 ' + it.prize : null].filter(Boolean),
         stats:[
           { v:String(it.entrants || 0), l:'Entrants' },
           { v:it.prize && it.prize !== '—' ? String(it.prize) : '—', l:'Prize' },
@@ -61208,6 +61216,7 @@ async function reactComment(ev, id, btn){
         desc:(it.game || 'Any game') + (it.category ? ' · ' + it.category : '')
              + ' · ' + (rlive ? 'Running now.' : 'Scheduled — entries open.'),
         art:rg.heroHi || rg.header || rg.cover || '',
+        fallback:'linear-gradient(135deg,#3a1a08 0%,#12100e 100%)',
         glyph:'🏁',
         genre:String(it.game || '').toLowerCase(),
         chips:[it.category, it.prize].filter(Boolean),
@@ -61250,6 +61259,7 @@ async function reactComment(ev, id, btn){
         ? it.members.toLocaleString() + ' members and growing.'
         : 'A new community ready to grow — be one of the first in.'),
       art:it.cover || it.icon || '',
+      fallback:it.fallback || 'linear-gradient(135deg,#2a2d3a 0%,#15161e 100%)',
       glyph:it.initial || String(it.name || '?').charAt(0).toUpperCase(),
       genre:String(it.tag || '').toLowerCase(),
       chips:tags.slice(0, 3),
@@ -61355,7 +61365,12 @@ async function reactComment(ev, id, btn){
 
   /* ── Card markup ─────────────────────────────────────────────── */
   function cardHtml(c, slot){
-    var artStyle = c.art ? 'background-image:' + cssUrl(c.art) : '';
+    /* No artwork is not the same as no colour: every kind ships a
+       fallback gradient, which is what the art column shows instead of
+       going flat grey. */
+    var artStyle = c.art
+      ? 'background-image:' + cssUrl(c.art)
+      : (c.fallback ? 'background-image:' + c.fallback : '');
     var inner = c.avatar !== undefined
       ? '<div class="dcx-avatar"><div>' + (c.avatar
           ? '<img src="' + esc(c.avatar) + '" alt="" loading="lazy">'
