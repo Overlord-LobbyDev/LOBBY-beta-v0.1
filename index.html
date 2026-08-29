@@ -58054,5 +58054,115 @@ async function reactComment(ev, id, btn){
   else start();
 })();
 </script>
+
+<!-- ══════════════════════════════════════════════════════════════════
+     SECTION TITLES — depth
+
+     Flat white caps on a dark ground have nothing to them, however good
+     the face is. These are the titles on the front page, so they are
+     built in layers rather than given another shadow:
+
+       An outlined ghost of the same word behind, a little larger. It is
+       the layer that actually creates depth — something is genuinely
+       behind something else, rather than a shadow implying it. Drawn as
+       a hairline outline with no fill, so it reads as air around the
+       word instead of a smear.
+
+       A bevel: one pixel of light above each glyph, one of shadow
+       below. This is what makes type feel cut rather than printed, and
+       it costs no blur, so there is no dark rectangle behind the words.
+
+       An ambient glow in the accent colour, wide and faint. It ties the
+       title to the wash the front card is throwing across the section,
+       so the two move together instead of being separate ideas.
+
+     The ghost needs the title's own text in an attribute to duplicate
+     it, so the builder now stamps data-text alongside setting it.
+     ══════════════════════════════════════════════════════════════════ -->
+<style>
+#homeContent .home-section-title{
+  position:relative !important;
+  isolation:isolate;
+
+  /* Solid fill, deliberately. background-clip:text was the obvious way
+     to shade the letters, but the element background paints BEFORE
+     text-shadow, so the bevel below would land on top of the gradient
+     inside every glyph and read as dirt at 25px. The bevel does more for
+     depth than the shading would, so the shading is what gives way. */
+  color:#fff !important;
+  -webkit-text-fill-color:#fff !important;
+  background:none !important;
+
+  /* Cut, not printed: a pixel of light above, a pixel of shadow below,
+     then one soft lift. No wide blur, so there is no dark box. */
+  text-shadow:
+    0 -1px 0 rgba(255,255,255,.30),
+    0 1px 0 rgba(0,0,0,.55),
+    0 3px 7px rgba(0,0,0,.42),
+    0 0 42px color-mix(in srgb, var(--accent) 32%, transparent) !important;
+
+  padding-bottom:2px !important;   /* room for the descender-side bevel */
+}
+
+/* The layer behind. An outline rather than a fill, scaled just past the
+   real word, so it reads as depth around the letters. */
+#homeContent .home-section-title::before{
+  content:attr(data-text);
+  position:absolute; left:0; right:0; top:0;
+  z-index:-1; pointer-events:none;
+  color:transparent;
+  -webkit-text-fill-color:transparent;
+  background:none;
+  -webkit-text-stroke:1px rgba(255,255,255,.115);
+  transform:translateY(1px) scale(1.055);
+  transform-origin:center center;
+  text-shadow:none;
+}
+
+/* Nothing to duplicate before the builder has stamped it. */
+#homeContent .home-section-title:not([data-text])::before{ content:none; }
+
+@media (prefers-reduced-motion: reduce){
+  #homeContent .home-section-title::before{ transform:none; }
+}
+</style>
+<script>
+(function () {
+  'use strict';
+
+  /* The ghost is drawn with content:attr(data-text), so the word has to
+     exist as an attribute as well as as text. The builder sets the text
+     once and strips the leading emoji; this mirrors whatever it settles
+     on, and re-mirrors if it ever changes. */
+  function stamp(){
+    document.querySelectorAll('#homeContent .home-section-title').forEach(function (t) {
+      var txt = (t.textContent || '').trim();
+      if (txt && t.getAttribute('data-text') !== txt){
+        t.setAttribute('data-text', txt);
+      }
+    });
+  }
+
+  function start(){
+    var hc = document.getElementById('homeContent');
+    if (!hc) { setTimeout(start, 200); return; }
+    var queued = false;
+    function ping(){
+      if (queued) return;
+      queued = true;
+      requestAnimationFrame(function () { queued = false; stamp(); });
+    }
+    /* characterData too: the builder rewrites the text node to drop the
+       emoji, which is not a childList change. */
+    new MutationObserver(ping).observe(hc, {
+      childList: true, subtree: true, characterData: true
+    });
+    stamp();
+  }
+
+  if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', start);
+  else start();
+})();
+</script>
 </body>
 </html>
