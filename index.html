@@ -62792,5 +62792,1015 @@ async function reactComment(ev, id, btn){
 })();
 </script>
 
+
+<!-- ══════════════════════════════════════════════════════════════════
+     THE HUB ENGINE
+
+     Discover's structure is not really about lobbies. It is: a set of
+     named collections, one of them promoted to a deck, the rest as
+     shelves, each with the full list under it, all of it filtered by two
+     rows and reorderable by the person looking at it.
+
+     Tournaments and Speedrun are the same shape with different nouns, so
+     this is that structure with the nouns taken out. A page becomes a
+     config: which rails, where each one's data comes from, and how to
+     turn a row of it into a card. Everything else -- paging, the deck
+     geometry, the filter rows, drag-to-reorder, per-account order,
+     empty states, load-on-approach -- is here once.
+
+     WHY DISCOVER IS NOT ON IT YET. It works and it has been signed off.
+     Migrating it would risk a page that is finished to save a
+     duplication that is not costing anything today; the engine was
+     lifted from it, so the two agree, and Discover can move over once
+     this has proven itself on two more pages.
+
+     THE CSS IS SHARED, NOT COPIED. Every rail here emits the same
+     .dcx-* classes Discover does. The rules that were written against
+     #discoverOverlay are re-pointed at [data-hub] below, so the
+     typography, surfaces and card treatment are one definition used by
+     every hub -- and because each overlay already declares its own
+     --hub-accent, each one arrives in its own colour without a line of
+     per-page styling.
+     ══════════════════════════════════════════════════════════════════ -->
+<style>
+/* Everything Discover scoped to itself, generalised to any hub. The
+   #discoverOverlay copies stay put -- Discover is not on this engine
+   yet, and two identical definitions are better than a flag day. */
+.lobby-overlay[data-hub] .home-section-header{
+  display:flex !important; flex-direction:column !important;
+  align-items:center !important; justify-content:center !important;
+  gap:0 !important; position:relative;
+  margin:0 0 22px !important; padding:6px 0 !important;
+  text-align:center !important;
+  cursor:grab;
+}
+.lobby-overlay[data-hub] .home-section-header:active{ cursor:grabbing; }
+.lobby-overlay[data-hub] .home-section-header.dcx-dragging{ opacity:.38; }
+.lobby-overlay[data-hub] .home-section-header.dcx-over::after{
+  content:''; position:absolute; left:12%; right:12%; top:-9px; height:3px;
+  border-radius:99px; background:var(--hub-accent);
+  box-shadow:0 0 16px color-mix(in srgb, var(--hub-accent) 80%, transparent);
+}
+.lobby-overlay[data-hub] .home-section-title{
+  font-family:'Archivo', var(--font), sans-serif !important;
+  text-transform:uppercase !important;
+  font-size:25px !important; font-weight:900 !important;
+  letter-spacing:2.2px !important; line-height:1.06 !important;
+  color:#fff !important; -webkit-text-fill-color:#fff !important;
+  background:none !important;
+  position:relative !important; isolation:isolate;
+  padding-bottom:2px !important;
+  text-shadow:
+    0 -1px 0 rgba(255,255,255,.30),
+    0 1px 0 rgba(0,0,0,.55),
+    0 3px 7px rgba(0,0,0,.42),
+    0 0 42px color-mix(in srgb, var(--hub-accent) 34%, transparent) !important;
+}
+.lobby-overlay[data-hub] .home-section-title::before{
+  content:attr(data-text);
+  position:absolute; left:0; right:0; top:0;
+  z-index:-1; pointer-events:none;
+  color:transparent; -webkit-text-fill-color:transparent;
+  background:none; text-shadow:none;
+  -webkit-text-stroke:1px rgba(255,255,255,.075);
+  transform:translateY(1px) scale(1.018);
+  transform-origin:center center;
+}
+.lobby-overlay[data-hub] .home-section-title:not([data-text])::before{ content:none; }
+.lobby-overlay[data-hub] .home-section-sub{
+  font-size:12.5px !important; color:var(--text-3) !important;
+  margin-top:7px !important; letter-spacing:.2px;
+}
+.lobby-overlay[data-hub] .hs-idx,
+.lobby-overlay[data-hub] .hs-ico{ color:color-mix(in srgb, var(--hub-accent) 88%, white); }
+.lobby-overlay[data-hub] .hs-bar{
+  background:linear-gradient(90deg, transparent,
+    color-mix(in srgb, var(--hub-accent) 95%, white) 35%,
+    color-mix(in srgb, var(--hub-accent) 95%, white) 65%, transparent);
+}
+.lobby-overlay[data-hub] .hs-count .dot{
+  background:color-mix(in srgb, var(--hub-accent) 90%, white);
+  box-shadow:0 0 9px color-mix(in srgb, var(--hub-accent) 70%, transparent);
+}
+
+/* The stage and its own filter bar. */
+.hub-stage{
+  display:flex; flex-direction:column; gap:8px;
+  max-width:1820px; margin:0 auto;
+}
+.hub-filters{
+  display:flex; flex-direction:column; align-items:stretch; gap:12px;
+  max-width:1820px; margin:0 auto 6px;
+  padding:0 2px;
+}
+
+/* The wash, per hub. */
+.lobby-overlay[data-hub] .dcx-wash{
+  position:absolute; top:0; left:0; right:0; height:780px;
+  z-index:0; pointer-events:none;
+  background-image:var(--dcx-art, none);
+  background-size:cover; background-position:center 22%;
+  filter:blur(90px) saturate(1.7) brightness(.85);
+  opacity:0; transition:opacity .55s ease;
+  -webkit-mask-image:linear-gradient(180deg,#000 0%,rgba(0,0,0,.72) 38%,rgba(0,0,0,.28) 66%,transparent 96%);
+          mask-image:linear-gradient(180deg,#000 0%,rgba(0,0,0,.72) 38%,rgba(0,0,0,.28) 66%,transparent 96%);
+}
+.lobby-overlay[data-hub] .dcx-wash.on{ opacity:.42; }
+</style>
+<script>
+(function () {
+  'use strict';
+
+  /* ── Helpers ─────────────────────────────────────────────────── */
+  function esc(v){
+    return String(v == null ? '' : v)
+      .replace(/&/g,'&amp;').replace(/</g,'&lt;')
+      .replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+  }
+  function jsStr(v){ return JSON.stringify(String(v == null ? '' : v)).replace(/"/g,'&quot;'); }
+  /* SINGLE quotes: this goes into style="...", where a double quote ends
+     the attribute and silently kills the rule. */
+  function cssUrl(u){
+    return u ? "url('" + String(u).replace(/\\/g,'%5C').replace(/'/g,'%27') + "')" : '';
+  }
+  function api(path, opts){
+    if (typeof window.api !== 'function') return Promise.reject(new Error('no api'));
+    return window.api(path, opts);
+  }
+
+  var PAGE = 50;
+  var STEP = 300, STEP2 = 520;
+  var INSTANCES = {};
+
+  /* ── One hub ─────────────────────────────────────────────────── */
+  function Hub(cfg){
+    this.cfg      = cfg;
+    this.order    = Object.keys(cfg.rails);
+    this.defaults = this.order.slice();
+    this.kind     = 'all';
+    this.genre    = 'all';
+    this.liveOnly = false;
+    this.sortBy   = 'rec';
+    this.search   = '';
+    this.deckIdx  = {};
+    this.store    = {};
+    this.io       = null;
+    this.dragWired = false;
+
+    var self = this;
+    this.defaults.forEach(function (id){
+      self.store[id] = { items:[], offset:0, done:false, loading:false };
+    });
+    this.loadLocalOrder();
+  }
+
+  Hub.prototype.rail = function (id){ return this.cfg.rails[id]; };
+  Hub.prototype.stage = function (){ return document.querySelector(this.cfg.stageSel); };
+  Hub.prototype.filterHost = function (){ return document.querySelector(this.cfg.filterSel); };
+  Hub.prototype.overlay = function (){ return document.getElementById(this.cfg.overlayId); };
+
+  /* ── Order, remembered per account ───────────────────────────── */
+  Hub.prototype.lsKey   = function (){ return 'lobby_hub_order_' + this.cfg.key + '_v1'; };
+  Hub.prototype.prefKey = function (){ return this.cfg.prefKey; };
+
+  Hub.prototype.sane = function (arr){
+    if (!Array.isArray(arr)) return null;
+    var d = this.defaults;
+    var keep = arr.filter(function (x){ return d.indexOf(x) !== -1; });
+    /* A rail added in a later version must not vanish because a saved
+       order predates it. */
+    d.forEach(function (x){ if (keep.indexOf(x) === -1) keep.push(x); });
+    return keep.length ? keep : null;
+  };
+  Hub.prototype.loadLocalOrder = function (){
+    try {
+      var o = this.sane(JSON.parse(localStorage.getItem(this.lsKey()) || 'null'));
+      if (o) this.order = o;
+    } catch (e){}
+  };
+  Hub.prototype.saveOrder = function (){
+    try { localStorage.setItem(this.lsKey(), JSON.stringify(this.order)); } catch (e){}
+    if (!this.prefKey()) return;
+    api('/me/prefs/' + this.prefKey(), {
+      method:'POST',
+      headers:{ 'Content-Type':'application/json' },
+      body:JSON.stringify(this.order),
+    }).catch(function(){});
+  };
+  Hub.prototype.loadRemoteOrder = function (){
+    var self = this;
+    if (!this.prefKey()) return Promise.resolve(false);
+    return api('/me/prefs/' + this.prefKey()).then(function (r){
+      var remote = self.sane(r);
+      if (!remote) return false;
+      if (remote.join(',') === self.order.join(',')) return false;
+      self.order = remote;
+      try { localStorage.setItem(self.lsKey(), JSON.stringify(remote)); } catch (e){}
+      return true;
+    }).catch(function (){ return false; });
+  };
+
+  /* ── Data ────────────────────────────────────────────────────── */
+  Hub.prototype.loadPage = function (railId){
+    var st = this.store[railId], rail = this.rail(railId), self = this;
+    if (!st || !rail || st.loading || st.done) return Promise.resolve(false);
+    st.loading = true;
+    return Promise.resolve()
+      .then(function (){ return rail.load(st.offset, PAGE); })
+      .then(function (rows){
+        if (!Array.isArray(rows)){ st.done = true; return false; }
+        var have = {}, grew = false;
+        st.items.forEach(function (x){ have[String(x.key)] = 1; });
+        rows.forEach(function (raw){
+          var c = null;
+          try { c = rail.map(raw); } catch (e){ c = null; }
+          if (!c || have[String(c.key)]) return;
+          have[String(c.key)] = 1;
+          st.items.push(c);
+          grew = true;
+        });
+        st.offset += rows.length;
+        /* A short page is the end. Nothing here returns a total, so it
+           is the only signal available, and one wasted request after an
+           exactly-full final page beats truncating a rail. */
+        if (rail.single || rows.length < PAGE) st.done = true;
+        return grew;
+      })
+      .catch(function (){ st.done = true; return false; })
+      .then(function (grew){ st.loading = false; return grew; });
+  };
+
+  Hub.prototype.loadAll = function (){
+    var self = this;
+    this.defaults.forEach(function (id){
+      self.loadPage(id).then(function (grew){ if (grew) self.render(); });
+    });
+  };
+
+  /* ── Filtering ───────────────────────────────────────────────── */
+  Hub.prototype.matches = function (c){
+    var q = this.search.toLowerCase().trim();
+    if (q){
+      var hay = (c.name + ' ' + (c.desc||'') + ' ' + (c.chips||[]).join(' ') + ' ' + (c.genre||'')).toLowerCase();
+      if (hay.indexOf(q) === -1) return false;
+    }
+    if (this.liveOnly && !c.live) return false;
+    if (this.genre !== 'all'){
+      var g = ((c.genre||'') + ' ' + (c.chips||[]).join(' ')).toLowerCase();
+      if (g.indexOf(this.genre) === -1) return false;
+    }
+    return true;
+  };
+
+  Hub.prototype.sort = function (list){
+    var by = this.sortBy, copy = list.slice();
+    if (by === 'busy'){
+      copy.sort(function (a,b){ return (b.weight - a.weight) || (b.live - a.live); });
+    } else if (by === 'az'){
+      copy.sort(function (a,b){ return a.name.localeCompare(b.name); });
+    } else {
+      copy.sort(function (a,b){
+        if (a.live !== b.live) return b.live - a.live;
+        return b.weight - a.weight;
+      });
+    }
+    return copy;
+  };
+
+  Hub.prototype.groups = function (){
+    var self = this, out = {}, totals = { all:0 };
+    var q = this.search.toLowerCase().trim();
+    this.defaults.forEach(function (id){
+      var items = self.store[id].items;
+      out[id] = self.sort(items.filter(function (c){ return self.matches(c); }));
+      var n = 0;
+      items.forEach(function (c){
+        if (q){
+          var hay = (c.name + ' ' + (c.desc||'') + ' ' + (c.chips||[]).join(' ')).toLowerCase();
+          if (hay.indexOf(q) === -1) return;
+        }
+        n++;
+      });
+      totals[id] = n; totals.all += n;
+    });
+    return { groups:out, totals:totals };
+  };
+
+  /* Ranked by how many things carry the tag, capped at six, keeping the
+     casing whoever wrote it used. */
+  Hub.prototype.genres = function (){
+    var self = this, count = {}, label = {};
+    this.defaults.forEach(function (id){
+      if (self.kind !== 'all' && id !== self.kind) return;
+      self.store[id].items.forEach(function (c){
+        var here = {};
+        (c.chips||[]).concat([c.genre]).forEach(function (raw){
+          var text = String(raw || '').trim(), g = text.toLowerCase();
+          if (!g || g.length > 18) return;
+          if (/[\uD800-\uDFFF]/.test(text)) return;    /* emoji-led chips */
+          if (here[g]) return;
+          here[g] = 1;
+          count[g] = (count[g] || 0) + 1;
+          if (!label[g]) label[g] = text;
+        });
+      });
+    });
+    return Object.keys(count)
+      .sort(function (a,b){ return (count[b]-count[a]) || a.localeCompare(b); })
+      .slice(0, 6)
+      .map(function (g){ return { key:g, label:label[g] || g }; });
+  };
+
+  /* ── Markup ──────────────────────────────────────────────────── */
+  Hub.prototype.cardHtml = function (c, slot){
+    var artStyle = c.art
+      ? 'background-image:' + cssUrl(c.art)
+      : (c.fallback ? 'background-image:' + c.fallback : '');
+
+    var inner = (c.avatar !== undefined)
+      ? '<div class="dcx-avatar"><div>' + (c.avatar
+          ? '<img src="' + esc(c.avatar) + '" alt="" loading="lazy">'
+          : esc(c.glyph)) + '</div></div>'
+      : (c.art ? '' : '<div class="dcx-art-glyph">' + esc(c.glyph) + '</div>');
+
+    var stats = (c.stats && c.stats.length)
+      ? '<div class="dcx-stats">' + c.stats.map(function (s){
+          return '<div class="dcx-stat"><b>' + esc(s.v) + '</b><span>' + esc(s.l) + '</span></div>';
+        }).join('') + '</div>'
+      : '';
+
+    var chips = (c.chips && c.chips.length)
+      ? '<div class="dcx-chips">' + c.chips.map(function (t){
+          return '<span class="dcx-chip">' + esc(t) + '</span>';
+        }).join('') + '</div>'
+      : '';
+
+    var who = '';
+    var faces = (c.faces || []).filter(function (f){ return f && (f.avatar || f.name); });
+    if (slot === 'hero' && faces.length){
+      var shown = faces.slice(0, 5);
+      var more = Math.max(0, (c.faceTotal || faces.length) - shown.length);
+      who = '<div class="dcx-who">' +
+        '<div class="dcx-who-l">' + esc(c.faceLabel || "Who's in") + '</div>' +
+        '<div class="dcx-faces">' + shown.map(function (f){
+          var t = esc(f.name || '');
+          return f.avatar
+            ? '<span class="dcx-face" title="' + t + '"><img src="' + esc(f.avatar) + '" alt="" loading="lazy"></span>'
+            : '<span class="dcx-face" title="' + t + '">' +
+                esc(String(f.name || '?').trim().charAt(0).toUpperCase()) + '</span>';
+        }).join('') +
+        (more > 0 ? '<span class="dcx-face dcx-face-more">+' + more + '</span>' : '') +
+        '</div></div>';
+    }
+
+    /* On a tile the whole card acts. In the deck only the button does,
+       which is what stops a click meant to bring a card forward from
+       also firing its action. */
+    var click = (slot === 'rail') ? ' onclick="' + c.cta.js + '"' : '';
+
+    return '<div class="dcx-card" data-key="' + esc(c.key) + '"' +
+      ' data-genre="' + esc(c.genre || '') + '"' +
+      ' style="--dcx-card-art:' + (c.art ? cssUrl(c.art) : (c.fallback || 'none')) + '"' + click + '>' +
+      '<div class="dcx-art" style="' + artStyle + '">' + inner +
+        '<span class="dcx-badge ' + esc(c.badge) + '">' + esc(c.badgeText) + '</span>' +
+      '</div>' +
+      '<div class="dcx-info">' +
+        '<div class="dcx-name">' + esc(c.name) + '</div>' +
+        '<div class="dcx-desc">' + esc(c.desc || '') + '</div>' +
+        stats + chips + who +
+        '<div class="dcx-foot">' +
+          '<button class="dcx-cta" onclick="event.stopPropagation();' + c.cta.js + '">' +
+            esc(c.cta.label) +
+            '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" ' +
+            'stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round">' +
+            '<polyline points="9 18 15 12 9 6"/></svg>' +
+          '</button>' +
+        '</div>' +
+      '</div>' +
+    '</div>';
+  };
+
+  Hub.prototype.emptyHtml = function (railId){
+    var rail = this.rail(railId);
+    var filtered = !!(this.search || this.liveOnly || this.genre !== 'all');
+    var e = rail.empty || {};
+    var title = filtered ? 'Nothing matches' : (e.title || 'Nothing here yet');
+    var sub = filtered
+      ? 'No ' + rail.word + ' match the filters you have set. Clear them to see everything here.'
+      : (e.sub || '');
+    var cta = filtered
+      ? '<button class="dcx-cta ghost" onclick="window.HUB(' + jsStr(this.cfg.key) + ').clear()">Clear filters</button>'
+      : (e.cta ? '<button class="dcx-cta" onclick="' + e.cta.js + '">' + esc(e.cta.label) + '</button>' : '');
+    return '<div class="dcx-empty">' +
+      '<div class="dcx-empty-ico">' + (filtered ? '🔍' : (e.ico || '—')) + '</div>' +
+      '<div class="dcx-empty-title">' + esc(title) + '</div>' +
+      '<div class="dcx-empty-sub">' + esc(sub) + '</div>' + cta +
+    '</div>';
+  };
+
+  Hub.prototype.railHtml = function (railId, cards, slot, index){
+    var rail = this.rail(railId), n = cards.length, K = jsStr(this.cfg.key), R = jsStr(railId);
+    var self = this;
+
+    var tools = '<div class="dcx-railtools">' +
+      (index === 0 || this.kind !== 'all' ? '' :
+        '<button class="dcx-tool" onclick="window.HUB(' + K + ').feature(' + R + ')" ' +
+          'title="Move this to the top and give it the big deck">' +
+          '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" ' +
+          'stroke-linecap="round" stroke-linejoin="round"><path d="M12 19V5"/><path d="m5 12 7-7 7 7"/></svg>' +
+          'Feature</button>') +
+      (this.kind === 'all'
+        ? '<span class="dcx-grip" title="Drag to reorder">' +
+            '<svg width="13" height="13" viewBox="0 0 24 24" fill="currentColor">' +
+            '<circle cx="9" cy="6" r="1.6"/><circle cx="15" cy="6" r="1.6"/>' +
+            '<circle cx="9" cy="12" r="1.6"/><circle cx="15" cy="12" r="1.6"/>' +
+            '<circle cx="9" cy="18" r="1.6"/><circle cx="15" cy="18" r="1.6"/></svg></span>'
+        : '') + '</div>';
+
+    var kicker = '<div class="hs-kicker">' +
+      '<span class="hs-idx">' + ('0' + (index + 1)).slice(-2) + '</span>' +
+      '<span class="sep">/</span>' +
+      '<span class="hs-ico">' + rail.ico + '</span>' +
+      '<span>' + esc(rail.label) + '</span>' +
+      (n ? '<span class="sep2">·</span><span class="hs-count"><span class="dot"></span><b>' +
+           n + '</b> ' + esc(rail.word) + '</span>' : '') +
+    '</div>';
+
+    var head = '<div class="home-section-header" draggable="' + (this.kind === 'all' ? 'true' : 'false') + '">' +
+      '<div class="hs-main">' +
+        '<div class="home-section-title" data-text="' + esc(rail.title) + '">' + esc(rail.title) + '</div>' +
+        '<span class="hs-bar"></span>' + kicker +
+        '<div class="home-section-sub">' + esc(rail.sub) + '</div>' +
+      '</div>' + tools + '</div>';
+
+    var body;
+    if (!n){
+      body = '<div class="dcx-body">' + this.emptyHtml(railId) + '</div>';
+    } else if (slot === 'hero'){
+      body = '<div class="dcx-body">' +
+        (n > 1 ? '<button class="dcx-arrow prev" onclick="window.HUB(' + K + ').step(' + R + ',-1)" aria-label="Previous">←</button>' : '') +
+        '<div class="dcx-track">' + cards.map(function (c){ return self.cardHtml(c, 'hero'); }).join('') + '</div>' +
+        (n > 1 ? '<button class="dcx-arrow next" onclick="window.HUB(' + K + ').step(' + R + ',1)" aria-label="Next">→</button>' : '') +
+      '</div>' +
+      (n > 1 ? '<div class="dcx-dots">' + cards.map(function (_, i){
+        return '<span class="dcx-dot" onclick="window.HUB(' + K + ').goto(' + R + ',' + i + ')"></span>';
+      }).join('') + '</div>' : '');
+    } else {
+      body = '<div class="dcx-body">' +
+        '<button class="dcx-sarrow prev" onclick="window.HUB(' + K + ').scroll(' + R + ',-1)" aria-label="Scroll left">‹</button>' +
+        '<div class="dcx-track">' + cards.map(function (c){ return self.cardHtml(c, 'rail'); }).join('') + '</div>' +
+        '<button class="dcx-sarrow next" onclick="window.HUB(' + K + ').scroll(' + R + ',1)" aria-label="Scroll right">›</button>' +
+      '</div>';
+    }
+
+    var st = this.store[railId] || {};
+    var all = n > (slot === 'hero' ? 1 : 4)
+      ? '<div class="dcx-all">' +
+          '<div class="dcx-all-head">' +
+            '<span class="dcx-all-title">All ' + esc(rail.word) + '</span>' +
+            '<span class="dcx-all-n">' + n + (st.done ? '' : '+') + '</span>' +
+          '</div>' +
+          '<div class="dcx-all-grid">' + cards.map(function (c){ return self.cardHtml(c, 'rail'); }).join('') + '</div>' +
+          (st.done ? '' :
+            '<div class="dcx-sentinel" data-dcx-sentinel="' + railId + '">' +
+              '<span class="dcx-spin"></span>Loading more ' + esc(rail.word) + '</div>') +
+        '</div>'
+      : '';
+
+    return '<section class="dcx-rail" data-dcx-rail="' + railId + '" data-dcx-slot="' + slot + '">' +
+      head + body + all + '</section>';
+  };
+
+  Hub.prototype.filtersHtml = function (totals){
+    var self = this, K = jsStr(this.cfg.key);
+    var defs = [{ id:'all', label:'All', ico:this.cfg.allIco || '' }].concat(
+      this.defaults.map(function (id){
+        return { id:id, label:self.rail(id).title, ico:self.rail(id).ico };
+      }));
+
+    var kinds = '<div class="dcx-kinds">' + defs.map(function (d){
+      var n = totals[d.id] || 0;
+      var off = d.id !== 'all' && n === 0;
+      return '<button class="dcx-kind' + (self.kind === d.id ? ' on' : '') + '"' +
+        (off ? ' disabled' : '') +
+        ' onclick="window.HUB(' + K + ').setKind(' + jsStr(d.id) + ')">' +
+        '<span class="dcx-kind-ico">' + d.ico + '</span>' + esc(d.label) +
+        '<span class="dcx-kind-n">' + n + '</span></button>';
+    }).join('') + '</div>';
+
+    var gs = this.genres();
+    var out = '<div class="dcx-refine">';
+    if (gs.length){
+      out += '<span class="dcx-refine-label">' + esc(this.cfg.genreLabel || 'Genre') + '</span>';
+      out += '<button class="dcx-pill' + (this.genre === 'all' ? ' on' : '') +
+             '" onclick="window.HUB(' + K + ').setGenre(' + jsStr('all') + ')">Any</button>';
+      out += gs.map(function (g){
+        return '<button class="dcx-pill' + (self.genre === g.key ? ' on' : '') +
+               '" onclick="window.HUB(' + K + ').setGenre(' + jsStr(g.key) + ')">' + esc(g.label) + '</button>';
+      }).join('');
+      out += '<span class="dcx-sep"></span>';
+    }
+    out += '<button class="dcx-pill' + (this.liveOnly ? ' on' : '') +
+           '" onclick="window.HUB(' + K + ').toggleLive()"><span class="dcx-livedot"></span>Live now</button>';
+    out += '<span class="dcx-sep"></span><span class="dcx-refine-label">Sort</span>';
+    [['rec','Recommended'],['busy','Most active'],['az','A–Z']].forEach(function (s){
+      out += '<button class="dcx-pill' + (self.sortBy === s[0] ? ' on' : '') +
+             '" onclick="window.HUB(' + K + ').setSort(' + jsStr(s[0]) + ')">' + s[1] + '</button>';
+    });
+    out += '</div>';
+    return kinds + out;
+  };
+
+  /* ── Render ──────────────────────────────────────────────────── */
+  Hub.prototype.render = function (){
+    var stage = this.stage();
+    if (!stage) return;
+    var g = this.groups(), self = this;
+
+    var fh = this.filterHost();
+    if (fh) fh.innerHTML = this.filtersHtml(g.totals);
+
+    var shown = this.kind === 'all' ? this.order.slice() : [this.kind];
+    stage.innerHTML = shown.map(function (id, i){
+      return self.railHtml(id, g.groups[id] || [], i === 0 ? 'hero' : 'rail', i);
+    }).join('');
+
+    this.setTitle();
+    if (shown.length) this.applyDeck(shown[0]);
+    this.syncArrows();
+    this.watchSentinels();
+    this.wireDrag();
+    this.wash();
+  };
+
+  Hub.prototype.setTitle = function (){
+    if (!this.cfg.titleSel) return;
+    var t = document.querySelector(this.cfg.titleSel);
+    if (!t) return;
+    var word = (this.kind === 'all')
+      ? (this.cfg.titleAll || 'EVERYTHING')
+      : this.rail(this.kind).title.toUpperCase();
+    if (t.getAttribute('data-word') === word) return;
+    t.setAttribute('data-word', word);
+    t.setAttribute('data-text', this.cfg.titleLead + ' ' + word);
+    t.innerHTML = esc(this.cfg.titleLead) + ' <span class="' +
+      esc(this.cfg.titleAccentClass || 'gt-hero-accent') + '">' + esc(word) + '</span>';
+  };
+
+  /* ── The deck ────────────────────────────────────────────────── */
+  Hub.prototype.deckCards = function (railId){
+    var stage = this.stage();
+    if (!stage) return [];
+    var sec = stage.querySelector('.dcx-rail[data-dcx-rail="' + railId + '"][data-dcx-slot="hero"]');
+    if (!sec) return [];
+    var body = sec.querySelector(':scope > .dcx-body');
+    return body ? Array.prototype.slice.call(body.querySelectorAll('.dcx-card')) : [];
+  };
+
+  Hub.prototype.applyDeck = function (railId){
+    var cards = this.deckCards(railId), n = cards.length, self = this;
+    if (!n) return;
+    var idx = ((this.deckIdx[railId] || 0) % n + n) % n;
+    this.deckIdx[railId] = idx;
+
+    cards.forEach(function (c, i){
+      var off = i - idx;
+      if (off >  n/2) off -= n;
+      if (off < -n/2) off += n;
+      var a = Math.abs(off), s = c.style;
+      c.classList.toggle('on', off === 0);
+      if (a === 0){
+        s.setProperty('--rc-x','0px'); s.setProperty('--rc-s','1');
+        s.setProperty('--rc-o','1');   s.setProperty('--rc-sat','1');
+        s.setProperty('--rc-b','1');   s.zIndex = 30;
+      } else if (a === 1){
+        /* Depth is dimming and desaturation, never opacity: a
+           see-through card lets the one behind read straight through it
+           and the stack looks like it is melting together. */
+        s.setProperty('--rc-x',(off*STEP)+'px'); s.setProperty('--rc-s','.8');
+        s.setProperty('--rc-o','1');   s.setProperty('--rc-sat','.72');
+        s.setProperty('--rc-b','.66'); s.zIndex = 20;
+      } else if (a === 2){
+        s.setProperty('--rc-x',(off/a*STEP2)+'px'); s.setProperty('--rc-s','.66');
+        s.setProperty('--rc-o','1');   s.setProperty('--rc-sat','.54');
+        s.setProperty('--rc-b','.48'); s.zIndex = 10;
+      } else {
+        s.setProperty('--rc-x',(off>0 ? STEP2+200 : -(STEP2+200))+'px');
+        s.setProperty('--rc-s','.6');  s.setProperty('--rc-o','0');
+        s.zIndex = 1;
+      }
+      c.onclick = (off === 0) ? null : function (ev){
+        if (ev.target.closest('.dcx-cta')) return;
+        self.deckIdx[railId] = i;
+        self.applyDeck(railId);
+        self.wash();
+      };
+    });
+
+    var stage = this.stage();
+    var sec = stage && stage.querySelector('.dcx-rail[data-dcx-rail="' + railId + '"]');
+    if (sec){
+      var dots = sec.querySelectorAll('.dcx-dot');
+      for (var d = 0; d < dots.length; d++) dots[d].classList.toggle('on', d === idx);
+    }
+  };
+
+  Hub.prototype.step = function (railId, dir){
+    var n = this.deckCards(railId).length;
+    if (!n) return;
+    this.deckIdx[railId] = ((this.deckIdx[railId] || 0) + dir + n) % n;
+    this.applyDeck(railId); this.wash();
+  };
+  Hub.prototype.goto = function (railId, i){
+    this.deckIdx[railId] = i; this.applyDeck(railId); this.wash();
+  };
+  Hub.prototype.scroll = function (railId, dir){
+    var stage = this.stage();
+    var sec = stage && stage.querySelector('.dcx-rail[data-dcx-rail="' + railId + '"]');
+    var track = sec && sec.querySelector('.dcx-body > .dcx-track');
+    if (!track) return;
+    track.scrollBy({ left: dir * Math.max(280, track.clientWidth * 0.8), behavior:'smooth' });
+  };
+
+  /* Arrows on a shelf that does not overflow are furniture. */
+  Hub.prototype.syncArrows = function (){
+    var stage = this.stage();
+    if (!stage) return;
+    stage.querySelectorAll('.dcx-rail[data-dcx-slot="rail"]').forEach(function (sec){
+      var track = sec.querySelector('.dcx-body > .dcx-track');
+      var arrows = sec.querySelectorAll('.dcx-sarrow');
+      var over = track && track.scrollWidth > track.clientWidth + 8;
+      for (var i = 0; i < arrows.length; i++) arrows[i].style.display = over ? '' : 'none';
+    });
+  };
+
+  /* ── The wash ────────────────────────────────────────────────── */
+  Hub.prototype.washEl = function (){
+    var ov = this.overlay();
+    if (!ov) return null;
+    var el = ov.querySelector(':scope > .dcx-wash');
+    if (!el){
+      el = document.createElement('div');
+      el.className = 'dcx-wash';
+      ov.insertBefore(el, ov.firstChild);
+    }
+    return el;
+  };
+  Hub.prototype.wash = function (){
+    var el = this.washEl();
+    if (!el) return;
+    var stage = this.stage();
+    var focused = stage && stage.querySelector('.dcx-rail[data-dcx-slot="hero"] .dcx-card.on');
+    var art = focused && focused.style.getPropertyValue('--dcx-card-art');
+    if (art && art !== 'none'){ el.style.setProperty('--dcx-art', art); el.classList.add('on'); }
+    else el.classList.remove('on');
+  };
+
+  /* ── Load more on approach ───────────────────────────────────── */
+  Hub.prototype.watchSentinels = function (){
+    if (!('IntersectionObserver' in window)) return;
+    var self = this, stage = this.stage();
+    if (!stage) return;
+    if (!this.io){
+      var root = this.cfg.scrollSel ? document.querySelector(this.cfg.scrollSel) : null;
+      this.io = new IntersectionObserver(function (entries){
+        entries.forEach(function (en){
+          if (!en.isIntersecting) return;
+          var id = en.target.getAttribute('data-dcx-sentinel');
+          var st = id && self.store[id];
+          if (!st || st.loading || st.done) return;
+          self.loadPage(id).then(function (){ self.render(); });
+        });
+      }, { root:root || null, rootMargin:'600px 0px' });
+    }
+    /* render() rebuilds the stage, so the previous pass's sentinels are
+       detached. Dropping them keeps the list the length of the page. */
+    this.io.disconnect();
+    stage.querySelectorAll('[data-dcx-sentinel]').forEach(function (el){ self.io.observe(el); });
+  };
+
+  /* ── Reorder ─────────────────────────────────────────────────── */
+  Hub.prototype.feature = function (railId){
+    this.order = [railId].concat(this.order.filter(function (x){ return x !== railId; }));
+    this.saveOrder(); this.render();
+    var stage = this.stage();
+    if (stage) stage.scrollIntoView({ behavior:'smooth', block:'start' });
+  };
+
+  Hub.prototype.wireDrag = function (){
+    var stage = this.stage(), self = this;
+    if (!stage || stage.__hubDrag) return;
+    stage.__hubDrag = true;
+    var dragging = null, over = null;
+
+    stage.addEventListener('dragstart', function (e){
+      var head = e.target.closest && e.target.closest('.home-section-header');
+      if (!head || self.kind !== 'all') return;
+      dragging = head.closest('.dcx-rail');
+      if (!dragging) return;
+      head.classList.add('dcx-dragging');
+      e.dataTransfer.effectAllowed = 'move';
+      try { e.dataTransfer.setDragImage(new Image(), 0, 0); } catch (err){}
+    });
+
+    stage.addEventListener('dragover', function (e){
+      if (!dragging) return;
+      e.preventDefault();
+      var head = e.target.closest && e.target.closest('.home-section-header');
+      var target = head && head.closest('.dcx-rail');
+      if (!target || target === dragging) return;
+      if (over && over !== head) over.classList.remove('dcx-over');
+      over = head; head.classList.add('dcx-over');
+      var r = target.getBoundingClientRect();
+      if (e.clientY < r.top + r.height/2) stage.insertBefore(dragging, target);
+      else stage.insertBefore(dragging, target.nextSibling);
+    });
+
+    stage.addEventListener('dragend', function (){
+      if (over){ over.classList.remove('dcx-over'); over = null; }
+      var head = dragging && dragging.querySelector('.home-section-header');
+      if (head) head.classList.remove('dcx-dragging');
+      dragging = null;
+      /* Read the order back out of the DOM: that is what was just
+         arranged, rather than indices tracked through the drag. */
+      var next = Array.prototype.map.call(
+        stage.querySelectorAll('.dcx-rail'),
+        function (s){ return s.getAttribute('data-dcx-rail'); }).filter(Boolean);
+      if (next.length){ self.order = self.sane(next) || self.order; self.saveOrder(); }
+      self.render();
+    });
+  };
+
+  /* ── Filter handlers ─────────────────────────────────────────── */
+  Hub.prototype.setKind = function (k){
+    this.kind = k;
+    var keys = this.genres().map(function (g){ return g.key; });
+    if (this.genre !== 'all' && keys.indexOf(this.genre) === -1) this.genre = 'all';
+    this.render();
+  };
+  Hub.prototype.setGenre  = function (g){ this.genre = g; this.render(); };
+  Hub.prototype.toggleLive= function (){ this.liveOnly = !this.liveOnly; this.render(); };
+  Hub.prototype.setSort   = function (s){ this.sortBy = s; this.render(); };
+  Hub.prototype.setSearch = function (q){ this.search = String(q || ''); this.render(); };
+  Hub.prototype.clear = function (){
+    this.genre = 'all'; this.liveOnly = false; this.search = '';
+    if (this.cfg.searchSel){
+      var box = document.querySelector(this.cfg.searchSel);
+      if (box) box.value = '';
+    }
+    this.render();
+  };
+
+  /* Called when the page opens. */
+  Hub.prototype.open = function (){
+    var self = this;
+    this.washEl();
+    this.render();
+    this.loadAll();
+    this.loadRemoteOrder().then(function (changed){ if (changed) self.render(); });
+  };
+
+  /* ── Registry ────────────────────────────────────────────────── */
+  window.LobbyHub = {
+    create: function (cfg){
+      var h = new Hub(cfg);
+      INSTANCES[cfg.key] = h;
+      var ov = document.getElementById(cfg.overlayId);
+      if (ov) ov.setAttribute('data-hub', cfg.key);
+      return h;
+    },
+    get: function (key){ return INSTANCES[key]; },
+  };
+  /* Short name because it appears in every inline handler the engine
+     writes, and those are the bulk of the markup. */
+  window.HUB = function (key){
+    return INSTANCES[key] || { step:function(){}, goto:function(){}, scroll:function(){},
+      feature:function(){}, setKind:function(){}, setGenre:function(){},
+      toggleLive:function(){}, setSort:function(){}, clear:function(){} };
+  };
+
+  window.addEventListener('resize', function (){
+    Object.keys(INSTANCES).forEach(function (k){ INSTANCES[k].syncArrows(); });
+  });
+})();
+</script>
+
+
+<!-- ══════════════════════════════════════════════════════════════════
+     TOURNAMENTS ON THE HUB ENGINE
+
+     The page was a game picker over a flat list. The picker's job — cut
+     this down to one game — is what the engine's genre row already does,
+     so it becomes a row of pills instead of a grid of covers that pushed
+     the actual tournaments below the fold. What is left is three
+     collections, and the person looking decides which one gets the deck:
+
+       Live now      brackets in progress
+       Open          still taking entrants
+       Yours         hosted or entered
+
+     COLOUR FROM THE NAME. Most brackets carry no game id, so _gtGame
+     falls through to its catch-all and every card would arrive the same
+     shade of indigo — a deck of identical rectangles. Where there is no
+     artwork the card takes a hue derived from its own name, so the deck
+     has range and the same tournament is the same colour every time you
+     come back. It is decoration and reads as decoration; nothing is
+     claimed by it.
+
+     THE OLD LIST STAYS IN THE FILE. #gtGameGrid and #gtTournamentList
+     are hidden rather than deleted: renderGtTournaments and
+     _renderGtGameGrid still run on open, still write into them, and
+     several other places call them. Removing them is a separate change
+     from making this page look right.
+     ══════════════════════════════════════════════════════════════════ -->
+<style>
+#globalTournamentsOverlay #gtGameGrid,
+#globalTournamentsOverlay #gtTournamentList,
+#globalTournamentsOverlay .gt-section-head{ display:none !important; }
+#globalTournamentsOverlay > .gt-hero,
+#globalTournamentsOverlay > div[style*="overflow-y"]{ position:relative; z-index:1; }
+#gtHubFilters{ margin-bottom:18px; }
+</style>
+<script>
+(function () {
+  'use strict';
+
+  function esc(v){
+    return String(v == null ? '' : v)
+      .replace(/&/g,'&amp;').replace(/</g,'&lt;')
+      .replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+  }
+  function jsStr(v){ return JSON.stringify(String(v == null ? '' : v)).replace(/"/g,'&quot;'); }
+
+  var ICO = {
+    all:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><polygon points="15.6 8.4 13.5 13.5 8.4 15.6 10.5 10.5 15.6 8.4"/></svg>',
+    live:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3.2"/><path d="M5.6 5.6a9 9 0 0 0 0 12.8"/><path d="M18.4 18.4a9 9 0 0 0 0-12.8"/></svg>',
+    open:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M7 4h10v5a5 5 0 0 1-10 0z"/><path d="M7 5H4v2a3 3 0 0 0 3 3"/><path d="M17 5h3v2a3 3 0 0 1-3 3"/><path d="M12 14v3"/><path d="M9 20h6"/></svg>',
+    mine:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="8" r="3.6"/><path d="M5 20v-1.6A5.4 5.4 0 0 1 10.4 13h3.2A5.4 5.4 0 0 1 19 18.4V20"/></svg>',
+  };
+
+  function gtGame(id){
+    try { if (typeof _gtGame === 'function') return _gtGame(id) || {}; } catch (e){}
+    return {};
+  }
+
+  /* A stable hue per name, so a bracket with no cover art still has a
+     colour of its own and the same one every visit. Decoration only --
+     it encodes nothing and is never the sole carrier of meaning. */
+  function hueOf(str){
+    var h = 0, s = String(str || '');
+    for (var i = 0; i < s.length; i++) h = (h * 31 + s.charCodeAt(i)) % 360;
+    return h;
+  }
+  function tint(name){
+    var h = hueOf(name);
+    return 'linear-gradient(140deg, hsl(' + h + ' 58% 34%) 0%, hsl(' + ((h + 34) % 360) + ' 62% 12%) 100%)';
+  }
+
+  function tourneyCard(t){
+    var g = gtGame(t.game);
+    var named = !!t.game && g.id !== 'other';
+    var st = String(t.status || '').toLowerCase();
+    var live = st === 'in-progress' || st === 'live';
+    var prize = t.prize && t.prize !== '—' ? String(t.prize) : null;
+    var seats = t.maxPlayers ? (t.maxPlayers - (t.entrants || 0)) : null;
+
+    return {
+      key:'t-' + t.id,
+      name:t.name || 'Tournament',
+      desc:(named ? g.name + ' · ' : '') +
+           (live ? 'Running right now on the global circuit.'
+                 : 'Open on the global circuit — entries while seats last.') +
+           (t.host ? ' Hosted by ' + t.host + '.' : ''),
+      art:named ? (g.heroHi || g.header || g.cover || '') : '',
+      fallback:named ? (g.fallback || '') : tint(t.name || String(t.id)),
+      glyph:named ? (g.initial || '•') : '🏆',
+      genre:named ? g.name.toLowerCase() : '',
+      badge:live ? 'live' : 'tournament',
+      badgeText:live ? 'Live now' : (t.status || 'Open'),
+      chips:[named ? g.name : null, prize ? '💰 ' + prize : null,
+             t.format ? String(t.format) : null].filter(Boolean),
+      stats:[
+        { v:String(t.entrants || 0), l:'Entrants' },
+        { v:prize || '—', l:'Prize' },
+        { v:seats != null && seats > 0 ? String(seats) : (live ? 'Live' : 'Open'),
+          l:seats != null && seats > 0 ? 'Seats left' : 'Status' },
+      ],
+      faces:t.faces || [],
+      faceTotal:t.entrants || 0,
+      faceLabel:'In the bracket',
+      cta:{ label:live ? 'Watch bracket' : 'View bracket',
+            js:'window.gtOpenBracket(' + Number(t.id) + ',' + jsStr(g.id || '') + ')' },
+      live:live,
+      weight:(t.entrants || 0),
+    };
+  }
+
+  /* The hub cards point here rather than at openGamePage directly, so
+     there is one place to change when brackets get their own view. */
+  window.gtOpenBracket = function (tournamentId, gameId){
+    if (typeof window.openTournamentDetail === 'function') return window.openTournamentDetail(tournamentId);
+    if (gameId && typeof window.openGamePage === 'function') return window.openGamePage(gameId);
+    if (typeof window.openGamePage === 'function') return window.openGamePage('other');
+  };
+
+  function list(path){
+    return function (offset, limit){
+      return window.api(path + (path.indexOf('?') === -1 ? '?' : '&') +
+                        'limit=' + limit + '&offset=' + offset)
+        .then(function (r){ return Array.isArray(r) ? r : []; })
+        .catch(function (){ return []; });
+    };
+  }
+
+  function mount(){
+    var ov = document.getElementById('globalTournamentsOverlay');
+    if (!ov) return null;
+    var scroll = ov.querySelector(':scope > div[style*="overflow-y"]');
+    if (!scroll) return null;
+    if (!document.getElementById('gtHubStage')){
+      var f = document.createElement('div');
+      f.id = 'gtHubFilters'; f.className = 'hub-filters';
+      var st = document.createElement('div');
+      st.id = 'gtHubStage'; st.className = 'hub-stage';
+      scroll.insertBefore(f, scroll.firstChild);
+      scroll.insertBefore(st, f.nextSibling);
+    }
+    return scroll;
+  }
+
+  function start(){
+    if (!window.LobbyHub || typeof window.api !== 'function'){ setTimeout(start, 250); return; }
+    if (!mount()){ setTimeout(start, 250); return; }
+
+    var hub = window.LobbyHub.create({
+      key:'tournaments',
+      overlayId:'globalTournamentsOverlay',
+      stageSel:'#gtHubStage',
+      filterSel:'#gtHubFilters',
+      scrollSel:'#globalTournamentsOverlay > div[style*="overflow-y"]',
+      searchSel:'#gtSearchInput',
+      titleSel:'#globalTournamentsOverlay .gt-hero-title',
+      titleAccentClass:'gt-hero-accent',
+      titleLead:'GLOBAL',
+      titleAll:'TOURNAMENTS',
+      genreLabel:'Game',
+      allIco:ICO.all,
+      prefKey:'tournaments_rail_order',
+      rails:{
+        live:{
+          title:'Live now', sub:'Brackets being played right now',
+          label:'In progress', word:'brackets', ico:ICO.live,
+          load:list('/tournaments/global?status=live'), map:tourneyCard,
+          empty:{ ico:'🎮', title:'Nothing live',
+            sub:'No bracket is mid-match. Open ones are below, and starting your own takes about a minute.',
+            cta:{ label:'Create a tournament', js:'window.openCreateTournament()' } },
+        },
+        open:{
+          title:'Open', sub:'Brackets still taking entrants',
+          label:'Taking entries', word:'brackets', ico:ICO.open,
+          load:list('/tournaments/global?status=open'), map:tourneyCard,
+          empty:{ ico:'🏆', title:'No open brackets',
+            sub:'Nothing is accepting entrants right now. Host one and it will be the first here.',
+            cta:{ label:'Create a tournament', js:'window.openCreateTournament()' } },
+        },
+        mine:{
+          title:'Yours', sub:'Tournaments you host or have entered',
+          label:'Your circuit', word:'brackets', ico:ICO.mine,
+          load:list('/me/tournaments'), map:tourneyCard,
+          empty:{ ico:'📋', title:'You are not in a bracket',
+            sub:'Enter one from the rails above, or run your own — you keep full control of format, seeding and prizes.',
+            cta:{ label:'Create a tournament', js:'window.openCreateTournament()' } },
+        },
+      },
+    });
+
+    /* The hero search box drove the old grid. It drives both now: the
+       legacy renderers still own the hidden list, and removing them is a
+       separate change from making this page look right. */
+    var origSearch = window.gtSearch;
+    window.gtSearch = function (q){
+      try { if (typeof origSearch === 'function') origSearch(q); } catch (e){}
+      hub.setSearch(q);
+    };
+
+    var origOpen = window.openGlobalTournaments;
+    if (typeof origOpen === 'function' && !origOpen.__hubWrapped){
+      var wrapped = function (){
+        var out = origOpen.apply(this, arguments);
+        mount();
+        hub.open();
+        return out;
+      };
+      wrapped.__hubWrapped = true;
+      window.openGlobalTournaments = wrapped;
+    }
+  }
+
+  if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', start);
+  else start();
+})();
+</script>
+
 </body>
 </html>
