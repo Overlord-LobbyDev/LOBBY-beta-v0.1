@@ -54986,105 +54986,177 @@ body.double-dock[data-feed-position="right"].feed-open:not(.rail-hidden) #settin
 </script>
 
 
+
 <!-- ══════════════════════════════════════════════════════════════════
-     RECENTLY PLAYED — circular featured carousel
+     RECENTLY PLAYED — circular featured carousel, landscape card
 
-     Rebuilt from the first attempt, which had four faults:
+     The card is now a landscape split: cover art down the left, the
+     game's detail down the right. Stacked, the art pushed everything
+     below the fold and the stat strip had to share a line with the
+     capsule; side by side, the art is the biggest thing on the page and
+     the detail still gets a full column.
 
-       centring was measured from offsetLeft while the width transition
-         was still running, so it read the OLD widths and settled the
-         front card off to one side. Position is now computed from the
-         index — transform only, nothing measured, nothing to be wrong
-         about mid-animation.
-       the deck did not wrap, so the first game had empty space to its
-         left. Offsets are circular now: there is always a card either
-         side, however many games there are.
-       front and side cards were both too small, and the sides sat
-         beside the front card rather than behind it. Sides now overlap
-         inward and are layered under it.
-       the front card showed two lines of hours; it now carries a proper
-         stat strip.
+     Positioning is computed from the index — transform only, nothing
+     measured — so the front card is centred by construction rather than
+     by reading offsets mid-animation. Offsets are circular, so the deck
+     always has a card either side and the arrows never dead-end.
 
-     Cards are laid out absolutely from the centre line: each one is
-     placed by its circular distance from the active index, so the
-     active card is exactly centred by construction.
+     loadRecentGames() is untouched: this restyles what it renders and
+     reads its own two hour lines back out of the DOM to build the stats.
      ══════════════════════════════════════════════════════════════════ -->
 <style>
 #homeRecents .spotlight-carousel-wrap{ padding:4px 0 0; }
+#homeRecents .spotlight-carousel-wrap > div{ overflow:hidden !important; width:100% !important; }
 
-/* The window the deck is centred in. Fixed height because the cards are
-   absolutely positioned out of flow. */
-#homeRecents .spotlight-carousel-wrap > div{
-  overflow:hidden !important; width:100% !important;
-}
 #homeRecents .home-games-grid{
-  position:relative !important;
-  display:block !important;
-  height:452px !important;
-  transform:none !important;      /* the old track translation is gone */
-  overflow:visible !important;
-  padding:0 !important;
+  position:relative !important; display:block !important;
+  height:412px !important; transform:none !important;
+  overflow:visible !important; padding:0 !important;
 }
 
 #homeRecents .game-card{
-  position:absolute !important;
-  top:0; left:50%;
-  width:760px !important;
-  height:430px !important;
-  margin:0 !important;
+  position:absolute !important; top:0; left:50%;
+  width:900px !important; height:392px !important;
+  margin:0 !important; border-radius:16px !important;
+  /* Landscape: art column, then detail column. */
+  display:flex !important; flex-direction:row !important; align-items:stretch !important;
   overflow:hidden;
   transform-origin:center center;
-  transition:transform .46s cubic-bezier(.22,1,.36,1),
-             opacity .36s ease, filter .36s ease, box-shadow .36s ease;
-  will-change:transform, opacity;
-  cursor:pointer;
-  backface-visibility:hidden;
-}
-/* Layer + dim by distance. JS sets --rc-x / --rc-s / --rc-o / z-index. */
-#homeRecents .game-card{
   transform:translateX(calc(-50% + var(--rc-x, 0px))) scale(var(--rc-s, 1));
   opacity:var(--rc-o, 1);
   filter:saturate(var(--rc-sat, 1)) brightness(var(--rc-b, 1));
+  transition:transform .46s cubic-bezier(.22,1,.36,1),
+             opacity .36s ease, filter .36s ease, box-shadow .36s ease;
+  will-change:transform, opacity;
+  backface-visibility:hidden;
+  background:linear-gradient(135deg,#14161f 0%,#0b0d13 100%) !important;
 }
+#homeRecents .game-card:hover{ transform:translateX(calc(-50% + var(--rc-x, 0px))) scale(var(--rc-s, 1)) !important; }
 #homeRecents .game-card.rc-active{
   cursor:default;
-  box-shadow:0 30px 70px rgba(0,0,0,.7),
+  box-shadow:0 30px 70px rgba(0,0,0,.72),
              0 0 0 1px color-mix(in srgb, var(--accent) 30%, transparent);
 }
 #homeRecents .game-card:not(.rc-active):hover{ --rc-o:.85 !important; }
 
-#homeRecents .game-card .game-card-hero{
-  height:240px !important; width:100% !important; object-fit:cover;
+/* ── Art column ─────────────────────────────────────────────────── */
+#homeRecents .game-card-hero{
+  width:46% !important; height:100% !important;
+  object-fit:cover !important; flex:0 0 46% !important;
+  border-radius:0 !important;
 }
-/* Behind the front card only the art and the name read at that scale. */
-#homeRecents .game-card:not(.rc-active) .game-card-achievements,
-#homeRecents .game-card:not(.rc-active) .rc-stats{ display:none !important; }
+#homeRecents .game-card-placeholder{
+  width:46% !important; height:100% !important; flex:0 0 46%;
+  font-size:56px !important;
+}
+/* Art bleeds into the detail column rather than stopping at a hard
+   seam — the join is the thing that made the split look pasted. */
+#homeRecents .game-card::after{
+  content:''; position:absolute; top:0; bottom:0; left:46%;
+  width:110px; pointer-events:none; z-index:1;
+  background:linear-gradient(90deg, rgba(11,13,19,0), rgba(11,13,19,.92) 70%, #0b0d13);
+}
 
-/* ── Stat strip on the front card ───────────────────────────────── */
-.rc-stats{
-  display:flex; gap:0; margin:10px 0 12px;
-  border:1px solid rgba(255,255,255,.07); border-radius:10px;
-  background:rgba(255,255,255,.02); overflow:hidden;
+/* ── Detail column ──────────────────────────────────────────────── */
+#homeRecents .game-card-body{
+  flex:1 1 auto !important; min-width:0 !important;
+  display:flex !important; flex-direction:column !important;
+  padding:26px 28px 22px !important; position:relative; z-index:2;
+  gap:0 !important;
 }
-.rc-stat{ flex:1; padding:9px 13px; border-right:1px solid rgba(255,255,255,.06); }
-.rc-stat:last-child{ border-right:0; }
+#homeRecents .game-card-top{ display:block !important; margin:0 !important; }
+#homeRecents .game-card-capsule{ display:none !important; }   /* the hero already IS the art */
+#homeRecents .game-card-name{
+  font-family:'Archivo','Inter',sans-serif !important;
+  font-size:26px !important; font-weight:900 !important;
+  letter-spacing:-.5px !important; line-height:1.12 !important;
+  color:#fff !important; white-space:normal !important;
+  display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical; overflow:hidden;
+}
+#homeRecents .game-card.rc-active .game-card-hours,
+#homeRecents .game-card.rc-active .game-card-hours-total{ display:none !important; }
+
+/* ── Stats ──────────────────────────────────────────────────────── */
+.rc-stats{
+  display:grid; grid-template-columns:repeat(auto-fit,minmax(84px,1fr));
+  gap:1px; margin:16px 0 0;
+  background:rgba(255,255,255,.07);
+  border:1px solid rgba(255,255,255,.07); border-radius:11px; overflow:hidden;
+}
+.rc-stat{ padding:10px 12px; background:#0d0f16; }
 .rc-stat b{
   display:block; font-family:'JetBrains Mono', ui-monospace, monospace;
-  font-size:17px; font-weight:800; color:#fff; line-height:1.1;
+  font-size:19px; font-weight:800; color:#fff; line-height:1.05;
   font-variant-numeric:tabular-nums;
 }
 .rc-stat span{
   display:block; font-family:'Archivo', var(--font), sans-serif;
-  font-size:8.5px; font-weight:800; letter-spacing:1.4px; text-transform:uppercase;
-  color:var(--text-3); margin-top:3px;
+  font-size:8px; font-weight:800; letter-spacing:1.3px; text-transform:uppercase;
+  color:var(--text-3); margin-top:4px; white-space:nowrap;
 }
 .rc-stat.hot b{ color:color-mix(in srgb, var(--accent) 92%, white); }
-/* The original two hour lines are replaced by the strip above. */
-#homeRecents .game-card.rc-active .game-card-hours,
-#homeRecents .game-card.rc-active .game-card-hours-total{ display:none !important; }
-#homeRecents .game-card-achievements{ max-height:104px; overflow:hidden; }
 
-.rc-dots{ display:flex; justify-content:center; gap:7px; margin-top:6px; }
+/* A bar reads faster than a percentage for "how much of my time here". */
+.rc-bar{ margin-top:12px; }
+.rc-bar-l{
+  display:flex; justify-content:space-between; align-items:baseline;
+  font-family:'Archivo', var(--font), sans-serif;
+  font-size:8.5px; font-weight:800; letter-spacing:1.3px; text-transform:uppercase;
+  color:var(--text-3); margin-bottom:6px;
+}
+.rc-bar-t{ height:4px; border-radius:99px; background:rgba(255,255,255,.08); overflow:hidden; }
+.rc-bar-f{
+  height:100%; border-radius:99px;
+  background:linear-gradient(90deg, color-mix(in srgb,var(--accent) 85%,white), var(--accent));
+}
+
+/* ── Achievements ───────────────────────────────────────────────── */
+#homeRecents .game-card-achievements{
+  margin-top:16px !important; padding-top:14px !important;
+  border-top:1px solid rgba(255,255,255,.07) !important;
+  flex:1 1 auto; min-height:0; overflow:hidden;
+  display:flex; flex-direction:column; gap:6px;
+}
+#homeRecents .game-card-ach-label{
+  font-family:'Archivo', var(--font), sans-serif !important;
+  font-size:9px !important; font-weight:800 !important;
+  letter-spacing:1.5px !important; text-transform:uppercase;
+  color:var(--text-3) !important; margin:0 0 2px !important;
+}
+#homeRecents .game-card-ach{
+  background:rgba(255,255,255,.03) !important;
+  border:1px solid rgba(255,255,255,.05) !important;
+  border-radius:9px !important; padding:8px 10px !important;
+  gap:10px !important; flex:0 0 auto;
+}
+#homeRecents .game-card-ach-name{ font-size:12px !important; font-weight:700 !important; }
+#homeRecents .game-card-ach-desc{
+  font-size:10.5px !important; color:var(--text-3) !important;
+  overflow:hidden; text-overflow:ellipsis; white-space:nowrap;
+}
+#homeRecents .game-card-ach-icon{ width:26px !important; height:26px !important; border-radius:6px !important; }
+
+/* Behind the front card, only the art and the name carry. */
+#homeRecents .game-card:not(.rc-active) .game-card-achievements,
+#homeRecents .game-card:not(.rc-active) .rc-stats,
+#homeRecents .game-card:not(.rc-active) .rc-bar,
+#homeRecents .game-card:not(.rc-active) .rc-cta{ display:none !important; }
+#homeRecents .game-card:not(.rc-active) .game-card-name{ font-size:19px !important; }
+
+.rc-cta{
+  margin-top:14px; align-self:flex-start;
+  display:inline-flex; align-items:center; gap:8px;
+  padding:9px 15px; border-radius:10px; cursor:pointer;
+  font-family:'Archivo', var(--font), sans-serif;
+  font-size:11.5px; font-weight:800; letter-spacing:.6px;
+  background:color-mix(in srgb, var(--accent) 24%, transparent);
+  border:1px solid color-mix(in srgb, var(--accent) 52%, transparent);
+  color:#fff;
+}
+.rc-cta:hover{ background:color-mix(in srgb, var(--accent) 36%, transparent); }
+.rc-cta svg{ width:13px; height:13px; }
+
+.rc-dots{ display:flex; justify-content:center; gap:7px; margin-top:8px; }
 .rc-dot{
   width:7px; height:7px; border-radius:99px; cursor:pointer; border:0; padding:0;
   background:rgba(255,255,255,.18); transition:background .2s, width .2s;
@@ -55092,14 +55164,12 @@ body.double-dock[data-feed-position="right"].feed-open:not(.rail-hidden) #settin
 .rc-dot:hover{ background:rgba(255,255,255,.34); }
 .rc-dot.on{ width:20px; background:color-mix(in srgb, var(--accent) 85%, white); }
 
-#homeRecents .spotlight-carousel-btn{
-  top:50% !important; transform:translateY(-50%) !important; z-index:40;
-}
+#homeRecents .spotlight-carousel-btn{ top:50% !important; transform:translateY(-50%) !important; z-index:40; }
 
-@media (max-width:1400px){
-  #homeRecents .game-card{ width:600px !important; height:390px !important; }
-  #homeRecents .home-games-grid{ height:412px !important; }
-  #homeRecents .game-card .game-card-hero{ height:200px !important; }
+@media (max-width:1500px){
+  #homeRecents .game-card{ width:740px !important; height:360px !important; }
+  #homeRecents .home-games-grid{ height:380px !important; }
+  #homeRecents .game-card-name{ font-size:22px !important; }
 }
 @media (prefers-reduced-motion: reduce){
   #homeRecents .game-card{ transition:none !important; }
@@ -55110,11 +55180,7 @@ body.double-dock[data-feed-position="right"].feed-open:not(.rail-hidden) #settin
   'use strict';
 
   var idx = 0;
-
-  /* Distance between card centres, and how far each rank is scaled and
-     dimmed. Side cards are pulled INWARD of a full card width so they
-     tuck under the front card rather than sitting beside it. */
-  var STEP = 430, STEP2 = 700;
+  var STEP = 520, STEP2 = 830;
 
   function track(){ return document.getElementById('recentGamesList'); }
   function cards(){
@@ -55122,8 +55188,8 @@ body.double-dock[data-feed-position="right"].feed-open:not(.rail-hidden) #settin
     return t ? Array.prototype.slice.call(t.querySelectorAll('.game-card')) : [];
   }
 
-  /* Shortest signed distance around the ring, so the deck wraps and the
-     first game always has a card to its left. */
+  /* Shortest signed distance around the ring — this is what makes the
+     deck circular, so the first game has a card to its left. */
   function offsetOf(i, n){
     var raw = i - idx;
     if (raw >  n / 2) raw -= n;
@@ -55131,79 +55197,87 @@ body.double-dock[data-feed-position="right"].feed-open:not(.rail-hidden) #settin
     return raw;
   }
 
-  /* Pull the numbers out of the two lines the Steam renderer already
-     writes ("60.8h in last 2 weeks" / "85.3h total") and present them as
-     a stat strip. Reading the DOM rather than the API keeps this to a
-     restyle — loadRecentGames() is untouched. */
-  function stats(card){
-    if (card.querySelector('.rc-stats')) return;
-    var body = card.querySelector('.game-card-body');
-    var meta = card.querySelector('.game-card-meta');
-    if (!body || !meta) return;
+  function enhance(card){
+    if (card.__rc) return;
+    card.__rc = true;
 
-    function num(sel){
+    var meta = card.querySelector('.game-card-meta');
+    var body = card.querySelector('.game-card-body');
+    if (!meta || !body) return;
+
+    function hrs(sel){
       var el = card.querySelector(sel);
       if (!el) return null;
       var m = String(el.textContent || '').match(/([\d.]+)\s*h/i);
-      return m ? m[1] : null;
+      return m ? parseFloat(m[1]) : null;
     }
-    var recent = num('.game-card-hours');
-    var total  = num('.game-card-hours-total');
+    var recent = hrs('.game-card-hours');
+    var total  = hrs('.game-card-hours-total');
     var achN   = card.querySelectorAll('.game-card-ach').length;
 
     var out = '<div class="rc-stats">';
-    if (recent) out += '<div class="rc-stat hot"><b>' + recent + 'h</b><span>Last 2 weeks</span></div>';
-    if (total)  out += '<div class="rc-stat"><b>' + total + 'h</b><span>Total played</span></div>';
-    if (total && recent){
-      var pct = Math.round((parseFloat(recent) / Math.max(parseFloat(total), 0.1)) * 100);
-      out += '<div class="rc-stat"><b>' + Math.min(pct, 100) + '%</b><span>Of all time</span></div>';
-    }
+    out += '<div class="rc-stat' + (recent ? ' hot' : '') + '"><b>' +
+           (recent != null ? recent + 'h' : '—') + '</b><span>2 weeks</span></div>';
+    out += '<div class="rc-stat"><b>' + (total != null ? total + 'h' : '—') + '</b><span>Total</span></div>';
     out += '<div class="rc-stat"><b>' + achN + '</b><span>Achievements</span></div>';
     out += '</div>';
 
+    /* The share only means something when there IS recent play. At 0h it
+       is always 0% — a stat that can only say one thing is noise. */
+    if (recent && total){
+      var pct = Math.max(1, Math.min(100, Math.round((recent / total) * 100)));
+      out += '<div class="rc-bar">' +
+        '<div class="rc-bar-l"><span>Recent share of playtime</span><span>' + pct + '%</span></div>' +
+        '<div class="rc-bar-t"><div class="rc-bar-f" style="width:' + pct + '%"></div></div>' +
+      '</div>';
+    }
+
     meta.insertAdjacentHTML('afterend', out);
+
+    /* The whole active card already opens Steam; this states it rather
+       than leaving the card silently clickable. */
+    var cta = document.createElement('div');
+    cta.className = 'rc-cta';
+    cta.innerHTML = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" ' +
+      'stroke-linecap="round" stroke-linejoin="round"><path d="M14 4h6v6"/><path d="M20 4 10 14"/>' +
+      '<path d="M18 14v5a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1V7a1 1 0 0 1 1-1h5"/></svg>View on Steam';
+    body.appendChild(cta);
   }
 
   function apply(){
     var list = cards(), n = list.length;
     if (!n) return;
-    idx = ((idx % n) + n) % n;              // wrap the index itself
+    idx = ((idx % n) + n) % n;
 
     list.forEach(function(c, i){
-      var off = offsetOf(i, n);
-      var a = Math.abs(off);
-      var s = c.style;
+      enhance(c);
+      var off = offsetOf(i, n), a = Math.abs(off), s = c.style;
       c.classList.toggle('rc-active', off === 0);
-      stats(c);
 
       if (a === 0){
-        s.setProperty('--rc-x', '0px');   s.setProperty('--rc-s', '1');
-        s.setProperty('--rc-o', '1');     s.setProperty('--rc-sat', '1');
-        s.setProperty('--rc-b', '1');     s.zIndex = 30;
+        s.setProperty('--rc-x','0px');  s.setProperty('--rc-s','1');
+        s.setProperty('--rc-o','1');    s.setProperty('--rc-sat','1');
+        s.setProperty('--rc-b','1');    s.zIndex = 30;
       } else if (a === 1){
-        s.setProperty('--rc-x', (off * STEP) + 'px'); s.setProperty('--rc-s', '.78');
-        s.setProperty('--rc-o', '.6');   s.setProperty('--rc-sat', '.55');
-        s.setProperty('--rc-b', '.7');   s.zIndex = 20;
+        s.setProperty('--rc-x',(off * STEP) + 'px'); s.setProperty('--rc-s','.8');
+        s.setProperty('--rc-o','.62');  s.setProperty('--rc-sat','.5');
+        s.setProperty('--rc-b','.62');  s.zIndex = 20;
       } else if (a === 2){
-        s.setProperty('--rc-x', (off / a * STEP2) + 'px'); s.setProperty('--rc-s', '.62');
-        s.setProperty('--rc-o', '.28');  s.setProperty('--rc-sat', '.4');
-        s.setProperty('--rc-b', '.55');  s.zIndex = 10;
+        s.setProperty('--rc-x',(off / a * STEP2) + 'px'); s.setProperty('--rc-s','.66');
+        s.setProperty('--rc-o','.26');  s.setProperty('--rc-sat','.35');
+        s.setProperty('--rc-b','.5');   s.zIndex = 10;
       } else {
-        /* Parked just outside the deck so it animates in from the right
-           side rather than fading in on the spot. */
-        s.setProperty('--rc-x', (off > 0 ? STEP2 + 160 : -(STEP2 + 160)) + 'px');
-        s.setProperty('--rc-s', '.55');  s.setProperty('--rc-o', '0');
+        s.setProperty('--rc-x',(off > 0 ? STEP2 + 200 : -(STEP2 + 200)) + 'px');
+        s.setProperty('--rc-s','.6');   s.setProperty('--rc-o','0');
         s.zIndex = 1;
       }
       c.style.pointerEvents = a > 2 ? 'none' : 'auto';
     });
 
-    // Circular: the arrows never dead-end.
     var prev = document.getElementById('recentsPrev');
     var next = document.getElementById('recentsNext');
-    if (prev) prev.disabled = false;
+    if (prev) prev.disabled = false;      // circular: never a dead end
     if (next) next.disabled = false;
-
     dots(n);
   }
 
@@ -55222,8 +55296,7 @@ body.double-dock[data-feed-position="right"].feed-open:not(.rail-hidden) #settin
         apply();
       });
     }
-    // Rebuilt only when the count changes — otherwise this would replace
-    // the dot mid-click on every move.
+    // Rebuilt only on a count change, or this replaces the dot mid-click.
     if (host.children.length !== n){
       var out = '';
       for (var i = 0; i < n; i++) out += '<button class="rc-dot" data-i="' + i + '" aria-label="Game ' + (i + 1) + '"></button>';
@@ -55239,8 +55312,8 @@ body.double-dock[data-feed-position="right"].feed-open:not(.rail-hidden) #settin
     var t = track();
     if (!t) return;
 
-    /* A card behind the front one steps to it instead of opening Steam.
-       Capture phase, or the card's own onclick opens a tab first. */
+    /* A card behind the front one steps forward instead of opening
+       Steam. Capture phase, or the card's own onclick fires first. */
     t.addEventListener('click', function(e){
       var card = e.target.closest('.game-card');
       if (!card || card.classList.contains('rc-active')) return;
@@ -55249,11 +55322,9 @@ body.double-dock[data-feed-position="right"].feed-open:not(.rail-hidden) #settin
       apply();
     }, true);
 
-    new MutationObserver(function(){ idx = 0; apply(); })
-      .observe(t, { childList:true });
-
+    new MutationObserver(function(){ idx = 0; apply(); }).observe(t, { childList:true });
     apply();
-    console.log('[recents] circular featured carousel active');
+    console.log('[recents] landscape circular carousel active');
   }
 
   if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', start);
