@@ -51757,6 +51757,38 @@ body.chat-ctx-on #chatCtx{
 .cctx-av img{ width:100%; height:100%; object-fit:cover; display:block; }
 .cctx-av.voice{ border-color:color-mix(in srgb, var(--accent) 55%, transparent); }
 .cctx-empty{ font-size:11.5px; color:var(--text-3); padding:2px 4px 4px; }
+
+/* ── Context column: always present, and it RESERVES its space ────
+   Two problems with the first pass:
+
+   1. It was width-gated, so on a smaller screen with the right sidebar
+      open it vanished — exactly when the channel switcher is the only way
+      to move around, since the rail is covering its own list.
+   2. The conversation was centred in the FULL panel, which cut a gutter
+      out of the left whether or not anything was in it. With the column
+      gone that gutter was just a hole.
+
+   Now the column reserves a strip and the conversation centres in what
+   remains, so there is no unexplained space at either width. The column
+   flexes between 176px and 240px rather than disappearing, and on a truly
+   narrow panel both paddings collapse to 24px and the messages simply use
+   what is left. */
+body.chat-ctx-on{
+  --cctx-w: clamp(176px, 15vw, 240px);
+  --cctx-reserve: calc(var(--cctx-w) + 48px);   /* 28px inset + 20px gap */
+}
+body.chat-ctx-on #chatCtx{
+  width: var(--cctx-w);
+}
+body.chat-ctx-on.lobby-selected #chatPanel .messages,
+body.chat-ctx-on.lobby-selected #chatPanel .chat-input-wrap,
+body.chat-ctx-on.lobby-selected #chatPanel #lobbyPulse{
+  padding-left: calc(
+    var(--cctx-reserve) +
+    max(24px, calc((100% - var(--cctx-reserve) - var(--chat-max, 1040px)) / 2))
+  ) !important;
+  padding-right: max(24px, calc((100% - var(--cctx-reserve) - var(--chat-max, 1040px)) / 2)) !important;
+}
 </style>
 <script>
 (function () {
@@ -51765,7 +51797,11 @@ body.chat-ctx-on #chatCtx{
   /* The column needs the full message column PLUS both gutters wide enough
      to hold it (240 + 28 left inset + 24 breathing room). Below that the
      conversation is better off with the room. */
-  var CHAT_MAX = 1040, CTX_W = 240, CTX_NEED = CHAT_MAX + 2 * (CTX_W + 52);
+  /* No width threshold any more: the column is a permanent part of the
+     lobby view, not something that appears when there happens to be room.
+     Its width flexes instead, so a narrow panel shrinks it rather than
+     dropping it. */
+  var CHAT_MAX = 1040;
 
   function $(id){ return document.getElementById(id); }
   function esc(s){
@@ -51934,7 +51970,7 @@ body.chat-ctx-on #chatCtx{
      Feed or the Sidebar takes the space — no coordination with either. */
   function measure(){
     var main = $('chatMain') || $('chatPanel');
-    var on = !!main && eligible() && main.clientWidth >= CTX_NEED;
+    var on = eligible();
     document.body.classList.toggle('chat-ctx-on', on);
     if (on){ wire(); render(); }
   }
@@ -51948,7 +51984,7 @@ body.chat-ctx-on #chatCtx{
     window.addEventListener('resize', measure);
     setInterval(measure, 1500);      // presence and unread arrive over the socket
     measure();
-    console.log('[chat-ctx] context column ready — shows above ' + CTX_NEED + 'px');
+    console.log('[chat-ctx] context column ready — always on in a lobby channel');
   }
 
   if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', start);
