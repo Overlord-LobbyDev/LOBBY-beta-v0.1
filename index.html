@@ -58913,5 +58913,173 @@ async function reactComment(ev, id, btn){
   overflow:hidden !important;
 }
 </style>
+
+<!-- ══════════════════════════════════════════════════════════════════
+     LOBBY ART — one art pipeline for every page
+
+     The home page was not the only place constructing Steam URLs from an
+     appid. _steamGame() in the shared catalogue builds exactly the same
+     legacy paths:
+
+       .../steam/apps/<appid>/library_600x900.jpg
+       .../steam/apps/<appid>/header.jpg
+
+     Those 404 for anything published or re-published recently, because
+     Steam moved store art behind a content hash. So Discover,
+     Tournaments, Queue and Speedrun all have the same holes the home
+     page had, for the same reason.
+
+     This resolves them the same way home does, through /steam/art, which
+     asks Steam's own asset index. Three things happen:
+
+       the catalogue is patched in place, so anything rendered after
+         startup is built with correct URLs from the outset
+       already-rendered images are swept and upgraded, for panels opened
+         before the lookup finished
+       results are kept in sessionStorage, so reopening a panel is
+         instant and a reload costs one request rather than dozens
+
+     Non-Steam entries in the catalogue (Valorant, Fortnite, Smash) have
+     no appid at all and are untouched — they were always meant to fall
+     back to their gradient, which is not a bug.
+     ══════════════════════════════════════════════════════════════════ -->
+<script>
+(function () {
+  'use strict';
+
+  var SS_KEY = 'lobby_art_v1';
+  var map = {};                 // appid -> { header_img, capsule_img }
+  var inflight = null;
+
+  try {
+    var saved = sessionStorage.getItem(SS_KEY);
+    if (saved) map = JSON.parse(saved) || {};
+  } catch (e) { map = {}; }
+
+  function save(){
+    try { sessionStorage.setItem(SS_KEY, JSON.stringify(map)); } catch (e) {}
+  }
+
+  /* GT_GAMES is a top-level const. Those live in the global LEXICAL
+     scope, which classic scripts share, but they are NOT properties of
+     window — reading window.GT_GAMES yields undefined and this whole
+     module would silently do nothing. Reach it by name, guarded. */
+  function catalog(){
+    try { if (typeof GT_GAMES !== 'undefined' && Array.isArray(GT_GAMES)) return GT_GAMES; }
+    catch (e) {}
+    return null;
+  }
+
+  function base(){
+    try {
+      if (typeof FEED_AUTH_URL !== 'undefined' && FEED_AUTH_URL) return FEED_AUTH_URL;
+    } catch (e) {}
+    try {
+      if (typeof AUTH_URL !== 'undefined' && AUTH_URL) return AUTH_URL;
+    } catch (e) {}
+    return '';
+  }
+
+  /* Ask for everything we do not already hold, in one request. */
+  function prime(ids){
+    var want = (ids || [])
+      .map(function (x) { return String(x); })
+      .filter(function (x) { return /^\d+$/.test(x) && !map[x]; });
+    want = want.filter(function (x, i, a) { return a.indexOf(x) === i; });
+    if (!want.length) return Promise.resolve(map);
+
+    /* 50 at a time — the endpoint caps there so one call cannot fan out
+       into hundreds of upstream lookups. */
+    var chunks = [];
+    for (var i = 0; i < want.length; i += 50) chunks.push(want.slice(i, i + 50));
+
+    inflight = Promise.all(chunks.map(function (c) {
+      return fetch(base() + '/steam/art?appids=' + c.join(','))
+        .then(function (r) { return r.ok ? r.json() : {}; })
+        .catch(function () { return {}; });
+    })).then(function (parts) {
+      parts.forEach(function (p) {
+        Object.keys(p || {}).forEach(function (k) { map[k] = p[k]; });
+      });
+      save();
+      patchCatalog();
+      sweep();
+      return map;
+    });
+    return inflight;
+  }
+
+  function get(appid){ return map[String(appid)] || null; }
+
+  /* Rewrite the catalogue in place so anything rendered from here on is
+     built with resolved URLs rather than guessed ones. */
+  function patchCatalog(){
+    var cat = catalog();
+    if (!Array.isArray(cat)) return;
+    cat.forEach(function (g) {
+      if (!g || !g.steamAppId) return;
+      var a = map[String(g.steamAppId)];
+      if (!a) return;
+      if (a.capsule_img) g.cover = a.capsule_img;
+      if (a.header_img)  g.header = a.header_img;
+      /* library_hero has its own hash and is not in the payload, so the
+         wide hero keeps the header rather than a URL that 404s. */
+      if (a.header_img)  g.heroHi = a.heroHi || a.header_img;
+    });
+  }
+
+  var LEGACY = /steamstatic\.com\/steam\/apps\/(\d+)\/(library_600x900|header|library_hero|capsule_616x353)\.jpg/;
+
+  /* Panels opened before the lookup landed are already showing guessed
+     URLs. Upgrade them in place rather than making the user reopen. */
+  function sweep(){
+    document.querySelectorAll('img[src]').forEach(function (img) {
+      var m = LEGACY.exec(img.getAttribute('src') || '');
+      if (!m) return;
+      var a = map[m[1]];
+      if (!a) return;
+      var want = (m[2] === 'header' || m[2] === 'library_hero')
+        ? a.header_img : a.capsule_img;
+      if (want && img.getAttribute('src') !== want) img.setAttribute('src', want);
+    });
+    /* Same for CSS background-image, which several cards use instead. */
+    document.querySelectorAll('[style*="steamstatic.com/steam/apps/"]').forEach(function (el) {
+      var st = el.getAttribute('style') || '';
+      var m = LEGACY.exec(st);
+      if (!m) return;
+      var a = map[m[1]];
+      if (!a) return;
+      var want = (m[2] === 'header' || m[2] === 'library_hero')
+        ? a.header_img : a.capsule_img;
+      if (want) el.setAttribute('style', st.replace(LEGACY, want.replace(/\$/g, '$$$$')));
+    });
+  }
+
+  window.LobbyArt = { prime: prime, get: get, sweep: sweep, map: map };
+
+  function start(){
+    var cat = catalog();
+    var ids = Array.isArray(cat)
+      ? cat.filter(function (g) { return g && g.steamAppId; })
+           .map(function (g) { return g.steamAppId; })
+      : [];
+    if (ids.length) prime(ids);
+    else patchCatalog();
+
+    /* Panels build their grids on open, so new images keep arriving.
+       Debounced by a frame; sweep() only writes when a URL differs, so
+       it cannot drive itself. */
+    var queued = false;
+    new MutationObserver(function () {
+      if (queued) return;
+      queued = true;
+      requestAnimationFrame(function () { queued = false; sweep(); });
+    }).observe(document.body, { childList:true, subtree:true });
+  }
+
+  if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', start);
+  else start();
+})();
+</script>
 </body>
 </html>

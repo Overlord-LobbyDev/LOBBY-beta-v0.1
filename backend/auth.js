@@ -2951,6 +2951,41 @@ async function steamArt(appid) {
   return art;
 }
 
+// GET /steam/art?appids=1,2,3 — batch art resolution for any page.
+//
+// The home page was not the only place building Steam URLs from an
+// appid: the shared game catalogue behind Discover, Tournaments, Queue
+// and Speedrun does the same, so every one of those pages has the same
+// holes for recent titles. This exposes the resolver they all need.
+//
+// No auth: these are public store assets, and the panels that need them
+// render before a token is necessarily to hand. Capped at 50 ids per
+// call so one request cannot fan out into hundreds of upstream ones,
+// and steamArt() is cached, so a repeated id costs nothing.
+app.get("/steam/art", async (req, res) => {
+  const raw = String(req.query.appids || "");
+  const ids = raw.split(",")
+    .map(x => x.trim())
+    .filter(x => /^\d+$/.test(x))
+    .slice(0, 50);
+  if (!ids.length) return res.json({});
+
+  try {
+    const pairs = await Promise.all(ids.map(async (id) => {
+      try { return [id, await steamArt(id)]; }
+      catch (e) { return [id, null]; }
+    }));
+    const out = {};
+    for (const [id, art] of pairs) if (art) out[id] = art;
+    // Cached hard at the edge too: store art is effectively immutable.
+    res.set("Cache-Control", "public, max-age=21600");
+    res.json(out);
+  } catch (err) {
+    console.error("[steam/art]", err.message);
+    res.status(500).json({ error: "Could not resolve art" });
+  }
+});
+
 // GET /steam/recent — get recently played games + achievements for the logged-in user
 app.get("/steam/recent", requireAuth, async (req, res) => {
   const userRow = await pool.query("SELECT steam_id FROM users WHERE id = $1", [req.userId]);
