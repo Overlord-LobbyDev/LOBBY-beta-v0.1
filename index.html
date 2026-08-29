@@ -28068,6 +28068,7 @@ window.closeGlobalTournaments = function() {
 // Leaderboard — opens the in-app leaderboard hub overlay (#leaderboardOverlay).
 // Integrated into the unified overlay manager so it cross-fades with the
 // Tournaments / Store / Discover hubs and keeps the real LOBBY top bar.
+
 // LB.init() (defined near </body>) repopulates the board on every open.
 // ─────────────────────────────────────────────────────────────────────
 window.openLeaderboard = function() {
@@ -49531,10 +49532,6 @@ body.rail-anim-out #lobbyInfoRail{
    Both live in the rail, so the rail never leaves the screen when you
    switch between them — sliding it out and back would be a lie. Opacity
    only, no transform, so nothing shifts while the contents change. */
-@keyframes railXfadeOut { to   { opacity:0; } }
-@keyframes railXfadeIn  { from { opacity:0; } }
-body.rail-swap-out #lobbyInfoRail > *{ animation: railXfadeOut .13s ease both; will-change:opacity; }
-body.rail-swap-in  #lobbyInfoRail > *{ animation: railXfadeIn  .19s ease both; will-change:opacity; }
 @media (prefers-reduced-motion: reduce){
   body.rail-swap-out #lobbyInfoRail > *,
   body.rail-swap-in  #lobbyInfoRail > *{ animation:none; }
@@ -51427,8 +51424,11 @@ body.dock-sidebar:not(.dock-feed)  #phFeedToggleBtn .ph-fb-dot {
     return 'none';
   }
 
-  var XFADE_OUT = 130, XFADE_IN = 190;   // rail content crossfade
-  var INTENT_MS = 700;                   // long enough for the DOM to catch up
+  /* Must match --dock-out-dur / --dock-in-dur in the shared dock
+     animation block, or the swap classes are pulled off mid-animation and
+     the contents jump. */
+  var XFADE_OUT = 300, XFADE_IN = 460;
+  var INTENT_MS = 820;                   // outlasts the longest swap (300+460)
 
   function reduced(){
     try { return matchMedia('(prefers-reduced-motion: reduce)').matches; }
@@ -51956,5 +51956,123 @@ body.chat-ctx-on #chatCtx{
 })();
 </script>
 
+<!-- ══════════════════════════════════════════════════════════════════
+     ONE DOCK ANIMATION — the Sidebar's, shared by all three
+
+     Messages, Feed and Sidebar are one switch, so they should not enter
+     three different ways. The Sidebar's curve is now the single source
+     and the other two are pointed at it.
+
+     What was actually different:
+       Sidebar  .46s in / .30s out, slide + scale + blur   <- the reference
+       Feed     right and left already matched it, but SPLIT ran a
+                separate rise/sink (.58s with a .03s delay / .34s)
+       Messages a plain opacity fade (.13s / .19s ease) — no slide, no
+                blur, and roughly a third of the duration, which is why
+                it read as a different animation entirely
+
+     Timings live in custom properties so the three can never drift apart
+     again: change the token, all three follow.
+     ══════════════════════════════════════════════════════════════════ -->
+<style>
+:root{
+  --dock-in-dur:  .46s;
+  --dock-out-dur: .30s;
+  --dock-in-ease:  cubic-bezier(.22,1,.36,1);
+  --dock-out-ease: cubic-bezier(.5,.05,.7,.2);
+  --dock-shift-in:  26px;   /* entrance offset, matches railSlideIn  */
+  --dock-shift-out: 22px;   /* exit offset,     matches railSlideOut */
+  --dock-scale: .985;
+  --dock-blur: 8px;
+}
+
+/* Right-origin: the Sidebar, and the Feed when docked right. */
+@keyframes dockInR {
+  0%   { opacity:0; transform:translateX(var(--dock-shift-in)) scale(var(--dock-scale)); filter:blur(var(--dock-blur)); }
+  100% { opacity:1; transform:translateX(0) scale(1); filter:blur(0); }
+}
+@keyframes dockOutR {
+  0%   { opacity:1; transform:translateX(0) scale(1); filter:blur(0); }
+  100% { opacity:0; transform:translateX(var(--dock-shift-out)) scale(var(--dock-scale)); filter:blur(var(--dock-blur)); }
+}
+/* Left-origin: the Feed when docked left. Mirrored so it still enters
+   from its own edge — same curve, same blur, same duration. */
+@keyframes dockInL {
+  0%   { opacity:0; transform:translateX(calc(var(--dock-shift-in) * -1)) scale(var(--dock-scale)); filter:blur(var(--dock-blur)); }
+  100% { opacity:1; transform:translateX(0) scale(1); filter:blur(0); }
+}
+@keyframes dockOutL {
+  0%   { opacity:1; transform:translateX(0) scale(1); filter:blur(0); }
+  100% { opacity:0; transform:translateX(calc(var(--dock-shift-out) * -1)) scale(var(--dock-scale)); filter:blur(var(--dock-blur)); }
+}
+/* No-shift variant for the SPLIT feed, which opens in the centre of the
+   page rather than off an edge — a lateral slide there would be arbitrary.
+   Same duration, curve, scale and blur, so it still reads as the same
+   animation. */
+@keyframes dockInC {
+  0%   { opacity:0; transform:scale(var(--dock-scale)); filter:blur(var(--dock-blur)); }
+  100% { opacity:1; transform:scale(1); filter:blur(0); }
+}
+@keyframes dockOutC {
+  0%   { opacity:1; transform:scale(1); filter:blur(0); }
+  100% { opacity:0; transform:scale(var(--dock-scale)); filter:blur(var(--dock-blur)); }
+}
+
+/* ── 1. Sidebar (the reference) ─────────────────────────────────── */
+body.rail-anim-in  #lobbyInfoRail{
+  animation: dockInR var(--dock-in-dur) var(--dock-in-ease) both;
+  will-change: transform, opacity, filter;
+}
+body.rail-anim-out #lobbyInfoRail{
+  animation: dockOutR var(--dock-out-dur) var(--dock-out-ease) both;
+  will-change: transform, opacity, filter;
+}
+
+/* ── 2. Messages ────────────────────────────────────────────────
+   Switching Messages <-> Sidebar changes the rail's CONTENTS while the
+   panel itself stays on screen, so the animation runs on the contents.
+   Now the same slide, scale, blur and timing as the panel entrance
+   instead of the old bare opacity fade. */
+body.rail-swap-out #lobbyInfoRail > *{
+  animation: dockOutR var(--dock-out-dur) var(--dock-out-ease) both;
+  will-change: transform, opacity, filter;
+}
+body.rail-swap-in  #lobbyInfoRail > *{
+  animation: dockInR var(--dock-in-dur) var(--dock-in-ease) both;
+  will-change: transform, opacity, filter;
+}
+
+/* ── 3. Feed ────────────────────────────────────────────────────
+   Same selector shape as the originals (1,2,1) and later in the sheet,
+   so these win on source order without !important — which would have
+   killed the animations outright. */
+body[data-feed-position="right"].feed-anim-in  #socialFeed{
+  animation: dockInR  var(--dock-in-dur)  var(--dock-in-ease)  both;
+}
+body[data-feed-position="right"].feed-anim-out #socialFeed{
+  animation: dockOutR var(--dock-out-dur) var(--dock-out-ease) both;
+}
+body[data-feed-position="left"].feed-anim-in   #socialFeed{
+  animation: dockInL  var(--dock-in-dur)  var(--dock-in-ease)  both;
+}
+body[data-feed-position="left"].feed-anim-out  #socialFeed{
+  animation: dockOutL var(--dock-out-dur) var(--dock-out-ease) both;
+}
+body[data-feed-position="split"].feed-anim-in  #socialFeed{
+  animation: dockInC  var(--dock-in-dur)  var(--dock-in-ease)  both;
+}
+body[data-feed-position="split"].feed-anim-out #socialFeed{
+  animation: dockOutC var(--dock-out-dur) var(--dock-out-ease) both;
+}
+
+@media (prefers-reduced-motion: reduce){
+  body.rail-anim-in #lobbyInfoRail,
+  body.rail-anim-out #lobbyInfoRail,
+  body.rail-swap-out #lobbyInfoRail > *,
+  body.rail-swap-in  #lobbyInfoRail > *,
+  body.feed-anim-in  #socialFeed,
+  body.feed-anim-out #socialFeed{ animation:none; }
+}
+</style>
 </body>
 </html>
