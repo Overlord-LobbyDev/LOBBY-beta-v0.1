@@ -27417,7 +27417,11 @@ window.openDiscoverPanel = async function() {
     const r = await api('/lobbies/public').catch(() => null);
     if (Array.isArray(r) && r.length) {
       const real = r.map(s => ({
-        id: s.id, name: s.name, tag: s.tag, members: s.members||0, online: s.online||0,
+        id: s.id, name: s.name, tag: s.tag, members: s.members||0,
+        // NOT s.online||0 — that turns "the server did not tell us" into a
+        // confident "nobody is online". Left undefined so the honest
+        // em-dash path below actually triggers.
+        online: (typeof s.online === 'number' ? s.online : undefined),
         cover: s.cover || '', fallback: s.fallback || 'linear-gradient(135deg,#2a2d3a,#15161e)',
         initial: (s.name||'?')[0].toUpperCase(),
         tags: s.tags || (s.tag ? [s.tag] : []),
@@ -59301,6 +59305,156 @@ async function reactComment(ev, id, btn){
       queued = true;
       requestAnimationFrame(function () { queued = false; stamp(); });
     }).observe(document.body, { childList:true, subtree:true, characterData:true });
+  }
+
+  if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', start);
+  else start();
+})();
+</script>
+
+<!-- ══════════════════════════════════════════════════════════════════
+     HUB CARDS — the home page's card behaviour, applied across the hubs
+
+     The home cards earned four things worth carrying over, and they are
+     the reason a grid of nine reads as nine different things rather than
+     nine boxes:
+
+       the item's own artwork, heavily blurred, tinting the panel its
+         text sits on — so each card carries its subject's colour
+       a lit top edge on that panel, so it reads as a surface the art
+         sits on rather than a strip left underneath it
+       a hairline inside the radius, so cover art stops meeting the card
+         edge flat
+       a lift on hover with the hub's accent in the border, rather than
+         a generic brighten
+
+     Applied to the Discover lobby cards and the Tournaments game cards,
+     which are the two grids that carry artwork.
+
+     THE TINT NEEDS THE ART URL IN CSS. The cards already carry a
+     --dc-fallback gradient but not their image, so a small pass reads
+     the <img> back out of each card and publishes it as a custom
+     property. Nothing re-fetches: it is the URL the card is already
+     showing.
+     ══════════════════════════════════════════════════════════════════ -->
+<style>
+/* ── Discover lobby cards ─────────────────────────────────────── */
+#discoverOverlay .dc-card{
+  transition:transform .2s cubic-bezier(.22,1,.36,1),
+             box-shadow .2s ease, border-color .2s ease !important;
+}
+#discoverOverlay .dc-card:hover{
+  transform:translateY(-4px) !important;
+  border-color:color-mix(in srgb, var(--hub-accent) 50%, transparent) !important;
+  box-shadow:0 18px 40px rgba(0,0,0,.55),
+             0 0 0 1px color-mix(in srgb, var(--hub-accent) 22%, transparent) inset !important;
+}
+/* The lobby's own art, tinting the panel its name sits on. */
+#discoverOverlay .dc-card-info{
+  position:relative; isolation:isolate;
+  overflow:hidden;
+  background:#0b0d12 !important;
+  border-top:1px solid rgba(255,255,255,.07);
+}
+#discoverOverlay .dc-card-info::before{
+  content:''; position:absolute; inset:-40%; z-index:-1; pointer-events:none;
+  background-image:var(--dc-art, none);
+  background-size:cover; background-position:center;
+  /* Low and desaturated on purpose: blurring cover art hard gives you
+     the average of the whole image, and for most banners that is mud.
+     Enough to say which lobby it is, not enough to read as a colour. */
+  filter:blur(34px) saturate(1.15) brightness(.85);
+  opacity:.22;
+}
+#discoverOverlay .dc-card-info::after{
+  content:''; position:absolute; top:0; left:0; right:0; height:1px;
+  background:linear-gradient(90deg, transparent,
+    color-mix(in srgb, var(--hub-accent) 40%, rgba(255,255,255,.14)) 22%,
+    color-mix(in srgb, var(--hub-accent) 40%, rgba(255,255,255,.14)) 78%, transparent);
+  pointer-events:none;
+}
+/* Hairline inside the radius. */
+#discoverOverlay .dc-card::after{
+  content:''; position:absolute; inset:0; z-index:4; pointer-events:none;
+  border-radius:16px;
+  box-shadow:inset 0 0 0 1px rgba(255,255,255,.075);
+}
+#discoverOverlay .dc-card-name{
+  font-weight:800 !important; letter-spacing:.1px;
+  text-shadow:0 1px 2px rgba(0,0,0,.55);
+}
+/* An unknown count must not look like a live zero. */
+#discoverOverlay .dc-card-meta.is-empty .dc-online-dot{
+  background:rgba(255,255,255,.22) !important;
+  box-shadow:none !important;
+  animation:none !important;
+}
+#discoverOverlay .dc-card-meta.is-empty{ opacity:.6; }
+
+/* ── Tournament game cards ────────────────────────────────────── */
+#globalTournamentsOverlay .gt-game-card{
+  transition:transform .2s cubic-bezier(.22,1,.36,1),
+             box-shadow .2s ease, border-color .2s ease !important;
+}
+#globalTournamentsOverlay .gt-game-card:hover{
+  transform:translateY(-4px) !important;
+  border-color:color-mix(in srgb, var(--hub-accent) 50%, transparent) !important;
+  box-shadow:0 18px 40px rgba(0,0,0,.55) !important;
+}
+#globalTournamentsOverlay .gt-game-card-info{
+  position:relative; isolation:isolate; overflow:hidden;
+  border-top:1px solid rgba(255,255,255,.07);
+}
+#globalTournamentsOverlay .gt-game-card-info::before{
+  content:''; position:absolute; inset:-40%; z-index:-1; pointer-events:none;
+  background-image:var(--dc-art, none);
+  background-size:cover; background-position:center;
+  filter:blur(34px) saturate(1.15) brightness(.85);
+  opacity:.22;
+}
+#globalTournamentsOverlay .gt-game-card::after{
+  content:''; position:absolute; inset:0; z-index:4; pointer-events:none;
+  border-radius:inherit;
+  box-shadow:inset 0 0 0 1px rgba(255,255,255,.075);
+}
+#globalTournamentsOverlay .gt-game-card-title{
+  font-weight:800 !important;
+  text-shadow:0 1px 2px rgba(0,0,0,.55);
+}
+</style>
+<script>
+(function () {
+  'use strict';
+
+  /* Publish each card's own artwork as a custom property so the panel
+     beneath can tint itself with it. The URL is the one the card is
+     already displaying — nothing is fetched twice. */
+  var CARDS = '#discoverOverlay .dc-card, #globalTournamentsOverlay .gt-game-card';
+
+  function tint(card){
+    var img = card.querySelector('img[src]');
+    var src = img && img.getAttribute('src');
+    if (!src) return;
+    var want = 'url("' + src.replace(/"/g, '\\"') + '")';
+    if (card.style.getPropertyValue('--dc-art') === want) return;
+    card.style.setProperty('--dc-art', want);
+  }
+
+  function sweep(){
+    document.querySelectorAll(CARDS).forEach(tint);
+  }
+
+  function start(){
+    sweep();
+    var queued = false;
+    /* Grids are rebuilt on open, on search and on filter, so this has to
+       keep up. Debounced by a frame, and tint() only writes when the
+       value differs, so setting the property cannot drive it round. */
+    new MutationObserver(function () {
+      if (queued) return;
+      queued = true;
+      requestAnimationFrame(function () { queued = false; sweep(); });
+    }).observe(document.body, { childList:true, subtree:true });
   }
 
   if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', start);

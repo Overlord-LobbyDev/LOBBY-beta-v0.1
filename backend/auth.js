@@ -3361,9 +3361,11 @@ function _lobbyCard(s) {
     tag: tags[0] || null,
     tags,
     members: s.member_count || 0,
-    // Presence lives in the websocket process, not here, so this is not
-    // reported rather than guessed. The card treats 0 as "unknown".
-    online: 0,
+    // online is deliberately ABSENT, not zero. Presence lives in the
+    // websocket process, not this one, so this service genuinely does
+    // not know it -- and "0 online" beside a live pulsing dot is a
+    // confident claim that nobody is there. The card renders an
+    // em-dash when the field is missing, which is the truth.
     cover: s.banner_url || s.icon_url || "",
     icon: s.icon_url || "",
     fallback: "linear-gradient(135deg,#2a2d3a,#15161e)",
