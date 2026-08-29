@@ -4,6 +4,11 @@
   <meta charset="UTF-8" />
   <link rel="preload" href="https://fonts.googleapis.com/css2?family=Bebas+Neue&display=swap" as="style" onload="this.onload=null;this.rel='stylesheet'">
   <noscript><link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bebas+Neue&display=swap"></noscript>
+  <!-- Control Room: JetBrains Mono carries the telemetry read-out, Archivo
+       the condensed headline. Same preload pattern as Bebas above; both
+       have real fallbacks in the CSS if the network is unavailable. -->
+  <link rel="preload" href="https://fonts.googleapis.com/css2?family=Archivo:wght@700;800;900&family=JetBrains+Mono:wght@500;700;800&display=swap" as="style" onload="this.onload=null;this.rel='stylesheet'">
+  <noscript><link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo:wght@700;800;900&family=JetBrains+Mono:wght@500;700;800&display=swap"></noscript>
   <link rel="stylesheet" href="transitions.css" />
   <title>LOBBY</title>
   <style>
@@ -52916,6 +52921,472 @@ body.feed-anim-out #socialFeed{
     new MutationObserver(schedule).observe(document.body, { attributes:true, attributeFilter:['class'] });
     schedule();
     console.log('[coliseum-v3] grid repair + identity pass');
+  }
+
+  if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', start);
+  else start();
+})();
+</script>
+
+<!-- ══════════════════════════════════════════════════════════════════
+     COLISEUM — CONTROL ROOM
+     Direction 01A with 01C's card rows below the fold, built as its own
+     page rather than as more CSS over the old markup.
+
+     The old .col-canvas is hidden, not deleted: populate() keeps writing
+     into it harmlessly, and this renderer reads the same sources it does
+     (cachedServerMembers / cachedServerChannels / lobbyTournaments), so
+     there is one set of data and no second fetch.
+
+     The whole point of Control Room is that it does not need an event to
+     look finished: with nothing running the ticker reads STANDBY with the
+     last result, the telemetry grid still carries real numbers, and the
+     page keeps its shape. Nothing is ever hidden, so it cannot look
+     half-built the way the old page did.
+     ══════════════════════════════════════════════════════════════════ -->
+<style>
+body.coliseum-mode #coliseumRoot .col-canvas{ display:none !important; }
+
+#crRoot{
+  --cr-live:#ff3b3b;
+  --cr-ink:#f3f4f7;
+  --cr-ink2:rgba(243,244,247,.62);
+  --cr-ink3:rgba(243,244,247,.36);
+  --cr-line:rgba(255,255,255,.09);
+  --cr-mono:'JetBrains Mono',ui-monospace,'Cascadia Code',monospace;
+  position:relative; z-index:2;
+  max-width:1560px; margin:0 auto; padding:22px 26px 120px;
+  font-family:'Inter',system-ui,sans-serif;
+  color:var(--cr-ink);
+}
+#crRoot *{ box-sizing:border-box; }
+
+/* ── Ticker ─────────────────────────────────────────────────── */
+.cr-ticker{
+  display:flex; align-items:center; gap:12px; flex-wrap:wrap;
+  padding:9px 16px; border-radius:10px 10px 0 0;
+  background:linear-gradient(90deg, rgba(255,59,59,.20), transparent 58%);
+  border:1px solid rgba(255,59,59,.32); border-bottom:0;
+  font-family:var(--cr-mono); font-size:11px; color:var(--cr-ink2);
+  letter-spacing:.4px;
+}
+.cr-ticker.standby{
+  background:linear-gradient(90deg, rgba(255,255,255,.07), transparent 58%);
+  border-color:var(--cr-line);
+}
+.cr-sep{ color:rgba(255,255,255,.18); }
+.cr-tag{
+  display:inline-flex; align-items:center; gap:6px;
+  background:var(--cr-live); color:#fff;
+  font-size:10px; font-weight:900; letter-spacing:1.8px;
+  padding:4px 10px; border-radius:4px;
+}
+.cr-tag i{ width:6px; height:6px; border-radius:50%; background:#fff; display:block;
+  animation:crBlink 1.4s ease-in-out infinite; }
+@keyframes crBlink{ 0%,100%{opacity:1} 50%{opacity:.25} }
+.cr-tag.off{ background:rgba(255,255,255,.10); color:var(--cr-ink2); }
+.cr-tag.off i{ background:var(--cr-ink3); animation:none; }
+@media (prefers-reduced-motion: reduce){ .cr-tag i{ animation:none; } }
+
+/* ── Top: identity + match ─────────────────────────────────── */
+.cr-top{
+  display:grid; grid-template-columns:minmax(0,1fr) 360px;
+  border:1px solid var(--cr-line); border-radius:0 0 12px 12px;
+  overflow:hidden; background:#0a0c12;
+}
+.cr-id{ position:relative; padding:22px 24px; border-right:1px solid var(--cr-line); }
+/* Scanlines — the texture that makes it read as a monitor. */
+.cr-id::before{
+  content:''; position:absolute; inset:0; pointer-events:none;
+  background-image:repeating-linear-gradient(0deg, rgba(255,255,255,.035) 0 1px, transparent 1px 4px);
+}
+.cr-id-art{
+  position:absolute; inset:0; background-size:cover; background-position:center;
+  opacity:.30; pointer-events:none;
+}
+.cr-id-art::after{
+  content:''; position:absolute; inset:0;
+  background:linear-gradient(90deg, #0a0c12 8%, rgba(10,12,18,.86) 48%, rgba(10,12,18,.55) 100%);
+}
+.cr-id-row{ position:relative; display:flex; gap:15px; align-items:center; }
+.cr-crest{
+  width:66px; height:66px; border-radius:11px; flex:0 0 66px; overflow:hidden;
+  background:linear-gradient(135deg, var(--accent, #5865f2), #242a66);
+  display:flex; align-items:center; justify-content:center;
+  font-family:'Bebas Neue',sans-serif; font-size:32px; color:#fff;
+  box-shadow:0 0 0 1px rgba(255,255,255,.16), 0 14px 34px rgba(0,0,0,.6);
+}
+.cr-crest img{ width:100%; height:100%; object-fit:cover; }
+.cr-name{
+  font-family:'Archivo','Inter',sans-serif; font-weight:900;
+  font-size:clamp(20px,2vw,28px); line-height:1; letter-spacing:-.5px; margin:0;
+}
+.cr-desc{ font-size:12px; color:var(--cr-ink3); margin-top:5px; max-width:52ch; }
+.cr-acts{ margin-left:auto; display:flex; gap:7px; flex-wrap:wrap; }
+.cr-btn{
+  border:1px solid var(--cr-line); background:rgba(255,255,255,.04);
+  color:var(--cr-ink2); border-radius:7px; padding:7px 12px;
+  font-size:11px; font-weight:700; letter-spacing:.5px; cursor:pointer;
+  transition:border-color .15s, color .15s, background .15s;
+}
+.cr-btn:hover{ border-color:rgba(255,255,255,.28); color:#fff; background:rgba(255,255,255,.08); }
+.cr-btn.pri{
+  border-color:color-mix(in srgb, var(--accent) 55%, transparent);
+  color:#fff; background:color-mix(in srgb, var(--accent) 22%, transparent);
+}
+.cr-btn.live{ border-color:rgba(255,59,59,.55); color:#ffb3b3; background:rgba(255,59,59,.14); }
+
+/* Telemetry — real numbers in a monospace grid, never decorative. */
+.cr-tele{
+  position:relative; display:grid; grid-template-columns:repeat(4,1fr);
+  gap:1px; background:var(--cr-line); border:1px solid var(--cr-line); margin-top:18px;
+}
+.cr-tele > div{ background:#0a0c12; padding:10px 13px; }
+.cr-tele b{
+  display:block; font-family:var(--cr-mono); font-size:21px; font-weight:800;
+  line-height:1; color:#fff; font-variant-numeric:tabular-nums;
+}
+.cr-tele span{
+  font-size:8.5px; letter-spacing:1.5px; font-weight:800;
+  color:var(--cr-ink3); text-transform:uppercase;
+}
+.cr-tele b.hot{ color:#5ee08a; }
+
+/* Match panel */
+.cr-match{ padding:18px; background:linear-gradient(180deg,#12141d,#0a0c12); }
+.cr-match-h{ display:flex; align-items:center; gap:8px; }
+.cr-pill{
+  font-size:9.5px; font-weight:800; letter-spacing:1.1px; text-transform:uppercase;
+  padding:3px 9px; border-radius:99px; border:1px solid var(--cr-line); color:var(--cr-ink2);
+}
+.cr-pill.hot{ border-color:rgba(255,59,59,.5); color:#ff9a9a; }
+.cr-vs{ display:flex; align-items:center; gap:10px; margin-top:14px; }
+.cr-team{ flex:1; text-align:center; min-width:0; }
+.cr-av{
+  width:46px; height:46px; border-radius:50%; margin:0 auto 7px; overflow:hidden;
+  background:linear-gradient(135deg,#3a4152,#171a24); border:1px solid var(--cr-line);
+  display:flex; align-items:center; justify-content:center;
+  font-size:13px; font-weight:800; color:var(--cr-ink2);
+}
+.cr-av img{ width:100%; height:100%; object-fit:cover; }
+.cr-team b{ font-size:12px; display:block; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+.cr-score{ font-family:'Bebas Neue',sans-serif; font-size:26px; color:var(--cr-live); line-height:1; }
+.cr-match-empty{ font-size:12px; color:var(--cr-ink3); line-height:1.6; margin-top:12px; }
+
+/* ── Bracket rail ───────────────────────────────────────────── */
+.cr-sec{ margin-top:18px; }
+.cr-h{
+  font-family:var(--cr-mono); font-size:10px; font-weight:800; letter-spacing:2px;
+  text-transform:uppercase; color:var(--cr-ink3); margin:0 0 11px;
+  display:flex; align-items:center; gap:10px;
+}
+.cr-h .more{ margin-left:auto; font-size:10px; color:var(--cr-ink3); cursor:pointer; letter-spacing:.6px; }
+.cr-h .more:hover{ color:#fff; }
+.cr-rail{ display:grid; grid-template-columns:repeat(auto-fit,minmax(190px,1fr)); gap:9px; }
+.cr-node{
+  border:1px solid var(--cr-line); border-left:2px solid rgba(255,255,255,.18);
+  border-radius:0 7px 7px 0; padding:10px 12px; background:#0b0d14;
+  font-size:12px; cursor:pointer; transition:border-color .15s, background .15s;
+}
+.cr-node:hover{ border-color:rgba(255,255,255,.3); background:#0f1219; }
+.cr-node.on{ border-left-color:var(--cr-live); background:linear-gradient(90deg, rgba(255,59,59,.13), #0b0d14); }
+.cr-node small{
+  display:block; color:var(--cr-ink3); font-family:var(--cr-mono);
+  font-size:9px; letter-spacing:1.1px; margin-bottom:4px;
+}
+
+/* ── Deck rows (from 01C) ───────────────────────────────────── */
+.cr-cards{ display:grid; grid-template-columns:repeat(auto-fill,minmax(210px,1fr)); gap:11px; }
+.cr-card{
+  border:1px solid var(--cr-line); border-radius:10px; overflow:hidden;
+  background:#0d0f16; cursor:pointer;
+  transition:border-color .16s, transform .16s, box-shadow .16s;
+}
+.cr-card:hover{ border-color:rgba(255,255,255,.26); transform:translateY(-2px); box-shadow:0 14px 30px rgba(0,0,0,.5); }
+.cr-thumb{
+  height:76px; position:relative; display:flex; align-items:center; justify-content:center;
+  background:linear-gradient(135deg,#232a3d,#11141d); font-size:23px;
+}
+.cr-thumb .cr-tag{ position:absolute; top:8px; left:8px; }
+.cr-card.live{ border-color:rgba(255,59,59,.45); }
+.cr-card.live .cr-thumb{ background:linear-gradient(135deg, rgba(255,59,59,.34), #11141d); }
+.cr-card.voice .cr-thumb{ background:linear-gradient(135deg, rgba(35,165,90,.30), #11141d); }
+.cr-card-b{ padding:10px 12px; }
+.cr-card-b b{ font-size:12.5px; display:block; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+.cr-card-b span{ font-size:10.5px; color:var(--cr-ink3); }
+
+@media (max-width:900px){
+  .cr-top{ grid-template-columns:1fr; }
+  .cr-id{ border-right:0; border-bottom:1px solid var(--cr-line); }
+}
+</style>
+<script>
+(function () {
+  'use strict';
+
+  function $(id){ return document.getElementById(id); }
+  function esc(s){
+    return String(s == null ? '' : s)
+      .replace(/&/g,'&amp;').replace(/"/g,'&quot;')
+      .replace(/</g,'&lt;').replace(/>/g,'&gt;');
+  }
+  function initials(n){ return String(n || '?').trim().slice(0,2).toUpperCase(); }
+
+  /* selectedServer is a top-level `let` — reachable lexically, not on
+     window. Reading window.selectedServer yields undefined. */
+  function server(){
+    try { if (typeof selectedServer !== 'undefined' && selectedServer) return selectedServer; } catch(e){}
+    return window.selectedServer || null;
+  }
+  function members(){ return Array.isArray(window.cachedServerMembers) ? window.cachedServerMembers : []; }
+  function channels(){ return Array.isArray(window.cachedServerChannels) ? window.cachedServerChannels : []; }
+  function tournaments(){
+    var s = server();
+    try {
+      if (s && window.lobbyTournaments && Array.isArray(window.lobbyTournaments[s.id]))
+        return window.lobbyTournaments[s.id];
+    } catch(e){}
+    return Array.isArray(window.cachedServerTournaments) ? window.cachedServerTournaments : [];
+  }
+  function presence(m){
+    return (typeof window._lirPresenceOf === 'function') ? window._lirPresenceOf(m) : 'offline';
+  }
+  function isLive(t){
+    var s = String(t && t.status || '').toLowerCase();
+    return s === 'live' || s === 'active' || s === 'in_progress';
+  }
+  function isDone(t){
+    var s = String(t && t.status || '').toLowerCase();
+    return s === 'done' || s === 'finished' || s === 'complete' || s === 'completed';
+  }
+
+  function avatar(p){
+    if (!p) return '<div class="cr-av">?</div>';
+    var url = p.avatar_url || p.avatarUrl;
+    var name = p.name || p.display_name || p.username || '?';
+    return '<div class="cr-av">' +
+      (url ? '<img src="' + esc(url) + '" alt="">' : esc(initials(name))) +
+      '</div>';
+  }
+
+  function root(){
+    var host = $('coliseumRoot');
+    if (!host) return null;
+    var el = $('crRoot');
+    if (!el || !el.isConnected){
+      el = document.createElement('div');
+      el.id = 'crRoot';
+      host.appendChild(el);
+    }
+    return el;
+  }
+
+  function render(){
+    var el = root();
+    var s = server();
+    if (!el || !s) return;
+
+    var mem = members(), chs = channels(), ts = tournaments();
+    var online = mem.filter(function(m){ return presence(m) !== 'offline'; });
+    var voice  = mem.filter(function(m){ return presence(m) === 'voice'; });
+
+    var liveT = ts.filter(isLive);
+    var active = liveT[0] || null;
+    var matches = active ? (active.matches || active.current_matches || []) : [];
+    var liveMatches = matches.filter(function(m){ return m && m.live; });
+
+    /* ── Ticker. STANDBY is a real state with real content, not a
+       placeholder — this is what stops a quiet lobby looking broken. ── */
+    var tick;
+    if (active){
+      tick = '<span class="cr-tag"><i></i>LIVE</span>' +
+        '<span>' + esc(String(active.name || active.title || 'TOURNAMENT').toUpperCase()) + '</span>' +
+        '<span class="cr-sep">│</span><span>' + (liveMatches.length || matches.length) + ' MATCHES</span>' +
+        '<span class="cr-sep">│</span><span>' + voice.length + ' IN VOICE</span>';
+    } else {
+      var last = ts.filter(isDone)[0];
+      tick = '<span class="cr-tag off"><i></i>STANDBY</span>' +
+        '<span>NO EVENT RUNNING</span>' +
+        (last ? '<span class="cr-sep">│</span><span>LAST: ' + esc(String(last.name || last.title).toUpperCase()) + '</span>' : '') +
+        '<span class="cr-sep">│</span><span>' + ts.length + ' TOURNAMENTS ON FILE</span>';
+    }
+
+    var banner = s.banner_url || s.bannerUrl || s.banner;
+    var icon   = s.icon_url || s.iconUrl || s.icon;
+
+    /* ── Match panel: the live match if there is one, otherwise the next
+       tournament waiting to start. Never an empty box. ── */
+    var mHtml;
+    if (matches.length){
+      var m = liveMatches[0] || matches[0];
+      var a = m.team_a || m.a || {}, b = m.team_b || m.b || {};
+      mHtml =
+        '<div class="cr-match-h">' +
+          '<span class="cr-pill ' + (m.live ? 'hot' : '') + '">' + (m.live ? 'LIVE MATCH' : 'NEXT MATCH') + '</span>' +
+          (active.format ? '<span class="cr-pill">' + esc(active.format) + '</span>' : '') +
+        '</div>' +
+        '<div class="cr-vs">' +
+          '<div class="cr-team">' + avatar(a) + '<b>' + esc(a.name || 'TBD') + '</b></div>' +
+          '<div class="cr-score">' + esc((m.score_a != null ? m.score_a : 0) + '–' + (m.score_b != null ? m.score_b : 0)) + '</div>' +
+          '<div class="cr-team">' + avatar(b) + '<b>' + esc(b.name || 'TBD') + '</b></div>' +
+        '</div>';
+    } else {
+      var next = ts.filter(function(t){ return !isDone(t); })[0];
+      mHtml =
+        '<div class="cr-match-h"><span class="cr-pill">' + (next ? 'NEXT UP' : 'NO EVENT') + '</span></div>' +
+        (next
+          ? '<div class="cr-vs"><div class="cr-team" style="flex:1">' +
+              '<div style="font-family:\'Bebas Neue\',sans-serif;font-size:24px;line-height:1.05">' +
+                esc(String(next.name || next.title || 'Tournament').toUpperCase()) + '</div>' +
+              '<div style="font-size:11px;color:var(--cr-ink3);margin-top:5px">Waiting to start</div>' +
+            '</div></div>' +
+            '<button class="cr-btn pri" style="width:100%;margin-top:14px" data-act="tourneys">Open bracket</button>'
+          : '<div class="cr-match-empty">No tournaments yet. Run one and the bracket takes over this panel.</div>' +
+            '<button class="cr-btn pri" style="width:100%;margin-top:12px" data-act="newt">New tournament</button>');
+    }
+
+    /* ── Bracket rail: real matches when they exist, otherwise the
+       tournaments themselves as nodes. ── */
+    var railItems = matches.length
+      ? matches.slice(0, 4).map(function(m){
+          var a = m.team_a || m.a || {}, b = m.team_b || m.b || {};
+          return '<div class="cr-node ' + (m.live ? 'on' : '') + '">' +
+            '<small>' + (m.live ? 'LIVE' : 'SCHEDULED') + '</small>' +
+            esc(a.name || 'TBD') + ' <span style="color:var(--cr-ink3)">vs</span> ' + esc(b.name || 'TBD') +
+            '</div>';
+        }).join('')
+      : ts.slice(0, 4).map(function(t){
+          return '<div class="cr-node ' + (isLive(t) ? 'on' : '') + '" data-act="tourneys">' +
+            '<small>' + esc(String(t.status || 'SETUP').toUpperCase()) + '</small>' +
+            esc(t.name || t.title || 'Tournament') +
+            '</div>';
+        }).join('');
+
+    /* ── Deck rows ── */
+    function chCard(c){
+      var isVoice = c.type === 'voice';
+      var here = isVoice
+        ? mem.filter(function(m){ return m && (m.voiceChannelId === c.id || m.voice_channel_id === c.id); }).length
+        : 0;
+      return '<div class="cr-card ' + (isVoice ? 'voice' : '') + '" data-ch="' + esc(c.id) +
+        '" data-type="' + esc(c.type || 'text') + '" data-name="' + esc(c.name || 'channel') + '">' +
+        '<div class="cr-thumb">' + (isVoice ? '🎙' : c.type === 'announcement' ? '📣' : '💬') + '</div>' +
+        '<div class="cr-card-b"><b>' + esc(String(c.name || 'channel').replace(/^#/, '')) + '</b>' +
+        '<span>' + (isVoice ? (here ? here + ' here now' : 'Voice room') : 'Text channel') + '</span></div></div>';
+    }
+    function tCard(t){
+      var live = isLive(t);
+      return '<div class="cr-card ' + (live ? 'live' : '') + '" data-act="tourneys">' +
+        '<div class="cr-thumb">' + (live ? '<span class="cr-tag"><i></i>LIVE</span>' : '') + (isDone(t) ? '🏁' : '🏆') + '</div>' +
+        '<div class="cr-card-b"><b>' + esc(t.name || t.title || 'Tournament') + '</b>' +
+        '<span>' + esc(String(t.status || 'setup').toUpperCase()) + '</span></div></div>';
+    }
+
+    el.innerHTML =
+      '<div class="cr-ticker ' + (active ? '' : 'standby') + '">' + tick + '</div>' +
+      '<div class="cr-top">' +
+        '<div class="cr-id">' +
+          (banner ? '<div class="cr-id-art" style="background-image:url(\'' + esc(banner) + '\')"></div>' : '') +
+          '<div class="cr-id-row">' +
+            '<div class="cr-crest">' + (icon ? '<img src="' + esc(icon) + '" alt="">' : esc(initials(s.name))) + '</div>' +
+            '<div style="min-width:0">' +
+              '<h1 class="cr-name">' + esc(String(s.name || 'Lobby').toUpperCase()) + '</h1>' +
+              '<div class="cr-desc">' + esc(s.description || s.motto || 'No description set.') + '</div>' +
+            '</div>' +
+            '<div class="cr-acts">' +
+              (voice.length
+                ? '<button class="cr-btn live" data-act="joinvoice">Join voice · ' + voice.length + '</button>'
+                : '<button class="cr-btn pri" data-act="startvoice">Start a room</button>') +
+              '<button class="cr-btn" data-act="calendar">Calendar</button>' +
+              '<button class="cr-btn" data-act="settings">Settings</button>' +
+              '<button class="cr-btn" data-act="invite">Invite</button>' +
+            '</div>' +
+          '</div>' +
+          '<div class="cr-tele">' +
+            '<div><b>' + mem.length + '</b><span>Members</span></div>' +
+            '<div><b class="' + (online.length ? 'hot' : '') + '">' + online.length + '</b><span>Online</span></div>' +
+            '<div><b class="' + (voice.length ? 'hot' : '') + '">' + voice.length + '</b><span>In voice</span></div>' +
+            '<div><b>' + ts.length + '</b><span>Tournaments</span></div>' +
+          '</div>' +
+        '</div>' +
+        '<div class="cr-match">' + mHtml + '</div>' +
+      '</div>' +
+      (railItems ? '<div class="cr-sec"><p class="cr-h">' + (matches.length ? 'Bracket' : 'Tournaments') +
+        '<span class="more" data-act="tourneys">View all ' + ts.length + ' →</span></p>' +
+        '<div class="cr-rail">' + railItems + '</div></div>' : '') +
+      '<div class="cr-sec"><p class="cr-h">Rooms</p><div class="cr-cards">' +
+        (chs.length ? chs.map(chCard).join('')
+                    : '<div class="cr-match-empty">No channels yet — create one in Settings.</div>') +
+      '</div></div>' +
+      (ts.length ? '<div class="cr-sec"><p class="cr-h">Tournaments' +
+        '<span class="more" data-act="newt">New tournament</span></p>' +
+        '<div class="cr-cards">' + ts.slice(0, 8).map(tCard).join('') + '</div></div>' : '');
+  }
+
+  /* One delegated handler; re-rendering never has to rebind. */
+  function wire(){
+    var el = root();
+    if (!el || el.__wired) return;
+    el.addEventListener('click', function(e){
+      var s = server();
+      var card = e.target.closest('[data-ch]');
+      if (card){
+        var id = card.getAttribute('data-ch');
+        var nm = card.getAttribute('data-name');
+        var tp = card.getAttribute('data-type');
+        if (tp === 'voice'){
+          if (typeof window.joinVoiceChannel === 'function') window.joinVoiceChannel(id, nm);
+        } else if (typeof window.openChannel === 'function'){
+          window.openChannel(id, nm, tp || 'text');
+        }
+        return;
+      }
+      var act = e.target.closest('[data-act]');
+      if (!act || !s) return;
+      switch (act.getAttribute('data-act')){
+        case 'calendar':
+          if (typeof window.openLobbyCalendar === 'function') window.openLobbyCalendar(s.id, s.name);
+          break;
+        case 'settings':
+          if (typeof window.openServerSettings === 'function') window.openServerSettings(s.id);
+          break;
+        case 'invite':
+          if (typeof window.inviteFriendToServer === 'function') window.inviteFriendToServer(s.id);
+          break;
+        case 'joinvoice':
+        case 'startvoice': {
+          var vc = channels().find(function(c){ return c.type === 'voice'; });
+          if (vc && typeof window.joinVoiceChannel === 'function') window.joinVoiceChannel(vc.id, vc.name);
+          break;
+        }
+        case 'tourneys':
+          if (typeof window.showOverlay === 'function') window.showOverlay('myTournamentsOverlay');
+          break;
+        case 'newt':
+          if (typeof window.openModal === 'function') window.openModal('createTournamentModal');
+          break;
+      }
+    });
+    el.__wired = true;
+  }
+
+  var t = null;
+  function schedule(){
+    clearTimeout(t);
+    t = setTimeout(function(){
+      if (!document.body.classList.contains('coliseum-mode')) return;
+      wire(); render();
+    }, 90);
+  }
+
+  function start(){
+    new MutationObserver(schedule).observe(document.body, { attributes:true, attributeFilter:['class'] });
+    // Presence and tournament data arrive over the socket after paint.
+    setInterval(function(){
+      if (document.body.classList.contains('coliseum-mode')) { wire(); render(); }
+    }, 2500);
+    schedule();
+    console.log('[coliseum] Control Room active');
   }
 
   if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', start);
