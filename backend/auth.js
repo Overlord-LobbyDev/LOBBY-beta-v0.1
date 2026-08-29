@@ -1327,6 +1327,7 @@ app.get("/friends", requireAuth, async (req, res) => {
 // exist yet and this endpoint cannot honour it.
 app.get("/users/discover", requireAuth, async (req, res) => {
   try {
+    const { limit, offset } = _page(req);
     const r = await pool.query(`
       SELECT id, username, display_name, avatar_url, bio, created_at
       FROM users
@@ -1334,8 +1335,8 @@ app.get("/users/discover", requireAuth, async (req, res) => {
         AND id <> $1
         AND (avatar_url IS NOT NULL OR bio IS NOT NULL OR display_name IS NOT NULL)
       ORDER BY created_at DESC
-      LIMIT 40
-    `, [req.userId]);
+      LIMIT $2 OFFSET $3
+    `, [req.userId, limit, offset]);
     res.json(r.rows.map(u => ({
       id: u.id,
       username: u.username,
@@ -4111,9 +4112,12 @@ function _tourneyCard(r) {
 // GET /tournaments/global — every tournament worth showing, across lobbies.
 app.get("/tournaments/global", async (req, res) => {
   try {
+    const { limit, offset } = _page(req);
     const r = await pool.query(_TOURNEY_SELECT +
       ` WHERE t.status IN ('setup','registration','in-progress')` +
-      ` ORDER BY (t.status = 'in-progress') DESC, entrants DESC, t.created_at DESC LIMIT 60`);
+      `   AND ` + _PUBLIC_TOURNEY_WHERE +
+      ` ORDER BY (t.status = 'in-progress') DESC, entrants DESC, t.created_at DESC` +
+      ` LIMIT $1 OFFSET $2`, [limit, offset]);
     res.json(r.rows.map(_tourneyCard));
   } catch (e) {
     console.error("[tournaments/global]", e.message);
@@ -4229,6 +4233,31 @@ app.get("/tournaments/me/stats", requireAuth, async (req, res) => {
 const _PUBLIC_LOBBY_WHERE =
   "s.tags IS NOT NULL AND s.tags::text NOT IN ('[]','','null')";
 
+// A tournament is exactly as public as the lobby holding it. Discover
+// is a browse surface for strangers, so a bracket run inside a private
+// lobby must not appear on it -- its name, its host and its entrant
+// list are all as private as the room they are in.
+//
+// Deliberately NOT folded into _TOURNEY_SELECT. That constant also
+// backs a lobby's own tournament list, where members are entitled to
+// see their own private brackets; this belongs only to the routes that
+// serve the public.
+//
+// lobby_id is TEXT NOT NULL so every tournament has one, and the join
+// in _TOURNEY_SELECT is a LEFT JOIN -- a lobby_id pointing at a row
+// that no longer exists yields NULL tags and is excluded, which is the
+// safe direction to fail.
+const _PUBLIC_TOURNEY_WHERE = _PUBLIC_LOBBY_WHERE;
+
+// Shared paging for the browse endpoints. Caps the page so a caller
+// cannot ask for the whole table, and floors the offset so a negative
+// one cannot walk backwards off the start.
+function _page(req, def = 50, max = 100) {
+  const limit  = Math.min(max, Math.max(1, parseInt(req.query.limit, 10)  || def));
+  const offset = Math.max(0, parseInt(req.query.offset, 10) || 0);
+  return { limit, offset };
+}
+
 function _lobbyCard(s) {
   let tags = [];
   try { tags = Array.isArray(s.tags) ? s.tags : JSON.parse(s.tags || "[]"); }
@@ -4261,6 +4290,7 @@ function _lobbyCard(s) {
 // GET /lobbies/public — the Discover grid.
 app.get("/lobbies/public", async (req, res) => {
   try {
+    const { limit, offset } = _page(req);
     const r = await pool.query(`
       SELECT s.*,
         (SELECT COUNT(*)::int FROM server_members WHERE server_id = s.id) AS member_count,
@@ -4284,8 +4314,8 @@ app.get("/lobbies/public", async (req, res) => {
       FROM servers s
       WHERE ` + _PUBLIC_LOBBY_WHERE + `
       ORDER BY member_count DESC, s.created_at DESC
-      LIMIT 100
-    `);
+      LIMIT $1 OFFSET $2
+    `, [limit, offset]);
     res.json(r.rows.map(_lobbyCard));
   } catch (e) {
     console.error("[lobbies/public]", e.message);
@@ -4303,7 +4333,8 @@ app.get("/lobbies/public", async (req, res) => {
 app.get("/featured/spotlight", async (req, res) => {
   try {
     const t = await pool.query(_TOURNEY_SELECT +
-      ` WHERE t.status = 'in-progress' ORDER BY entrants DESC LIMIT 1`);
+      ` WHERE t.status = 'in-progress' AND ` + _PUBLIC_TOURNEY_WHERE +
+      ` ORDER BY entrants DESC LIMIT 1`);
     if (t.rows.length && (t.rows[0].entrants || 0) > 0) {
       return res.json(Object.assign(_tourneyCard(t.rows[0]), { kind: "tournament" }));
     }
