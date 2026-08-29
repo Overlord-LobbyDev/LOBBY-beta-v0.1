@@ -54743,5 +54743,246 @@ body.double-dock[data-feed-position="right"].feed-open:not(.rail-hidden) #lsRoot
   console.log('[settings] lobby settings page ready — ' + SECTIONS.length + ' sections');
 })();
 </script>
+
+<!-- ══════════════════════════════════════════════════════════════════
+     USER SETTINGS — same page language as Lobby settings
+
+     The 12 sections inside #settingsDrawer all work and carry their own
+     handlers (Steam linking, audio devices, themes, password), so this
+     converts the SHELL and re-skins the controls rather than rebuilding
+     them. Rebuilding would have meant re-wiring twelve features to gain
+     nothing a restyle does not.
+
+     What changes:
+       the 720px slide-out drawer becomes a full page, offset below the
+         top bars and giving up the right edge to whichever dock is open
+       the backdrop goes — a full page has nothing to dim behind it
+       the emoji nav becomes drawn glyphs, matched to Lobby settings
+       headings, fields, cards, buttons and toggles adopt the same
+         palette, type and spacing
+
+     Nav icons are swapped in JS because the buttons are static markup
+     with the emoji sitting in the text node; the label is preserved and
+     only the leading glyph is replaced.
+     ══════════════════════════════════════════════════════════════════ -->
+<style>
+/* ── Shell: drawer → page ───────────────────────────────────────── */
+#settingsPanelBackdrop{ display:none !important; }
+
+#settingsDrawer{
+  --ls-ink:#f3f4f7;
+  --ls-ink2:rgba(243,244,247,.66);
+  --ls-ink3:rgba(243,244,247,.40);
+  --ls-line:rgba(255,255,255,.08);
+  --ls-surface:#101219;
+  --ls-mono:'JetBrains Mono',ui-monospace,Consolas,monospace;
+  --ls-head:'Archivo','Inter',system-ui,sans-serif;
+
+  top:calc(72px + var(--ph-row-h, 0px)) !important;
+  left:0 !important; right:0 !important; bottom:0 !important;
+  width:auto !important; max-width:none !important; height:auto !important;
+  border-radius:0 !important; box-shadow:none !important;
+  background:linear-gradient(180deg,#0b0d13 0%,#08090e 100%) !important;
+  border-right:0 !important;
+  /* Opacity, not translateX: a full page sliding in from the left edge
+     reads as a drawer, which is the thing being retired. */
+  transform:none !important;
+  opacity:0; pointer-events:none;
+  transition:opacity .2s ease !important;
+  z-index:9100 !important;
+}
+#settingsDrawer.open{ opacity:1; pointer-events:auto; }
+
+body.feed-closed.lobby-selected:not(.rail-hidden) #settingsDrawer{ right:var(--lir-w) !important; }
+body[data-feed-position="right"].feed-open #settingsDrawer{ right:var(--feed-w) !important; }
+body[data-feed-position="left"].feed-open #settingsDrawer{ left:calc(var(--feed-left-edge) + var(--feed-w)) !important; }
+body.double-dock[data-feed-position="right"].feed-open:not(.rail-hidden) #settingsDrawer{
+  right:calc(var(--feed-w) + var(--lir-w)) !important;
+}
+
+/* ── Header ─────────────────────────────────────────────────────── */
+#settingsDrawer .sp-header{
+  padding:18px 26px !important; height:auto !important;
+  border-bottom:1px solid var(--ls-line) !important;
+  background:linear-gradient(90deg, rgba(255,255,255,.03), transparent 60%) !important;
+}
+#settingsDrawer .sp-title{
+  font-family:'Bebas Neue',sans-serif !important;
+  font-size:24px !important; letter-spacing:1px !important; color:var(--ls-ink) !important;
+  font-weight:400 !important;
+}
+#settingsDrawer .sp-close{
+  width:34px; height:34px; border-radius:9px !important;
+  background:rgba(255,255,255,.05) !important; border:1px solid var(--ls-line) !important;
+  color:var(--ls-ink2) !important; font-size:17px !important; padding:0 !important;
+}
+#settingsDrawer .sp-close:hover{ background:rgba(255,255,255,.1) !important; color:#fff !important; }
+
+/* ── Nav ────────────────────────────────────────────────────────── */
+#settingsDrawer .sp-nav{
+  width:236px !important; min-width:236px !important;
+  background:rgba(255,255,255,.012) !important;
+  border-right:1px solid var(--ls-line) !important;
+  padding:20px 14px !important; gap:2px !important;
+}
+#settingsDrawer .sp-nav-label{
+  font-family:var(--ls-head) !important; font-size:9px !important; font-weight:800 !important;
+  letter-spacing:1.8px !important; text-transform:uppercase;
+  color:var(--ls-ink3) !important; padding:0 10px 8px !important; margin-top:18px !important;
+}
+#settingsDrawer .sp-nav-label:first-child{ margin-top:0 !important; }
+#settingsDrawer .sp-nav-btn{
+  padding:9px 11px !important; border-radius:9px !important;
+  border:1px solid transparent !important; background:transparent !important;
+  color:var(--ls-ink2) !important;
+  font-family:var(--ls-head) !important; font-size:13px !important; font-weight:600 !important;
+  gap:10px !important;
+  transition:background .14s, color .14s, border-color .14s !important;
+}
+#settingsDrawer .sp-nav-btn:hover{ background:rgba(255,255,255,.05) !important; color:#fff !important; }
+#settingsDrawer .sp-nav-btn.active{
+  background:color-mix(in srgb, var(--accent) 16%, transparent) !important;
+  border-color:color-mix(in srgb, var(--accent) 34%, transparent) !important;
+  color:#fff !important;
+}
+#settingsDrawer .sp-nav-btn .spi{ width:15px; height:15px; flex:none; opacity:.8; display:block; }
+#settingsDrawer .sp-nav-btn .spi svg{ width:15px; height:15px; display:block; }
+
+/* ── Content ────────────────────────────────────────────────────── */
+#settingsDrawer .sp-content{ padding:30px 34px 60px !important; }
+#settingsDrawer .sp-content > .sp-section{ max-width:720px; }
+#settingsDrawer .sp-content h2{
+  font-family:var(--ls-head) !important; font-size:20px !important; font-weight:800 !important;
+  letter-spacing:-.2px !important; color:var(--ls-ink) !important; margin-bottom:5px !important;
+}
+#settingsDrawer .sp-subtitle{
+  font-size:13px !important; color:var(--ls-ink3) !important;
+  margin-bottom:24px !important; line-height:1.6 !important;
+}
+#settingsDrawer .sp-section-rule{ display:none !important; }
+#settingsDrawer .sp-group-label{
+  font-family:var(--ls-head) !important; font-size:10px !important; font-weight:800 !important;
+  letter-spacing:1.5px !important; text-transform:uppercase;
+  color:var(--ls-ink3) !important; margin:26px 0 9px !important;
+}
+#settingsDrawer .sp-card{
+  background:var(--ls-surface) !important;
+  border:1px solid var(--ls-line) !important;
+  border-radius:11px !important; padding:13px 15px !important; margin-bottom:9px !important;
+}
+#settingsDrawer input[type="text"],
+#settingsDrawer input[type="password"],
+#settingsDrawer input[type="email"],
+#settingsDrawer input[type="number"],
+#settingsDrawer select,
+#settingsDrawer textarea{
+  background:#0a0c12 !important; border:1px solid var(--ls-line) !important;
+  border-radius:10px !important; color:var(--ls-ink) !important;
+  padding:11px 13px !important; font-size:13.5px !important;
+  font-family:'Inter',system-ui,sans-serif !important;
+}
+#settingsDrawer input:focus, #settingsDrawer select:focus, #settingsDrawer textarea:focus{
+  outline:none !important;
+  border-color:color-mix(in srgb, var(--accent) 55%, transparent) !important;
+  background:#0d1017 !important;
+}
+/* Buttons: the product's accent, never a stock blue. */
+#settingsDrawer .sp-btn,
+#settingsDrawer button.sp-primary,
+#settingsDrawer .sp-save{
+  border-radius:10px !important;
+  font-family:var(--ls-head) !important; font-size:12.5px !important;
+  font-weight:700 !important; letter-spacing:.4px !important;
+  padding:10px 18px !important;
+  background:color-mix(in srgb, var(--accent) 26%, transparent) !important;
+  border:1px solid color-mix(in srgb, var(--accent) 58%, transparent) !important;
+  color:#fff !important;
+}
+#settingsDrawer .sp-btn:hover,
+#settingsDrawer button.sp-primary:hover,
+#settingsDrawer .sp-save:hover{
+  background:color-mix(in srgb, var(--accent) 36%, transparent) !important;
+}
+#settingsDrawer .sp-btn.secondary,
+#settingsDrawer .sp-btn.ghost{
+  background:rgba(255,255,255,.05) !important;
+  border-color:var(--ls-line) !important; color:var(--ls-ink2) !important;
+}
+
+@media (max-width:900px){
+  #settingsDrawer .sp-body{ flex-direction:column; }
+  #settingsDrawer .sp-nav{
+    width:auto !important; min-width:0 !important;
+    flex-direction:row !important; overflow-x:auto;
+    border-right:0 !important; border-bottom:1px solid var(--ls-line) !important;
+    padding:12px !important;
+  }
+  #settingsDrawer .sp-nav-label{ display:none !important; }
+  #settingsDrawer .sp-nav-btn{ white-space:nowrap; width:auto !important; }
+}
+</style>
+<script>
+(function () {
+  'use strict';
+
+  /* Drawn glyphs to replace the emoji in the nav, keyed by the button's
+     existing data-sp so nothing about the section wiring changes. */
+  var G = {
+    profile:    '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="8" r="4"/><path d="M4 21v-1a6 6 0 0 1 6-6h4a6 6 0 0 1 6 6v1"/></svg>',
+    appearance: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M12 3a9 9 0 0 0 0 18 4.5 4.5 0 0 0 0-9 4.5 4.5 0 0 1 0-9z"/></svg>',
+    themes:     '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m3 17 9-13 9 13"/><path d="M3 17c3 3 15 3 18 0"/></svg>',
+    security:   '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="10" width="16" height="10" rx="2"/><path d="M8 10V7a4 4 0 0 1 8 0v3"/></svg>',
+    steam:      '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><circle cx="15" cy="9" r="2.5"/><path d="M3.5 15.5 9 13"/><circle cx="8" cy="16" r="2"/></svg>',
+    chess:      '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 21h6"/><path d="M10 21c0-4 4-5 4-9"/><path d="M12 3a3 3 0 0 1 3 3c0 2-3 3-3 6"/><circle cx="12" cy="3.5" r="1.5"/></svg>',
+    audiovideo: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2a3 3 0 0 0-3 3v6a3 3 0 0 0 6 0V5a3 3 0 0 0-3-3z"/><path d="M19 10v1a7 7 0 0 1-14 0v-1"/><line x1="12" y1="18" x2="12" y2="22"/></svg>',
+    feed:       '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 11a9 9 0 0 1 9 9"/><path d="M4 4a16 16 0 0 1 16 16"/><circle cx="5" cy="19" r="1.5"/></svg>',
+    sounds:     '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 9v6h4l5 4V5l-5 4H6z"/><path d="M18 9.5a4 4 0 0 1 0 5"/></svg>',
+    updates:    '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12a9 9 0 1 1-3-6.7"/><polyline points="21 4 21 9 16 9"/></svg>',
+    performance:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="13 2 4 14 11 14 10 22 20 10 13 10 13 2"/></svg>',
+    tournaments:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M7 4h10v5a5 5 0 0 1-10 0z"/><path d="M17 5h3v2a3 3 0 0 1-3 3"/><path d="M7 5H4v2a3 3 0 0 0 3 3"/><path d="M10 20h4"/><path d="M12 14v6"/></svg>'
+  };
+
+  /* The emoji sits in the button's text node, so strip leading
+     non-word characters and put a glyph span in front. Idempotent —
+     a button already carrying .spi is left alone. */
+  function decorate(){
+    var nav = document.querySelector('#settingsDrawer .sp-nav');
+    if (!nav) return;
+    nav.querySelectorAll('.sp-nav-btn').forEach(function(b){
+      if (b.querySelector('.spi')) return;
+      var key = b.getAttribute('data-sp');
+      var label = (b.textContent || '').replace(/^[^A-Za-z0-9]+/, '').trim();
+      b.textContent = '';
+      if (G[key]){
+        var i = document.createElement('span');
+        i.className = 'spi';
+        i.innerHTML = G[key];
+        b.appendChild(i);
+      }
+      b.appendChild(document.createTextNode(label));
+    });
+    var t = document.querySelector('#settingsDrawer .sp-title');
+    if (t) t.textContent = 'Settings';     // drop the leading gear emoji
+  }
+
+  /* The drawer is opened from several places; decorating on open covers
+     all of them without wrapping each caller. */
+  var obs = new MutationObserver(function(){
+    var d = document.getElementById('settingsDrawer');
+    if (d && d.classList.contains('open')) decorate();
+  });
+
+  function start(){
+    var d = document.getElementById('settingsDrawer');
+    if (!d) return;
+    obs.observe(d, { attributes:true, attributeFilter:['class'] });
+    if (d.classList.contains('open')) decorate();
+    console.log('[settings] user settings converted to full page');
+  }
+
+  if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', start);
+  else start();
+})();
+</script>
 </body>
 </html>
