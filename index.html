@@ -55061,10 +55061,15 @@ body.double-dock[data-feed-position="right"].feed-open:not(.rail-hidden) #settin
   filter:blur(26px) saturate(1.7) brightness(.62);
   transform:scale(1.15);
 }
+/* cover, not contain. With library_600x900 preferred first the column is
+   an exact 2:3 match, so cover crops nothing at all on the common path.
+   Where only wide art exists, cover shows a sharp centre slice of a
+   large image — which beats contain's alternative of a thin strip
+   stranded in a blurred surround, the state the last pass produced. */
 #homeRecents .game-card-hero{
   position:relative; z-index:1;
   width:100% !important; height:100% !important;
-  object-fit:contain !important; object-position:center !important;
+  object-fit:cover !important; object-position:center !important;
   flex:none !important; background:transparent !important;
   border-radius:0 !important;
 }
@@ -55072,6 +55077,9 @@ body.double-dock[data-feed-position="right"].feed-open:not(.rail-hidden) #settin
   width:287px !important; height:100% !important; flex:0 0 287px;
   font-size:56px !important;
   position:relative; z-index:1;
+  display:flex !important; align-items:center; justify-content:center;
+  background:linear-gradient(160deg,#1a1d27,#0d0f16) !important;
+  opacity:.55;
 }
 /* ── Ambient colour, taken from the game's own art ───────────────
    A heavily blurred, over-scaled copy of the cover sits behind the whole
@@ -55339,13 +55347,27 @@ body.double-dock[data-feed-position="right"].feed-open:not(.rail-hidden) #settin
 
     var list = artUrls(appid), i = 0;
     (function next(){
-      if (i >= list.length) return;              // genuinely no art — keep the placeholder
+      if (i >= list.length){ giveUp(); return; }
       var url = list[i++];
       var probe = new Image();
       probe.onload = function(){ use(url); };
       probe.onerror = next;
       probe.src = url;
     })();
+
+    /* Every URL 404'd — Assassin's Creed Black Flag Resynced is one such
+       app. Removing the inline onerror earlier meant the broken <img>
+       stayed put and rendered its ALT TEXT across the column, which is
+       worse than the placeholder it replaced. Put the placeholder back
+       explicitly now that this code owns the failure path. */
+    function giveUp(){
+      var img = card.querySelector('.game-card-hero');
+      if (!img) return;
+      var box = document.createElement('div');
+      box.className = 'game-card-placeholder';
+      box.textContent = '🎮';
+      (img.closest('.rc-art') || img).replaceWith(box);
+    }
   }
 
   function enhance(card){
@@ -55356,7 +55378,13 @@ body.double-dock[data-feed-position="right"].feed-open:not(.rail-hidden) #settin
        placeholder the moment one URL fails, which would tear out the
        element the fallback chain is trying to fix. */
     var h = card.querySelector('.game-card-hero');
-    if (h) h.removeAttribute('onerror');
+    if (h){
+      h.removeAttribute('onerror');
+      /* Blank the alt too. A broken image renders its alt text, and the
+         renderer puts the game's full name there — which is what was
+         being drawn across the empty column. */
+      h.setAttribute('alt', '');
+    }
     artwork(card);
 
     var meta = card.querySelector('.game-card-meta');
