@@ -55165,11 +55165,32 @@ body.double-dock[data-feed-position="right"].feed-open:not(.rail-hidden) #settin
 }
 
 /* ── Achievements ───────────────────────────────────────────────── */
+/* Scrolls instead of truncating. min-height:0 is required — a flex item
+   defaults to min-height:auto, which refuses to shrink below its content
+   and would push the list straight through the bottom of the card
+   instead of scrolling inside it. */
 #homeRecents .game-card-achievements{
   margin-top:16px !important; padding-top:14px !important;
   border-top:1px solid rgba(255,255,255,.07) !important;
-  flex:0 1 auto; min-height:0; overflow:hidden;
+  flex:1 1 auto; min-height:0; overflow-y:auto; overflow-x:hidden;
   display:flex; flex-direction:column; gap:6px;
+  padding-right:6px !important;
+  scrollbar-width:thin; scrollbar-color:rgba(255,255,255,.18) transparent;
+}
+#homeRecents .game-card-achievements::-webkit-scrollbar{ width:5px; }
+#homeRecents .game-card-achievements::-webkit-scrollbar-track{ background:transparent; }
+#homeRecents .game-card-achievements::-webkit-scrollbar-thumb{
+  background:rgba(255,255,255,.16); border-radius:99px;
+}
+#homeRecents .game-card-achievements::-webkit-scrollbar-thumb:hover{ background:rgba(255,255,255,.3); }
+/* Rows keep their height under pressure, so one can never be half-drawn
+   at the scroll edge. */
+#homeRecents .game-card-ach{ flex:0 0 auto !important; }
+/* The label stays put while the rows move under it. */
+#homeRecents .game-card-ach-label{
+  position:sticky; top:0; z-index:2;
+  background:linear-gradient(180deg, rgba(11,13,19,.98) 70%, rgba(11,13,19,0));
+  padding-bottom:6px !important;
 }
 .rc-more{
   font-family:'Archivo', var(--font), sans-serif;
@@ -55178,7 +55199,11 @@ body.double-dock[data-feed-position="right"].feed-open:not(.rail-hidden) #settin
 }
 /* Pushes the action to the bottom edge whatever the list length, so the
    card's footer is in the same place on every game. */
-#homeRecents .game-card.rc-active .rc-cta{ margin-top:auto !important; }
+#homeRecents .game-card.rc-active .rc-cta{ margin-top:14px !important; flex:none; }
+/* Cursor states now match what actually happens on click. */
+#homeRecents .game-card.rc-active{ cursor:default !important; }
+#homeRecents .game-card:not(.rc-active){ cursor:pointer !important; }
+#homeRecents .rc-cta{ cursor:pointer !important; }
 #homeRecents .game-card-ach-label{
   font-family:'Archivo', var(--font), sans-serif !important;
   font-size:9px !important; font-weight:800 !important;
@@ -55420,24 +55445,18 @@ body.double-dock[data-feed-position="right"].feed-open:not(.rail-hidden) #settin
 
     meta.insertAdjacentHTML('afterend', out);
 
-    /* Cap the list at three. The column has a fixed height, so a longer
-       list gets sliced mid-row by overflow — a half-drawn achievement
-       reads as a rendering fault. Three complete rows plus a count is
-       the same information, stated deliberately. */
+    /* Up to ten, scrolled rather than truncated. Rows are a fixed height
+       inside a scrolling container, so the card's edge can never slice
+       one in half — which is what the previous cap was working around.
+       Ten is the ceiling because past that it stops being "recent". */
     var achWrap = card.querySelector('.game-card-achievements');
     if (achWrap){
       var rows = Array.prototype.slice.call(achWrap.querySelectorAll('.game-card-ach'));
-      if (rows.length > 2){
-        rows.slice(2).forEach(function(r){ r.style.display = 'none'; });
-        var more = document.createElement('div');
-        more.className = 'rc-more';
-        more.textContent = '+' + (rows.length - 2) + ' more';
-        achWrap.appendChild(more);
-      }
+      rows.slice(10).forEach(function(r){ r.remove(); });
     }
 
-    /* The whole active card already opens Steam; this states it rather
-       than leaving the card silently clickable. */
+    /* Opening Steam belongs to this button alone — see the click guard
+       in start(), which stops the card's own inline onclick. */
     var cta = document.createElement('div');
     cta.className = 'rc-cta';
     cta.innerHTML = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" ' +
@@ -55514,12 +55533,28 @@ body.double-dock[data-feed-position="right"].feed-open:not(.rail-hidden) #settin
     var t = track();
     if (!t) return;
 
-    /* A card behind the front one steps forward instead of opening
-       Steam. Capture phase, or the card's own onclick fires first. */
+    /* One capture-phase guard for the whole deck. Capture, because every
+       card carries an inline onclick that opens Steam, and that fires
+       before any listener added in the bubble phase.
+
+         View on Steam   -> the ONLY thing that opens the store
+         a card behind   -> steps forward
+         the front card  -> nothing. Opening an external browser tab on
+                            any stray click of a large card was far too
+                            easy to trigger by accident. */
     t.addEventListener('click', function(e){
       var card = e.target.closest('.game-card');
-      if (!card || card.classList.contains('rc-active')) return;
+      if (!card) return;
+
+      if (e.target.closest('.rc-cta')){
+        e.preventDefault(); e.stopPropagation();
+        var appid = appIdOf(card);
+        if (appid) window.open('https://store.steampowered.com/app/' + appid, '_blank');
+        return;
+      }
+
       e.preventDefault(); e.stopPropagation();
+      if (card.classList.contains('rc-active')) return;   // front card: inert
       idx = cards().indexOf(card);
       apply();
     }, true);
