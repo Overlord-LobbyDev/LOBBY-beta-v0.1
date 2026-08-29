@@ -55332,12 +55332,12 @@ body.double-dock[data-feed-position="right"].feed-open:not(.rail-hidden) #settin
   function track(){
     var s = heroSec();
     if (!s) return document.getElementById('recentGamesList');
-    return s.querySelector('.home-games-grid, .home-communities-grid');
+    return s.querySelector('.home-games-grid, .home-communities-grid, .spotlight-carousel-track');
   }
   function cards(){
     var t = track();
     return t ? Array.prototype.slice.call(
-      t.querySelectorAll('.game-card, .community-card')) : [];
+      t.querySelectorAll('.game-card, .community-card, .spotlight-card')) : [];
   }
 
   /* Shortest signed distance around the ring — this is what makes the
@@ -55499,6 +55499,10 @@ body.double-dock[data-feed-position="right"].feed-open:not(.rail-hidden) #settin
     card.__rc = true;
 
     if (card.classList.contains('community-card')){ enhanceLobby(card); return; }
+    if (card.classList.contains('spotlight-card')){
+      if (window.__spEnhance) window.__spEnhance(card);
+      return;
+    }
 
     /* Kill the inline onerror first: it replaces the <img> with a
        placeholder the moment one URL fails, which would tear out the
@@ -55591,6 +55595,12 @@ body.double-dock[data-feed-position="right"].feed-open:not(.rail-hidden) #settin
       var off = offsetOf(i, n), a = Math.abs(off), s = c.style;
       c.classList.toggle('rc-active', off === 0);
 
+      /* Comments belong to the card being read, so they are fetched as
+         it reaches the front rather than for all 24 up front. */
+      if (off === 0 && c.classList.contains('spotlight-card') && window.__spLoadComments){
+        window.__spLoadComments(c);
+      }
+
       if (a === 0){
         s.setProperty('--rc-x','0px');  s.setProperty('--rc-s','1');
         s.setProperty('--rc-o','1');    s.setProperty('--rc-sat','1');
@@ -55611,10 +55621,14 @@ body.double-dock[data-feed-position="right"].feed-open:not(.rail-hidden) #settin
       c.style.pointerEvents = a > 2 ? 'none' : 'auto';
     });
 
-    var prev = document.getElementById('recentsPrev');
-    var next = document.getElementById('recentsNext');
-    if (prev) prev.disabled = false;      // circular: never a dead end
-    if (next) next.disabled = false;
+    /* Circular: never a dead end. Enabled across whichever section holds
+       the deck, since it is no longer always Recently Played — Spotlight
+       brings its own buttons and disables prev at index 0. */
+    if (sec){
+      sec.querySelectorAll('.spotlight-carousel-btn').forEach(function (b) {
+        b.disabled = false;
+      });
+    }
     dots(n);
   }
 
@@ -55676,6 +55690,24 @@ body.double-dock[data-feed-position="right"].feed-open:not(.rail-hidden) #settin
       /* A lobby card's Join / Open / Edit buttons ARE its actions, so
          they are allowed to fire. Anything else on a back card steps
          the deck; on the front card it does nothing. */
+      /* A post card's author chip and GIF tap are its own controls, and
+         the CTA opens the focus view. Everything else steps the deck. */
+      if (card.classList.contains('spotlight-card')){
+        if (e.target.closest('.spotlight-card-author, .spotlight-gif-overlay')) return;
+        e.preventDefault(); e.stopPropagation();
+        if (e.target.closest('.rc-cta')){
+          try {
+            window.openSpotlightFocus(
+              JSON.parse(decodeURIComponent(card.getAttribute('data-post'))));
+          } catch (err) {}
+          return;
+        }
+        if (card.classList.contains('rc-active')) return;
+        idx = cards().indexOf(card);
+        apply();
+        return;
+      }
+
       if (card.classList.contains('community-card')){
         if (e.target.closest('.community-join-btn, .community-edit-btn')) return;
         e.preventDefault(); e.stopPropagation();
@@ -56895,6 +56927,307 @@ body[data-feed-position="split"].feed-open #homeContent > [data-home-slot="col"]
 
   if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', start);
   else start();
+})();
+</script>
+
+<!-- ══════════════════════════════════════════════════════════════════
+     SPOTLIGHT IN THE HERO SLOT
+
+     The third deck. Same 920x430 frame as the game and lobby cards, so
+     the three sections genuinely trade places — media down the left, the
+     post itself down the right.
+
+     The media column is 400px rather than the 287px the other two use.
+     A game card's left column is cover art, decoration for the stats
+     beside it; on a post the image IS the content, so it earns the room
+     and the comments still get a 520px column to live in.
+
+     Out of the hero slot Spotlight keeps its own poster carousel exactly
+     as it was — it is the one section that already had a carousel, and
+     it is not converted into small grid cards. Nothing here is scoped to
+     the col slot, and the col-slot rules elsewhere only name .game-card
+     and .community-card, so that form survives untouched.
+
+     ON COMMENT REACTIONS: "most reacted comment" is not backable today.
+     post_comments carries no reaction join and there is no comment
+     reactions endpoint, so there is no way to know which comment is the
+     most reacted. The thread is shown in full instead, and the post's
+     own reaction count sits in the stat strip. Adding reactions to
+     comments is a backend change -- say the word and I will build it.
+     ══════════════════════════════════════════════════════════════════ -->
+<style>
+/* The track becomes the same absolute stage the other two decks use. */
+#homeContent [data-home-slot="hero"] .spotlight-carousel-track-outer{
+  overflow:visible !important;
+}
+#homeContent [data-home-slot="hero"] .spotlight-carousel-track{
+  position:relative !important; display:block !important;
+  height:450px !important; transform:none !important;
+  overflow:visible !important; padding:0 !important;
+  transition:none !important;
+}
+/* Its own dots are superseded by the deck's. */
+#homeContent [data-home-slot="hero"] .spotlight-dots{ display:none !important; }
+
+#homeContent [data-home-slot="hero"] .spotlight-card{
+  position:absolute !important; top:0; left:50%;
+  width:920px !important; height:430px !important;
+  margin:0 !important; border-radius:16px !important;
+  display:flex !important; flex-direction:row !important; align-items:stretch !important;
+  overflow:hidden;
+  transform-origin:center center;
+  transform:translateX(calc(-50% + var(--rc-x, 0px))) scale(var(--rc-s, 1));
+  opacity:var(--rc-o, 1);
+  filter:saturate(var(--rc-sat, 1)) brightness(var(--rc-b, 1));
+  transition:transform .46s cubic-bezier(.22,1,.36,1),
+             opacity .36s ease, filter .36s ease, box-shadow .36s ease;
+  will-change:transform, opacity;
+  backface-visibility:hidden;
+  background:linear-gradient(135deg,#14161f 0%,#0b0d13 100%) !important;
+  border:1px solid rgba(255,255,255,.08) !important;
+}
+#homeContent [data-home-slot="hero"] .spotlight-card:hover{
+  transform:translateX(calc(-50% + var(--rc-x, 0px))) scale(var(--rc-s, 1)) !important;
+  box-shadow:none;
+}
+#homeContent [data-home-slot="hero"] .spotlight-card.rc-active{
+  cursor:default;
+  box-shadow:0 30px 70px rgba(0,0,0,.72),
+             0 0 0 1px color-mix(in srgb, var(--accent) 30%, transparent);
+}
+#homeContent [data-home-slot="hero"] .spotlight-card:not(.rc-active):hover{ --rc-o:.85 !important; }
+
+/* ── Media column ─────────────────────────────────────────────── */
+#homeContent [data-home-slot="hero"] .spotlight-card-media{
+  position:relative !important; inset:auto !important;
+  flex:0 0 400px !important; width:400px !important; height:100% !important;
+  z-index:2; background:#07080b;
+}
+#homeContent [data-home-slot="hero"] .spotlight-card-img,
+#homeContent [data-home-slot="hero"] .spotlight-card-video{
+  width:100% !important; height:100% !important; object-fit:cover !important;
+}
+/* The poster overlay darkened the whole card; here it would sit over the
+   text column too. The media gets its own right-edge fade instead. */
+#homeContent [data-home-slot="hero"] .spotlight-card-overlay{ display:none !important; }
+#homeContent [data-home-slot="hero"] .spotlight-card-media::after{
+  content:''; position:absolute; inset:0; z-index:1; pointer-events:none;
+  background:linear-gradient(90deg, transparent 60%, rgba(11,13,19,.85) 100%);
+}
+#homeContent [data-home-slot="hero"] .spotlight-rank-badge{
+  z-index:3; top:12px !important; left:12px !important;
+  font-size:12px !important; padding:5px 11px !important;
+}
+#homeContent [data-home-slot="hero"] .spotlight-reel-badge{ z-index:3; top:auto !important; bottom:12px; }
+#homeContent [data-home-slot="hero"] .spotlight-play-btn{ z-index:3; }
+
+/* ── Detail column ────────────────────────────────────────────── */
+#homeContent [data-home-slot="hero"] .spotlight-card-body{
+  position:relative !important; inset:auto !important;
+  flex:1 1 auto; min-width:0; z-index:2;
+  display:flex !important; flex-direction:column !important;
+  padding:22px 26px 20px !important;
+}
+#homeContent [data-home-slot="hero"] .spotlight-card-author{
+  margin-bottom:12px !important; flex:0 0 auto;
+}
+#homeContent [data-home-slot="hero"] .spotlight-card-av{
+  width:38px !important; height:38px !important; font-size:14px !important;
+}
+#homeContent [data-home-slot="hero"] .spotlight-card-name{ font-size:15px !important; }
+#homeContent [data-home-slot="hero"] .spotlight-card-time{ font-size:11.5px !important; }
+#homeContent [data-home-slot="hero"] .spotlight-card-content{
+  font-size:15px !important; line-height:1.55 !important;
+  color:rgba(255,255,255,.92) !important;
+  margin:0 0 14px !important; flex:0 0 auto;
+  display:-webkit-box; -webkit-line-clamp:4; line-clamp:4;
+  -webkit-box-orient:vertical; overflow:hidden;
+  -webkit-text-stroke:0 !important; text-shadow:none !important;
+}
+/* Replaced by the stat strip the controller builds. */
+#homeContent [data-home-slot="hero"] .spotlight-card-stats{ display:none !important; }
+
+/* ── Comments ─────────────────────────────────────────────────── */
+.sp-clabel{
+  font-size:10.5px; font-weight:800; letter-spacing:1.2px; text-transform:uppercase;
+  color:rgba(255,255,255,.42); margin:0 0 8px; flex:0 0 auto;
+  display:flex; align-items:center; gap:7px;
+}
+.sp-clabel::after{
+  content:''; flex:1 1 auto; height:1px;
+  background:linear-gradient(90deg, rgba(255,255,255,.12), transparent);
+}
+.sp-comments{
+  flex:1 1 auto; min-height:0; overflow-y:auto; padding-right:6px;
+  display:flex; flex-direction:column; gap:8px;
+  scrollbar-width:thin; scrollbar-color:rgba(255,255,255,.16) transparent;
+}
+.sp-comments::-webkit-scrollbar{ width:4px; }
+.sp-comments::-webkit-scrollbar-track{ background:transparent; }
+.sp-comments::-webkit-scrollbar-thumb{ background:rgba(255,255,255,.16); border-radius:99px; }
+.sp-comments::-webkit-scrollbar-thumb:hover{ background:rgba(255,255,255,.3); }
+.sp-c{
+  display:flex; gap:9px; align-items:flex-start;
+  background:rgba(255,255,255,.035); border:1px solid rgba(255,255,255,.06);
+  border-radius:10px; padding:8px 10px;
+}
+.sp-c-av{
+  width:24px; height:24px; border-radius:50%; flex:0 0 auto; overflow:hidden;
+  background:var(--accent); display:flex; align-items:center; justify-content:center;
+  font-size:10px; font-weight:800; color:#fff;
+}
+.sp-c-av img{ width:100%; height:100%; object-fit:cover; }
+.sp-c-b{ min-width:0; flex:1 1 auto; }
+.sp-c-n{ font-size:11.5px; font-weight:800; color:rgba(255,255,255,.88); margin-bottom:1px; }
+.sp-c-t{ font-size:12px; line-height:1.45; color:rgba(255,255,255,.66); word-break:break-word; }
+.sp-c-empty{ font-size:12.5px; color:rgba(255,255,255,.4); padding:6px 2px; }
+
+/* Only the front card offers its action, matching the other two decks. */
+#homeContent [data-home-slot="hero"] .spotlight-card:not(.rc-active) .rc-cta,
+#homeContent [data-home-slot="hero"] .spotlight-card:not(.rc-active) .sp-comments,
+#homeContent [data-home-slot="hero"] .spotlight-card:not(.rc-active) .sp-clabel{
+  opacity:0; pointer-events:none;
+}
+#homeContent [data-home-slot="hero"] .spotlight-card .rc-cta{ flex:0 0 auto; margin-top:12px; }
+</style>
+<script>
+(function () {
+  'use strict';
+
+  /* Every card already carries its whole post as JSON, put there by
+     loadSpotlight() for the focus modal. Nothing here re-fetches a post. */
+  function postOf(card){
+    var raw = card.getAttribute('data-post');
+    if (!raw) return null;
+    try { return JSON.parse(decodeURIComponent(raw)); } catch (e) { return null; }
+  }
+
+  function esc(s){
+    return String(s == null ? '' : s)
+      .replace(/&/g, '&amp;').replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+  }
+
+  /* Comments load for the front card only, one post at a time. The deck
+     holds up to 24 posts; prefetching them all would be 24 requests for
+     a stack the reader may never step through. Answers are kept so
+     stepping back is free. */
+  var cache = {};
+
+  function renderComments(box, rows){
+    if (!Array.isArray(rows) || !rows.length){
+      box.innerHTML = '<div class="sp-c-empty">No comments yet — be the first.</div>';
+      return;
+    }
+    box.innerHTML = rows.map(function (c) {
+      var name = c.username || '?';
+      var av = c.avatar_url
+        ? '<img src="' + esc(c.avatar_url) + '" alt="" />'
+        : esc(name.slice(0, 1).toUpperCase());
+      return '<div class="sp-c">' +
+          '<div class="sp-c-av">' + av + '</div>' +
+          '<div class="sp-c-b">' +
+            '<div class="sp-c-n">' + esc(name) + '</div>' +
+            '<div class="sp-c-t">' + esc(c.content || '') + '</div>' +
+          '</div>' +
+        '</div>';
+    }).join('');
+  }
+
+  function loadComments(card){
+    var box = card.querySelector('.sp-comments');
+    if (!box || box.__done) return;
+    var p = postOf(card);
+    if (!p || p.id == null) return;
+    box.__done = true;
+
+    if (cache[p.id]) { renderComments(box, cache[p.id]); return; }
+    if (typeof feedApi === 'undefined') {
+      box.innerHTML = '<div class="sp-c-empty">Comments unavailable.</div>';
+      return;
+    }
+    Promise.resolve(feedApi('/posts/' + p.id + '/comments')).then(function (rows) {
+      cache[p.id] = rows;
+      renderComments(box, rows);
+    }).catch(function () {
+      box.__done = false;   // let a later pass try again
+      box.innerHTML = '<div class="sp-c-empty">Could not load comments.</div>';
+    });
+  }
+  window.__spLoadComments = loadComments;
+
+  function enhanceSpotlight(card){
+    var body = card.querySelector('.spotlight-card-body');
+    if (!body || card.querySelector('.sp-comments')) return;
+    var p = postOf(card) || {};
+
+    var reacts = p.reaction_count || 0;
+    var comms  = p.comment_count  || 0;
+    var emoji  = (p.reactions || []).map(function (r) { return r.emoji; })
+                   .slice(0, 3).join('') || '❤️';
+    var kind = (p.video_url || p.media_type === 'video') ? 'Reel'
+             : (p.image_url ? 'Image' : 'Text');
+
+    var stats = document.createElement('div');
+    stats.className = 'rc-stats';
+    stats.innerHTML =
+      '<div class="rc-stat' + (reacts ? ' hot' : '') + '"><b>' + reacts +
+        '</b><span>' + esc(emoji) + ' Reactions</span></div>' +
+      '<div class="rc-stat"><b>' + comms + '</b><span>Comments</span></div>' +
+      '<div class="rc-stat"><b>' + kind + '</b><span>Post</span></div>';
+    body.appendChild(stats);
+
+    var label = document.createElement('div');
+    label.className = 'sp-clabel';
+    label.textContent = 'Comments';
+    body.appendChild(label);
+
+    var box = document.createElement('div');
+    box.className = 'sp-comments';
+    box.innerHTML = '<div class="sp-c-empty">Loading…</div>';
+    body.appendChild(box);
+
+    var cta = document.createElement('div');
+    cta.className = 'rc-cta';
+    cta.innerHTML = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" ' +
+      'stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">' +
+      '<path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/>' +
+      '</svg>Open post';
+    body.appendChild(cta);
+  }
+  window.__spEnhance = enhanceSpotlight;
+
+  /* Spotlight's own prev/next slide its track sideways. In the hero slot
+     that track has become an absolute stage, so sliding it would drag
+     every card off screen at once — the buttons hand over to the deck
+     instead. Below the fold they work exactly as they always did. */
+  var navOrig  = window.spotlightNav;
+  var gotoOrig = window.spotlightGoTo;
+
+  function heroIsSpotlight(){
+    var sec = document.getElementById('homeSpotlight');
+    return !!sec && sec.getAttribute('data-home-slot') === 'hero';
+  }
+
+  window.spotlightNav = function (dir) {
+    if (heroIsSpotlight()){
+      if (window.recentsNav) window.recentsNav(dir);
+      return;
+    }
+    if (navOrig) return navOrig.apply(this, arguments);
+  };
+  var updOrig = window.spotlightUpdateNav;
+  window.spotlightUpdateNav = function () {
+    /* In the hero slot the deck owns the buttons and the ring is
+       circular, so this would disable prev at index 0 and dead-end it. */
+    if (heroIsSpotlight()) return;
+    if (updOrig) return updOrig.apply(this, arguments);
+  };
+
+  window.spotlightGoTo = function () {
+    if (heroIsSpotlight()) return;      // the deck's own dots are showing
+    if (gotoOrig) return gotoOrig.apply(this, arguments);
+  };
 })();
 </script>
 </body>
