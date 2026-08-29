@@ -55409,6 +55409,9 @@ body.double-dock[data-feed-position="right"].feed-open:not(.rail-hidden) #settin
 
     function use(url){
       card.style.setProperty('--rc-art', 'url("' + url + '")');
+      /* The section wash reads --rc-art off the active card, and the
+         chain settles well after that card is first shown. */
+      if (window.__heroWash) window.__heroWash();
       if (hero){ hero.src = url; frame(hero); return; }
       // The inline onerror already swapped the img out for a placeholder;
       // put a real image back in its place.
@@ -55633,6 +55636,8 @@ body.double-dock[data-feed-position="right"].feed-open:not(.rail-hidden) #settin
       }
       c.style.pointerEvents = a > 2 ? 'none' : 'auto';
     });
+
+    if (window.__heroWash) window.__heroWash();
 
     /* Circular: never a dead end. Enabled across whichever section holds
        the deck, since it is no longer always Recently Played — Spotlight
@@ -57208,6 +57213,11 @@ body[data-feed-position="split"].feed-open #homeContent > [data-home-slot="col"]
     var kind = (p.video_url || p.media_type === 'video') ? 'Reel'
              : (p.image_url ? 'Image' : 'Text');
 
+    /* The wash reads --rc-art off the active card whatever its type, so
+       a post has to publish its own media the same way. */
+    var media = p.image_url || p.thumbnail_url || p.video_poster;
+    if (media) card.style.setProperty('--rc-art', 'url("' + media + '")');
+
     var stats = document.createElement('div');
     stats.className = 'rc-stats';
     stats.innerHTML =
@@ -57879,6 +57889,127 @@ async function reactComment(ev, id, btn){
     }
     new MutationObserver(ping).observe(hc, { childList: true, subtree: true });
     sweep();
+  }
+
+  if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', start);
+  else start();
+})();
+</script>
+
+<!-- ══════════════════════════════════════════════════════════════════
+     HERO WASH — the front card lights its whole section
+
+     The active card already tints itself with its own artwork. This
+     carries that colour out behind the whole hero section, so the page
+     changes character as you step through the deck instead of the card
+     being a bright object on a dead ground.
+
+     Kept deliberately faint. At the size of a whole section even a
+     little saturation becomes the loudest thing on the page, and this
+     has to sit UNDER a title and a stat strip that both need to stay
+     readable. Hence ~.2 opacity, a very heavy blur, and a mask that
+     fades it out well before the section's edges — the wash should have
+     no findable border.
+
+     Two stacked layers rather than one, because background-image cannot
+     be transitioned: swapping the image on a single layer pops the
+     colour even through that much blur. The layers alternate and
+     crossfade, so stepping the deck reads as the room changing colour.
+
+     Works for all three decks. Games get --rc-art from the art chain,
+     lobbies from their banner, and posts now set it from their own
+     media — the wash only ever reads --rc-art off whichever card is
+     currently .rc-active, so it does not care which section it is.
+     ══════════════════════════════════════════════════════════════════ -->
+<style>
+/* The wash is positioned, so the section's own content has to be lifted
+   above it explicitly. A positioned element at z-index:0 paints over the
+   inline content of static siblings — the title would have disappeared
+   behind it otherwise. */
+#homeContent > section[data-home-slot="hero"] > *{
+  position:relative; z-index:1;
+}
+#homeContent > section[data-home-slot="hero"] > .hero-wash{
+  position:absolute; z-index:0;
+  inset:-26px -18px; pointer-events:none;
+  border-radius:28px; overflow:hidden;
+  /* No findable edge: gone well before the section boundary. */
+  -webkit-mask-image:radial-gradient(115% 92% at 50% 46%, #000 22%, transparent 76%);
+  mask-image:radial-gradient(115% 92% at 50% 46%, #000 22%, transparent 76%);
+}
+#homeContent > section[data-home-slot="col"] > .hero-wash{ display:none !important; }
+
+.hero-wash > i{
+  position:absolute; inset:-14%;
+  background-size:cover; background-position:center;
+  filter:blur(90px) saturate(1.85);
+  opacity:0; transform:scale(1.06);
+  transition:opacity .85s cubic-bezier(.4,0,.2,1);
+  will-change:opacity;
+}
+.hero-wash > i.on{ opacity:.2; }
+
+@media (prefers-reduced-motion: reduce){
+  .hero-wash > i{ transition:none; }
+}
+</style>
+<script>
+(function () {
+  'use strict';
+
+  function hero(){
+    var hc = document.getElementById('homeContent');
+    return hc ? hc.querySelector('section[data-home-slot="hero"]') : null;
+  }
+
+  function ensure(sec){
+    var w = sec.querySelector(':scope > .hero-wash');
+    if (w) return w;
+    w = document.createElement('div');
+    w.className = 'hero-wash';
+    w.appendChild(document.createElement('i'));
+    w.appendChild(document.createElement('i'));
+    sec.insertBefore(w, sec.firstChild);
+    return w;
+  }
+
+  function update(){
+    var sec = hero();
+    if (!sec) return;
+    var w = ensure(sec);
+
+    var card = sec.querySelector('.rc-active');
+    var art = card ? (card.style.getPropertyValue('--rc-art') || '').trim() : '';
+    if (!art || art === 'none'){
+      w.querySelectorAll('i').forEach(function (el) { el.classList.remove('on'); });
+      w.__art = '';
+      return;
+    }
+    if (w.__art === art) return;      // same card, or art resolved to the same URL
+    w.__art = art;
+
+    var a = w.children[0], b = w.children[1];
+    var back = a.classList.contains('on') ? b : a;
+    back.style.backgroundImage = art;
+    back.classList.add('on');
+    (back === a ? b : a).classList.remove('on');
+  }
+
+  /* Called from apply() when the front card changes, and from the art
+     resolver when a URL finally wins — the chain finishes well after the
+     card is first shown, so one call at step time is not enough. */
+  var queued = false;
+  window.__heroWash = function(){
+    if (queued) return;
+    queued = true;
+    requestAnimationFrame(function () { queued = false; update(); });
+  };
+
+  function start(){
+    var hc = document.getElementById('homeContent');
+    if (!hc) { setTimeout(start, 200); return; }
+    new MutationObserver(window.__heroWash).observe(hc, { childList: true, subtree: true });
+    window.__heroWash();
   }
 
   if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', start);
