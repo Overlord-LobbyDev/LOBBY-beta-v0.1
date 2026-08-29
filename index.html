@@ -55828,8 +55828,10 @@ body.lobby-selected #chatPanel .chat-header{ display:none !important; }
 
 #homeContent .home-section-title{
   font-family:'Bebas Neue', var(--font), sans-serif !important;
-  font-size:46px !important; font-weight:400 !important;
-  letter-spacing:1.5px !important; line-height:.92 !important;
+  /* 20% down from 46px, and tracked wider to keep the same presence at
+     the smaller size — less height, more width. */
+  font-size:37px !important; font-weight:400 !important;
+  letter-spacing:5.5px !important; line-height:.95 !important;
   color:#fff !important;
   /* Solid, not a gradient fill. The fade read as a shortcut for
      interest; at this size the type carries itself. */
@@ -56133,5 +56135,93 @@ body.lobby-selected #chatPanel .chat-header{ display:none !important; }
 </script>
 
 
+
+<!-- ══════════════════════════════════════════════════════════════════
+     HOME — TWO COLUMNS
+
+     Spotlight and Lobbies share a row under the carousel, so the widest
+     part of the page carries two sections instead of one narrow one.
+
+     Done with flex-wrap on #homeContent, NOT a grid, and with no DOM
+     changes at all. Both of those are deliberate, from what went wrong
+     with the bento:
+
+       No wrapper elements. The app restores section order with
+       `homeContent.appendChild(section)` on load and after every drag,
+       which tore sections straight out of any wrapper they were put in.
+
+       No grid. A grid row sizes itself from its items, and the
+       carousel's cards are position:absolute — in a grid row the section
+       collapsed and the cards painted over whatever came next. As a flex
+       item on its own wrapped line, the section takes its height from
+       the track's real 450px and cannot collapse.
+
+     Reordering still works: whatever the app appends first takes the
+     first line. Any section that is not the carousel can share a row.
+     ══════════════════════════════════════════════════════════════════ -->
+<style>
+#homeContent{
+  flex-direction:row !important;
+  flex-wrap:wrap !important;
+  /* stretch, not flex-start: the two columns are bordered cards, so a
+     ragged bottom edge shows. Same line = same height. */
+  align-items:stretch !important;
+  align-content:flex-start !important;
+  gap:22px !important;
+  padding:16px 16px 40px !important;
+}
+
+/* The carousel always takes a full line. Its track is a fixed height of
+   absolutely positioned cards, so it needs the whole width — and it must
+   never be asked to share one. */
+#homeContent > #homeRecents{
+  flex:0 0 100% !important;
+  max-width:100% !important;
+}
+
+/* Everything else pairs up. calc() rather than 50% so the gap is taken
+   out of the columns instead of pushing the second one onto its own
+   line. */
+#homeContent > #homeSpotlight,
+#homeContent > #homeCommunities{
+  flex:1 1 calc(50% - 11px) !important;
+  min-width:0 !important;
+  max-width:calc(50% - 11px) !important;
+  border:1px solid rgba(255,255,255,.07);
+  border-radius:16px;
+  background:linear-gradient(160deg, rgba(255,255,255,.03), rgba(255,255,255,.01));
+  padding:22px 24px !important;
+  position:relative;
+}
+#homeContent > #homeSpotlight::after,
+#homeContent > #homeCommunities::after{
+  content:''; position:absolute; top:0; left:24px; right:24px; height:1px;
+  background:linear-gradient(90deg, transparent, rgba(255,255,255,.14), transparent);
+}
+
+/* In a half-width column the lobby grid needs to reflow rather than keep
+   its full-page column count. */
+#homeContent > #homeCommunities .home-communities-grid{
+  grid-template-columns:repeat(auto-fill, minmax(190px, 1fr)) !important;
+}
+
+/* The media query measures the viewport, but with the feed docked in split
+   mode #homeContent is roughly half that wide while the viewport is
+   unchanged — two columns in there would be ~340px each. Collapse on the
+   feed state as well as on width. */
+body[data-feed-position="split"].feed-open #homeContent > #homeSpotlight,
+body[data-feed-position="split"].feed-open #homeContent > #homeCommunities{
+  flex:0 0 100% !important; max-width:100% !important;
+}
+
+/* 1450, not 1250: the page carries zoom:1.15 and loses width to the rail and
+   sidebar, so the usable column is well under the viewport number. */
+@media (max-width:1450px){
+  #homeContent > #homeSpotlight,
+  #homeContent > #homeCommunities{
+    flex:0 0 100% !important; max-width:100% !important;
+  }
+}
+</style>
 </body>
 </html>
