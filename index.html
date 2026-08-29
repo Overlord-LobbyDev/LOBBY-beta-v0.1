@@ -52340,593 +52340,7 @@ body.feed-anim-out #socialFeed{
 })();
 </script>
 
-<!-- ══════════════════════════════════════════════════════════════════
-     COLISEUM v2 — capsule hero, live band, no empty modules
 
-     Brief: storefront + what is happening now, empty sections hidden,
-     lean into the arena, Steam capsule hero.
-
-     Four things made it read as tacky:
-
-     1. The banner was the background of the WHOLE identity section, and
-        that section also contained the channel cards — so the mascot art
-        and the LOBBY watermark bled through the cards behind a weak
-        rgba(0,0,0,.15) scrim. The art now gets its own capsule band with
-        a real scrim, and the channels move out onto their own surface.
-     2. Every block had an eyebrow AND a display title, so six headlines
-        competed and none was subordinate. One headline per section now.
-     3. A new lobby rendered six "nothing here yet" panels. Empty sections
-        are removed, so a quiet lobby reads as short and deliberate.
-     4. The Moment slab was neon yellow against an obsidian page — the
-        only object in that language. Retoned to the arena bronze.
-
-     Restyles and re-parents the existing markup rather than replacing it,
-     so populate() keeps writing to the same ids.
-     ══════════════════════════════════════════════════════════════════ -->
-<style>
-#coliseumRoot{
-  --col-gold:    #d8a648;
-  --col-bronze:  #8a6a2f;
-  --col-surface: #111219;
-  --col-line:    rgba(255,255,255,.07);
-}
-
-/* ── Order. .col-canvas is a flex column, so the sequence is set here
-   rather than by moving markup: identity, live, channels, stage,
-   tournaments + members, featured, hall, composer, chronicle. ── */
-#coliseumRoot .col-identity   { order:1; }
-#coliseumRoot .colv2-live     { order:2; }
-#coliseumRoot .colv2-channels { order:3; }
-#coliseumRoot .col-row-hero   { order:4; }
-#coliseumRoot .col-row-mid    { order:5; }
-#coliseumRoot .col-featured   { order:6; }
-#coliseumRoot .col-hof        { order:7; }
-#coliseumRoot .col-composer   { order:8; }
-#coliseumRoot .col-chronicle  { order:9; }
-
-.colv2-hide{ display:none !important; }
-
-/* ── 1. Capsule hero ─────────────────────────────────────────────
-   The art is a band. Text sits over a scrim that is opaque where the
-   words are and clears toward the art — the Steam capsule move. No
-   cards are laid over it any more. */
-#coliseumRoot .col-identity{
-  padding:0 !important;
-  border-radius:20px !important;
-  min-height:280px;
-  display:flex;
-  align-items:stretch;
-  background:var(--lobby-banner-bg, linear-gradient(135deg,#232634 0%,#0b0d14 100%)) !important;
-  background-size:cover !important;
-  background-position:center 30% !important;
-  border:1px solid var(--col-line) !important;
-  box-shadow:0 24px 60px rgba(0,0,0,.55) !important;
-}
-/* Horizontal scrim for legibility, vertical to seat the capsule. */
-#coliseumRoot .col-identity::before{
-  background:
-    linear-gradient(90deg, rgba(7,8,12,.97) 0%, rgba(7,8,12,.90) 38%, rgba(7,8,12,.42) 68%, rgba(7,8,12,.20) 100%),
-    linear-gradient(180deg, rgba(7,8,12,.30) 0%, transparent 35%, rgba(7,8,12,.55) 100%) !important;
-  z-index:0 !important;
-}
-/* The dot grid was a third texture on top of the art. */
-#coliseumRoot .col-identity::after{ display:none !important; }
-
-#coliseumRoot .col-identity-inner{
-  padding:30px 34px;
-  align-items:flex-end;
-  width:100%;
-  gap:20px;
-}
-#coliseumRoot .col-ident-emblem{
-  width:104px; height:104px; border-radius:20px;
-  box-shadow:0 16px 40px rgba(0,0,0,.6), 0 0 0 1px rgba(255,255,255,.14) inset;
-}
-/* The spinning dashed ring read as a loading spinner. */
-#coliseumRoot .col-ident-emblem::after{ display:none !important; }
-
-#coliseumRoot .col-ident-eyebrow{
-  color:var(--col-gold);
-  letter-spacing:2px;
-  font-weight:900;
-}
-#coliseumRoot .col-ident-name{
-  text-shadow:0 2px 24px rgba(0,0,0,.85);
-  margin-bottom:2px;
-}
-#coliseumRoot .col-ident-motto{
-  max-width:52ch;
-  color:rgba(255,255,255,.72);
-  text-shadow:0 1px 10px rgba(0,0,0,.8);
-}
-/* Stats as a hairline row, not four boxes competing with the name. */
-#coliseumRoot .col-ident-stats{
-  gap:0 !important;
-  margin-top:14px;
-  border-top:1px solid rgba(255,255,255,.10);
-  padding-top:12px;
-  display:inline-flex;
-}
-#coliseumRoot .col-ident-stat{
-  background:none !important;
-  border:0 !important;
-  border-radius:0 !important;
-  padding:0 20px !important;
-  border-right:1px solid rgba(255,255,255,.09) !important;
-}
-#coliseumRoot .col-ident-stat:first-child{ padding-left:0 !important; }
-#coliseumRoot .col-ident-stat:last-child{ border-right:0 !important; }
-#coliseumRoot .col-ident-actions{ align-self:flex-end; }
-
-/* ── Section furniture: ONE headline, on a gold mark ─────────────
-   The paired eyebrow is removed rather than restyled — two labels for
-   one section is what made the page shout. */
-#coliseumRoot .col-lounges-eyebrow,
-#coliseumRoot .col-stage-eyebrow,
-#coliseumRoot .col-chron-eyebrow,
-#coliseumRoot .col-theatre-eyebrow,
-#coliseumRoot .col-const-eyebrow{ display:none !important; }
-
-#coliseumRoot .col-lounges-title,
-#coliseumRoot .col-stage-title,
-#coliseumRoot .col-chron-title,
-#coliseumRoot .col-theatre-title,
-#coliseumRoot .col-const-title,
-#coliseumRoot .col-hof-title{
-  font-size:15px !important;
-  letter-spacing:2.4px !important;
-  text-transform:uppercase;
-  color:rgba(255,255,255,.92) !important;
-  display:inline-flex; align-items:center; gap:10px;
-}
-#coliseumRoot .col-lounges-title::before,
-#coliseumRoot .col-stage-title::before,
-#coliseumRoot .col-chron-title::before,
-#coliseumRoot .col-theatre-title::before,
-#coliseumRoot .col-const-title::before{
-  content:''; width:3px; height:15px; border-radius:2px; flex:0 0 3px;
-  background:linear-gradient(180deg, var(--col-gold), var(--col-bronze));
-}
-
-/* ── One card family for every section ──────────────────────────── */
-#coliseumRoot .colv2-channels,
-#coliseumRoot .col-stage,
-#coliseumRoot .col-theatre,
-#coliseumRoot .col-const,
-#coliseumRoot .col-chron-card{
-  background:linear-gradient(180deg, var(--col-surface) 0%, #0b0c12 100%) !important;
-  border:1px solid var(--col-line) !important;
-  border-radius:16px !important;
-  box-shadow:0 12px 34px rgba(0,0,0,.42) !important;
-}
-#coliseumRoot .colv2-channels{ padding:18px 20px; }
-
-/* ── 2. In voice now ─────────────────────────────────────────────
-   Rendered only when someone is actually in voice — see the JS. */
-.colv2-live{
-  display:flex; align-items:center; gap:16px; flex-wrap:wrap;
-  padding:14px 20px; border-radius:16px;
-  background:linear-gradient(90deg, color-mix(in srgb, var(--col-gold) 12%, #0b0c12) 0%, #0b0c12 60%);
-  border:1px solid color-mix(in srgb, var(--col-gold) 26%, transparent);
-}
-.colv2-live-label{
-  display:inline-flex; align-items:center; gap:8px;
-  font-size:11px; font-weight:900; letter-spacing:2px; text-transform:uppercase;
-  color:var(--col-gold);
-}
-.colv2-live-dot{
-  width:7px; height:7px; border-radius:50%; background:#23a55a;
-  box-shadow:0 0 10px #23a55a; animation:colv2Pulse 2s ease-in-out infinite;
-}
-@keyframes colv2Pulse{ 0%,100%{opacity:1} 50%{opacity:.45} }
-@media (prefers-reduced-motion: reduce){ .colv2-live-dot{ animation:none; } }
-.colv2-live-people{ display:flex; gap:6px; flex-wrap:wrap; flex:1; min-width:0; }
-.colv2-live-av{
-  width:28px; height:28px; border-radius:50%; overflow:hidden;
-  border:1px solid color-mix(in srgb, var(--col-gold) 45%, transparent);
-  background:rgba(255,255,255,.08); color:#fff;
-  font-size:10px; font-weight:800;
-  display:flex; align-items:center; justify-content:center;
-}
-.colv2-live-av img{ width:100%; height:100%; object-fit:cover; }
-.colv2-live-cta{
-  padding:8px 16px; border-radius:10px; cursor:pointer; border:0;
-  background:linear-gradient(180deg, var(--col-gold), var(--col-bronze));
-  color:#1b1405; font-weight:900; font-size:12px; letter-spacing:1.2px;
-  text-transform:uppercase;
-}
-.colv2-live-cta:hover{ filter:brightness(1.08); }
-
-/* ── 4. Retone the Moment slab and the Hall ─────────────────────
-   Bronze on obsidian puts them in the same family as everything else
-   while still letting them be the loudest things on the page. */
-#coliseumRoot .col-featured{
-  background:
-    radial-gradient(700px 260px at 82% 40%, color-mix(in srgb, var(--col-gold) 15%, transparent) 0%, transparent 62%),
-    linear-gradient(180deg, #14110a 0%, #0b0c12 100%) !important;
-  border:1px solid color-mix(in srgb, var(--col-gold) 24%, transparent) !important;
-  box-shadow:0 16px 44px rgba(0,0,0,.5) !important;
-}
-#coliseumRoot .col-hof{
-  background:
-    radial-gradient(600px 200px at 12% 0%, color-mix(in srgb, var(--col-gold) 12%, transparent) 0%, transparent 60%),
-    linear-gradient(180deg, var(--col-surface) 0%, #0b0c12 100%) !important;
-  border:1px solid color-mix(in srgb, var(--col-gold) 20%, transparent) !important;
-  border-radius:16px !important;
-}
-</style>
-<script>
-(function () {
-  'use strict';
-
-  function $(id){ return document.getElementById(id); }
-  function q(sel, root){ return (root || document).querySelector(sel); }
-
-  function members(){
-    return Array.isArray(window.cachedServerMembers) ? window.cachedServerMembers : [];
-  }
-  function inVoice(){
-    return members().filter(function(m){
-      return m && (m.voiceChannelId != null || m.voice_channel_id != null);
-    });
-  }
-  function esc(s){
-    return String(s == null ? '' : s)
-      .replace(/&/g,'&amp;').replace(/"/g,'&quot;')
-      .replace(/</g,'&lt;').replace(/>/g,'&gt;');
-  }
-
-  /* Move the channel grid OUT of the identity section. It was a child of
-     the element carrying the banner as its background, which is exactly
-     why the art showed through the cards. */
-  function restructure(){
-    var canvas = q('#coliseumRoot .col-canvas');
-    if (!canvas) return;
-
-    var lounges = q('#coliseumRoot .col-ident-lounges');
-    if (lounges && !lounges.closest('.colv2-channels')){
-      var sec = document.createElement('section');
-      sec.className = 'colv2-channels';
-      lounges.parentNode.removeChild(lounges);
-      sec.appendChild(lounges);
-      canvas.appendChild(sec);              // CSS `order` places it
-    }
-
-    if (!$('colv2Live')){
-      var live = document.createElement('section');
-      live.className = 'colv2-live colv2-hide';
-      live.id = 'colv2Live';
-      canvas.appendChild(live);
-    }
-  }
-
-  function renderLive(){
-    var el = $('colv2Live');
-    if (!el) return;
-    var people = inVoice();
-
-    /* Deliberately voice-only. A "live" strip that really means "you are
-       online" would be on permanently and mean nothing. */
-    if (!people.length){ el.classList.add('colv2-hide'); return; }
-    el.classList.remove('colv2-hide');
-
-    var avatars = people.slice(0, 14).map(function(m){
-      var name = m.display_name || m.username || '?';
-      var url  = m.avatar_url || m.avatarUrl;
-      return '<div class="colv2-live-av" title="' + esc(name) + '">' +
-        (url ? '<img src="' + esc(url) + '" alt="">'
-             : esc(String(name).slice(0,2).toUpperCase())) +
-        '</div>';
-    }).join('');
-
-    el.innerHTML =
-      '<span class="colv2-live-label"><span class="colv2-live-dot"></span>In voice now</span>' +
-      '<div class="colv2-live-people">' + avatars +
-        (people.length > 14 ? '<div class="colv2-live-av">+' + (people.length - 14) + '</div>' : '') +
-      '</div>' +
-      '<button class="colv2-live-cta" id="colv2Join">Join them</button>';
-
-    var btn = $('colv2Join');
-    if (btn) btn.onclick = function(){
-      var m = people[0];
-      var chId = (m.voiceChannelId != null) ? m.voiceChannelId : m.voice_channel_id;
-      if (chId != null && typeof window.joinVoiceChannel === 'function')
-        window.joinVoiceChannel(chId, 'voice');
-    };
-  }
-
-  /* A section whose only content is one of the app's own empty-state
-     elements is removed rather than rendered as "nothing here yet". */
-  function emptyIn(sel, marker){
-    var host = q(sel);
-    if (!host) return false;
-    return !!q(marker, host);
-  }
-  function toggle(sel, hide){
-    var el = q(sel);
-    if (el) el.classList.toggle('colv2-hide', !!hide);
-  }
-
-  function hideEmpties(){
-    // The Stage hides on its own, not with its row — the Alter Ego card
-    // beside it is always populated and should stay.
-    toggle('#coliseumRoot .col-stage', emptyIn('#colStageRing', '.col-empty'));
-
-    var ft = $('colFeaturedTitle');
-    toggle('#coliseumRoot .col-featured',
-      !!ft && /^no featured moment/i.test((ft.textContent || '').trim()));
-
-    toggle('#coliseumRoot .col-hof',   emptyIn('#colHofTrack',  '.col-hof-empty'));
-    toggle('#coliseumRoot .col-const', emptyIn('#colConstBody', '.col-chron-empty'));
-
-    var pulseEmpty = emptyIn('#colChronList',  '.col-chron-empty');
-    var evEmpty    = emptyIn('#colNextEvents', '.col-chron-empty');
-    var cards = document.querySelectorAll('#coliseumRoot .col-chronicle .col-chron-card');
-    if (cards[0]) cards[0].classList.toggle('colv2-hide', pulseEmpty);
-    if (cards[1]) cards[1].classList.toggle('colv2-hide', evEmpty);
-    toggle('#coliseumRoot .col-chronicle', pulseEmpty && evEmpty);
-  }
-
-  var t = null;
-  function refresh(){
-    if (!document.body.classList.contains('coliseum-mode')) return;
-    restructure();
-    renderLive();
-    hideEmpties();
-  }
-  function schedule(){ clearTimeout(t); t = setTimeout(refresh, 90); }
-
-  function start(){
-    var root = $('coliseumRoot');
-    if (root){
-      /* populate() rewrites these sections asynchronously as each fetch
-         lands, so react to the DOM rather than trying to hook it. The
-         debounce, plus the fact that every write here is idempotent,
-         keeps our own edits from looping. */
-      new MutationObserver(schedule).observe(root, { childList:true, subtree:true });
-    }
-    new MutationObserver(schedule).observe(document.body, { attributes:true, attributeFilter:['class'] });
-    schedule();
-    console.log('[coliseum-v2] capsule hero, live band, empty sections hidden');
-  }
-
-  if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', start);
-  else start();
-})();
-</script>
-
-<!-- ══════════════════════════════════════════════════════════════════
-     COLISEUM v3 — fix the collapse, then make it look like something
-
-     v2 fixed the structure and left the page flat and broken. Two of
-     those were bugs I introduced:
-
-       .col-row-mid  is `grid-template-columns: 1.4fr 1fr`. Hiding the
-                     member constellation left column 2 EMPTY — that is
-                     the dead space down the right of Tournaments.
-       .col-row-hero is `1fr 360px`. Hiding the Stage dropped the Alter
-                     Ego card into column 1, where it stretched into a
-                     huge empty slab.
-
-     A hidden grid child does not remove its track. So instead of leaving
-     holes, the Alter Ego card is re-parented into a side column beside
-     Tournaments, where it fills the space the constellation left, and the
-     Stage row is dropped entirely when there is no voice.
-
-     The rest is the identity pass: the page had no depth, no accent
-     structure and no hierarchy of surface — every block was the same flat
-     rectangle. Gold is used as structure (rules, edges, seams), not as
-     decoration.
-     ══════════════════════════════════════════════════════════════════ -->
-<style>
-/* ── Layout repair ──────────────────────────────────────────────── */
-#coliseumRoot .col-row-mid{
-  grid-template-columns:minmax(0,1.5fr) 340px !important;
-  align-items:start !important;
-}
-.colv2-side{ display:flex; flex-direction:column; gap:18px; min-width:0; }
-/* Both side cards gone → Tournaments takes the whole width rather than
-   leaving an empty track. */
-#coliseumRoot .col-row-mid.colv2-solo{ grid-template-columns:minmax(0,1fr) !important; }
-#coliseumRoot .col-row-hero{ grid-template-columns:minmax(0,1fr) !important; }
-#coliseumRoot .colv2-side .col-identity-card{ border-radius:16px !important; padding:20px 18px !important; }
-
-/* ── Hero: give it room and layers ──────────────────────────────── */
-#coliseumRoot .col-identity{
-  min-height:340px !important;
-  align-items:flex-end !important;
-  position:relative;
-  background-position:right center !important;
-  background-repeat:no-repeat !important;
-}
-/* Stronger and wider than v2: the LOBBY watermark in the artwork was
-   still reading through behind the stats. */
-#coliseumRoot .col-identity::before{
-  background:
-    linear-gradient(90deg, rgba(6,7,11,.985) 0%, rgba(6,7,11,.95) 42%, rgba(6,7,11,.55) 72%, rgba(6,7,11,.18) 100%),
-    linear-gradient(180deg, rgba(6,7,11,.55) 0%, transparent 30%, rgba(6,7,11,.75) 100%) !important;
-}
-/* A lit top seam and an inner hairline — the edge that makes a surface
-   read as an object rather than a filled rectangle. */
-#coliseumRoot .col-identity::after{
-  display:block !important;
-  content:'' !important;
-  position:absolute !important; inset:0 !important;
-  border-radius:20px;
-  background:
-    linear-gradient(90deg, transparent 0%, color-mix(in srgb, var(--col-gold) 55%, transparent) 18%, color-mix(in srgb, var(--col-gold) 22%, transparent) 52%, transparent 82%) top/100% 1px no-repeat !important;
-  box-shadow:0 0 0 1px rgba(255,255,255,.05) inset !important;
-  mask-image:none !important; -webkit-mask-image:none !important;
-  z-index:2 !important; pointer-events:none !important;
-}
-#coliseumRoot .col-identity-inner{
-  padding:34px 38px 30px !important;
-  align-items:flex-end !important;
-  gap:26px !important;
-  flex-wrap:nowrap !important;
-}
-#coliseumRoot .col-ident-meta{ flex:1 1 auto; min-width:0; }
-/* Was colliding with the title and the stats row. */
-#coliseumRoot .col-ident-actions{
-  position:absolute !important;
-  top:22px; right:26px;
-  align-self:flex-start !important;
-  z-index:3;
-}
-#coliseumRoot .col-ident-emblem{
-  width:112px !important; height:112px !important;
-  border-radius:22px !important;
-  box-shadow:
-    0 18px 44px rgba(0,0,0,.7),
-    0 0 0 1px color-mix(in srgb, var(--col-gold) 45%, transparent),
-    0 0 0 5px rgba(6,7,11,.85) !important;
-}
-#coliseumRoot .col-ident-name{
-  font-size:clamp(34px, 3.4vw, 54px) !important;
-  line-height:.95 !important;
-  letter-spacing:1px !important;
-}
-#coliseumRoot .col-ident-eyebrow{
-  display:inline-flex; align-items:center; gap:7px;
-  padding:4px 10px; border-radius:99px;
-  background:color-mix(in srgb, var(--col-gold) 14%, rgba(0,0,0,.5));
-  border:1px solid color-mix(in srgb, var(--col-gold) 32%, transparent);
-  font-size:9.5px !important;
-}
-#coliseumRoot .col-ident-stat .n{
-  font-size:22px !important;
-  color:#fff !important;
-}
-#coliseumRoot .col-ident-stat .l{
-  font-size:9px !important; letter-spacing:1.6px !important;
-  color:rgba(255,255,255,.45) !important;
-}
-
-/* ── Channel cards: were tall boxes of mostly nothing ───────────── */
-#coliseumRoot .col-lounge-card{
-  padding:14px 16px !important;
-  border-radius:14px !important;
-  background:linear-gradient(180deg, rgba(28,30,40,.9), rgba(13,15,22,.94)) !important;
-  border:1px solid rgba(255,255,255,.07) !important;
-  transition:border-color .18s, transform .18s, box-shadow .18s !important;
-}
-#coliseumRoot .col-lounge-card:hover{
-  border-color:color-mix(in srgb, var(--col-gold) 42%, transparent) !important;
-  transform:translateY(-2px);
-  box-shadow:0 14px 30px rgba(0,0,0,.5) !important;
-}
-/* The body only ever holds voice orbs; empty it collapses to a gap. */
-#coliseumRoot .col-lounge-body:empty{ display:none !important; }
-#coliseumRoot .col-lounge-foot{
-  margin-top:10px !important;
-  padding-top:10px !important;
-  border-top:1px solid rgba(255,255,255,.06) !important;
-}
-/* "Channel" under every card said nothing the icon had not. */
-#coliseumRoot .col-lounge-stat{ opacity:.45; font-size:9.5px !important; }
-#coliseumRoot .col-lounge-card.voice{
-  background:
-    radial-gradient(300px 120px at 100% 0%, color-mix(in srgb, var(--col-gold) 12%, transparent), transparent 70%),
-    linear-gradient(180deg, rgba(28,30,40,.9), rgba(13,15,22,.94)) !important;
-}
-
-/* ── Surfaces: a seam of light on top of every card ─────────────── */
-#coliseumRoot .colv2-channels,
-#coliseumRoot .col-stage,
-#coliseumRoot .col-theatre,
-#coliseumRoot .col-const,
-#coliseumRoot .col-identity-card,
-#coliseumRoot .col-chron-card{
-  position:relative;
-}
-#coliseumRoot .colv2-channels::after,
-#coliseumRoot .col-theatre::after,
-#coliseumRoot .col-const::after,
-#coliseumRoot .col-chron-card::after{
-  content:''; position:absolute; top:0; left:22px; right:22px; height:1px;
-  background:linear-gradient(90deg, transparent, color-mix(in srgb, var(--col-gold) 30%, transparent), transparent);
-  pointer-events:none;
-}
-
-/* ── Tournament rows: were flat bars in a flat box ──────────────── */
-#coliseumRoot .col-theatre{ padding:20px 22px !important; }
-#coliseumRoot .col-t-row{
-  border-radius:10px !important;
-  border:1px solid rgba(255,255,255,.05) !important;
-  transition:border-color .16s, background .16s !important;
-}
-#coliseumRoot .col-t-row:hover{
-  border-color:color-mix(in srgb, var(--col-gold) 34%, transparent) !important;
-  background:color-mix(in srgb, var(--col-gold) 7%, transparent) !important;
-}
-
-/* ── Page ground: the canvas was pure flat black ────────────────── */
-#coliseumRoot .col-amb{
-  background:
-    radial-gradient(1200px 620px at 78% -8%, color-mix(in srgb, var(--col-gold) 9%, transparent) 0%, transparent 62%),
-    radial-gradient(900px 500px at 8% 104%, color-mix(in srgb, var(--accent) 8%, transparent) 0%, transparent 60%) !important;
-}
-#coliseumRoot .col-canvas{ gap:18px !important; }
-</style>
-<script>
-(function () {
-  'use strict';
-
-  function $(id){ return document.getElementById(id); }
-  function q(sel, root){ return (root || document).querySelector(sel); }
-
-  /* Re-parent the Alter Ego card into a side column beside Tournaments.
-     It used to sit next to the Stage, so whenever the Stage was hidden it
-     stretched across a full row on its own. In the side column it fills
-     the track the member constellation leaves empty. */
-  function reflow(){
-    var mid = q('#coliseumRoot .col-row-mid');
-    if (!mid) return;
-
-    var side = q('#coliseumRoot .colv2-side');
-    if (!side){
-      side = document.createElement('div');
-      side.className = 'colv2-side';
-      mid.appendChild(side);
-    }
-
-    var ego = q('#coliseumRoot .col-identity-card');
-    if (ego && ego.parentNode !== side) side.appendChild(ego);
-
-    var con = q('#coliseumRoot .col-const');
-    if (con && con.parentNode !== side) side.appendChild(con);
-
-    // The Stage row now holds only the Stage, so it goes when it does.
-    var stage = q('#coliseumRoot .col-stage');
-    var row   = q('#coliseumRoot .col-row-hero');
-    if (row && stage) row.classList.toggle('colv2-hide', stage.classList.contains('colv2-hide'));
-
-    /* If everything in the side column is hidden, drop the track instead
-       of leaving a 340px hole. */
-    var visible = Array.prototype.filter.call(side.children, function(el){
-      return !el.classList.contains('colv2-hide');
-    }).length;
-    side.classList.toggle('colv2-hide', visible === 0);
-    mid.classList.toggle('colv2-solo', visible === 0);
-  }
-
-  var t = null;
-  function schedule(){ clearTimeout(t); t = setTimeout(function(){
-    if (document.body.classList.contains('coliseum-mode')) reflow();
-  }, 120); }
-
-  function start(){
-    var root = $('coliseumRoot');
-    if (root) new MutationObserver(schedule).observe(root, { childList:true, subtree:true });
-    new MutationObserver(schedule).observe(document.body, { attributes:true, attributeFilter:['class'] });
-    schedule();
-    console.log('[coliseum-v3] grid repair + identity pass');
-  }
-
-  if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', start);
-  else start();
-})();
-</script>
 
 <!-- ══════════════════════════════════════════════════════════════════
 <!-- ══════════════════════════════════════════════════════════════════
@@ -53056,12 +52470,16 @@ body.coliseum-mode #coliseumRoot .col-canvas{ display:none !important; }
 .cr-body{ display:grid; grid-template-columns:minmax(0,1fr) 340px; gap:0; }
 .cr-main{ min-width:0; border-right:1px solid var(--cr-line); }
 .cr-side{ min-width:0; background:rgba(255,255,255,.012); }
-.cr-sec{ padding:26px 36px; border-bottom:1px solid var(--cr-line); }
-.cr-side .cr-sec{ padding:24px 22px; }
+/* Vertical rhythm: sections breathe more than the cards inside them, so
+   the eye reads groups before items. This was the "too compact" note —
+   section padding was competing with card padding at the same value. */
+.cr-sec{ padding:32px 40px; border-bottom:1px solid var(--cr-line); }
+.cr-side .cr-sec{ padding:28px 24px; }
 .cr-sec:last-child{ border-bottom:0; }
 .cr-h{
   font-family:var(--cr-head); font-size:11.5px; font-weight:800; letter-spacing:2px;
-  text-transform:uppercase; color:var(--cr-ink3); margin:0 0 16px;
+  text-transform:uppercase; color:var(--cr-ink3); margin:0 0 20px;
+  padding-bottom:12px; border-bottom:1px solid rgba(255,255,255,.05);
   display:flex; align-items:center; gap:10px;
 }
 .cr-h .more{ margin-left:auto; font-size:10px; cursor:pointer; letter-spacing:.6px; color:var(--cr-ink3); font-weight:700; }
@@ -53079,7 +52497,41 @@ body.coliseum-mode #coliseumRoot .col-canvas{ display:none !important; }
 .cr-match .vs{ color:var(--cr-ink3); font-size:10px; font-weight:800; letter-spacing:1.5px; margin:8px 0; font-family:var(--cr-mono); }
 .cr-match .st{ color:var(--cr-ink3); font-size:10.5px; font-family:var(--cr-mono); letter-spacing:1.1px; }
 
+/* Rooms are grouped by kind: a voice room you can drop into and a text
+   channel you read are different objects, and one flat row of identical
+   cards said nothing about which was which. */
+.cr-group + .cr-group{ margin-top:22px; }
+.cr-group-h{
+  display:flex; align-items:center; gap:9px; margin:0 0 11px;
+  font-family:var(--cr-head); font-size:10px; font-weight:800;
+  letter-spacing:1.8px; text-transform:uppercase; color:var(--cr-ink3);
+}
+.cr-group-h .n{
+  font-family:var(--cr-mono); font-size:9.5px; padding:1px 7px; border-radius:99px;
+  background:rgba(255,255,255,.06); color:var(--cr-ink2);
+}
 .cr-rooms{ display:grid; grid-template-columns:repeat(auto-fit,minmax(250px,1fr)); gap:12px; }
+
+/* Voice rooms are the bigger object — they carry who is inside. */
+.cr-vroom{
+  border:1px solid var(--cr-line); border-radius:12px; padding:15px 17px;
+  background:var(--cr-surface); cursor:pointer;
+  transition:border-color .16s, background .16s, transform .16s;
+}
+.cr-vroom:hover{ border-color:color-mix(in srgb, var(--cr-elec) 55%, transparent); transform:translateY(-2px); }
+.cr-vroom.live{ border-color:rgba(35,165,90,.45); background:linear-gradient(180deg, rgba(35,165,90,.10), var(--cr-surface)); }
+.cr-vroom-top{ display:flex; align-items:center; gap:11px; }
+.cr-vroom-top .nm{ font-size:13.5px; font-weight:600; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+.cr-vroom-top .go{ margin-left:auto; font-size:10px; font-weight:900; letter-spacing:1.3px; color:color-mix(in srgb, var(--cr-elec) 92%, white); }
+.cr-vroom.live .cr-vroom-top .go{ color:#5ee08a; }
+.cr-occ{ display:flex; align-items:center; gap:6px; margin-top:12px; flex-wrap:wrap; }
+.cr-occ .av{
+  width:26px; height:26px; border-radius:50%; overflow:hidden;
+  border:1px solid rgba(35,165,90,.5); background:rgba(255,255,255,.08);
+  display:flex; align-items:center; justify-content:center;
+  font-size:9.5px; font-weight:800; color:var(--cr-ink2);
+}
+.cr-occ .empty{ font-size:11.5px; color:var(--cr-ink3); }
 .cr-room{
   display:flex; align-items:center; gap:12px;
   border:1px solid var(--cr-line); border-radius:12px; padding:15px 17px;
@@ -53169,6 +52621,31 @@ body.coliseum-mode #coliseumRoot .col-canvas{ display:none !important; }
 }
 #crRoot .col-ic-av-wrap .col-ic-av,
 #crRoot .col-ic-av{ width:74px !important; height:74px !important; }
+
+/* ── Avatars ─────────────────────────────────────────────────────
+   Every avatar here is a round or rounded frame with an <img> dropped
+   inside it. Without object-fit the image keeps its own aspect ratio and
+   spills or squashes — non-square uploads were rendering as stretched
+   blobs poking out of their frame. Nothing sets this globally, so it has
+   to be said once for the whole page. */
+#crRoot .cr-crest img,
+#crRoot .cr-occ .av img,
+#crRoot .col-ic-av img,
+#crRoot .col-const-orb img,
+#crRoot .col-composer-av img,
+#crRoot .col-chron-av img,
+#crRoot .col-featured-author .av img{
+  width:100% !important; height:100% !important;
+  object-fit:cover !important; object-position:center !important;
+  display:block !important; border-radius:inherit !important;
+}
+/* The frames themselves must clip, or a cover-fitted image bleeds past
+   the rounding. */
+#crRoot .cr-occ .av,
+#crRoot .col-ic-av,
+#crRoot .col-const-orb,
+#crRoot .col-composer-av,
+#crRoot .col-chron-av{ overflow:hidden !important; }
 #crRoot .col-composer{ display:flex !important; align-items:center; gap:12px; }
 #crRoot .col-const-orbs{ gap:7px !important; }
 
@@ -53235,7 +52712,7 @@ body.coliseum-mode #coliseumRoot .col-canvas{ display:none !important; }
         '<div class="cr-body">' +
           '<div class="cr-main">' +
             '<div class="cr-sec" id="crBracketSec"></div>' +
-            '<div class="cr-sec"><p class="cr-h">Rooms</p><div class="cr-rooms" id="crRooms"></div></div>' +
+            '<div class="cr-sec"><p class="cr-h">Rooms</p><div id="crRooms"></div></div>' +
             '<div class="cr-sec" id="crSayS"><p class="cr-h">Say something</p><div id="crSay"></div></div>' +
             '<div class="cr-sec" id="crPulseS"><p class="cr-h">Lobby pulse</p><div id="crPulse"></div></div>' +
             '<div class="cr-sec" id="crTourneySec"></div>' +
@@ -53254,11 +52731,21 @@ body.coliseum-mode #coliseumRoot .col-canvas{ display:none !important; }
   /* Move the REAL nodes over. populate() keeps writing into them and
      their own handlers keep working; only the skin changes. */
   function adopt(){
+    /* Strip the retired v2/v3 layer's classes on the way in. They set
+       display:none !important, and a node still carrying one arrived
+       adopted but invisible — which is why Alter Ego, Who Is Around and
+       Lobby Pulse showed a heading with nothing under it. */
+    function clean(node){
+      if (!node) return node;
+      node.classList.remove('colv2-hide', 'colv2-side', 'colv2-solo');
+      node.querySelectorAll('.colv2-hide').forEach(function(n){ n.classList.remove('colv2-hide'); });
+      return node;
+    }
     function move(sel, mountId){
       var node = q('#coliseumRoot ' + sel);
       var mount = $(mountId);
       if (node && mount && node.parentNode !== mount) mount.appendChild(node);
-      return node;
+      return clean(node);
     }
     move('.col-identity-card', 'crEgo');
     move('.col-const',         'crWho');
@@ -53271,6 +52758,7 @@ body.coliseum-mode #coliseumRoot .col-canvas{ display:none !important; }
     var pulse = $('crPulse');
     if (pulse) Array.prototype.forEach.call(cards, function(c){
       if (c.parentNode !== pulse) pulse.appendChild(c);
+      clean(c);
     });
 
     // A mount whose section never received anything stays out of the way.
@@ -53365,16 +52853,64 @@ body.coliseum-mode #coliseumRoot .col-canvas{ display:none !important; }
       '<span class="more" data-act="tourneys">View all ' + ts.length + ' →</span></p>' +
       '<div class="cr-brk">' + html + '</div>';
 
-    $('crRooms').innerHTML = chs.length ? chs.map(function(c){
-      var isVoice = c.type === 'voice';
-      var here = isVoice ? mem.filter(function(m){ return m && (m.voiceChannelId === c.id || m.voice_channel_id === c.id); }).length : 0;
-      return '<div class="cr-room ' + (here ? 'live' : '') + '" data-ch="' + esc(c.id) +
+    /* ── Rooms, grouped by kind ────────────────────────────────
+       A voice room you drop into and a channel you read are different
+       objects; one flat row of identical cards told you nothing about
+       which was which. Voice rooms are the larger card because they
+       carry who is inside — the thing that actually decides whether you
+       join. Announcements are split out too: they are broadcast, not
+       conversation. */
+    function occ(c){
+      return mem.filter(function(m){
+        return m && (m.voiceChannelId === c.id || m.voice_channel_id === c.id);
+      });
+    }
+    function vroomCard(c){
+      var here = occ(c);
+      return '<div class="cr-vroom ' + (here.length ? 'live' : '') + '" data-ch="' + esc(c.id) +
+        '" data-type="voice" data-name="' + esc(c.name || 'voice') + '">' +
+        '<div class="cr-vroom-top">' +
+          '<span class="ic">🎙</span>' +
+          '<span class="nm">' + esc(String(c.name || 'voice').replace(/^#/, '')) + '</span>' +
+          '<span class="go">' + (here.length ? 'JOIN THEM' : 'DROP IN') + '</span>' +
+        '</div>' +
+        '<div class="cr-occ">' +
+          (here.length
+            ? here.slice(0, 8).map(function(m){
+                var nm = m.display_name || m.username || '?';
+                var url = m.avatar_url || m.avatarUrl;
+                return '<span class="av" title="' + esc(nm) + '">' +
+                  (url ? '<img src="' + esc(url) + '" alt="">' : esc(initials(nm))) + '</span>';
+              }).join('') + (here.length > 8 ? '<span class="av">+' + (here.length - 8) + '</span>' : '')
+            : '<span class="empty">Empty — be the first in</span>') +
+        '</div></div>';
+    }
+    function textRow(c){
+      var unread = (window.unreadChannels && window.unreadChannels[c.id]) || 0;
+      return '<div class="cr-room" data-ch="' + esc(c.id) +
         '" data-type="' + esc(c.type || 'text') + '" data-name="' + esc(c.name || 'channel') + '">' +
-        '<span class="ic">' + (isVoice ? '🎙' : c.type === 'announcement' ? '📣' : '💬') + '</span>' +
+        '<span class="ic">' + (c.type === 'announcement' ? '📣' : '💬') + '</span>' +
         '<span>' + esc(String(c.name || 'channel').replace(/^#/, '')) + '</span>' +
-        (here ? '<span class="who">' + here + ' here</span>'
-              : '<span class="go">' + (isVoice ? 'JOIN' : 'OPEN') + '</span>') + '</div>';
-    }).join('') : '<div class="cr-empty">No channels yet — create one in Settings.</div>';
+        (unread ? '<span class="who">' + unread + ' new</span>' : '<span class="go">OPEN</span>') +
+        '</div>';
+    }
+
+    var vrooms = chs.filter(function(c){ return c.type === 'voice'; });
+    var anns   = chs.filter(function(c){ return c.type === 'announcement'; });
+    var texts  = chs.filter(function(c){ return c.type !== 'voice' && c.type !== 'announcement'; });
+
+    function group(label, items, render){
+      if (!items.length) return '';
+      return '<div class="cr-group">' +
+        '<p class="cr-group-h">' + label + '<span class="n">' + items.length + '</span></p>' +
+        '<div class="cr-rooms">' + items.map(render).join('') + '</div></div>';
+    }
+
+    $('crRooms').innerHTML = chs.length
+      ? group('Voice rooms', vrooms, vroomCard) +
+        group('Channels', texts, textRow) +
+        group('Announcements', anns, textRow)
+      : '<div class="cr-empty">No channels yet — create one in Settings.</div>';
 
     var tsec = $('crTourneySec');
     tsec.style.display = ts.length ? '' : 'none';
