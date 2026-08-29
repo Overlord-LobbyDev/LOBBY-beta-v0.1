@@ -55772,41 +55772,51 @@ body.lobby-selected #chatPanel .chat-header{ display:none !important; }
      than looking like a landing page.
      ══════════════════════════════════════════════════════════════════ -->
 <style>
+/* Centred — but every row is its own centred block, which is the part
+   that was wrong before. Previously the icon shared a row WITH the
+   title, so the row balanced while the words sat left of the page's
+   middle. The title row now contains nothing but the title, so the
+   words themselves are centred. */
 #homeContent .home-section-header{
-  display:grid !important;
-  grid-template-columns:auto minmax(0,1fr) auto;
-  grid-template-areas:'spine main action';
-  align-items:center !important;
-  column-gap:20px; gap:0 20px !important;
-  margin:0 0 24px !important; padding:4px 0 !important;
-  text-align:left !important;
+  display:flex !important; flex-direction:column !important;
+  align-items:center !important; justify-content:center !important;
+  gap:0 !important; position:relative;
+  margin:0 0 26px !important; padding:6px 0 !important;
+  text-align:center !important;
 }
-#homeContent .home-section-header::before{ left:-16px !important; }
+#homeContent .home-section-header::before{ left:2px !important; }
 
-.hs-spine{
-  grid-area:spine;
-  width:5px; align-self:stretch; min-height:74px; border-radius:99px;
-  background:linear-gradient(180deg,
-    color-mix(in srgb, var(--accent) 95%, white),
-    color-mix(in srgb, var(--accent) 55%, transparent) 55%,
-    transparent);
-}
-.hs-main{ grid-area:main; min-width:0; }
+.hs-main{ width:100%; display:flex; flex-direction:column; align-items:center; }
 
+/* The index, the source and the live count sit ABOVE the name, not
+   beside it — that is what keeps the title itself dead centre. */
 .hs-kicker{
-  display:flex; align-items:center; gap:9px;
+  display:inline-flex; align-items:center; gap:10px;
   font-family:'JetBrains Mono', ui-monospace, monospace;
   font-size:10px; font-weight:700; letter-spacing:2.2px; text-transform:uppercase;
-  color:var(--text-3); margin-bottom:7px;
+  color:var(--text-3); margin-bottom:9px;
+  padding:5px 13px; border-radius:99px;
+  background:rgba(255,255,255,.035);
+  border:1px solid rgba(255,255,255,.07);
+}
+/* A short accent bar under the name instead of rules running off to the
+   page edges — it marks the section without the centred-hairline look. */
+.hs-bar{
+  width:64px; height:3px; border-radius:99px; margin-top:12px;
+  background:linear-gradient(90deg,
+    transparent,
+    color-mix(in srgb, var(--accent) 95%, white) 35%,
+    color-mix(in srgb, var(--accent) 95%, white) 65%,
+    transparent);
 }
 .hs-idx{ color:color-mix(in srgb, var(--accent) 92%, white); font-weight:800; }
 .hs-kicker .sep{ color:rgba(255,255,255,.18); }
 .hs-ico{ display:inline-flex; color:color-mix(in srgb, var(--accent) 85%, white); }
 .hs-ico svg{ width:14px; height:14px; display:block; }
 .hs-count{
-  margin-left:auto; display:inline-flex; align-items:center; gap:7px;
-  color:var(--text-2);
+  display:inline-flex; align-items:center; gap:7px; color:var(--text-2);
 }
+.hs-kicker .sep2{ color:rgba(255,255,255,.18); }
 .hs-count b{
   font-weight:800; color:#fff; font-variant-numeric:tabular-nums;
 }
@@ -55831,7 +55841,9 @@ body.lobby-selected #chatPanel .chat-header{ display:none !important; }
 }
 
 #homeContent .home-section-btn{
-  grid-area:action; position:static !important; transform:none !important;
+  /* Absolute, so the button cannot shift what the centred rows are
+     centred ON. In flow it would push the whole stack left. */
+  position:absolute !important; right:0; top:50%; transform:translateY(-50%) !important;
   border-radius:9px !important; padding:9px 15px !important;
   font-family:'Archivo', var(--font), sans-serif !important;
   font-size:11.5px !important; font-weight:700 !important; letter-spacing:.5px !important;
@@ -55846,6 +55858,7 @@ body.lobby-selected #chatPanel .chat-header{ display:none !important; }
 @media (max-width:900px){
   #homeContent .home-section-title{ font-size:34px !important; }
   .hs-count{ display:none; }
+  #homeContent .home-section-btn{ position:static !important; transform:none !important; margin-top:14px; }
 }
 </style>
 <script>
@@ -55896,27 +55909,31 @@ body.lobby-selected #chatPanel .chat-header{ display:none !important; }
       if (!main){
         title.textContent = (title.textContent || '').replace(/^[^A-Za-z0-9]+/, '').trim();
 
-        var spine = document.createElement('span');
-        spine.className = 'hs-spine';
-
         main = document.createElement('div');
         main.className = 'hs-main';
 
+        /* One pill above the name carrying index, source and live count.
+           Keeping all of it out of the title's row is what lets the
+           title itself be centred rather than merely balanced. */
         var kicker = document.createElement('div');
         kicker.className = 'hs-kicker';
         kicker.innerHTML =
           '<span class="hs-idx"></span><span class="sep">/</span>' +
           '<span class="hs-ico">' + cfg.ico + '</span>' +
           '<span>' + cfg.label + '</span>' +
+          '<span class="sep2">·</span>' +
           '<span class="hs-count"><span class="dot"></span><b>0</b> ' + cfg.word + '</span>';
+
+        var bar = document.createElement('span');
+        bar.className = 'hs-bar';
 
         var oldWrap = title.parentElement;
         main.appendChild(kicker);
         main.appendChild(title);
+        main.appendChild(bar);
         if (sub) main.appendChild(sub);
 
-        head.insertBefore(spine, head.firstChild);
-        head.insertBefore(main, spine.nextSibling);
+        head.insertBefore(main, head.firstChild);
         if (oldWrap && oldWrap !== head && !oldWrap.children.length) oldWrap.remove();
       }
 
@@ -55929,7 +55946,11 @@ body.lobby-selected #chatPanel .chat-header{ display:none !important; }
       if (cnt && cnt.textContent !== String(n)) cnt.textContent = String(n);
       var wrap = main.querySelector('.hs-count');
       // Nothing loaded yet: a live count reading zero is worse than none.
-      if (wrap) wrap.style.visibility = n ? 'visible' : 'hidden';
+      /* Hide the count AND its separator at zero — a live readout
+         showing nothing is worse than no readout. */
+      var sep2 = main.querySelector('.sep2');
+      if (wrap) wrap.style.display = n ? '' : 'none';
+      if (sep2) sep2.style.display = n ? '' : 'none';
     });
   }
 
