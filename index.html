@@ -58164,5 +58164,212 @@ async function reactComment(ev, id, btn){
   else start();
 })();
 </script>
+
+<!-- ══════════════════════════════════════════════════════════════════
+     DISPLAY SCALE
+
+     zoom:1.15 was a number tuned by eye on one monitor. On anything
+     else it is wrong, and moving the window between two displays with
+     different DPI made it wrong twice.
+
+     WHAT IT SCALES ON. Not the physical monitor size — that is the
+     wrong input and it double-counts. Windows display scaling already
+     converts physical size into CSS pixels: a 27" 4K at 150% reports
+     about 2560 CSS px, a 24" 1080p at 100% reports 1920. Scaling again
+     by inches would apply the OS's correction twice. What matters is
+     the CSS width actually available to the content, which folds in the
+     OS scale, the window size, and whether the feed and sidebar are
+     docked — all three, for free.
+
+     WHERE 1390 COMES FROM. It is not a guess. At a 1920 CSS viewport
+     the home panel measures about 1600px, and 1.15 was chosen there:
+     1600 / 1.15 = 1391. So the layout was, in effect, designed for
+     ~1390px of content, and Auto reproduces exactly the current
+     appearance on the display it was tuned on while adapting elsewhere.
+
+     Clamped to 0.85-1.45. Past those the layout stops being the thing
+     that was designed: the deck cards are a fixed 920px and would start
+     colliding with the rails at the top end, and the meta type falls
+     under 10px at the bottom.
+
+     Quantised to 2% steps. clientWidth changes by a pixel during a drag
+     and an unquantised scale would rewrite on every frame of a resize.
+     ══════════════════════════════════════════════════════════════════ -->
+<style>
+/* The hardcoded value becomes the fallback, so the page still renders
+   at the tuned size if the controller never runs. */
+#homeContent{ zoom:var(--ui-scale, 1.15) !important; }
+
+.uis-row{ display:flex; flex-wrap:wrap; gap:8px; margin-top:12px; }
+.uis-btn{
+  flex:0 0 auto; min-width:62px;
+  padding:9px 12px; border-radius:9px;
+  border:2px solid rgba(255,255,255,.1);
+  background:rgba(255,255,255,.04);
+  color:var(--text-2); font-family:var(--font);
+  font-size:12px; font-weight:700; cursor:pointer;
+  transition:border-color .15s, background .15s, color .15s;
+  font-variant-numeric:tabular-nums;
+}
+.uis-btn:hover{ background:rgba(255,255,255,.08); color:var(--text-1); }
+.uis-btn.on{
+  border-color:var(--accent);
+  background:color-mix(in srgb, var(--accent) 18%, transparent);
+  color:#fff;
+}
+.uis-read{
+  margin-top:11px; font-size:12px; color:var(--text-3);
+  display:flex; align-items:center; gap:7px; flex-wrap:wrap;
+}
+.uis-read b{ color:var(--text-1); font-variant-numeric:tabular-nums; }
+.uis-chip{
+  font-size:10.5px; font-weight:800; letter-spacing:.6px; text-transform:uppercase;
+  padding:3px 8px; border-radius:99px;
+  background:rgba(255,255,255,.06); border:1px solid rgba(255,255,255,.1);
+  color:var(--text-2);
+}
+</style>
+<script>
+(function () {
+  'use strict';
+
+  var KEY = 'lobby_ui_scale';
+  var DESIGN_W = 1390;      // see the note above — derived, not guessed
+  var MIN = 0.85, MAX = 1.45;
+  var STEPS = [
+    { v:'auto', label:'Auto' },
+    { v:'0.90', label:'90%'  },
+    { v:'1.00', label:'100%' },
+    { v:'1.15', label:'115%' },
+    { v:'1.30', label:'130%' },
+    { v:'1.45', label:'145%' }
+  ];
+
+  function pref(){
+    try { return localStorage.getItem(KEY) || 'auto'; } catch (e) { return 'auto'; }
+  }
+  function setPref(v){
+    try { localStorage.setItem(KEY, v); } catch (e) {}
+    apply();
+    paintButtons();
+  }
+
+  /* Measured on #homePanel, which is the UNZOOMED parent. Measuring
+     #homeContent would read a width the zoom itself had already changed,
+     and each pass would feed the next. */
+  function availableWidth(){
+    var panel = document.getElementById('homePanel');
+    var w = panel ? panel.clientWidth : 0;
+    if (!w) w = document.documentElement.clientWidth || DESIGN_W;
+    return w;
+  }
+
+  function autoScale(){
+    var raw = availableWidth() / DESIGN_W;
+    var q = Math.round(raw / 0.02) * 0.02;         // 2% steps, see note
+    return Math.max(MIN, Math.min(MAX, q));
+  }
+
+  function effective(){
+    var p = pref();
+    if (p === 'auto') return autoScale();
+    var n = parseFloat(p);
+    return isFinite(n) ? Math.max(MIN, Math.min(MAX, n)) : 1;
+  }
+
+  function apply(){
+    var s = effective().toFixed(3);
+    if (document.documentElement.style.getPropertyValue('--ui-scale') === s) return;
+    document.documentElement.style.setProperty('--ui-scale', s);
+    paintReadout();
+  }
+  window.setUiScale = setPref;
+  window.getUiScale = effective;
+
+  /* ── The control, added to Settings → Appearance ──────────────── */
+  function card(){
+    var host = document.getElementById('sp-appearance');
+    if (!host) return null;
+    var el = document.getElementById('uisCard');
+    if (el && el.isConnected) return el;
+
+    el = document.createElement('div');
+    el.className = 'sp-card';
+    el.id = 'uisCard';
+    el.innerHTML =
+      '<div class="sp-card-title">Display scale</div>' +
+      '<div class="sp-card-desc">How large the home page is drawn. Auto fits it ' +
+        'to the window, so it stays right when you move between monitors or ' +
+        'dock the feed.</div>' +
+      '<div class="uis-row" id="uisRow"></div>' +
+      '<div class="uis-read" id="uisRead"></div>';
+
+    /* After the rule that follows the subtitle, so it reads as part of
+       the panel rather than being tacked on the end. */
+    var rule = host.querySelector('.sp-section-rule');
+    if (rule && rule.nextSibling) host.insertBefore(el, rule.nextSibling);
+    else host.appendChild(el);
+
+    var row = el.querySelector('#uisRow');
+    STEPS.forEach(function (s) {
+      var b = document.createElement('button');
+      b.type = 'button';
+      b.className = 'uis-btn';
+      b.setAttribute('data-v', s.v);
+      b.textContent = s.label;
+      b.addEventListener('click', function (e) {
+        e.preventDefault(); e.stopPropagation();
+        setPref(s.v);
+      });
+      row.appendChild(b);
+    });
+    paintButtons();
+    paintReadout();
+    return el;
+  }
+
+  function paintButtons(){
+    var p = pref();
+    document.querySelectorAll('#uisRow .uis-btn').forEach(function (b) {
+      b.classList.toggle('on', b.getAttribute('data-v') === p);
+    });
+  }
+
+  function paintReadout(){
+    var el = document.getElementById('uisRead');
+    if (!el) return;
+    var auto = pref() === 'auto';
+    el.innerHTML =
+      '<span class="uis-chip">' + (auto ? 'Auto' : 'Manual') + '</span>' +
+      '<span>Drawing at <b>' + Math.round(effective() * 100) + '%</b></span>' +
+      '<span>·</span>' +
+      '<span><b>' + availableWidth() + 'px</b> available</span>';
+  }
+
+  function start(){
+    apply();
+
+    /* One observer covers window resize, moving to a display with a
+       different DPI, and the feed or sidebar docking — all three change
+       this element's width, and nothing else has to be wired up. */
+    var panel = document.getElementById('homePanel');
+    if (panel && window.ResizeObserver){
+      new ResizeObserver(function () { apply(); paintReadout(); }).observe(panel);
+    } else {
+      window.addEventListener('resize', function () { apply(); paintReadout(); });
+    }
+
+    /* The settings page is built on demand, so wait for the panel to
+       exist rather than assuming it does. */
+    if (!card()){
+      var mo = new MutationObserver(function () { if (card()) mo.disconnect(); });
+      mo.observe(document.body, { childList:true, subtree:true });
+    }
+  }
+
+  if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', start);
+  else start();
+})();
+</script>
 </body>
 </html>
