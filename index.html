@@ -52584,29 +52584,53 @@ body.coliseum-mode #coliseumRoot .col-canvas{ display:none !important; }
   background:rgba(255,255,255,.06); color:var(--cr-ink2); letter-spacing:.6px;
 }
 
-/* Everyone online who is NOT in a voice lounge. The ones who are appear
-   inside their lounge above — presence shown where it happens, which is
-   why Who Is Around no longer needs a card of its own. */
-#crRoot .cr-around{
-  display:flex; align-items:center; gap:12px; flex-wrap:wrap;
-  margin-top:16px; padding-top:16px;
-  border-top:1px solid rgba(255,255,255,.06);
+/* Lounges left, presence right. Stacked underneath, "Around" read as an
+   afterthought and left the lounge rows running the full page width for
+   three words of content. */
+#crRoot .cr-lounge-grid{
+  display:grid; grid-template-columns:minmax(0,1fr) 236px; gap:18px;
+  align-items:start;
 }
-#crRoot .cr-around-l{
+@media (max-width:1100px){
+  #crRoot .cr-lounge-grid{ grid-template-columns:1fr; }
+}
+
+/* Everyone online who is NOT in a voice lounge — the ones who are appear
+   inside their lounge, which is why Who Is Around no longer needs a card
+   of its own in the side column. */
+#crRoot .cr-around{
+  border:1px solid var(--cr-line); border-radius:12px;
+  background:rgba(255,255,255,.018); padding:14px 15px;
+}
+#crRoot .cr-around-h{
+  display:flex; align-items:center; gap:8px; margin:0 0 12px;
   font-family:var(--cr-head); font-size:10px; font-weight:800;
   letter-spacing:1.8px; text-transform:uppercase; color:var(--cr-ink3);
 }
-#crRoot .cr-around-people{ display:flex; gap:6px; flex-wrap:wrap; }
-#crRoot .cr-around-people .av{
-  width:26px; height:26px; border-radius:50%; overflow:hidden;
+#crRoot .cr-around-h .n{
+  margin-left:auto; font-family:var(--cr-mono); font-size:9.5px;
+  color:var(--cr-ink2); letter-spacing:.4px; background:none; padding:0;
+}
+#crRoot .cr-around-list{ display:flex; flex-direction:column; gap:8px; }
+#crRoot .cr-around-row{
+  display:flex; align-items:center; gap:9px; min-width:0;
+  font-size:12.5px; color:var(--cr-ink2);
+}
+#crRoot .cr-around-row .nm{ overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+#crRoot .cr-around-row .av{
+  width:24px; height:24px; border-radius:50%; overflow:hidden; flex:0 0 24px;
   border:1px solid rgba(255,255,255,.14); background:rgba(255,255,255,.07);
   display:flex; align-items:center; justify-content:center;
-  font-size:9.5px; font-weight:800; color:var(--cr-ink2);
+  font-size:9px; font-weight:800; color:var(--cr-ink2);
 }
-#crRoot .cr-around-people .av img{
-  width:100%; height:100%; object-fit:cover; display:block;
+#crRoot .cr-around-row .av img{ width:100%; height:100%; object-fit:cover; display:block; }
+#crRoot .cr-around-more,
+#crRoot .cr-around-empty{ font-size:11.5px; color:var(--cr-ink3); }
+#crRoot .cr-around-more{ margin-top:8px; }
+#crRoot .cr-around-foot{
+  margin-top:12px; padding-top:10px; border-top:1px solid rgba(255,255,255,.06);
+  font-family:var(--cr-mono); font-size:10px; letter-spacing:.6px; color:#5ee08a;
 }
-#crRoot .cr-around-n{ font-size:11.5px; color:var(--cr-ink3); margin-left:auto; }
 
 /* Voice rooms are the bigger object — they carry who is inside. */
 #crRoot .cr-vroom{
@@ -53038,26 +53062,36 @@ body.coliseum-mode #coliseumRoot .col-canvas{ display:none !important; }
                     (loungesExpanded ? 'Show less' : 'Show all ' + ordered.length + ' →') +
                   '</span>' : '') +
         '</p>' +
-        '<div class="cr-lounges">' +
-          shown.map(function(c){ return c.type === 'voice' ? vroomCard(c) : textRow(c); }).join('') +
-        '</div>' +
-        (elsewhere.length
-          ? '<div class="cr-around">' +
-              '<span class="cr-around-l">Around</span>' +
-              '<div class="cr-around-people">' +
-                elsewhere.slice(0, 16).map(function(m){
-                  var nm = m.display_name || m.username || '?';
-                  var url = m.avatar_url || m.avatarUrl;
-                  return '<span class="av" title="' + esc(nm) + '">' +
-                    (url ? '<img src="' + esc(url) + '" alt="" onerror="this.remove()">'
-                         : esc(initials(nm))) + '</span>';
-                }).join('') +
-                (elsewhere.length > 16 ? '<span class="av">+' + (elsewhere.length - 16) + '</span>' : '') +
-              '</div>' +
-              '<span class="cr-around-n">' + elsewhere.length + ' online, not in voice</span>' +
-            '</div>'
-          : '') +
-        ''
+        /* Two columns: lounges left, presence right. Beside the list
+           rather than stacked under it — it reads as one unit, and it
+           takes width off the lounge rows, which were sprawling the full
+           page for three words of content. */
+        '<div class="cr-lounge-grid">' +
+          '<div class="cr-lounges">' +
+            shown.map(function(c){ return c.type === 'voice' ? vroomCard(c) : textRow(c); }).join('') +
+          '</div>' +
+          '<aside class="cr-around">' +
+            '<p class="cr-around-h">Around<span class="n">' + online.length + '/' + mem.length + '</span></p>' +
+            (elsewhere.length
+              ? '<div class="cr-around-list">' +
+                  elsewhere.slice(0, 10).map(function(m){
+                    var nm = m.display_name || m.username || '?';
+                    var url = m.avatar_url || m.avatarUrl;
+                    return '<div class="cr-around-row" title="' + esc(nm) + '">' +
+                      '<span class="av">' +
+                        (url ? '<img src="' + esc(url) + '" alt="" onerror="this.remove()">'
+                             : esc(initials(nm))) +
+                      '</span><span class="nm">' + esc(nm) + '</span></div>';
+                  }).join('') +
+                  (elsewhere.length > 10
+                    ? '<div class="cr-around-more">+' + (elsewhere.length - 10) + ' more</div>' : '') +
+                '</div>'
+              : '<div class="cr-around-empty">' +
+                  (talking ? 'Everyone online is in voice.' : 'Nobody around right now.') +
+                '</div>') +
+            (talking ? '<div class="cr-around-foot">' + talking + ' in voice</div>' : '') +
+          '</aside>' +
+        '</div>'
       : '<p class="cr-h">Lounges</p><div class="cr-empty">No lounges yet — create one in Settings.</div>';
 
     var tsec = $('crTourneySec');
