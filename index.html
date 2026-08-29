@@ -56131,5 +56131,265 @@ body.lobby-selected #chatPanel .chat-header{ display:none !important; }
   else start();
 })();
 </script>
+
+<!-- ══════════════════════════════════════════════════════════════════
+     HOME BENTO
+
+     The dead space had two causes: one narrow column running down a wide
+     window, and Spotlight drawing a single 220px card at the far left
+     when there is one post. A grid of sized tiles removes both, because
+     a tile is only as big as it needs to be and the grid closes up
+     around whatever is missing.
+
+     PLACEMENT — the part worth getting right:
+
+       Spotlight   3x2, top left. It is the only section with imagery and
+                   the only one that changes daily, so it earns the
+                   largest tile and the first read.
+       Friends     1x1, top right. Glanceable, and the reason someone
+                   opens the app rather than a store page. Small because
+                   it is a count and some faces, not something you dwell
+                   on.
+       This week   1x1, beneath it. Personal, but the least urgent thing
+                   here, so it takes the smallest slot in the coldest
+                   corner.
+       Lobbies     4x1, full width beneath. Discovery is a browse, and a
+                   browse wants a wide track rather than a tall box.
+
+     Recently Played stays above the grid, full width and untouched: it
+     is the showpiece and a bento tile would shrink it.
+
+     Auto-flow dense with spans rather than named areas. Named areas
+     would leave a hole the moment a tile is absent -- dense packing is
+     what makes "no dead space" structural rather than a layout that
+     happens to look right when everything is present.
+     ══════════════════════════════════════════════════════════════════ -->
+<style>
+#homeBento{
+  display:grid;
+  grid-template-columns:repeat(4, minmax(0,1fr));
+  grid-auto-rows:minmax(150px, auto);
+  grid-auto-flow:row dense;
+  gap:16px;
+  width:100%;
+}
+.bn{
+  position:relative; min-width:0; overflow:hidden;
+  border:1px solid rgba(255,255,255,.08); border-radius:16px;
+  background:linear-gradient(160deg, rgba(255,255,255,.035), rgba(255,255,255,.012));
+  padding:18px 20px;
+  display:flex; flex-direction:column;
+}
+.bn::before{
+  content:''; position:absolute; top:0; left:20px; right:20px; height:1px;
+  background:linear-gradient(90deg, transparent, rgba(255,255,255,.16), transparent);
+}
+.bn-spot{ grid-column:span 3; grid-row:span 2; }
+.bn-lob { grid-column:span 4; grid-row:span 2; }
+.bn-sm  { grid-column:span 1; grid-row:span 1; }
+
+.bn-h{
+  display:flex; align-items:center; gap:9px; margin:0 0 14px; flex:none;
+  font-family:'Archivo', var(--font), sans-serif;
+  font-size:10px; font-weight:800; letter-spacing:1.8px; text-transform:uppercase;
+  color:var(--text-3);
+}
+.bn-h .n{
+  margin-left:auto; font-family:'JetBrains Mono', ui-monospace, monospace;
+  font-size:10px; color:var(--text-2); font-variant-numeric:tabular-nums;
+}
+.bn-h .ic{ display:inline-flex; color:color-mix(in srgb, var(--accent) 88%, white); }
+.bn-h .ic svg{ width:14px; height:14px; display:block; }
+.bn-body{ flex:1; min-height:0; overflow:hidden; }
+
+/* Adopted sections lose their page-level slate inside a tile — a 46px
+   centred title is a section heading, not a tile heading. */
+#homeBento .home-section-header{ display:none !important; }
+#homeBento > .bn > section{ margin:0 !important; }
+
+/* Numbers big enough to read from across the room; labels quiet. */
+.bn-figs{ display:flex; gap:22px; flex-wrap:wrap; margin-top:auto; }
+.bn-fig b{
+  display:block; font-family:'JetBrains Mono', ui-monospace, monospace;
+  font-size:26px; font-weight:800; color:#fff; line-height:1;
+  font-variant-numeric:tabular-nums;
+}
+.bn-fig span{
+  display:block; font-family:'Archivo', var(--font), sans-serif;
+  font-size:8.5px; font-weight:800; letter-spacing:1.4px; text-transform:uppercase;
+  color:var(--text-3); margin-top:5px;
+}
+.bn-fig b.hot{ color:color-mix(in srgb, var(--accent) 92%, white); }
+
+.bn-faces{ display:flex; flex-wrap:wrap; gap:6px; margin-bottom:12px; }
+.bn-face{
+  width:32px; height:32px; border-radius:50%; overflow:hidden;
+  border:1px solid rgba(35,165,90,.5); background:rgba(255,255,255,.07);
+  display:grid; place-items:center; font-size:11px; font-weight:800; color:var(--text-2);
+}
+.bn-face img{ width:100%; height:100%; object-fit:cover; display:block; }
+.bn-empty{ font-size:12.5px; color:var(--text-3); margin-top:auto; }
+
+@media (max-width:1200px){
+  #homeBento{ grid-template-columns:repeat(2, minmax(0,1fr)); }
+  .bn-spot{ grid-column:span 2; }
+  .bn-lob{ grid-column:span 2; }
+}
+@media (max-width:700px){
+  #homeBento{ grid-template-columns:1fr; }
+  .bn-spot,.bn-lob,.bn-sm{ grid-column:span 1; grid-row:auto; }
+}
+</style>
+<script>
+(function () {
+  'use strict';
+
+  var ICO = {
+    spot:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3s5 4 5 8a5 5 0 0 1-10 0c0-1.6.8-3 1.6-4.1.5 1 1.2 1.6 2 1.6C12 8.5 12 5.5 12 3z"/><path d="M9 17a3 3 0 0 0 6 0"/></svg>',
+    lob:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="9" cy="8" r="3.2"/><path d="M3 20v-1.5A4.5 4.5 0 0 1 7.5 14h3A4.5 4.5 0 0 1 15 18.5V20"/><circle cx="17" cy="9" r="2.4"/><path d="M17.5 13.4A4 4 0 0 1 21 17.3V19"/></svg>',
+    fren:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="8" r="3.4"/><path d="M5 20v-1a5 5 0 0 1 5-5h4a5 5 0 0 1 5 5v1"/></svg>',
+    week:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 17l5-5 4 3 6-7"/><path d="M14 8h4v4"/></svg>'
+  };
+
+  function esc(s){
+    return String(s == null ? '' : s)
+      .replace(/&/g,'&amp;').replace(/"/g,'&quot;')
+      .replace(/</g,'&lt;').replace(/>/g,'&gt;');
+  }
+  function tile(cls, id){
+    var d = document.createElement('div');
+    d.className = 'bn ' + cls;
+    d.id = id;
+    return d;
+  }
+  function head(ico, label, countId){
+    return '<div class="bn-h"><span class="ic">' + ico + '</span>' + label +
+           '<span class="n" id="' + countId + '"></span></div>';
+  }
+
+  /* Built once. The adopted sections keep their own renderers and
+     handlers — only their container changes. */
+  function build(){
+    var home = document.getElementById('homeContent');
+    var recents = document.getElementById('homeRecents');
+    if (!home || !recents || document.getElementById('homeBento')) return;
+
+    var spotSec = document.getElementById('homeSpotlight');
+    var lobSec  = document.getElementById('homeCommunities');
+    if (!spotSec || !lobSec) return;
+
+    var grid = document.createElement('div');
+    grid.id = 'homeBento';
+
+    var tSpot = tile('bn-spot', 'bnSpot');
+    tSpot.innerHTML = head(ICO.spot, 'Spotlight', 'bnSpotN');
+    var spotBody = document.createElement('div');
+    spotBody.className = 'bn-body';
+    tSpot.appendChild(spotBody);
+    spotBody.appendChild(spotSec);
+
+    var tFren = tile('bn-sm', 'bnFren');
+    tFren.innerHTML = head(ICO.fren, 'Friends', 'bnFrenN') +
+      '<div class="bn-faces" id="bnFaces"></div>' +
+      '<div class="bn-figs"><div class="bn-fig"><b class="hot" id="bnFrenC">0</b><span>Online now</span></div></div>';
+
+    var tWeek = tile('bn-sm', 'bnWeek');
+    tWeek.innerHTML = head(ICO.week, 'This week', 'bnWeekN') +
+      '<div class="bn-figs">' +
+        '<div class="bn-fig"><b id="bnHrs">0h</b><span>Played</span></div>' +
+        '<div class="bn-fig"><b id="bnAch">0</b><span>Achievements</span></div>' +
+      '</div>';
+
+    var tLob = tile('bn-lob', 'bnLob');
+    tLob.innerHTML = head(ICO.lob, 'Lobbies', 'bnLobN');
+    var lobBody = document.createElement('div');
+    lobBody.className = 'bn-body';
+    tLob.appendChild(lobBody);
+    lobBody.appendChild(lobSec);
+
+    grid.appendChild(tSpot);
+    grid.appendChild(tFren);
+    grid.appendChild(tWeek);
+    grid.appendChild(tLob);
+
+    // Straight after the hero, which stays full width above the grid.
+    recents.insertAdjacentElement('afterend', grid);
+    refresh();
+  }
+
+  /* Everything here is derived from what is already on the page or
+     already in memory — no new endpoints. */
+  function refresh(){
+    var spotN = document.querySelectorAll('#homeSpotlight .spotlight-card').length;
+    var lobN  = document.querySelectorAll('#homeCommunities .community-card').length;
+    set('bnSpotN', spotN ? spotN + (spotN === 1 ? ' post' : ' posts') : '');
+    set('bnLobN',  lobN ? lobN + (lobN === 1 ? ' lobby' : ' lobbies') : '');
+
+    /* Hours and achievements come from the Steam cards the carousel has
+       already rendered, so this cannot disagree with what is on screen. */
+    var hrs = 0, ach = 0;
+    document.querySelectorAll('#homeRecents .game-card').forEach(function(c){
+      var el = c.querySelector('.game-card-hours');
+      var m = el && String(el.textContent || '').match(/([\d.]+)\s*h/i);
+      if (m) hrs += parseFloat(m[1]) || 0;
+      ach += c.querySelectorAll('.game-card-ach').length;
+    });
+    set('bnHrs', (Math.round(hrs * 10) / 10) + 'h');
+    set('bnAch', String(ach));
+    var games = document.querySelectorAll('#homeRecents .game-card').length;
+    set('bnWeekN', games ? games + ' games' : '');
+
+    friends();
+  }
+
+  function set(id, txt){
+    var el = document.getElementById(id);
+    if (el && el.textContent !== txt) el.textContent = txt;
+  }
+
+  var fCache = null, fAt = 0;
+  function friends(){
+    var host = document.getElementById('bnFaces');
+    if (!host) return;
+
+    function paint(list){
+      var ids = window.onlineUserIds;
+      var on = (list || []).filter(function(f){
+        return ids && ids.has ? ids.has(f.other_id) : false;
+      });
+      set('bnFrenC', String(on.length));
+      set('bnFrenN', (list || []).length ? (list.length + ' total') : '');
+      host.innerHTML = on.length
+        ? on.slice(0, 8).map(function(f){
+            var nm = f.username || '?';
+            return '<span class="bn-face" title="' + esc(nm) + '">' +
+              (f.avatar_url ? '<img src="' + esc(f.avatar_url) + '" alt="" onerror="this.remove()">'
+                            : esc(nm.charAt(0).toUpperCase())) + '</span>';
+          }).join('')
+        : '<span class="bn-empty">Nobody online right now.</span>';
+    }
+
+    if (fCache && Date.now() - fAt < 30000){ paint(fCache); return; }
+    if (typeof feedApi !== 'function' && typeof window.feedApi !== 'function'){ paint([]); return; }
+    fAt = Date.now();
+    Promise.resolve(window.feedApi('/friends')).then(function(d){
+      fCache = (Array.isArray(d) ? d : []).filter(function(f){ return f.status === 'accepted'; });
+      paint(fCache);
+    }).catch(function(){ paint([]); });
+  }
+
+  function start(){
+    build();
+    var home = document.getElementById('homeContent');
+    if (home) new MutationObserver(function(){ build(); refresh(); })
+      .observe(home, { childList:true, subtree:true });
+    setInterval(refresh, 4000);   // counts and presence arrive after their fetches
+    console.log('[home] bento grid active');
+  }
+
+  if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', start);
+  else start();
+})();
+</script>
 </body>
 </html>
