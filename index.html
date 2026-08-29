@@ -19554,6 +19554,13 @@ async function openDM(userId, username, avatarUrl) {
 
 // ── Open Channel ──────────────────────────────────────────────
 async function openChannel(id, name, type) {
+  /* Same normalisation as joinVoiceChannel, and for a sharper reason:
+     this id becomes currentView.id, and the websocket handlers compare
+     `msg.channelId === currentView.id` strictly. A string id from a data
+     attribute would therefore silently stop live messages rendering in
+     the channel you are looking at. */
+  if (typeof id === "string" && id !== "" && !isNaN(id)) id = Number(id);
+
   if (type === "voice") { joinVoiceChannel(id, name); return; }
   // Make sure the chat panel is actually on-screen before we render into it.
   // A text channel can be opened from the Coliseum overlay, from Home, from a
@@ -22314,7 +22321,20 @@ function renderVcGrid() {
 }
 
 async function joinVoiceChannel(channelId, channelName) {
-  if (vcChannelId === channelId) { showVcPanel(channelName); return; }
+  /* Normalise the id once. Callers that build rows from data attributes
+     hand this a STRING ("12"), while vcChannelId is a number — so the
+     already-in-this-channel check below failed on ===, fell through to
+     the leave-and-rejoin path, and clicking the lounge you were already
+     in dropped you out of the call instead of reopening it.
+     Everything downstream compares against vcChannelId (the ws handler,
+     the channel list, the PiP), so the coercion belongs here, once,
+     rather than at each call site. */
+  if (typeof channelId === "string" && channelId !== "" && !isNaN(channelId)) {
+    channelId = Number(channelId);
+  }
+
+  // String-compared for the same reason renderChannelList does it.
+  if (String(vcChannelId) === String(channelId)) { showVcPanel(channelName); return; }
   if (vcChannelId !== null) await leaveVoiceChannel();
 
   try { vcStream = await navigator.mediaDevices.getUserMedia({ audio:true, video:false }); }
