@@ -56964,6 +56964,13 @@ body[data-feed-position="split"].feed-open #homeContent > [data-home-slot="col"]
 }
 #homeContent [data-home-slot="hero"] .spotlight-carousel-track{
   position:relative !important; display:block !important;
+  /* width:100% is the whole fix for the card sitting off to the left.
+     The base rule is width:max-content, which sizes the track to its
+     in-flow children — and in the deck every card is position:absolute,
+     so there are none and the track computes to ZERO width. The cards
+     are placed with left:50%, and 50% of nothing is nothing, so they
+     stacked on the left edge instead of the centre. */
+  width:100% !important;
   height:450px !important; transform:none !important;
   overflow:visible !important; padding:0 !important;
   transition:none !important;
