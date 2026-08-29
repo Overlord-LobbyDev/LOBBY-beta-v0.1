@@ -183,10 +183,22 @@
       outline:none;
     }
     .server-icon::before { display:none; }
-    .server-icon img { width:100%; height:100%; object-fit:cover; border-radius:12px; overflow:hidden; }
+    /* border-radius:inherit, not a fixed 12px. box-sizing is border-box
+       globally, so the 1.5px border insets the image — and a tighter
+       radius on the image than on its frame let the frame's background
+       bleed out at the four corners. Matching the curve exactly, and
+       clipping at the frame, makes the icon read as one object. */
+    .server-icon { overflow:hidden; }
+    .server-icon img {
+      width:100%; height:100%; object-fit:cover; object-position:center;
+      display:block; border-radius:inherit;
+    }
     .server-icon:hover { background:var(--bg-3); border-color:rgba(255,255,255,.08); transform:translateY(-1px); }
-    .server-icon.active { background:var(--accent); border-color:transparent; border-radius:12px; }
-    .server-icon.active img { border-radius:10px; }
+    /* Active is a border, NOT a background. As a background the accent
+       showed through the border inset all the way round the artwork —
+       which is what looked broken rather than selected. */
+    .server-icon.active { background:var(--bg-2); border-color:var(--accent); border-radius:12px; }
+    .server-icon.active img { border-radius:inherit; }
     .server-icon.drag-over {
       border-color:var(--accent);
       transform:scale(1.04);
@@ -53889,6 +53901,52 @@ body[data-feed-position="left"].feed-open #hofOverlay{
 /* Double Dock: both share the right edge, so clear both. */
 body.double-dock[data-feed-position="right"].feed-open:not(.rail-hidden) #hofOverlay{
   right:calc(var(--feed-w) + var(--lir-w)) !important;
+}
+</style>
+
+<!-- ══════════════════════════════════════════════════════════════════
+     LOBBY CRESTS: THE IMAGE FILLS ITS FRAME
+
+     Every lobby crest is a rounded tile with a coloured fallback
+     background (for lobbies with no icon, which show initials instead)
+     and a 1.5px transparent border. box-sizing is border-box globally,
+     so that border insets the <img> — and the accent background behind
+     it showed through as a rim all the way round the artwork. With a
+     tighter radius on the image than on its frame, it bled at the
+     corners too. That is the "broken picture" look: a blue frame around
+     an image that is not quite filling its box.
+
+     Two fixes, applied wherever a crest is drawn:
+       the image inherits the frame's radius, so the curves line up
+       the image spans the border inset, so nothing shows behind it
+
+     The fallback background stays for icon-less lobbies, and .active
+     still gets its accent border — that ring is now deliberate rather
+     than a gap in the artwork.
+     ══════════════════════════════════════════════════════════════════ -->
+<style>
+.lir-recent img,
+.lirm-lobby img,
+.ph-lobby-icon img,
+.cr-crest-emblem img,
+.col-crest-emblem img{
+  width:calc(100% + 3px) !important;
+  height:calc(100% + 3px) !important;
+  margin:-1.5px !important;
+  object-fit:cover !important;
+  object-position:center !important;
+  display:block !important;
+  border-radius:inherit !important;
+}
+/* An active crest keeps a visible ring: the image is pulled back inside
+   the border so the accent edge reads as selection, not as a gap. */
+.lir-recent.active img,
+.lirm-lobby.active img,
+.lir-recent.call img,
+.lirm-lobby.call img,
+.lir-recent.unread img,
+.lirm-lobby.unread img{
+  width:100% !important; height:100% !important; margin:0 !important;
 }
 </style>
 </body>
