@@ -55467,7 +55467,19 @@ body.double-dock[data-feed-position="right"].feed-open:not(.rail-hidden) #settin
        it, and the existing image simply stays if nothing better exists. */
     if (!appid) return;
 
-    var list = artUrls(appid), i = 0;
+    /* The server resolves art through Steam's own asset index now, so what
+       it supplied is authoritative — a hashed poster no guess could ever
+       reach. Try those first and keep artUrls() as the fallback for when
+       that lookup failed. Deduped, so a URL is never probed twice. */
+    var capsuleEl = card.querySelector('.game-card-capsule');
+    var served = [
+      capsuleEl && capsuleEl.getAttribute('src'),
+      hero && hero.getAttribute('src')
+    ].filter(Boolean);
+    var list = served.concat(artUrls(appid)).filter(function (u, n, arr) {
+      return arr.indexOf(u) === n;
+    });
+    var i = 0;
     (function next(){
       if (i >= list.length){ giveUp(); return; }
       var url = list[i++];

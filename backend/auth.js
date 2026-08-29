@@ -2859,18 +2859,24 @@ app.delete("/steam/unlink", requireAuth, async (req, res) => {
 // ── Store art ──────────────────────────────────────────────────────
 // Steam moved store art to content-hashed paths:
 //
-//   .../store_item_assets/steam/apps/<appid>/<hash>/header.jpg
+//   .../store_item_assets/steam/apps/<appid>/<hash>/library_capsule.jpg
 //
-// The hash is a content digest, so it CANNOT be built from the appid.
-// Older apps still answer on the legacy unhashed path, which is why most
-// games worked; anything published or re-published recently 404s on every
-// guessable URL. appdetails is the only thing that knows the hash, and
-// each asset carries its own -- the header hash does not resolve
-// library_600x900 -- so nothing can be derived from anything else.
+// The hash is a content digest, so nothing can be built from an appid,
+// and every asset carries a DIFFERENT hash -- the header hash does not
+// resolve the poster. Older apps still answer on the legacy unhashed
+// path, which is why most of the library worked and anything published
+// recently 404d on every guess.
 //
-// Cached: appdetails is rate limited (about 200 calls per 5 minutes per
-// IP) and this runs once per game per request. Store art changes about
-// never, so the window is long.
+// IStoreBrowseService/GetItems is the source that solves it. Unlike
+// appdetails, which exposes only header_image and a 231x87 capsule, it
+// returns the hash of EVERY asset including library_capsule -- the 2:3
+// poster this UI is built around -- and it does so for old and new apps
+// alike. Verified against a 2026 beta, a re-release, and two catalogue
+// titles: all four resolve, and library_capsule_2x is a true 600x900.
+//
+// Cached for six hours. The call runs once per game per request and
+// store art changes about never.
+const STEAM_ASSET_HOST = "https://shared.akamai.steamstatic.com/store_item_assets/";
 const _steamArtCache = new Map();
 const STEAM_ART_TTL = 6 * 60 * 60 * 1000;
 
@@ -2878,35 +2884,69 @@ async function steamArt(appid) {
   const hit = _steamArtCache.get(appid);
   if (hit && Date.now() - hit.at < STEAM_ART_TTL) return hit.art;
 
-  // The legacy paths, which still resolve for most of the back catalogue.
+  // Legacy paths. Still correct for most of the back catalogue, and the
+  // floor to fall back to if Steam cannot be reached at all.
   const legacy = {
     header_img:  `https://cdn.cloudflare.steamstatic.com/steam/apps/${appid}/header.jpg`,
     capsule_img: `https://cdn.cloudflare.steamstatic.com/steam/apps/${appid}/library_600x900.jpg`,
   };
-  let art = legacy;
+  let art = null;
 
   try {
+    const input = JSON.stringify({
+      ids: [{ appid: Number(appid) }],
+      context: { language: "english", country_code: "US", steam_realm: 1 },
+      data_request: { include_assets: true },
+    });
     const r = await fetch(
-      `https://store.steampowered.com/api/appdetails?appids=${appid}&filters=basic`
+      "https://api.steampowered.com/IStoreBrowseService/GetItems/v1/?input_json=" +
+      encodeURIComponent(input)
     );
     if (r.ok) {
       const j = await r.json();
-      const d = j && j[appid] && j[appid].data;
-      if (d && d.header_image) {
-        art = {
-          // Authoritative, and for a hashed app the only URL that works.
-          header_img: d.header_image,
-          // library_600x900 is not exposed by appdetails and carries its
-          // own hash, so the legacy guess is kept: it resolves for older
-          // apps, and the client falls back to the header when it does not.
-          capsule_img: legacy.capsule_img,
-        };
+      const items = j && j.response && j.response.store_items;
+      const a = items && items[0] && items[0].assets;
+      if (a && a.asset_url_format) {
+        // asset_url_format is "steam/apps/<id>/${FILENAME}?t=...", and each
+        // filename already carries its own hash directory.
+        const mk = (f) =>
+          f ? STEAM_ASSET_HOST + a.asset_url_format.replace("${FILENAME}", f) : null;
+        // 2x first: a true 600x900 rather than the 300x450, which the
+        // poster card would otherwise have to scale up.
+        const poster = mk(a.library_capsule_2x || a.library_capsule || a.main_capsule);
+        const header = mk(a.header_2x || a.header);
+        if (poster || header) {
+          art = {
+            header_img:  header || legacy.header_img,
+            capsule_img: poster || legacy.capsule_img,
+          };
+        }
       }
     }
   } catch (e) {
-    console.error("[steam-art]", appid, e.message);
+    console.error("[steam-art] GetItems", appid, e.message);
   }
 
+  // appdetails knows the header hash but no library art, so it is a
+  // second choice rather than the first.
+  if (!art) {
+    try {
+      const r = await fetch(
+        `https://store.steampowered.com/api/appdetails?appids=${appid}&filters=basic`
+      );
+      if (r.ok) {
+        const j = await r.json();
+        const d = j && j[appid] && j[appid].data;
+        if (d && d.header_image) {
+          art = { header_img: d.header_image, capsule_img: legacy.capsule_img };
+        }
+      }
+    } catch (e) {
+      console.error("[steam-art] appdetails", appid, e.message);
+    }
+  }
+
+  if (!art) art = legacy;
   _steamArtCache.set(appid, { art, at: Date.now() });
   return art;
 }
