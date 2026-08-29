@@ -55010,13 +55010,13 @@ body.double-dock[data-feed-position="right"].feed-open:not(.rail-hidden) #settin
 
 #homeRecents .home-games-grid{
   position:relative !important; display:block !important;
-  height:412px !important; transform:none !important;
+  height:450px !important; transform:none !important;
   overflow:visible !important; padding:0 !important;
 }
 
 #homeRecents .game-card{
   position:absolute !important; top:0; left:50%;
-  width:900px !important; height:392px !important;
+  width:920px !important; height:430px !important;
   margin:0 !important; border-radius:16px !important;
   /* Landscape: art column, then detail column. */
   display:flex !important; flex-direction:row !important; align-items:stretch !important;
@@ -55040,27 +55040,36 @@ body.double-dock[data-feed-position="right"].feed-open:not(.rail-hidden) #settin
 #homeRecents .game-card:not(.rc-active):hover{ --rc-o:.85 !important; }
 
 /* ── Art column ─────────────────────────────────────────────────── */
+/* ── Art column ─────────────────────────────────────────────────
+   287px wide against a 430px card is exactly 2:3 — the ratio of
+   library_600x900, the asset preferred first. A portrait therefore fills
+   it precisely: no crop, no letterbox, nothing to go wrong.
+
+   Anything else (a wide capsule, a hero) is contained inside that box
+   and the gap around it is filled with a blurred copy of the SAME image,
+   supplied by .rc-art below. That is what the last attempt was missing —
+   the gaps fell back to the card's own grey, which is why a letterboxed
+   header looked broken rather than deliberate. */
+#homeRecents .rc-art{
+  position:relative; flex:0 0 287px; width:287px; height:100%;
+  overflow:hidden; background:#0b0d13;
+}
+#homeRecents .rc-art::before{
+  content:''; position:absolute; inset:-10%;
+  background-image:var(--rc-art, none);
+  background-size:cover; background-position:center;
+  filter:blur(26px) saturate(1.7) brightness(.62);
+  transform:scale(1.15);
+}
 #homeRecents .game-card-hero{
-  /* 38%, not 46%: at 46% the column was 414x392 -- almost square, so
-     portrait art cropped a third of its height away. Narrower is much
-     closer to the 2:3 of library_600x900, so far less is lost. */
-  /* contain, NOT cover. Cover crops to fill, and every game ships a
-     different aspect ratio, so the crop lands somewhere different each
-     time -- there is no single box that flatters them all. contain shows
-     the WHOLE artwork every time; the space around it is filled by the
-     blurred copy of that same art behind it, so nothing looks empty. */
-  width:42% !important; height:100% !important;
-  object-fit:contain !important; object-position:center !important;
-  flex:0 0 42% !important;
-  background:transparent !important;
-  border-radius:0 !important;
-  /* Positioned so it paints ABOVE the ambient ::before. A positioned
-     pseudo with z-index:0 otherwise covers in-flow content, and the
-     blurred layer would sit on top of the art it was made from. */
   position:relative; z-index:1;
+  width:100% !important; height:100% !important;
+  object-fit:contain !important; object-position:center !important;
+  flex:none !important; background:transparent !important;
+  border-radius:0 !important;
 }
 #homeRecents .game-card-placeholder{
-  width:42% !important; height:100% !important; flex:0 0 42%;
+  width:287px !important; height:100% !important; flex:0 0 287px;
   font-size:56px !important;
   position:relative; z-index:1;
 }
@@ -55212,8 +55221,11 @@ body.double-dock[data-feed-position="right"].feed-open:not(.rail-hidden) #settin
 #homeRecents .spotlight-carousel-btn{ top:50% !important; transform:translateY(-50%) !important; z-index:40; }
 
 @media (max-width:1500px){
-  #homeRecents .game-card{ width:740px !important; height:360px !important; }
-  #homeRecents .home-games-grid{ height:380px !important; }
+  #homeRecents .game-card{ width:780px !important; height:400px !important; }
+  #homeRecents .home-games-grid{ height:420px !important; }
+  /* 2:3 of 400 — keeps the portrait fitting exactly at this size too. */
+  #homeRecents .rc-art{ flex:0 0 267px !important; width:267px !important; }
+  #homeRecents .game-card-placeholder{ width:267px !important; flex:0 0 267px; }
   #homeRecents .game-card-name{ font-size:22px !important; }
 }
 @media (prefers-reduced-motion: reduce){
@@ -55287,9 +55299,20 @@ body.double-dock[data-feed-position="right"].feed-open:not(.rail-hidden) #settin
     var hero = card.querySelector('.game-card-hero');
     var ph   = card.querySelector('.game-card-placeholder');
 
+    /* Put the image inside a fixed 2:3 column that carries a blurred
+       copy of the same art behind it, so whatever ratio arrives, the
+       column is filled with that game's colours rather than card grey. */
+    function frame(img){
+      if (!img || img.closest('.rc-art')) return;
+      var col = document.createElement('div');
+      col.className = 'rc-art';
+      img.parentNode.insertBefore(col, img);
+      col.appendChild(img);
+    }
+
     function use(url){
       card.style.setProperty('--rc-art', 'url("' + url + '")');
-      if (hero){ hero.src = url; return; }
+      if (hero){ hero.src = url; frame(hero); return; }
       // The inline onerror already swapped the img out for a placeholder;
       // put a real image back in its place.
       if (ph){
@@ -55298,6 +55321,7 @@ body.double-dock[data-feed-position="right"].feed-open:not(.rail-hidden) #settin
         img.alt = '';
         img.src = url;
         ph.replaceWith(img);
+        frame(img);
       }
     }
 
@@ -55305,6 +55329,7 @@ body.double-dock[data-feed-position="right"].feed-open:not(.rail-hidden) #settin
        colour while the better art is being probed. */
     if (hero && hero.getAttribute('src')){
       card.style.setProperty('--rc-art', 'url("' + hero.getAttribute('src') + '")');
+      frame(hero);
     }
     /* Deliberately NOT short-circuiting on "the current image loaded".
        What loads by default is header.jpg at 460x215, which is exactly
@@ -55374,11 +55399,11 @@ body.double-dock[data-feed-position="right"].feed-open:not(.rail-hidden) #settin
     var achWrap = card.querySelector('.game-card-achievements');
     if (achWrap){
       var rows = Array.prototype.slice.call(achWrap.querySelectorAll('.game-card-ach'));
-      if (rows.length > 3){
-        rows.slice(3).forEach(function(r){ r.style.display = 'none'; });
+      if (rows.length > 2){
+        rows.slice(2).forEach(function(r){ r.style.display = 'none'; });
         var more = document.createElement('div');
         more.className = 'rc-more';
-        more.textContent = '+' + (rows.length - 3) + ' more';
+        more.textContent = '+' + (rows.length - 2) + ' more';
         achWrap.appendChild(more);
       }
     }
