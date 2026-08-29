@@ -55022,16 +55022,16 @@ body.double-dock[data-feed-position="right"].feed-open:not(.rail-hidden) #settin
      reads its own two hour lines back out of the DOM to build the stats.
      ══════════════════════════════════════════════════════════════════ -->
 <style>
-#homeRecents .spotlight-carousel-wrap{ padding:4px 0 0; }
-#homeRecents .spotlight-carousel-wrap > div{ overflow:hidden !important; width:100% !important; }
+#homeContent [data-home-slot="hero"] .spotlight-carousel-wrap{ padding:4px 0 0; }
+#homeContent [data-home-slot="hero"] .spotlight-carousel-wrap > div{ overflow:hidden !important; width:100% !important; }
 
-#homeRecents .home-games-grid{
+#homeContent [data-home-slot="hero"] .home-games-grid{
   position:relative !important; display:block !important;
   height:450px !important; transform:none !important;
   overflow:visible !important; padding:0 !important;
 }
 
-#homeRecents .game-card{
+#homeContent [data-home-slot="hero"] .game-card{
   position:absolute !important; top:0; left:50%;
   width:920px !important; height:430px !important;
   margin:0 !important; border-radius:16px !important;
@@ -55048,13 +55048,13 @@ body.double-dock[data-feed-position="right"].feed-open:not(.rail-hidden) #settin
   backface-visibility:hidden;
   background:linear-gradient(135deg,#14161f 0%,#0b0d13 100%) !important;
 }
-#homeRecents .game-card:hover{ transform:translateX(calc(-50% + var(--rc-x, 0px))) scale(var(--rc-s, 1)) !important; }
-#homeRecents .game-card.rc-active{
+#homeContent [data-home-slot="hero"] .game-card:hover{ transform:translateX(calc(-50% + var(--rc-x, 0px))) scale(var(--rc-s, 1)) !important; }
+#homeContent [data-home-slot="hero"] .game-card.rc-active{
   cursor:default;
   box-shadow:0 30px 70px rgba(0,0,0,.72),
              0 0 0 1px color-mix(in srgb, var(--accent) 30%, transparent);
 }
-#homeRecents .game-card:not(.rc-active):hover{ --rc-o:.85 !important; }
+#homeContent [data-home-slot="hero"] .game-card:not(.rc-active):hover{ --rc-o:.85 !important; }
 
 /* ── Art column ─────────────────────────────────────────────────── */
 /* ── Art column ─────────────────────────────────────────────────
@@ -55067,11 +55067,11 @@ body.double-dock[data-feed-position="right"].feed-open:not(.rail-hidden) #settin
    supplied by .rc-art below. That is what the last attempt was missing —
    the gaps fell back to the card's own grey, which is why a letterboxed
    header looked broken rather than deliberate. */
-#homeRecents .rc-art{
+#homeContent [data-home-slot="hero"] .rc-art{
   position:relative; flex:0 0 287px; width:287px; height:100%;
   overflow:hidden; background:#0b0d13;
 }
-#homeRecents .rc-art::before{
+#homeContent [data-home-slot="hero"] .rc-art::before{
   content:''; position:absolute; inset:-10%;
   background-image:var(--rc-art, none);
   background-size:cover; background-position:center;
@@ -55083,14 +55083,14 @@ body.double-dock[data-feed-position="right"].feed-open:not(.rail-hidden) #settin
    Where only wide art exists, cover shows a sharp centre slice of a
    large image — which beats contain's alternative of a thin strip
    stranded in a blurred surround, the state the last pass produced. */
-#homeRecents .game-card-hero{
+#homeContent [data-home-slot="hero"] .game-card-hero{
   position:relative; z-index:1;
   width:100% !important; height:100% !important;
   object-fit:cover !important; object-position:center !important;
   flex:none !important; background:transparent !important;
   border-radius:0 !important;
 }
-#homeRecents .game-card-placeholder{
+#homeContent [data-home-slot="hero"] .game-card-placeholder{
   width:287px !important; height:100% !important; flex:0 0 287px;
   font-size:56px !important;
   position:relative; z-index:1;
@@ -55106,7 +55106,7 @@ body.double-dock[data-feed-position="right"].feed-open:not(.rail-hidden) #settin
    pixels needs a canvas, and Steam's CDN does not send CORS headers, so
    the canvas would be tainted and getImageData would throw. This gets
    real colour off the real artwork with nothing to be blocked. */
-#homeRecents .game-card::before{
+#homeContent [data-home-slot="hero"] .game-card::before{
   content:''; position:absolute; inset:-20%;
   background-image:var(--rc-art, none);
   background-size:cover; background-position:center;
@@ -55123,7 +55123,7 @@ body.double-dock[data-feed-position="right"].feed-open:not(.rail-hidden) #settin
    join, and it thickens toward the bottom-right, which is where the
    text actually sits. Colour where there is nothing to read, contrast
    where there is. */
-#homeRecents .game-card-body{
+#homeContent [data-home-slot="hero"] .game-card-body{
   background:
     linear-gradient(112deg,
       rgba(10,12,18,.28) 0%,
@@ -55134,7 +55134,7 @@ body.double-dock[data-feed-position="right"].feed-open:not(.rail-hidden) #settin
 }
 /* A darker pool behind the two blocks of small text, so the wash can
    stay light without costing legibility where it matters. */
-#homeRecents .game-card-body::before{
+#homeContent [data-home-slot="hero"] .game-card-body::before{
   content:''; position:absolute; inset:0; pointer-events:none; z-index:-1;
   background:radial-gradient(120% 80% at 100% 100%, rgba(6,8,12,.72), transparent 62%);
 }
@@ -55144,22 +55144,22 @@ body.double-dock[data-feed-position="right"].feed-open:not(.rail-hidden) #settin
 /* Softens the join only. It used to run all the way to solid #0b0d13,
    which walled the colour off at the seam — the exact place the art and
    the detail column are supposed to meet. */
-#homeRecents .game-card::after{
+#homeContent [data-home-slot="hero"] .game-card::after{
   content:''; position:absolute; top:0; bottom:0; left:calc(42% - 70px);
   width:140px; pointer-events:none; z-index:2;
   background:linear-gradient(90deg, rgba(11,13,19,0), rgba(11,13,19,.42) 50%, rgba(11,13,19,0));
 }
 
 /* ── Detail column ──────────────────────────────────────────────── */
-#homeRecents .game-card-body{
+#homeContent [data-home-slot="hero"] .game-card-body{
   flex:1 1 auto !important; min-width:0 !important;
   display:flex !important; flex-direction:column !important;
   padding:26px 28px 22px !important; position:relative; z-index:2;
   gap:0 !important;
 }
-#homeRecents .game-card-top{ display:block !important; margin:0 !important; }
-#homeRecents .game-card-capsule{ display:none !important; }   /* the hero already IS the art */
-#homeRecents .game-card-name{
+#homeContent [data-home-slot="hero"] .game-card-top{ display:block !important; margin:0 !important; }
+#homeContent [data-home-slot="hero"] .game-card-capsule{ display:none !important; }   /* the hero already IS the art */
+#homeContent [data-home-slot="hero"] .game-card-name{
   font-family:'Archivo','Inter',sans-serif !important;
   font-size:26px !important; font-weight:900 !important;
   letter-spacing:-.5px !important; line-height:1.12 !important;
@@ -55174,8 +55174,8 @@ body.double-dock[data-feed-position="right"].feed-open:not(.rail-hidden) #settin
   paint-order:stroke fill;
   text-shadow:0 1px 2px rgba(0,0,0,.55);
 }
-#homeRecents .game-card.rc-active .game-card-hours,
-#homeRecents .game-card.rc-active .game-card-hours-total{ display:none !important; }
+#homeContent [data-home-slot="hero"] .game-card.rc-active .game-card-hours,
+#homeContent [data-home-slot="hero"] .game-card.rc-active .game-card-hours-total{ display:none !important; }
 
 /* ── Stats ──────────────────────────────────────────────────────── */
 .rc-stats{
@@ -55216,7 +55216,7 @@ body.double-dock[data-feed-position="right"].feed-open:not(.rail-hidden) #settin
    defaults to min-height:auto, which refuses to shrink below its content
    and would push the list straight through the bottom of the card
    instead of scrolling inside it. */
-#homeRecents .game-card-achievements{
+#homeContent [data-home-slot="hero"] .game-card-achievements{
   margin-top:0 !important; padding-top:0 !important;
   border-top:0 !important;
   flex:1 1 auto; min-height:0; overflow-y:auto; overflow-x:hidden;
@@ -55224,19 +55224,19 @@ body.double-dock[data-feed-position="right"].feed-open:not(.rail-hidden) #settin
   padding-right:6px !important;
   scrollbar-width:thin; scrollbar-color:rgba(255,255,255,.18) transparent;
 }
-#homeRecents .game-card-achievements::-webkit-scrollbar{ width:5px; }
-#homeRecents .game-card-achievements::-webkit-scrollbar-track{ background:transparent; }
-#homeRecents .game-card-achievements::-webkit-scrollbar-thumb{
+#homeContent [data-home-slot="hero"] .game-card-achievements::-webkit-scrollbar{ width:5px; }
+#homeContent [data-home-slot="hero"] .game-card-achievements::-webkit-scrollbar-track{ background:transparent; }
+#homeContent [data-home-slot="hero"] .game-card-achievements::-webkit-scrollbar-thumb{
   background:rgba(255,255,255,.16); border-radius:99px;
 }
-#homeRecents .game-card-achievements::-webkit-scrollbar-thumb:hover{ background:rgba(255,255,255,.3); }
+#homeContent [data-home-slot="hero"] .game-card-achievements::-webkit-scrollbar-thumb:hover{ background:rgba(255,255,255,.3); }
 /* Rows keep their height under pressure, so one can never be half-drawn
    at the scroll edge. */
-#homeRecents .game-card-ach{ flex:0 0 auto !important; }
+#homeContent [data-home-slot="hero"] .game-card-ach{ flex:0 0 auto !important; }
 /* The label now sits outside the scrollport, so it needs the separator
    the list used to carry — and the list drops its own, or there would be
    two rules stacked. */
-#homeRecents .game-card-ach-label{
+#homeContent [data-home-slot="hero"] .game-card-ach-label{
   flex:none;
   margin:16px 0 8px !important; padding-top:14px !important;
   border-top:1px solid rgba(255,255,255,.07);
@@ -55248,36 +55248,36 @@ body.double-dock[data-feed-position="right"].feed-open:not(.rail-hidden) #settin
 }
 /* Pushes the action to the bottom edge whatever the list length, so the
    card's footer is in the same place on every game. */
-#homeRecents .game-card.rc-active .rc-cta{ margin-top:14px !important; flex:none; }
+#homeContent [data-home-slot="hero"] .game-card.rc-active .rc-cta{ margin-top:14px !important; flex:none; }
 /* Cursor states now match what actually happens on click. */
-#homeRecents .game-card.rc-active{ cursor:default !important; }
-#homeRecents .game-card:not(.rc-active){ cursor:pointer !important; }
-#homeRecents .rc-cta{ cursor:pointer !important; }
-#homeRecents .game-card-ach-label{
+#homeContent [data-home-slot="hero"] .game-card.rc-active{ cursor:default !important; }
+#homeContent [data-home-slot="hero"] .game-card:not(.rc-active){ cursor:pointer !important; }
+#homeContent [data-home-slot="hero"] .rc-cta{ cursor:pointer !important; }
+#homeContent [data-home-slot="hero"] .game-card-ach-label{
   font-family:'Archivo', var(--font), sans-serif !important;
   font-size:9px !important; font-weight:800 !important;
   letter-spacing:1.5px !important; text-transform:uppercase;
   color:var(--text-3) !important; margin:0 0 2px !important;
 }
-#homeRecents .game-card-ach{
+#homeContent [data-home-slot="hero"] .game-card-ach{
   background:rgba(255,255,255,.03) !important;
   border:1px solid rgba(255,255,255,.05) !important;
   border-radius:9px !important; padding:8px 10px !important;
   gap:10px !important; flex:0 0 auto;
 }
-#homeRecents .game-card-ach-name{ font-size:12px !important; font-weight:700 !important; }
-#homeRecents .game-card-ach-desc{
+#homeContent [data-home-slot="hero"] .game-card-ach-name{ font-size:12px !important; font-weight:700 !important; }
+#homeContent [data-home-slot="hero"] .game-card-ach-desc{
   font-size:10.5px !important; color:var(--text-3) !important;
   overflow:hidden; text-overflow:ellipsis; white-space:nowrap;
 }
-#homeRecents .game-card-ach-icon{ width:26px !important; height:26px !important; border-radius:6px !important; }
+#homeContent [data-home-slot="hero"] .game-card-ach-icon{ width:26px !important; height:26px !important; border-radius:6px !important; }
 
 /* Behind the front card, only the art and the name carry. */
-#homeRecents .game-card:not(.rc-active) .game-card-achievements,
-#homeRecents .game-card:not(.rc-active) .rc-stats,
-#homeRecents .game-card:not(.rc-active) .rc-bar,
-#homeRecents .game-card:not(.rc-active) .rc-cta{ display:none !important; }
-#homeRecents .game-card:not(.rc-active) .game-card-name{ font-size:19px !important; }
+#homeContent [data-home-slot="hero"] .game-card:not(.rc-active) .game-card-achievements,
+#homeContent [data-home-slot="hero"] .game-card:not(.rc-active) .rc-stats,
+#homeContent [data-home-slot="hero"] .game-card:not(.rc-active) .rc-bar,
+#homeContent [data-home-slot="hero"] .game-card:not(.rc-active) .rc-cta{ display:none !important; }
+#homeContent [data-home-slot="hero"] .game-card:not(.rc-active) .game-card-name{ font-size:19px !important; }
 
 .rc-cta{
   margin-top:14px; align-self:flex-start;
@@ -55300,18 +55300,18 @@ body.double-dock[data-feed-position="right"].feed-open:not(.rail-hidden) #settin
 .rc-dot:hover{ background:rgba(255,255,255,.34); }
 .rc-dot.on{ width:20px; background:color-mix(in srgb, var(--accent) 85%, white); }
 
-#homeRecents .spotlight-carousel-btn{ top:50% !important; transform:translateY(-50%) !important; z-index:40; }
+#homeContent [data-home-slot="hero"] .spotlight-carousel-btn{ top:50% !important; transform:translateY(-50%) !important; z-index:40; }
 
 @media (max-width:1500px){
-  #homeRecents .game-card{ width:780px !important; height:400px !important; }
-  #homeRecents .home-games-grid{ height:420px !important; }
+  #homeContent [data-home-slot="hero"] .game-card{ width:780px !important; height:400px !important; }
+  #homeContent [data-home-slot="hero"] .home-games-grid{ height:420px !important; }
   /* 2:3 of 400 — keeps the portrait fitting exactly at this size too. */
-  #homeRecents .rc-art{ flex:0 0 267px !important; width:267px !important; }
-  #homeRecents .game-card-placeholder{ width:267px !important; flex:0 0 267px; }
-  #homeRecents .game-card-name{ font-size:22px !important; }
+  #homeContent [data-home-slot="hero"] .rc-art{ flex:0 0 267px !important; width:267px !important; }
+  #homeContent [data-home-slot="hero"] .game-card-placeholder{ width:267px !important; flex:0 0 267px; }
+  #homeContent [data-home-slot="hero"] .game-card-name{ font-size:22px !important; }
 }
 @media (prefers-reduced-motion: reduce){
-  #homeRecents .game-card{ transition:none !important; }
+  #homeContent [data-home-slot="hero"] .game-card{ transition:none !important; }
 }
 </style>
 <script>
@@ -55321,10 +55321,23 @@ body.double-dock[data-feed-position="right"].feed-open:not(.rail-hidden) #settin
   var idx = 0;
   var STEP = 520, STEP2 = 830;
 
-  function track(){ return document.getElementById('recentGamesList'); }
+  /* The deck belongs to the hero SLOT, not to Recently Played. Whichever
+     section is sitting first gets it, and its own list element becomes
+     the track. */
+  function heroSec(){
+    var hc = document.getElementById('homeContent');
+    if (!hc) return null;
+    return hc.querySelector('section[data-home-slot="hero"]');
+  }
+  function track(){
+    var s = heroSec();
+    if (!s) return document.getElementById('recentGamesList');
+    return s.querySelector('.home-games-grid, .home-communities-grid');
+  }
   function cards(){
     var t = track();
-    return t ? Array.prototype.slice.call(t.querySelectorAll('.game-card')) : [];
+    return t ? Array.prototype.slice.call(
+      t.querySelectorAll('.game-card, .community-card')) : [];
   }
 
   /* Shortest signed distance around the ring — this is what makes the
@@ -55444,9 +55457,44 @@ body.double-dock[data-feed-position="right"].feed-open:not(.rail-hidden) #settin
     }
   }
 
+  /* Everything a lobby card can truthfully say is already in its own
+     markup — there is no second fetch here, this reads what
+     loadCommunities() rendered and restates it at deck size. */
+  function enhanceLobby(card){
+    var banner = card.querySelector('.community-card-banner');
+    var body   = card.querySelector('.community-card-body');
+    var meta   = card.querySelector('.community-card-meta');
+    if (!body || !meta) return;
+
+    /* Tint the card with its own banner, the way a game card is tinted
+       with its cover art. */
+    if (banner){
+      var bg = banner.style.backgroundImage ||
+               window.getComputedStyle(banner).backgroundImage;
+      if (bg && bg !== 'none') card.style.setProperty('--rc-art', bg);
+    }
+
+    var memText = (card.querySelector('.community-card-members') || {}).textContent || '';
+    var mem = (memText.match(/(\d+)/) || [])[1];
+    var joined = !!card.querySelector('.community-join-btn.joined');
+    var rec = /Recommended/i.test(banner ? banner.textContent : '');
+
+    var out = '<div class="rc-stats">';
+    out += '<div class="rc-stat' + (mem && +mem > 0 ? ' hot' : '') + '"><b>' +
+           (mem != null ? mem : '—') + '</b><span>Members</span></div>';
+    out += '<div class="rc-stat"><b>' + (joined ? 'Joined' : 'Open') +
+           '</b><span>Status</span></div>';
+    out += '<div class="rc-stat"><b>' + (rec ? 'Yes' : '—') +
+           '</b><span>Recommended</span></div>';
+    out += '</div>';
+    meta.insertAdjacentHTML('beforebegin', out);
+  }
+
   function enhance(card){
     if (card.__rc) return;
     card.__rc = true;
+
+    if (card.classList.contains('community-card')){ enhanceLobby(card); return; }
 
     /* Kill the inline onerror first: it replaces the <img> with a
        placeholder the moment one URL fails, which would tear out the
@@ -55522,9 +55570,16 @@ body.double-dock[data-feed-position="right"].feed-open:not(.rail-hidden) #settin
     body.appendChild(cta);
   }
 
+  var lastKey = '';
   function apply(){
+    var sec = heroSec();
     var list = cards(), n = list.length;
     if (!n) return;
+    /* Start from the front again when the deck changes hands or the
+       contents change — but NOT on every stray mutation, or stepping
+       through it would keep snapping back to the first card. */
+    var key = (sec ? sec.id : '') + ':' + n;
+    if (key !== lastKey){ lastKey = key; idx = 0; }
     idx = ((idx % n) + n) % n;
 
     list.forEach(function(c, i){
@@ -55560,9 +55615,14 @@ body.double-dock[data-feed-position="right"].feed-open:not(.rail-hidden) #settin
   }
 
   function dots(n){
-    var wrap = document.querySelector('#homeRecents .spotlight-carousel-wrap');
+    var sec = heroSec();
+    if (!sec) return;
+    var wrap = sec.querySelector('.spotlight-carousel-wrap') || track();
     if (!wrap || !wrap.parentElement) return;
     var host = document.getElementById('rcDots');
+    /* The dots are one element. When the deck moves to another section
+       they move with it rather than being left behind in the old one. */
+    if (host && !sec.contains(host)) host.remove(), host = null;
     if (!host){
       host = document.createElement('div');
       host.id = 'rcDots'; host.className = 'rc-dots';
@@ -55586,9 +55646,14 @@ body.double-dock[data-feed-position="right"].feed-open:not(.rail-hidden) #settin
   window.recentsNav = function(dir){ idx += (dir > 0 ? 1 : -1); apply(); };
   window.recentsUpdateNav = function(){ apply(); };
 
+  window.__rcApply = function(){ apply(); };
+
   function start(){
-    var t = track();
-    if (!t) return;
+    /* Bound to #homeContent rather than to a track element, because the
+       track is whichever list the hero section owns and that changes
+       when the sections are reordered. */
+    var t = document.getElementById('homeContent');
+    if (!t) { setTimeout(start, 200); return; }
 
     /* One capture-phase guard for the whole deck. Capture, because every
        card carries an inline onclick that opens Steam, and that fires
@@ -55600,8 +55665,21 @@ body.double-dock[data-feed-position="right"].feed-open:not(.rail-hidden) #settin
                             any stray click of a large card was far too
                             easy to trigger by accident. */
     t.addEventListener('click', function(e){
-      var card = e.target.closest('.game-card');
+      var card = e.target.closest('.game-card, .community-card');
       if (!card) return;
+      if (!card.closest('[data-home-slot="hero"]')) return;  // grid card: leave it alone
+
+      /* A lobby card's Join / Open / Edit buttons ARE its actions, so
+         they are allowed to fire. Anything else on a back card steps
+         the deck; on the front card it does nothing. */
+      if (card.classList.contains('community-card')){
+        if (e.target.closest('.community-join-btn, .community-edit-btn')) return;
+        e.preventDefault(); e.stopPropagation();
+        if (card.classList.contains('rc-active')) return;
+        idx = cards().indexOf(card);
+        apply();
+        return;
+      }
 
       if (e.target.closest('.rc-cta')){
         e.preventDefault(); e.stopPropagation();
@@ -55616,9 +55694,18 @@ body.double-dock[data-feed-position="right"].feed-open:not(.rail-hidden) #settin
       apply();
     }, true);
 
-    new MutationObserver(function(){ idx = 0; apply(); }).observe(t, { childList:true });
+    /* Debounced: apply() calls enhance(), which inserts nodes, which the
+       observer sees. One frame's coalescing means that settles in two
+       passes instead of looping. */
+    var queued = false;
+    function ping(){
+      if (queued) return;
+      queued = true;
+      requestAnimationFrame(function(){ queued = false; apply(); });
+    }
+    new MutationObserver(ping).observe(t, { childList:true, subtree:true });
     apply();
-    console.log('[recents] landscape circular carousel active');
+    console.log('[home] slot-aware deck active');
   }
 
   if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', start);
@@ -55740,11 +55827,11 @@ body.lobby-selected #chatPanel .chat-header{ display:none !important; }
    the same factor, or the large card would hold on past the width that
    can actually fit it. */
 @media (max-width:1800px){
-  #homeRecents .game-card{ width:780px !important; height:400px !important; }
-  #homeRecents .home-games-grid{ height:420px !important; }
-  #homeRecents .rc-art{ flex:0 0 267px !important; width:267px !important; }
-  #homeRecents .game-card-placeholder{ width:267px !important; flex:0 0 267px; }
-  #homeRecents .game-card-name{ font-size:22px !important; }
+  #homeContent [data-home-slot="hero"] .game-card{ width:780px !important; height:400px !important; }
+  #homeContent [data-home-slot="hero"] .home-games-grid{ height:420px !important; }
+  #homeContent [data-home-slot="hero"] .rc-art{ flex:0 0 267px !important; width:267px !important; }
+  #homeContent [data-home-slot="hero"] .game-card-placeholder{ width:267px !important; flex:0 0 267px; }
+  #homeContent [data-home-slot="hero"] .game-card-name{ font-size:22px !important; }
 }
 </style>
 
@@ -56138,91 +56225,388 @@ body.lobby-selected #chatPanel .chat-header{ display:none !important; }
 
 
 <!-- ══════════════════════════════════════════════════════════════════
-     HOME — TWO COLUMNS
+     HOME — PRESENTATION FOLLOWS THE SLOT
 
-     Spotlight and Lobbies share a row under the carousel, so the widest
-     part of the page carries two sections instead of one narrow one.
+     The front page has two kinds of place, and a section looks like
+     wherever it is standing rather than like itself:
 
-     Done with flex-wrap on #homeContent, NOT a grid, and with no DOM
-     changes at all. Both of those are deliberate, from what went wrong
-     with the bento:
+       hero  the top, full width — the big circular deck
+       col   the row below, half width — a compact grid of small cards
 
-       No wrapper elements. The app restores section order with
-       `homeContent.appendChild(section)` on load and after every drag,
-       which tore sections straight out of any wrapper they were put in.
+     So dragging Lobbies above Recently Played does not just swap two
+     blocks. Lobbies picks up the deck, and Recently Played picks up the
+     small-card grid. Either section can hold either treatment.
 
-       No grid. A grid row sizes itself from its items, and the
-       carousel's cards are position:absolute — in a grid row the section
-       collapsed and the cards painted over whatever came next. As a flex
-       item on its own wrapped line, the section takes its height from
-       the track's real 450px and cannot collapse.
+     How it is wired: stampSlots() puts data-home-slot="hero" on the
+     first section and "col" on the rest, and everything below keys off
+     that attribute instead of a section id. The 54 carousel rules that
+     used to be written against #homeRecents were re-pointed at
+     [data-home-slot="hero"] rather than duplicated, so there is one
+     definition of what the deck looks like.
 
-     Reordering still works: whatever the app appends first takes the
-     first line. Any section that is not the carousel can share a row.
+     A MutationObserver drives the stamping instead of a call at each
+     site. Order is set from three places — the initial render, the
+     restore in loadHomeSecOrder(), and each drag drop — and the
+     observer catches all three, including any added later.
      ══════════════════════════════════════════════════════════════════ -->
 <style>
+/* The row that makes two columns possible. Flex wrap, not grid: a grid
+   row sizes from its items and the deck cards are position:absolute, so
+   the hero section collapsed and painted over the row beneath it. On its
+   own wrapped flex line it takes its height from the track. */
 #homeContent{
   flex-direction:row !important;
   flex-wrap:wrap !important;
-  /* stretch, not flex-start: the two columns are bordered cards, so a
-     ragged bottom edge shows. Same line = same height. */
   align-items:stretch !important;
   align-content:flex-start !important;
   gap:22px !important;
   padding:16px 16px 40px !important;
 }
 
-/* The carousel always takes a full line. Its track is a fixed height of
-   absolutely positioned cards, so it needs the whole width — and it must
-   never be asked to share one. */
-#homeContent > #homeRecents{
-  flex:0 0 100% !important;
-  max-width:100% !important;
+/* ── The slots themselves ──────────────────────────────────────── */
+#homeContent > [data-home-slot="hero"]{
+  flex:0 0 100% !important; max-width:100% !important;
+  border:0 !important; background:none !important; padding:0 !important;
 }
+#homeContent > [data-home-slot="hero"]::after{ display:none !important; }
 
-/* Everything else pairs up. calc() rather than 50% so the gap is taken
-   out of the columns instead of pushing the second one onto its own
-   line. */
-#homeContent > #homeSpotlight,
-#homeContent > #homeCommunities{
+#homeContent > [data-home-slot="col"]{
   flex:1 1 calc(50% - 11px) !important;
-  min-width:0 !important;
-  max-width:calc(50% - 11px) !important;
+  min-width:0 !important; max-width:calc(50% - 11px) !important;
   border:1px solid rgba(255,255,255,.07);
   border-radius:16px;
   background:linear-gradient(160deg, rgba(255,255,255,.03), rgba(255,255,255,.01));
   padding:22px 24px !important;
   position:relative;
 }
-#homeContent > #homeSpotlight::after,
-#homeContent > #homeCommunities::after{
+#homeContent > [data-home-slot="col"]::after{
   content:''; position:absolute; top:0; left:24px; right:24px; height:1px;
   background:linear-gradient(90deg, transparent, rgba(255,255,255,.14), transparent);
 }
-
-/* In a half-width column the lobby grid needs to reflow rather than keep
-   its full-page column count. */
-#homeContent > #homeCommunities .home-communities-grid{
-  grid-template-columns:repeat(auto-fill, minmax(190px, 1fr)) !important;
-}
-
-/* The media query measures the viewport, but with the feed docked in split
-   mode #homeContent is roughly half that wide while the viewport is
-   unchanged — two columns in there would be ~340px each. Collapse on the
-   feed state as well as on width. */
-body[data-feed-position="split"].feed-open #homeContent > #homeSpotlight,
-body[data-feed-position="split"].feed-open #homeContent > #homeCommunities{
+body[data-feed-position="split"].feed-open #homeContent > [data-home-slot="col"]{
   flex:0 0 100% !important; max-width:100% !important;
 }
-
-/* 1450, not 1250: the page carries zoom:1.15 and loses width to the rail and
-   sidebar, so the usable column is well under the viewport number. */
 @media (max-width:1450px){
-  #homeContent > #homeSpotlight,
-  #homeContent > #homeCommunities{
-    flex:0 0 100% !important; max-width:100% !important;
-  }
+  #homeContent > [data-home-slot="col"]{ flex:0 0 100% !important; max-width:100% !important; }
 }
+
+/* ═══ LOBBIES IN THE HERO SLOT ═════════════════════════════════════
+   Same geometry as the game deck — the --rc-* variables are set by the
+   one controller, so a lobby card sits in the ring exactly like a game
+   card does. Only what is INSIDE the card differs, because a lobby has
+   different things worth showing than a game does. */
+#homeContent [data-home-slot="hero"] .home-communities-grid{
+  position:relative !important; display:block !important;
+  height:450px !important; overflow:visible !important;
+  padding:0 !important; grid-template-columns:none !important;
+}
+#homeContent [data-home-slot="hero"] .community-card{
+  position:absolute !important; top:0; left:50%;
+  width:920px !important; height:430px !important;
+  margin:0 !important; border-radius:16px !important;
+  display:flex !important; flex-direction:row !important; align-items:stretch !important;
+  overflow:hidden;
+  transform-origin:center center;
+  transform:translateX(calc(-50% + var(--rc-x, 0px))) scale(var(--rc-s, 1));
+  opacity:var(--rc-o, 1);
+  filter:saturate(var(--rc-sat, 1)) brightness(var(--rc-b, 1));
+  transition:transform .46s cubic-bezier(.22,1,.36,1),
+             opacity .36s ease, filter .36s ease, box-shadow .36s ease;
+  will-change:transform, opacity;
+  backface-visibility:hidden;
+  background:linear-gradient(135deg,#14161f 0%,#0b0d13 100%) !important;
+  border:1px solid rgba(255,255,255,.08) !important;
+}
+#homeContent [data-home-slot="hero"] .community-card:hover{
+  transform:translateX(calc(-50% + var(--rc-x, 0px))) scale(var(--rc-s, 1)) !important;
+}
+#homeContent [data-home-slot="hero"] .community-card.rc-active{
+  cursor:default;
+  box-shadow:0 30px 70px rgba(0,0,0,.72),
+             0 0 0 1px color-mix(in srgb, var(--accent) 30%, transparent);
+}
+#homeContent [data-home-slot="hero"] .community-card:not(.rc-active):hover{ --rc-o:.85 !important; }
+
+/* Art column. The banner is the only artwork a lobby has, so it carries
+   the column the way cover art carries a game card — and a blurred copy
+   of itself behind it, so a short banner still fills the height in the
+   lobby's own colours instead of card grey. */
+#homeContent [data-home-slot="hero"] .community-card-banner{
+  position:relative !important; flex:0 0 287px !important; width:287px !important;
+  height:100% !important; border-radius:0 !important; margin:0 !important;
+  background-size:cover !important; background-position:center !important;
+  z-index:2;
+}
+#homeContent [data-home-slot="hero"] .community-card-banner::after{
+  content:''; position:absolute; inset:0; z-index:1;
+  background:linear-gradient(90deg, transparent 55%, rgba(11,13,19,.9) 100%);
+  pointer-events:none;
+}
+
+/* Ambient tint: the card takes the lobby's banner as a colour source the
+   same way a game card takes its cover art. */
+#homeContent [data-home-slot="hero"] .community-card::before{
+  content:''; position:absolute; inset:0; z-index:0;
+  background-image:var(--rc-art, none);
+  background-size:cover; background-position:center;
+  filter:blur(46px) saturate(1.5); opacity:.34; transform:scale(1.25);
+  pointer-events:none;
+}
+
+/* Detail column */
+#homeContent [data-home-slot="hero"] .community-card-body{
+  position:relative; z-index:2;
+  flex:1 1 auto; min-width:0;
+  display:flex !important; flex-direction:column !important;
+  padding:26px 30px 24px !important;
+  gap:0 !important;
+}
+#homeContent [data-home-slot="hero"] .community-card-icon{
+  position:static !important; width:54px !important; height:54px !important;
+  border-radius:14px !important; margin:0 0 12px !important;
+  font-size:20px !important; border:1px solid rgba(255,255,255,.16) !important;
+  box-shadow:0 8px 22px rgba(0,0,0,.5) !important;
+}
+#homeContent [data-home-slot="hero"] .community-card-name{
+  font-size:30px !important; font-weight:800 !important;
+  letter-spacing:.2px !important; line-height:1.1 !important;
+  margin:0 0 8px !important; color:#fff !important;
+  -webkit-text-stroke:.5px #fff; paint-order:stroke fill;
+  text-shadow:0 1px 2px rgba(0,0,0,.55);
+}
+#homeContent [data-home-slot="hero"] .community-card-desc{
+  font-size:14px !important; line-height:1.55 !important;
+  color:rgba(255,255,255,.72) !important;
+  -webkit-line-clamp:3 !important; line-clamp:3 !important;
+  margin:0 0 16px !important; max-width:52ch;
+}
+/* The compact meta row is replaced by the stat strip + CTA the
+   controller builds, so its own layout is stood down here. */
+#homeContent [data-home-slot="hero"] .community-card-meta{
+  display:block !important; margin:0 !important; padding:0 !important;
+  border:0 !important;
+}
+#homeContent [data-home-slot="hero"] .community-card-members{ display:none !important; }
+#homeContent [data-home-slot="hero"] .community-card .community-join-btn{
+  position:relative; z-index:3;
+  font-size:13px !important; font-weight:700 !important;
+  padding:11px 20px !important; border-radius:11px !important;
+  margin-top:2px !important;
+}
+/* Only the front card offers its action, and only the front card can be
+   edited — matching the game deck, where a back card is a target to
+   step to and nothing else. */
+#homeContent [data-home-slot="hero"] .community-card:not(.rc-active) .community-join-btn,
+#homeContent [data-home-slot="hero"] .community-card:not(.rc-active) .community-edit-btn{
+  opacity:0 !important; pointer-events:none !important;
+}
+#homeContent [data-home-slot="hero"] .community-card .community-edit-btn{ z-index:3; }
+
+/* Tag chips and the stat strip, both built by the controller. */
+.lc-tags{ display:flex; flex-wrap:wrap; gap:6px; margin:0 0 16px; }
+.lc-tag{
+  font-size:10.5px; font-weight:700; letter-spacing:.6px; text-transform:uppercase;
+  padding:4px 9px; border-radius:99px; color:rgba(255,255,255,.8);
+  background:rgba(255,255,255,.07); border:1px solid rgba(255,255,255,.1);
+}
+#homeContent [data-home-slot="hero"] .community-card .rc-stats{ margin-bottom:16px; }
+
+/* ═══ RECENTLY PLAYED IN A COLUMN SLOT ═════════════════════════════
+   The mirror of the above: out of the hero the deck geometry is stood
+   down completely and the games become the same small grid cards the
+   lobbies use, so the two sections genuinely trade places. */
+#homeContent [data-home-slot="col"] .home-games-grid{
+  position:static !important; display:grid !important;
+  grid-template-columns:repeat(auto-fill, minmax(190px, 1fr)) !important;
+  gap:14px !important; height:auto !important;
+  overflow:visible !important; transform:none !important; padding:0 !important;
+}
+#homeContent [data-home-slot="col"] .game-card{
+  position:static !important;
+  width:auto !important; height:auto !important;
+  transform:none !important; opacity:1 !important; filter:none !important;
+  display:flex !important; flex-direction:column !important;
+  border-radius:12px !important; margin:0 !important;
+  background:var(--bg-2) !important; border:1px solid rgba(255,255,255,.08) !important;
+  box-shadow:none !important; cursor:pointer;
+  transition:transform .15s, box-shadow .15s, border-color .15s;
+}
+#homeContent [data-home-slot="col"] .game-card:hover{
+  transform:translateY(-2px) !important;
+  box-shadow:0 8px 24px rgba(0,0,0,.4) !important;
+  border-color:rgba(255,255,255,.18) !important;
+}
+#homeContent [data-home-slot="col"] .game-card::before,
+#homeContent [data-home-slot="col"] .game-card::after{ display:none !important; }
+
+/* Art becomes a banner across the top, the shape a lobby card uses. */
+#homeContent [data-home-slot="col"] .rc-art{
+  flex:0 0 auto !important; width:100% !important; height:84px !important;
+  border-radius:12px 12px 0 0 !important; overflow:hidden; position:relative;
+}
+#homeContent [data-home-slot="col"] .rc-art::before{ display:none !important; }
+#homeContent [data-home-slot="col"] .game-card-hero{
+  width:100% !important; height:100% !important; object-fit:cover !important;
+  border-radius:0 !important; flex:none !important;
+}
+#homeContent [data-home-slot="col"] .game-card-placeholder{
+  width:100% !important; height:84px !important; flex:0 0 auto !important;
+  border-radius:12px 12px 0 0 !important;
+  display:flex !important; align-items:center; justify-content:center; font-size:26px;
+  background:linear-gradient(135deg,var(--accent),var(--bg-0));
+}
+#homeContent [data-home-slot="col"] .game-card-body{
+  padding:10px 12px 12px !important; display:block !important;
+  background:none !important;
+}
+#homeContent [data-home-slot="col"] .game-card-body::before{ display:none !important; }
+#homeContent [data-home-slot="col"] .game-card-top{ display:block !important; }
+#homeContent [data-home-slot="col"] .game-card-capsule{ display:none !important; }
+#homeContent [data-home-slot="col"] .game-card-name{
+  font-size:14px !important; font-weight:800 !important;
+  letter-spacing:0 !important; margin:0 0 2px !important;
+  white-space:nowrap; overflow:hidden; text-overflow:ellipsis;
+  -webkit-text-stroke:0 !important; text-shadow:none !important;
+}
+#homeContent [data-home-slot="col"] .game-card-hours,
+#homeContent [data-home-slot="col"] .game-card-hours-total{
+  font-size:12px !important; color:var(--text-3) !important;
+  display:block !important; opacity:1 !important;
+}
+/* The deck's own furniture has no place on a small card. */
+#homeContent [data-home-slot="col"] .game-card-achievements,
+#homeContent [data-home-slot="col"] .game-card-ach-label,
+#homeContent [data-home-slot="col"] .rc-stats,
+#homeContent [data-home-slot="col"] .rc-bar,
+#homeContent [data-home-slot="col"] .rc-cta,
+#homeContent [data-home-slot="col"] .lc-tags{ display:none !important; }
+
+/* Deck furniture belongs to the hero slot only. */
+/* Lobbies in a column: reflow to the narrower card count. */
+#homeContent [data-home-slot="col"] .home-communities-grid{
+  display:grid !important; position:static !important; height:auto !important;
+  grid-template-columns:repeat(auto-fill, minmax(190px, 1fr)) !important;
+  gap:14px !important;
+}
+#homeContent [data-home-slot="col"] .community-card{
+  position:static !important; width:auto !important; height:auto !important;
+  transform:none !important; opacity:1 !important; filter:none !important;
+  flex-direction:column !important; border-radius:12px !important;
+}
+#homeContent [data-home-slot="col"] .community-card::before{ display:none !important; }
+
+/* :not(#homeSpotlight) matters — Spotlight has a carousel of its own that
+   predates all of this and keeps working in either slot, so its buttons
+   must not be swept up with the deck's. */
+#homeContent [data-home-slot="col"] .rc-dots{ display:none !important; }
+#homeContent [data-home-slot="col"]:not(#homeSpotlight) .spotlight-carousel-btn{ display:none !important; }
+#homeContent [data-home-slot="hero"] .rc-dots{ display:flex !important; }
+
+/* Nav injected into a section that has none of its own. */
+#homeContent [data-home-slot="hero"] .hs-navwrap{ position:relative; }
 </style>
+<style>
+/* Nav injected into a hero section that has none of its own (Lobbies).
+   Positioned against the section rather than restructuring its markup
+   into a carousel wrapper — the less DOM this touches, the fewer ways
+   reordering can break it. */
+#homeContent > section[data-home-slot="hero"]{ position:relative; }
+#homeContent [data-home-slot="hero"] .hs-injected-nav{
+  position:absolute; top:calc(50% + 46px); transform:translateY(-50%); z-index:40;
+}
+#homeContent [data-home-slot="hero"] .hs-injected-nav.prev{ left:-4px; }
+#homeContent [data-home-slot="hero"] .hs-injected-nav.next{ right:-4px; }
+#homeContent [data-home-slot="col"] .hs-injected-nav{ display:none !important; }
+</style>
+<script>
+(function () {
+  'use strict';
+
+  var IDS = ['homeRecents', 'homeSpotlight', 'homeCommunities'];
+
+  function host(){ return document.getElementById('homeContent'); }
+
+  function sections(hc){
+    return Array.prototype.slice.call(hc.children).filter(function (el) {
+      return el.tagName === 'SECTION' && IDS.indexOf(el.id) !== -1;
+    });
+  }
+
+  /* A card that has just left the deck keeps the inline geometry the
+     controller gave it. transform is overridden in CSS, but z-index and
+     pointer-events are not — and the deck sets pointer-events:none on
+     anything more than two places from the front, which would leave
+     most of a grid dead to the mouse. Clear them on the way out. */
+  function undeck(sec){
+    sec.querySelectorAll('.game-card, .community-card').forEach(function (c) {
+      ['--rc-x','--rc-s','--rc-o','--rc-sat','--rc-b'].forEach(function (p) {
+        c.style.removeProperty(p);
+      });
+      c.style.zIndex = '';
+      c.style.pointerEvents = '';
+      c.classList.remove('rc-active');
+    });
+  }
+
+  /* Lobbies has no prev/next of its own — it was never a carousel. Give
+     the hero slot a pair if the section did not bring any, and take them
+     away again when it moves back down. */
+  function ensureNav(sec, isHero){
+    var own = sec.querySelector('.spotlight-carousel-btn:not(.hs-injected-nav)');
+    var mine = sec.querySelectorAll('.hs-injected-nav');
+    if (!isHero || own){
+      Array.prototype.forEach.call(mine, function (b) { b.remove(); });
+      return;
+    }
+    if (mine.length) return;
+    ['prev', 'next'].forEach(function (dir) {
+      var b = document.createElement('button');
+      b.className = 'spotlight-carousel-btn hs-injected-nav ' + dir;
+      b.type = 'button';
+      b.innerHTML = dir === 'prev' ? '&#8592;' : '&#8594;';
+      b.addEventListener('click', function (e) {
+        e.preventDefault(); e.stopPropagation();
+        if (window.recentsNav) window.recentsNav(dir === 'prev' ? -1 : 1);
+      });
+      sec.appendChild(b);
+    });
+  }
+
+  function stampSlots(){
+    var hc = host();
+    if (!hc) return;
+    var secs = sections(hc);
+    if (!secs.length) return;
+
+    secs.forEach(function (s, i) {
+      var slot = i === 0 ? 'hero' : 'col';
+      if (s.getAttribute('data-home-slot') !== slot){
+        s.setAttribute('data-home-slot', slot);
+        if (slot === 'col') undeck(s);
+      }
+      ensureNav(s, slot === 'hero');
+    });
+
+    if (window.__rcApply) window.__rcApply();
+  }
+
+  window.stampHomeSlots = stampSlots;
+
+  /* Order is set from three places — the first render, the restore in
+     loadHomeSecOrder(), and each drag drop. Observing the container
+     catches all three without having to find and edit each one, and
+     catches any fourth added later. childList only: the deck writes
+     inline styles constantly and watching attributes would re-enter. */
+  function start(){
+    var hc = host();
+    if (!hc) { setTimeout(start, 200); return; }
+    stampSlots();
+    new MutationObserver(stampSlots).observe(hc, { childList: true });
+  }
+
+  if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', start);
+  else start();
+})();
+</script>
 </body>
 </html>
