@@ -54985,75 +54985,106 @@ body.double-dock[data-feed-position="right"].feed-open:not(.rail-hidden) #settin
 })();
 </script>
 
+
 <!-- ══════════════════════════════════════════════════════════════════
-     RECENTLY PLAYED — featured carousel
+     RECENTLY PLAYED — circular featured carousel
 
-     Was a flat horizontal strip of eight identical 300px cards that
-     scrolled three at a time, so nothing was the subject and the row
-     just ran off the edge of the screen.
+     Rebuilt from the first attempt, which had four faults:
 
-     Now the Steam featured shape, tighter: one large card in front with
-     its hero art and achievements, its neighbours smaller, dimmed and
-     set back behind it. Arrows and dots move the focus; clicking a card
-     behind brings it forward rather than opening Steam, so a mis-click
-     costs a step instead of a new browser tab.
+       centring was measured from offsetLeft while the width transition
+         was still running, so it read the OLD widths and settled the
+         front card off to one side. Position is now computed from the
+         index — transform only, nothing measured, nothing to be wrong
+         about mid-animation.
+       the deck did not wrap, so the first game had empty space to its
+         left. Offsets are circular now: there is always a card either
+         side, however many games there are.
+       front and side cards were both too small, and the sides sat
+         beside the front card rather than behind it. Sides now overlap
+         inward and are layered under it.
+       the front card showed two lines of hours; it now carries a proper
+         stat strip.
 
-     The card markup is untouched — this restyles and re-centres what
-     loadRecentGames() already renders, so the Steam fields, capsule art
-     and achievement rows keep working exactly as they do now.
+     Cards are laid out absolutely from the centre line: each one is
+     placed by its circular distance from the active index, so the
+     active card is exactly centred by construction.
      ══════════════════════════════════════════════════════════════════ -->
 <style>
-#homeRecents .spotlight-carousel-wrap{ padding:6px 0 4px; }
+#homeRecents .spotlight-carousel-wrap{ padding:4px 0 0; }
 
-/* The track centres its active card rather than paging by a fixed
-   pixel step — cards are different widths now, so the offset has to be
-   measured from the DOM, not calculated. */
-#homeRecents .home-games-grid{
-  display:flex !important; align-items:center !important;
-  gap:14px !important; overflow:visible !important;
-  transition:transform .42s cubic-bezier(.22,1,.36,1) !important;
-  padding:10px 0 !important;
+/* The window the deck is centred in. Fixed height because the cards are
+   absolutely positioned out of flow. */
+#homeRecents .spotlight-carousel-wrap > div{
+  overflow:hidden !important; width:100% !important;
 }
-#homeRecents .home-games-grid::-webkit-scrollbar{ display:none; }
+#homeRecents .home-games-grid{
+  position:relative !important;
+  display:block !important;
+  height:452px !important;
+  transform:none !important;      /* the old track translation is gone */
+  overflow:visible !important;
+  padding:0 !important;
+}
 
 #homeRecents .game-card{
-  flex:0 0 auto;
-  width:250px;
-  opacity:.42;
-  transform:scale(.94);
-  filter:saturate(.6);
+  position:absolute !important;
+  top:0; left:50%;
+  width:760px !important;
+  height:430px !important;
+  margin:0 !important;
+  overflow:hidden;
+  transform-origin:center center;
+  transition:transform .46s cubic-bezier(.22,1,.36,1),
+             opacity .36s ease, filter .36s ease, box-shadow .36s ease;
+  will-change:transform, opacity;
   cursor:pointer;
-  transition:width .42s cubic-bezier(.22,1,.36,1),
-             opacity .3s ease, transform .42s cubic-bezier(.22,1,.36,1),
-             filter .3s ease, box-shadow .3s ease;
-  will-change:width, transform;
+  backface-visibility:hidden;
 }
-#homeRecents .game-card:hover{ opacity:.7; }
-
+/* Layer + dim by distance. JS sets --rc-x / --rc-s / --rc-o / z-index. */
+#homeRecents .game-card{
+  transform:translateX(calc(-50% + var(--rc-x, 0px))) scale(var(--rc-s, 1));
+  opacity:var(--rc-o, 1);
+  filter:saturate(var(--rc-sat, 1)) brightness(var(--rc-b, 1));
+}
 #homeRecents .game-card.rc-active{
-  width:620px;
-  opacity:1;
-  transform:scale(1);
-  filter:none;
-  box-shadow:0 26px 60px rgba(0,0,0,.62),
-             0 0 0 1px color-mix(in srgb, var(--accent) 26%, transparent);
   cursor:default;
+  box-shadow:0 30px 70px rgba(0,0,0,.7),
+             0 0 0 1px color-mix(in srgb, var(--accent) 30%, transparent);
 }
-/* The hero carries the card once it is the subject. */
+#homeRecents .game-card:not(.rc-active):hover{ --rc-o:.85 !important; }
+
 #homeRecents .game-card .game-card-hero{
-  height:118px !important; object-fit:cover; transition:height .42s cubic-bezier(.22,1,.36,1);
+  height:240px !important; width:100% !important; object-fit:cover;
 }
-#homeRecents .game-card.rc-active .game-card-hero{ height:250px !important; }
-
-/* Detail belongs to the front card only. Behind it, a name and hours is
-   all that reads at that size anyway. */
+/* Behind the front card only the art and the name read at that scale. */
 #homeRecents .game-card:not(.rc-active) .game-card-achievements,
-#homeRecents .game-card:not(.rc-active) .game-card-capsule{ display:none !important; }
-#homeRecents .game-card:not(.rc-active) .game-card-body{ padding:11px 13px !important; }
-#homeRecents .game-card:not(.rc-active) .game-card-name{ font-size:13px !important; }
+#homeRecents .game-card:not(.rc-active) .rc-stats{ display:none !important; }
 
-/* Dots */
-.rc-dots{ display:flex; justify-content:center; gap:7px; margin-top:14px; }
+/* ── Stat strip on the front card ───────────────────────────────── */
+.rc-stats{
+  display:flex; gap:0; margin:10px 0 12px;
+  border:1px solid rgba(255,255,255,.07); border-radius:10px;
+  background:rgba(255,255,255,.02); overflow:hidden;
+}
+.rc-stat{ flex:1; padding:9px 13px; border-right:1px solid rgba(255,255,255,.06); }
+.rc-stat:last-child{ border-right:0; }
+.rc-stat b{
+  display:block; font-family:'JetBrains Mono', ui-monospace, monospace;
+  font-size:17px; font-weight:800; color:#fff; line-height:1.1;
+  font-variant-numeric:tabular-nums;
+}
+.rc-stat span{
+  display:block; font-family:'Archivo', var(--font), sans-serif;
+  font-size:8.5px; font-weight:800; letter-spacing:1.4px; text-transform:uppercase;
+  color:var(--text-3); margin-top:3px;
+}
+.rc-stat.hot b{ color:color-mix(in srgb, var(--accent) 92%, white); }
+/* The original two hour lines are replaced by the strip above. */
+#homeRecents .game-card.rc-active .game-card-hours,
+#homeRecents .game-card.rc-active .game-card-hours-total{ display:none !important; }
+#homeRecents .game-card-achievements{ max-height:104px; overflow:hidden; }
+
+.rc-dots{ display:flex; justify-content:center; gap:7px; margin-top:6px; }
 .rc-dot{
   width:7px; height:7px; border-radius:99px; cursor:pointer; border:0; padding:0;
   background:rgba(255,255,255,.18); transition:background .2s, width .2s;
@@ -55061,18 +55092,17 @@ body.double-dock[data-feed-position="right"].feed-open:not(.rail-hidden) #settin
 .rc-dot:hover{ background:rgba(255,255,255,.34); }
 .rc-dot.on{ width:20px; background:color-mix(in srgb, var(--accent) 85%, white); }
 
-/* The arrows sit against the big card, not the old 70px offset. */
-#homeRecents .spotlight-carousel-btn{ top:50% !important; transform:translateY(-50%) !important; z-index:4; }
-#homeRecents .spotlight-carousel-btn:disabled{ opacity:.25; pointer-events:none; }
+#homeRecents .spotlight-carousel-btn{
+  top:50% !important; transform:translateY(-50%) !important; z-index:40;
+}
 
-@media (max-width:1200px){
-  #homeRecents .game-card.rc-active{ width:480px; }
-  #homeRecents .game-card{ width:200px; }
+@media (max-width:1400px){
+  #homeRecents .game-card{ width:600px !important; height:390px !important; }
+  #homeRecents .home-games-grid{ height:412px !important; }
+  #homeRecents .game-card .game-card-hero{ height:200px !important; }
 }
 @media (prefers-reduced-motion: reduce){
-  #homeRecents .home-games-grid,
-  #homeRecents .game-card,
-  #homeRecents .game-card .game-card-hero{ transition:none !important; }
+  #homeRecents .game-card{ transition:none !important; }
 }
 </style>
 <script>
@@ -55081,38 +55111,100 @@ body.double-dock[data-feed-position="right"].feed-open:not(.rail-hidden) #settin
 
   var idx = 0;
 
+  /* Distance between card centres, and how far each rank is scaled and
+     dimmed. Side cards are pulled INWARD of a full card width so they
+     tuck under the front card rather than sitting beside it. */
+  var STEP = 430, STEP2 = 700;
+
   function track(){ return document.getElementById('recentGamesList'); }
   function cards(){
     var t = track();
     return t ? Array.prototype.slice.call(t.querySelectorAll('.game-card')) : [];
   }
 
-  /* Centre the active card inside the visible window. Measured rather
-     than stepped: the active card is far wider than the rest, so a fixed
-     card-width stride would drift further out of line with every move. */
+  /* Shortest signed distance around the ring, so the deck wraps and the
+     first game always has a card to its left. */
+  function offsetOf(i, n){
+    var raw = i - idx;
+    if (raw >  n / 2) raw -= n;
+    if (raw < -n / 2) raw += n;
+    return raw;
+  }
+
+  /* Pull the numbers out of the two lines the Steam renderer already
+     writes ("60.8h in last 2 weeks" / "85.3h total") and present them as
+     a stat strip. Reading the DOM rather than the API keeps this to a
+     restyle — loadRecentGames() is untouched. */
+  function stats(card){
+    if (card.querySelector('.rc-stats')) return;
+    var body = card.querySelector('.game-card-body');
+    var meta = card.querySelector('.game-card-meta');
+    if (!body || !meta) return;
+
+    function num(sel){
+      var el = card.querySelector(sel);
+      if (!el) return null;
+      var m = String(el.textContent || '').match(/([\d.]+)\s*h/i);
+      return m ? m[1] : null;
+    }
+    var recent = num('.game-card-hours');
+    var total  = num('.game-card-hours-total');
+    var achN   = card.querySelectorAll('.game-card-ach').length;
+
+    var out = '<div class="rc-stats">';
+    if (recent) out += '<div class="rc-stat hot"><b>' + recent + 'h</b><span>Last 2 weeks</span></div>';
+    if (total)  out += '<div class="rc-stat"><b>' + total + 'h</b><span>Total played</span></div>';
+    if (total && recent){
+      var pct = Math.round((parseFloat(recent) / Math.max(parseFloat(total), 0.1)) * 100);
+      out += '<div class="rc-stat"><b>' + Math.min(pct, 100) + '%</b><span>Of all time</span></div>';
+    }
+    out += '<div class="rc-stat"><b>' + achN + '</b><span>Achievements</span></div>';
+    out += '</div>';
+
+    meta.insertAdjacentHTML('afterend', out);
+  }
+
   function apply(){
-    var t = track(), list = cards();
-    if (!t || !list.length) return;
-    idx = Math.max(0, Math.min(idx, list.length - 1));
+    var list = cards(), n = list.length;
+    if (!n) return;
+    idx = ((idx % n) + n) % n;              // wrap the index itself
 
-    list.forEach(function(c, i){ c.classList.toggle('rc-active', i === idx); });
+    list.forEach(function(c, i){
+      var off = offsetOf(i, n);
+      var a = Math.abs(off);
+      var s = c.style;
+      c.classList.toggle('rc-active', off === 0);
+      stats(c);
 
-    // Let the width transition start from the new classes before measuring.
-    requestAnimationFrame(function(){
-      var wrap = t.parentElement;                 // the overflow:hidden window
-      if (!wrap) return;
-      var active = list[idx];
-      var centre = active.offsetLeft + (active.offsetWidth / 2);
-      var shift  = (wrap.clientWidth / 2) - centre;
-      t.style.transform = 'translateX(' + Math.round(shift) + 'px)';
+      if (a === 0){
+        s.setProperty('--rc-x', '0px');   s.setProperty('--rc-s', '1');
+        s.setProperty('--rc-o', '1');     s.setProperty('--rc-sat', '1');
+        s.setProperty('--rc-b', '1');     s.zIndex = 30;
+      } else if (a === 1){
+        s.setProperty('--rc-x', (off * STEP) + 'px'); s.setProperty('--rc-s', '.78');
+        s.setProperty('--rc-o', '.6');   s.setProperty('--rc-sat', '.55');
+        s.setProperty('--rc-b', '.7');   s.zIndex = 20;
+      } else if (a === 2){
+        s.setProperty('--rc-x', (off / a * STEP2) + 'px'); s.setProperty('--rc-s', '.62');
+        s.setProperty('--rc-o', '.28');  s.setProperty('--rc-sat', '.4');
+        s.setProperty('--rc-b', '.55');  s.zIndex = 10;
+      } else {
+        /* Parked just outside the deck so it animates in from the right
+           side rather than fading in on the spot. */
+        s.setProperty('--rc-x', (off > 0 ? STEP2 + 160 : -(STEP2 + 160)) + 'px');
+        s.setProperty('--rc-s', '.55');  s.setProperty('--rc-o', '0');
+        s.zIndex = 1;
+      }
+      c.style.pointerEvents = a > 2 ? 'none' : 'auto';
     });
 
+    // Circular: the arrows never dead-end.
     var prev = document.getElementById('recentsPrev');
     var next = document.getElementById('recentsNext');
-    if (prev) prev.disabled = idx <= 0;
-    if (next) next.disabled = idx >= list.length - 1;
+    if (prev) prev.disabled = false;
+    if (next) next.disabled = false;
 
-    dots(list.length);
+    dots(n);
   }
 
   function dots(n){
@@ -55121,8 +55213,7 @@ body.double-dock[data-feed-position="right"].feed-open:not(.rail-hidden) #settin
     var host = document.getElementById('rcDots');
     if (!host){
       host = document.createElement('div');
-      host.id = 'rcDots';
-      host.className = 'rc-dots';
+      host.id = 'rcDots'; host.className = 'rc-dots';
       wrap.parentElement.insertBefore(host, wrap.nextSibling);
       host.addEventListener('click', function(e){
         var b = e.target.closest('.rc-dot');
@@ -55131,8 +55222,8 @@ body.double-dock[data-feed-position="right"].feed-open:not(.rail-hidden) #settin
         apply();
       });
     }
-    // Only rebuild when the count changes — otherwise this runs on every
-    // move and throws away the dot you are about to click.
+    // Rebuilt only when the count changes — otherwise this would replace
+    // the dot mid-click on every move.
     if (host.children.length !== n){
       var out = '';
       for (var i = 0; i < n; i++) out += '<button class="rc-dot" data-i="' + i + '" aria-label="Game ' + (i + 1) + '"></button>';
@@ -55141,8 +55232,6 @@ body.double-dock[data-feed-position="right"].feed-open:not(.rail-hidden) #settin
     Array.prototype.forEach.call(host.children, function(b, i){ b.classList.toggle('on', i === idx); });
   }
 
-  /* Replaces the old paging nav, which stepped by a fixed 316px and
-     assumed three equal cards were visible. */
   window.recentsNav = function(dir){ idx += (dir > 0 ? 1 : -1); apply(); };
   window.recentsUpdateNav = function(){ apply(); };
 
@@ -55150,9 +55239,8 @@ body.double-dock[data-feed-position="right"].feed-open:not(.rail-hidden) #settin
     var t = track();
     if (!t) return;
 
-    /* A card behind the front one brings itself forward instead of
-       opening Steam. Capture phase, because the card's own onclick would
-       otherwise fire first and open a tab you did not ask for. */
+    /* A card behind the front one steps to it instead of opening Steam.
+       Capture phase, or the card's own onclick opens a tab first. */
     t.addEventListener('click', function(e){
       var card = e.target.closest('.game-card');
       if (!card || card.classList.contains('rc-active')) return;
@@ -55161,13 +55249,11 @@ body.double-dock[data-feed-position="right"].feed-open:not(.rail-hidden) #settin
       apply();
     }, true);
 
-    // loadRecentGames() rewrites the track; re-centre whenever it does.
     new MutationObserver(function(){ idx = 0; apply(); })
       .observe(t, { childList:true });
 
-    window.addEventListener('resize', function(){ apply(); });
     apply();
-    console.log('[recents] featured carousel active');
+    console.log('[recents] circular featured carousel active');
   }
 
   if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', start);
