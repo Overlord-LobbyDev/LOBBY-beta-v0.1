@@ -49951,12 +49951,35 @@ body.lir-collapsed #lirRecents{ display:none; }
   document.addEventListener('click', function(e){
     var b = e.target.closest('.lir-recent, .lirm-lobby');
     if (!b || b.dataset.lobby == null) return;
-    // In a lobby: switch lobby, so rail and page always agree.
-    // Off-lobby: just change which lobby the rail is previewing — you
-    // stay on Home/Feed rather than being yanked into a lobby.
-    if (document.body.classList.contains('lobby-selected')) gotoLobby(b.dataset.lobby);
-    else setPreview(b.dataset.lobby);
+    /* Always preview — never navigate. Picking a crest changes which
+       lobby the RAIL is showing; the main page stays where it is, so you
+       can read one lobby's sidebar while sitting in another.
+
+       This used to call gotoLobby() whenever you were already inside a
+       lobby, on the reasoning that the rail and the page should agree.
+       They don't need to: the rail is a browser, and yanking the page to
+       a different lobby on a single click made it impossible to look
+       anything up without losing your place.
+
+       Entering is still one click away — the channel handler below takes
+       you into the previewed lobby and opens that channel. */
+    window._lirPinned = b.dataset.lobby;
+    setPreview(b.dataset.lobby);
   });
+
+  /* Navigating the page to a lobby releases the pin, so the rail follows
+     wherever you actually went — including when you enter the lobby you
+     were previewing. Without this the rail would stay stuck on an old
+     preview after switching lobbies from the top bar. */
+  (function pinFollowsNavigation(){
+    if (typeof window.selectServer !== 'function' || window.selectServer.__lirPin) return;
+    var orig = window.selectServer;
+    window.selectServer = function(){
+      window._lirPinned = null;
+      return orig.apply(this, arguments);
+    };
+    window.selectServer.__lirPin = true;
+  })();
 
   /* Channels in a previewed sidebar belong to a lobby you haven't entered,
      so their inline openChannel() would fire against the wrong state.
@@ -50205,7 +50228,20 @@ body.lir-collapsed #lirRecents{ display:none; }
      the placeholder is what's on screen. */
   /* Which lobby the rail should be showing, on any page: the one you're
      actually in, otherwise the ranked recent. */
+  /* Which lobby the rail SHOULD be showing.
+
+     A crest you clicked in the rail wins over the lobby the page is in —
+     that is the whole point of being able to read one lobby's sidebar
+     while sitting in another. Without the pin this returned the selected
+     server unconditionally, so applyPreview() bailed on the id check and
+     a preview of any other lobby simply never rendered.
+
+     The pin is only ever set by an explicit click, and selectServer
+     clears it, so navigating the page still re-syncs the rail. Falling
+     back to the selected server keeps the stale-repaint guard the id
+     check was added for. */
   function targetLobbyId(){
+    if (window._lirPinned != null) return window._lirPinned;
     var s = lexServer();
     if (s && s.id != null) return s.id;
     return wantedPreviewId();
