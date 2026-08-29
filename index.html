@@ -58599,5 +58599,132 @@ async function reactComment(ev, id, btn){
   margin-top:6px !important;
 }
 </style>
+
+<!-- ══════════════════════════════════════════════════════════════════
+     GAME TITLE LOGOS
+
+     "Make the title match the game's own style" — the right answer is
+     not to approximate the lettering with a font, it is to use the
+     lettering. Steam ships every game's official logo as an asset
+     alongside the cover art the deck already pulls:
+
+       logo.png / library_logo.png, transparent PNG, the wordmark as the
+       publisher drew it — TEKKEN 8's, Halo's, Rockstar's.
+
+     Per-game fonts would not have worked anyway: the faces are licensed
+     and mostly custom, so a hundred games would need a hundred webfonts,
+     and the result would still only be an impression of each title. The
+     logo IS the title.
+
+     Same chain pattern as the cover art: probe the known locations in
+     turn, take the first that loads, and leave the text standing if
+     none do. That last part matters — plenty of apps have no logo asset
+     (a beta, a delisted re-release), and those must read as a normally
+     typeset title rather than as a gap.
+
+     Deck cards only. The grid captions are ~150px wide, where a
+     wordmark would be too small to read and the name is the thing doing
+     the work; there, type is genuinely better than art.
+     ══════════════════════════════════════════════════════════════════ -->
+<style>
+.gl-logo{
+  display:block; width:auto; height:auto;
+  max-width:100%; max-height:76px;
+  object-fit:contain; object-position:left center;
+  /* Logos are drawn for a store page, so most are light with
+     transparency. A little shadow keeps a pale one from dissolving into
+     the card and gives a dark one an edge to sit on. */
+  filter:drop-shadow(0 2px 5px rgba(0,0,0,.6));
+}
+#homeContent [data-home-slot="hero"] .game-card-name.gl-has{
+  /* The element is a picture frame now — the type rules that shaped the
+     words would only constrain the image. */
+  font-size:0 !important; line-height:0 !important;
+  letter-spacing:0 !important; text-shadow:none !important;
+  min-height:0 !important; padding:0 !important;
+  margin:0 0 14px !important;
+}
+#homeContent [data-home-slot="hero"] .game-card:not(.rc-active) .gl-logo{
+  max-height:40px;
+}
+</style>
+<script>
+(function () {
+  'use strict';
+
+  function appIdOf(card){
+    var on = card.getAttribute('onclick') || '';
+    var m = on.match(/\/app\/(\d+)/);
+    return m ? m[1] : null;
+  }
+
+  /* library_logo first: it is the asset Steam uses on the library shelf
+     and is the more consistently present of the two. */
+  function logoUrls(id){
+    var A = 'https://cdn.cloudflare.steamstatic.com/steam/apps/' + id + '/';
+    var B = 'https://shared.cloudflare.steamstatic.com/store_item_assets/steam/apps/' + id + '/';
+    var C = 'https://cdn.akamai.steamstatic.com/steam/apps/' + id + '/';
+    return [
+      B + 'library_logo.png', A + 'library_logo.png',
+      B + 'logo.png',         A + 'logo.png',  C + 'logo.png'
+    ];
+  }
+
+  function fit(card){
+    if (card.__logo) return;
+    var nameEl = card.querySelector('.game-card-name');
+    if (!nameEl) return;
+    var id = appIdOf(card);
+    if (!id) return;
+    card.__logo = true;
+
+    var text = (nameEl.getAttribute('title') || nameEl.textContent || '').trim();
+    var urls = logoUrls(id), i = 0;
+
+    (function next(){
+      if (i >= urls.length) return;          // no logo: the text stays
+      var url = urls[i++];
+      var probe = new Image();
+      probe.onload = function(){
+        /* A one-pixel sentinel is not a wordmark. Steam answers some
+           missing assets with a placeholder rather than a 404. */
+        if (probe.naturalWidth < 40 || probe.naturalHeight < 12){ next(); return; }
+        var img = document.createElement('img');
+        img.className = 'gl-logo';
+        img.src = url;
+        img.alt = text;
+        nameEl.setAttribute('title', text);
+        nameEl.textContent = '';
+        nameEl.classList.add('gl-has');
+        nameEl.appendChild(img);
+      };
+      probe.onerror = next;
+      probe.src = url;
+    })();
+  }
+
+  function sweep(){
+    document.querySelectorAll(
+      '#homeContent [data-home-slot="hero"] .game-card'
+    ).forEach(fit);
+  }
+
+  function start(){
+    var hc = document.getElementById('homeContent');
+    if (!hc) { setTimeout(start, 200); return; }
+    var queued = false;
+    function ping(){
+      if (queued) return;
+      queued = true;
+      requestAnimationFrame(function () { queued = false; sweep(); });
+    }
+    new MutationObserver(ping).observe(hc, { childList:true, subtree:true });
+    sweep();
+  }
+
+  if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', start);
+  else start();
+})();
+</script>
 </body>
 </html>
