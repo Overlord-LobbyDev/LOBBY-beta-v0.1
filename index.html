@@ -52574,6 +52574,40 @@ body.coliseum-mode #coliseumRoot .col-canvas{ display:none !important; }
 }
 #crRoot .cr-rooms{ display:grid; grid-template-columns:repeat(auto-fit,minmax(250px,1fr)); gap:12px; }
 
+/* One prioritised column rather than a type-grouped grid: with 30
+   lounges the thing you want is almost never the first one alphabetically
+   in its group, and a single ordered list puts it at the top. */
+#crRoot .cr-lounges{ display:flex; flex-direction:column; gap:10px; }
+#crRoot .cr-h .n{
+  font-family:var(--cr-mono); font-size:9.5px; font-weight:700;
+  padding:2px 8px; border-radius:99px;
+  background:rgba(255,255,255,.06); color:var(--cr-ink2); letter-spacing:.6px;
+}
+
+/* Everyone online who is NOT in a voice lounge. The ones who are appear
+   inside their lounge above — presence shown where it happens, which is
+   why Who Is Around no longer needs a card of its own. */
+#crRoot .cr-around{
+  display:flex; align-items:center; gap:12px; flex-wrap:wrap;
+  margin-top:16px; padding-top:16px;
+  border-top:1px solid rgba(255,255,255,.06);
+}
+#crRoot .cr-around-l{
+  font-family:var(--cr-head); font-size:10px; font-weight:800;
+  letter-spacing:1.8px; text-transform:uppercase; color:var(--cr-ink3);
+}
+#crRoot .cr-around-people{ display:flex; gap:6px; flex-wrap:wrap; }
+#crRoot .cr-around-people .av{
+  width:26px; height:26px; border-radius:50%; overflow:hidden;
+  border:1px solid rgba(255,255,255,.14); background:rgba(255,255,255,.07);
+  display:flex; align-items:center; justify-content:center;
+  font-size:9.5px; font-weight:800; color:var(--cr-ink2);
+}
+#crRoot .cr-around-people .av img{
+  width:100%; height:100%; object-fit:cover; display:block;
+}
+#crRoot .cr-around-n{ font-size:11.5px; color:var(--cr-ink3); margin-left:auto; }
+
 /* Voice rooms are the bigger object — they carry who is inside. */
 #crRoot .cr-vroom{
   border:1px solid var(--cr-line); border-radius:12px; padding:15px 17px;
@@ -52752,6 +52786,11 @@ body.coliseum-mode #coliseumRoot .col-canvas{ display:none !important; }
   function presence(m){
     return (typeof window._lirPresenceOf === 'function') ? window._lirPresenceOf(m) : 'offline';
   }
+  /* Whether the lounge list is showing everything. Deliberately not
+     persisted: it resets to the prioritised short list each visit, which
+     is the state that keeps the section a constant height. */
+  var loungesExpanded = false;
+
   function statusOf(t){ return String(t && t.status || 'setup').toLowerCase(); }
   function isLive(t){ var s = statusOf(t); return s==='live'||s==='active'||s==='in_progress'||s==='in-progress'; }
   function isDone(t){ var s = statusOf(t); return s==='done'||s==='finished'||s==='complete'||s==='completed'; }
@@ -52774,14 +52813,13 @@ body.coliseum-mode #coliseumRoot .col-canvas{ display:none !important; }
         '<div class="cr-body">' +
           '<div class="cr-main">' +
             '<div class="cr-sec" id="crBracketSec"></div>' +
-            '<div class="cr-sec"><p class="cr-h">Rooms</p><div id="crRooms"></div></div>' +
+            '<div class="cr-sec" id="crLoungeSec"></div>' +
             '<div class="cr-sec" id="crSayS"><p class="cr-h">Say something</p><div id="crSay"></div></div>' +
             '<div class="cr-sec" id="crPulseS"><p class="cr-h">Lobby pulse</p><div id="crPulse"></div></div>' +
             '<div class="cr-sec" id="crTourneySec"></div>' +
           '</div>' +
           '<div class="cr-side">' +
             '<div class="cr-sec" id="crEgoS"><p class="cr-h">Your alter ego</p><div id="crEgo"></div></div>' +
-            '<div class="cr-sec" id="crWhoS"><p class="cr-h">Who is around</p><div id="crWho"></div></div>' +
             '<div class="cr-sec" id="crHofS"><p class="cr-h">Hall of fame</p><div id="crHof"></div></div>' +
           '</div>' +
         '</div>' +
@@ -52810,7 +52848,8 @@ body.coliseum-mode #coliseumRoot .col-canvas{ display:none !important; }
       return clean(node);
     }
     move('.col-identity-card', 'crEgo');
-    move('.col-const',         'crWho');
+    /* .col-const is no longer adopted: presence merged into Lounges,
+       where members show inside the voice lounge they are actually in. */
     move('.col-composer',      'crSay');
     move('.col-featured',      'crHof');
     move('.col-hof',           'crHof');
@@ -52825,7 +52864,7 @@ body.coliseum-mode #coliseumRoot .col-canvas{ display:none !important; }
 
     // A mount whose section never received anything stays out of the way.
     [['crSay','crSayS'],['crPulse','crPulseS'],['crEgo','crEgoS'],
-     ['crWho','crWhoS'],['crHof','crHofS']].forEach(function(p){
+     ['crHof','crHofS']].forEach(function(p){
       var m = $(p[0]), s = $(p[1]);
       if (m && s) s.style.display = m.children.length ? '' : 'none';
     });
@@ -52963,22 +53002,63 @@ body.coliseum-mode #coliseumRoot .col-canvas{ display:none !important; }
         '</div>';
     }
 
-    var vrooms = chs.filter(function(c){ return c.type === 'voice'; });
-    var anns   = chs.filter(function(c){ return c.type === 'announcement'; });
-    var texts  = chs.filter(function(c){ return c.type !== 'voice' && c.type !== 'announcement'; });
-
-    function group(label, items, render){
-      if (!items.length) return '';
-      return '<div class="crx-group">' +
-        '<p class="crx-group-h">' + label + '<span class="n">' + items.length + '</span></p>' +
-        '<div class="cr-rooms">' + items.map(render).join('') + '</div></div>';
+    /* ── Lounges: prioritised, capped, with presence merged in ──────
+       Sorted by what deserves attention rather than by type, so a lobby
+       with 30 lounges never buries the one people are actually in. The
+       list is capped so the section is a constant height however big the
+       lobby gets — type stays legible from the icon, which is what the
+       old Voice/Channels/Announcements headings were carrying. */
+    function rank(c){
+      var unread = (window.unreadChannels && window.unreadChannels[c.id]) || 0;
+      if (c.type === 'voice')        return occ(c).length ? 0 : 3;  // live voice first
+      if (c.type === 'announcement') return unread ? 1 : 4;         // announcements last when quiet
+      return unread ? 1 : 2;                                        // unread text, then text
     }
+    var ordered = chs.slice().sort(function(a, b){
+      var d = rank(a) - rank(b);
+      if (d) return d;
+      if (a.type === 'voice' && b.type === 'voice') return occ(b).length - occ(a).length;
+      return String(a.name || '').localeCompare(String(b.name || ''));
+    });
 
-    $('crRooms').innerHTML = chs.length
-      ? group('Voice rooms', vrooms, vroomCard) +
-        group('Channels', texts, textRow) +
-        group('Announcements', anns, textRow)
-      : '<div class="cr-empty">No channels yet — create one in Settings.</div>';
+    var CAP = 6;
+    var over = Math.max(0, ordered.length - CAP);
+    var shown = loungesExpanded ? ordered : ordered.slice(0, CAP);
+
+    /* Anyone online but NOT in a voice lounge. The people who ARE in one
+       already appear inside it, which is the point of merging Who Is
+       Around into this section — presence is shown where it happens. */
+    var elsewhere = online.filter(function(m){ return presence(m) !== 'voice'; });
+    var talking   = mem.filter(function(m){ return presence(m) === 'voice'; }).length;
+
+    $('crLoungeSec').innerHTML = chs.length
+      ? '<p class="cr-h">Lounges' +
+          '<span class="n">' + chs.length + (talking ? ' · ' + talking + ' here' : '') + '</span>' +
+          (over ? '<span class="more" data-act="lounges">' +
+                    (loungesExpanded ? 'Show less' : 'Show all ' + ordered.length + ' →') +
+                  '</span>' : '') +
+        '</p>' +
+        '<div class="cr-lounges">' +
+          shown.map(function(c){ return c.type === 'voice' ? vroomCard(c) : textRow(c); }).join('') +
+        '</div>' +
+        (elsewhere.length
+          ? '<div class="cr-around">' +
+              '<span class="cr-around-l">Around</span>' +
+              '<div class="cr-around-people">' +
+                elsewhere.slice(0, 16).map(function(m){
+                  var nm = m.display_name || m.username || '?';
+                  var url = m.avatar_url || m.avatarUrl;
+                  return '<span class="av" title="' + esc(nm) + '">' +
+                    (url ? '<img src="' + esc(url) + '" alt="" onerror="this.remove()">'
+                         : esc(initials(nm))) + '</span>';
+                }).join('') +
+                (elsewhere.length > 16 ? '<span class="av">+' + (elsewhere.length - 16) + '</span>' : '') +
+              '</div>' +
+              '<span class="cr-around-n">' + elsewhere.length + ' online, not in voice</span>' +
+            '</div>'
+          : '') +
+        ''
+      : '<p class="cr-h">Lounges</p><div class="cr-empty">No lounges yet — create one in Settings.</div>';
 
     var tsec = $('crTourneySec');
     tsec.style.display = ts.length ? '' : 'none';
@@ -53020,6 +53100,7 @@ body.coliseum-mode #coliseumRoot .col-canvas{ display:none !important; }
         }
         case 'tourneys': if (typeof window.showOverlay === 'function') window.showOverlay('myTournamentsOverlay'); break;
         case 'newt':     if (typeof window.openModal === 'function') window.openModal('createTournamentModal'); break;
+        case 'lounges':  loungesExpanded = !loungesExpanded; render(); break;
       }
     });
     el.__wired = true;
