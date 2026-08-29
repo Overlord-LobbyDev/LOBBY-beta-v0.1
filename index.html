@@ -56168,49 +56168,57 @@ body.lobby-selected #chatPanel .chat-header{ display:none !important; }
   padding:16px 16px 40px !important;
 }
 
-/* order, not DOM position: the app re-appends these on load and after a
-   drag, so source order cannot be relied on. */
-#homeContent > #homeRecents{ grid-column:span 4; order:0; }
-#homeContent > #homeSpotlight{ grid-column:span 3; grid-row:span 2; order:1; }
+/* Roles are assigned by POSITION, not by id, so whichever section the
+   user drags to the top becomes the hero and the rest follow. Hard-coding
+   #homeRecents as the hero meant the page could not be reorganised at all.
+   The app already persists the order and re-appends in it, so DOM order
+   IS the user order — these classes just read it. */
+#homeContent > .bn-hero{ grid-column:span 4; order:0; }
+#homeContent > .bn-main{ grid-column:span 3; grid-row:span 2; order:1; }
 #homeContent > #bnFren{ order:2; }
 #homeContent > #bnWeek{ order:3; }
-#homeContent > #homeCommunities{ grid-column:span 4; order:4; }
+#homeContent > .bn-wide{ grid-column:span 4; order:4; }
 
-/* The three app sections become tiles in place — same surface as the two
-   new ones, so the grid reads as one object. */
-#homeContent > #homeSpotlight,
-#homeContent > #homeCommunities,
+/* Tiles: same surface as the two new ones, so the grid reads as one
+   object. overflow is VISIBLE — hidden was clipping the Spotlight card
+   at the tile edge, and a card cut in half looks like a rendering fault
+   rather than a boundary. */
+#homeContent > .bn-main,
+#homeContent > .bn-wide,
 #homeContent > .bn{
-  position:relative; min-width:0; overflow:hidden;
+  position:relative; min-width:0; overflow:visible;
   border:1px solid rgba(255,255,255,.08); border-radius:16px;
   background:linear-gradient(160deg, rgba(255,255,255,.035), rgba(255,255,255,.012));
   padding:20px 22px;
 }
-#homeContent > #homeSpotlight::before,
-#homeContent > #homeCommunities::before,
+#homeContent > .bn-main::before,
+#homeContent > .bn-wide::before,
 #homeContent > .bn::before{
   content:''; position:absolute; top:0; left:22px; right:22px; height:1px;
   background:linear-gradient(90deg, transparent, rgba(255,255,255,.16), transparent);
 }
-/* Recently Played keeps its own presentation — a tile frame would fight
-   the carousel's own card. */
-#homeContent > #homeRecents{ background:none; border:0; padding:0; }
+/* The carousel keeps its own presentation wherever it sits — a tile
+   frame would fight the card it already draws. */
+#homeContent > #homeRecents{ background:none !important; border:0 !important; padding:0 !important; }
+#homeContent > #homeRecents::before{ display:none; }
+/* Rows grow to their content; nothing is trapped at a fixed height. */
+#homeContent{ grid-auto-rows:minmax(150px, auto); }
 
 /* Inside a tile the page-level slate is too big; the centred 46px title
    belongs to a full-width section, not a panel. */
-#homeContent > #homeSpotlight .home-section-header,
-#homeContent > #homeCommunities .home-section-header{
+#homeContent > .bn-main .home-section-header,
+#homeContent > .bn-wide .home-section-header{
   align-items:flex-start !important; text-align:left !important;
   margin:0 0 16px !important; padding:0 !important;
 }
-#homeContent > #homeSpotlight .home-section-title,
-#homeContent > #homeCommunities .home-section-title{ font-size:26px !important; letter-spacing:1.5px !important; }
-#homeContent > #homeSpotlight .hs-main,
-#homeContent > #homeCommunities .hs-main{ align-items:flex-start !important; }
-#homeContent > #homeSpotlight .hs-bar,
-#homeContent > #homeCommunities .hs-bar{ margin-left:0 !important; }
-#homeContent > #homeSpotlight .home-section-sub,
-#homeContent > #homeCommunities .home-section-sub{ text-align:left !important; }
+#homeContent > .bn-main .home-section-title,
+#homeContent > .bn-wide .home-section-title{ font-size:26px !important; letter-spacing:1.5px !important; }
+#homeContent > .bn-main .hs-main,
+#homeContent > .bn-wide .hs-main{ align-items:flex-start !important; }
+#homeContent > .bn-main .hs-bar,
+#homeContent > .bn-wide .hs-bar{ margin-left:0 !important; }
+#homeContent > .bn-main .home-section-sub,
+#homeContent > .bn-wide .home-section-sub{ text-align:left !important; }
 
 /* The two new tiles */
 .bn{ display:flex; flex-direction:column; min-height:150px; }
@@ -56249,16 +56257,16 @@ body.lobby-selected #chatPanel .chat-header{ display:none !important; }
 
 @media (max-width:1300px){
   #homeContent{ grid-template-columns:repeat(2, minmax(0,1fr)) !important; }
-  #homeContent > #homeRecents,
-  #homeContent > #homeSpotlight,
-  #homeContent > #homeCommunities{ grid-column:span 2; }
-  #homeContent > #homeSpotlight{ grid-row:auto; }
+  #homeContent > .bn-hero,
+  #homeContent > .bn-main,
+  #homeContent > .bn-wide{ grid-column:span 2; }
+  #homeContent > .bn-main{ grid-row:auto; }
 }
 @media (max-width:760px){
   #homeContent{ grid-template-columns:1fr !important; }
-  #homeContent > #homeRecents,
-  #homeContent > #homeSpotlight,
-  #homeContent > #homeCommunities{ grid-column:span 1; }
+  #homeContent > .bn-hero,
+  #homeContent > .bn-main,
+  #homeContent > .bn-wide{ grid-column:span 1; }
 }
 </style>
 <script>
@@ -56307,7 +56315,28 @@ body.lobby-selected #chatPanel .chat-header{ display:none !important; }
     refresh();
   }
 
+  /* Assign the layout roles from DOM position, so whichever section the
+     user drags to the top becomes the full-width hero and the others
+     follow it. The app persists the order and re-appends in it, so DOM
+     order already IS the user's order — this just reads it. Keying the
+     layout to #homeRecents meant the page could not be reorganised. */
+  function roles(){
+    var home = document.getElementById('homeContent');
+    if (!home) return;
+    var secs = Array.prototype.filter.call(home.children, function(el){
+      return el.tagName === 'SECTION' && el.id;
+    });
+    var ROLE = ['bn-hero', 'bn-main', 'bn-wide'];
+    secs.forEach(function(s, i){
+      var want = ROLE[i] || 'bn-wide';
+      ROLE.forEach(function(r){ if (r !== want) s.classList.remove(r); });
+      if (!s.classList.contains(want)) s.classList.add(want);
+    });
+  }
+
   function refresh(){
+    roles();
+
     /* Summed from the Steam cards the carousel has already rendered, so
        these cannot disagree with what is on screen. */
     var cards = document.querySelectorAll('#homeRecents .game-card');
@@ -56358,6 +56387,8 @@ body.lobby-selected #chatPanel .chat-header{ display:none !important; }
   function start(){
     build();
     var home = document.getElementById('homeContent');
+    /* childList catches the re-append that a drag triggers, so roles are
+       reassigned the moment the order changes. */
     if (home) new MutationObserver(function(){ build(); refresh(); })
       .observe(home, { childList:true });
     setInterval(refresh, 4000);
