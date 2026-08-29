@@ -35149,17 +35149,50 @@ window.closeLobbyCalendar = function() {
 };
 
 async function _calendarFetchEvents() {
+  const lobbyId = window._calendarState.lobbyId;
+  let events = [];
+
   try {
     const token = localStorage.getItem('vh_token') || sessionStorage.getItem('vh_token');
-    const res = await fetch(`https://lobby-auth-server.onrender.com/api/events/lobby/${window._calendarState.lobbyId}`, {
+    const res = await fetch(`https://lobby-auth-server.onrender.com/api/events/lobby/${lobbyId}`, {
       headers: { Authorization: `Bearer ${token}` }
     });
     const data = await res.json();
-    window._calendarState.events = data.events || [];
+    events = data.events || [];
   } catch(e) {
     console.error('[calendar fetch]', e);
-    window._calendarState.events = [];
+    events = [];
   }
+
+  /* Tournaments belong on the calendar too — anything scheduled should
+     appear there, not just what was typed into the calendar itself. They
+     live in their own table with a `start_time`, so they are fetched
+     separately and mapped onto the shape the grid renders: event_date is
+     the field it buckets days by, and 'tournament' is a type the chip
+     colours already define (they were designed for this and never wired
+     up). Prefixed ids keep them from colliding with real event ids. */
+  try {
+    const tRes = await api(`/tournaments/lobby/${lobbyId}`);
+    const list = Array.isArray(tRes) ? tRes : (tRes && tRes.tournaments) || [];
+    list.forEach(t => {
+      const when = t.start_time || t.starts_at || t.start_at || null;
+      if (!when) return;                    // undated tournaments cannot be placed
+      events.push({
+        id: 't-' + t.id,
+        title: t.name || t.title || 'Tournament',
+        description: t.description || `${t.format || 'Tournament'} · ${t.status || 'setup'}`,
+        event_date: when,
+        type: 'tournament',
+        is_private: false,
+        _tournamentId: t.id
+      });
+    });
+  } catch(e) {
+    // A calendar with its own events is still useful — don't lose them.
+    console.warn('[calendar] tournaments not merged', e && e.message);
+  }
+
+  window._calendarState.events = events;
 }
 
 function _calendarRender() {
@@ -53497,7 +53530,10 @@ body.coliseum-mode #coliseumRoot .col-canvas{ display:none !important; }
     if (feed.length){
       bs.innerHTML = '<p class="cr-h">Main events' +
         '<span class="n">' + feed.length + '</span>' +
-        '<span class="more" data-act="tourneys">View all ' + ts.length + ' →</span></p>' +
+        /* The calendar, not the tournaments overlay: this section mixes
+           tournaments, scheduled events and announcements, and the
+           calendar is the one place that now holds all of them. */
+        '<span class="more" data-act="calendar">Open calendar →</span></p>' +
         '<div class="cr-brk">' + feed.slice(0, 4).map(function(f){
           return '<div class="cr-ev ' + f.kind + '"' +
             ' data-act="' + esc(f.act) + '"' +
