@@ -52104,5 +52104,96 @@ body.feed-anim-out #socialFeed{
   transition: none !important;
 }
 </style>
+
+<!-- ══════════════════════════════════════════════════════════════════
+     OPEN A CHANNEL WHEN YOU ENTER A LOBBY
+
+     selectServer() renders the channel sidebar but never opens a channel,
+     so switching lobbies always landed on "No channel selected" and you
+     had to pick one by hand every time.
+
+     Hooked to renderChannelList() rather than selectServer(): selectServer
+     is async and awaits two API calls, so anything appended to it runs
+     before the channels exist. renderChannelList is called synchronously
+     with the loaded channels, which is exactly the moment the choice can
+     be made.
+
+     Remembers the last channel per lobby, so returning to a lobby puts you
+     back where you were instead of always at the top of the list.
+     ══════════════════════════════════════════════════════════════════ -->
+<script>
+(function () {
+  'use strict';
+
+  var KEY = 'lobby_last_channel:';
+
+  /* currentView is a top-level `let` — it is NOT on window. */
+  function view(){
+    try { if (typeof currentView !== 'undefined') return currentView; } catch(e){}
+    return window.currentView || null;
+  }
+
+  function remembered(serverId, channels){
+    var id;
+    try { id = localStorage.getItem(KEY + serverId); } catch(e){ return null; }
+    if (!id) return null;
+    return channels.find(function(c){ return String(c.id) === String(id); }) || null;
+  }
+
+  /* Never auto-join voice — that would open a mic connection you didn't
+     ask for. Text first, then announcements, then anything else readable. */
+  function firstReadable(channels){
+    var order = ['text', 'announcement', 'news', 'forum', 'poll', 'calendar'];
+    for (var i = 0; i < order.length; i++){
+      var hit = channels.find(function(c){ return c.type === order[i]; });
+      if (hit) return hit;
+    }
+    return channels.find(function(c){ return c.type !== 'voice'; }) || null;
+  }
+
+  function autoOpen(channels, server){
+    if (!server || server.id == null) return;
+    if (!Array.isArray(channels) || !channels.length) return;
+
+    /* Already reading a channel of THIS lobby: leave it alone. This also
+       makes the hook safe on the re-renders triggered by pinning,
+       searching and collapsing sections. */
+    var v = view();
+    if (v && v.type === 'channel' &&
+        channels.some(function(c){ return String(c.id) === String(v.id); })) return;
+
+    var pick = remembered(server.id, channels) || firstReadable(channels);
+    if (!pick) return;                       // voice-only lobby — nothing to open
+    if (typeof window.openChannel !== 'function') return;
+    window.openChannel(pick.id, pick.name, pick.type || 'text');
+  }
+
+  var origRender = window.renderChannelList;
+  if (typeof origRender === 'function' && !origRender.__autoOpen){
+    window.renderChannelList = function(channels, members, server){
+      var r = origRender.apply(this, arguments);
+      try { autoOpen(channels, server); } catch(e){ console.warn('[lobby-nav] auto-open', e); }
+      return r;
+    };
+    window.renderChannelList.__autoOpen = true;
+  }
+
+  /* Remember where you were. currentChannelsLobbyId is set by
+     renderChannelList and tracks which lobby the sidebar is showing. */
+  var origOpen = window.openChannel;
+  if (typeof origOpen === 'function' && !origOpen.__remember){
+    window.openChannel = function(id){
+      try {
+        var sid = window.currentChannelsLobbyId;
+        if (sid != null && id != null) localStorage.setItem(KEY + sid, String(id));
+      } catch(e){}
+      return origOpen.apply(this, arguments);
+    };
+    window.openChannel.__remember = true;
+  }
+
+  console.log('[lobby-nav] entering a lobby opens its last/first channel');
+})();
+</script>
 </body>
 </html>
