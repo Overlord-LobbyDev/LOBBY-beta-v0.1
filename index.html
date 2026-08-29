@@ -57443,5 +57443,98 @@ async function reactComment(ev, id, btn){
   else start();
 })();
 </script>
+
+<!-- ══════════════════════════════════════════════════════════════════
+     THE SEAM — removing the dark bar between art and detail
+
+     The bar was .game-card::after: a 140px band of rgba(11,13,19,.42)
+     placed at left:calc(42% - 70px), meant to soften the join.
+
+     It never sat on the join. The art column is a FIXED 287px, which on
+     a 920px card is 31% — so a band centred at 42% landed about 100px
+     into the text column. What it actually drew was light at the seam,
+     a dark bar in open space, then light again before the body's own
+     wash resumed darkening. Three changes of direction across one card,
+     which is exactly what reads as a bar.
+
+     Worse across sizes: under 1800px the card is 780px and the art is
+     still 287px, so the seam moves to 37% while the band stays at 42%.
+     A percentage offset can never track a fixed-width column.
+
+     The fix is to stop patching over the join and make it continuous:
+
+       the band is gone — it was the artefact, not the cure
+       the art's right edge dissolves over its last 110px, ending at the
+         exact alpha the body starts at, so nothing steps at the seam
+       the body's wash starts at that same alpha and only ever gets
+         darker, left to right — one direction, no reversals
+
+     Both sides now name the same value, so the two must meet flush.
+     ══════════════════════════════════════════════════════════════════ -->
+<style>
+/* The band was the bar. */
+#homeContent [data-home-slot="hero"] .game-card::after{
+  display:none !important;
+}
+
+/* The art dissolves into the detail column instead of being cut off.
+   .5 is the meeting value, and the body below starts at the same .5. */
+#homeContent [data-home-slot="hero"] .rc-art::after{
+  content:''; position:absolute; top:0; bottom:0; right:0;
+  width:110px; z-index:2; pointer-events:none;
+  background:linear-gradient(90deg,
+    rgba(11,13,19,0) 0%,
+    rgba(11,13,19,.22) 45%,
+    rgba(11,13,19,.5) 100%);
+}
+
+/* One direction only. 100deg rather than 112deg keeps the ramp close to
+   horizontal, so the left edge is genuinely the value declared at 0%
+   rather than a corner some way off it — the diagonal is what made the
+   seam alpha unpredictable down the card's height. */
+#homeContent [data-home-slot="hero"] .game-card-body{
+  background:
+    linear-gradient(100deg,
+      rgba(10,12,18,.50) 0%,
+      rgba(10,12,18,.68) 26%,
+      rgba(9,11,16,.84) 62%,
+      rgba(8,10,14,.94) 100%) !important;
+}
+
+/* Same treatment for the lobby card, which splits at the same place and
+   would show the same step. */
+#homeContent [data-home-slot="hero"] .community-card-banner::after{
+  background:linear-gradient(90deg,
+    rgba(11,13,19,0) 0%,
+    rgba(11,13,19,.22) 62%,
+    rgba(11,13,19,.5) 100%) !important;
+}
+#homeContent [data-home-slot="hero"] .community-card-body{
+  background:
+    linear-gradient(100deg,
+      rgba(10,12,18,.50) 0%,
+      rgba(10,12,18,.70) 30%,
+      rgba(9,11,16,.86) 66%,
+      rgba(8,10,14,.94) 100%) !important;
+}
+
+/* And the post card. Its media fade ran to .85, well past what the
+   detail side sits at, which left a dark lip down the edge of the
+   image. */
+#homeContent [data-home-slot="hero"] .spotlight-card-media::after{
+  background:linear-gradient(90deg,
+    rgba(11,13,19,0) 0%,
+    rgba(11,13,19,.22) 58%,
+    rgba(11,13,19,.5) 100%) !important;
+}
+#homeContent [data-home-slot="hero"] .spotlight-card-body{
+  background:
+    linear-gradient(100deg,
+      rgba(10,12,18,.50) 0%,
+      rgba(10,12,18,.70) 30%,
+      rgba(9,11,16,.86) 66%,
+      rgba(8,10,14,.94) 100%) !important;
+}
+</style>
 </body>
 </html>
