@@ -52825,12 +52825,27 @@ body.coliseum-mode #coliseumRoot .col-canvas{ display:none !important; }
 #crRoot .cr-room.live{ border-color:rgba(35,165,90,.4); background:linear-gradient(90deg, rgba(35,165,90,.12), var(--cr-surface)); }
 
 #crRoot .cr-tlist{ display:flex; flex-direction:column; gap:9px; }
+/* Matches the lounge rows: same spine, same hover, same mono status —
+   two lists of rows on one page should not be two different objects. */
 #crRoot .cr-trow{
-  display:flex; align-items:center; gap:12px;
-  border:1px solid var(--cr-line); border-radius:10px; padding:13px 16px;
-  background:#0d0f16; cursor:pointer; transition:border-color .16s, background .16s;
+  position:relative; display:flex; align-items:center; gap:12px;
+  border:1px solid var(--cr-line); border-radius:11px; padding:14px 16px 14px 17px;
+  background:linear-gradient(90deg, color-mix(in srgb, var(--cr-elec) 6%, transparent), #0d0f16 42%);
+  cursor:pointer; overflow:hidden;
+  transition:border-color .16s, transform .16s;
 }
-#crRoot .cr-trow:hover{ border-color:rgba(255,255,255,.24); background:#11141b; }
+#crRoot .cr-trow::before{
+  content:''; position:absolute; left:0; top:0; bottom:0; width:2px;
+  background:linear-gradient(180deg, var(--cr-elec), color-mix(in srgb, var(--cr-elec) 30%, transparent));
+}
+#crRoot .cr-trow.live::before{
+  background:linear-gradient(180deg, var(--cr-live), color-mix(in srgb, var(--cr-live) 30%, transparent));
+}
+#crRoot .cr-trow:hover{
+  border-color:color-mix(in srgb, var(--cr-elec) 50%, transparent);
+  transform:translateX(2px);
+}
+#crRoot .cr-trow .nm{ font-family:var(--cr-head); font-weight:700; }
 #crRoot .cr-trow.live{ border-color:rgba(255,59,59,.42); background:linear-gradient(90deg, rgba(255,59,59,.1), #0d0f16); }
 #crRoot .cr-trow .nm{ font-size:13.5px; font-weight:600; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
 #crRoot .cr-trow .st{ margin-left:auto; font-family:var(--cr-mono); font-size:9.5px; letter-spacing:1.3px; color:var(--cr-ink3); text-transform:uppercase; }
@@ -52893,6 +52908,53 @@ body.coliseum-mode #coliseumRoot .col-canvas{ display:none !important; }
   display:block !important;
 }
 #crRoot .col-featured-media{ display:none !important; }   /* the floating sparks read as clip-art at this size */
+
+/* ── Adopted cards: one heading, not two ─────────────────────────
+   Each card now sits under a section heading that names it, so its own
+   internal header was saying the same words again immediately below
+   ("HALL OF FAME" over a card headed "HALL OF FAME"). The section
+   heading is the one kept, since it speaks the page's language. */
+#crRoot .col-chron-title-wrap,
+#crRoot .col-hof-title-wrap,
+#crRoot .col-featured-eyebrow,
+#crRoot .col-ic-eyebrow{ display:none !important; }
+/* The head row still carries the "Open calendar" link, so it stays —
+   just without the duplicated title beside it. */
+#crRoot .col-chron-head,
+#crRoot .col-hof-head{
+  margin:0 0 12px !important; padding:0 !important;
+  min-height:0 !important; border:0 !important;
+  justify-content:flex-end !important;
+}
+#crRoot .col-chron-head:empty,
+#crRoot .col-hof-head:empty{ display:none !important; }
+
+/* Retone the leftover neon-yellow CTAs. These are the last objects still
+   speaking the old Coliseum's language — pure #ffd700 with a glow, which
+   is why the Hall block still looked pasted in from the old design. */
+#crRoot .col-featured-cta,
+#crRoot .col-hof-cta,
+#crRoot .col-ic-cta{
+  background:linear-gradient(180deg, var(--cr-gold), #8a6a2f) !important;
+  color:#1b1405 !important;
+  border:1px solid color-mix(in srgb, var(--cr-gold) 55%, transparent) !important;
+  box-shadow:none !important;
+  font-family:var(--cr-head) !important; font-weight:800 !important;
+  letter-spacing:1.1px !important;
+  border-radius:9px !important;
+}
+#crRoot .col-featured-cta.ghost,
+#crRoot .col-ic-cta{
+  background:rgba(255,255,255,.05) !important;
+  color:var(--cr-ink2) !important;
+  border-color:var(--cr-line) !important;
+}
+#crRoot .col-featured-cta:hover,
+#crRoot .col-hof-cta:hover,
+#crRoot .col-ic-cta:hover{ filter:brightness(1.1); }
+
+/* Consistent breathing room between stacked adopted cards. */
+#crRoot .cr-sec > div > .col-chron-card + .col-chron-card{ margin-top:16px !important; }
 #crRoot .col-hof{
   background:
     radial-gradient(420px 160px at 12% 0%, color-mix(in srgb, var(--cr-gold) 13%, transparent), transparent 62%),
@@ -53059,12 +53121,18 @@ body.coliseum-mode #coliseumRoot .col-canvas{ display:none !important; }
             '<div class="cr-sec" id="crBracketSec"></div>' +
             '<div class="cr-sec" id="crLoungeSec"></div>' +
             '<div class="cr-sec" id="crSayS"><p class="cr-h">Say something</p><div id="crSay"></div></div>' +
+            /* One mount per card, each with its own heading. Two cards
+               sharing a section put "Lobby pulse" above a card that also
+               says "Lobby pulse", and stacked the calendar under a
+               heading that did not describe it. */
             '<div class="cr-sec" id="crPulseS"><p class="cr-h">Lobby pulse</p><div id="crPulse"></div></div>' +
+            '<div class="cr-sec" id="crCalS"><p class="cr-h">On the calendar</p><div id="crCal"></div></div>' +
             '<div class="cr-sec" id="crTourneySec"></div>' +
           '</div>' +
           '<div class="cr-side">' +
             '<div class="cr-sec" id="crEgoS"><p class="cr-h">Your alter ego</p><div id="crEgo"></div></div>' +
-            '<div class="cr-sec" id="crHofS"><p class="cr-h">Hall of fame</p><div id="crHof"></div></div>' +
+            '<div class="cr-sec" id="crMomentS"><p class="cr-h">Moment of the week</p><div id="crMoment"></div></div>' +
+            '<div class="cr-sec" id="crHofS"><p class="cr-h">Hall of fame</p><div id="crHall"></div></div>' +
           '</div>' +
         '</div>' +
       '</div>';
@@ -53095,20 +53163,23 @@ body.coliseum-mode #coliseumRoot .col-canvas{ display:none !important; }
     /* .col-const is no longer adopted: presence merged into Lounges,
        where members show inside the voice lounge they are actually in. */
     move('.col-composer',      'crSay');
-    move('.col-featured',      'crHof');
-    move('.col-hof',           'crHof');
+    move('.col-featured',      'crMoment');   // its own section now
+    move('.col-hof',           'crHall');
 
-    // Chronicle holds two cards: activity, then upcoming events.
+    // Chronicle holds two cards: activity first, then upcoming events.
+    // They go to separate sections so each sits under a heading that
+    // actually describes it.
     var cards = document.querySelectorAll('#coliseumRoot .col-chronicle .col-chron-card');
-    var pulse = $('crPulse');
-    if (pulse) Array.prototype.forEach.call(cards, function(c){
-      if (c.parentNode !== pulse) pulse.appendChild(c);
+    var mounts = [$('crPulse'), $('crCal')];
+    Array.prototype.forEach.call(cards, function(c, i){
+      var m = mounts[i] || mounts[0];
+      if (m && c.parentNode !== m) m.appendChild(c);
       clean(c);
     });
 
     // A mount whose section never received anything stays out of the way.
-    [['crSay','crSayS'],['crPulse','crPulseS'],['crEgo','crEgoS'],
-     ['crHof','crHofS']].forEach(function(p){
+    [['crSay','crSayS'],['crPulse','crPulseS'],['crCal','crCalS'],
+     ['crEgo','crEgoS'],['crMoment','crMomentS'],['crHall','crHofS']].forEach(function(p){
       var m = $(p[0]), s = $(p[1]);
       if (m && s) s.style.display = m.children.length ? '' : 'none';
     });
