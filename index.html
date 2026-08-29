@@ -62587,5 +62587,210 @@ async function reactComment(ev, id, btn){
 }
 </style>
 
+
+<!-- ══════════════════════════════════════════════════════════════════
+     THE TROPHY AND THE PLAY BUTTON
+
+     Both were placeholders that shipped. The trophy was the 🏆 emoji,
+     which means it was rendered by the operating system: Segoe UI Emoji
+     on this machine, Apple Color Emoji on another, Noto on a third. It
+     sat in a stat cell built from Archivo and JetBrains Mono at exact
+     weights and could not be styled, scaled or coloured with them --
+     the one element on a considered card drawn by something else. It is
+     now a drawn mark that takes the card's own gold.
+
+     The Play button was a green rectangle. It is the most important
+     control on the front page -- the whole point of a card that says
+     you played this for 56 hours -- and it looked like a form submit.
+     It now has weight: a deeper green with a lit top edge and a shadow
+     that matches the light source, the glyph in its own disc, and a
+     sheen that crosses it on hover.
+
+     ONE GRADIENT, DEFINED ONCE. SVG gradients are referenced by id, and
+     ten cards each carrying their own <defs> would be ten duplicate ids
+     -- valid enough that browsers resolve to the first, until the first
+     card is the one that scrolls out and gets removed, and every other
+     trophy turns black. A single hidden svg holds the definition and
+     every trophy points at it.
+     ══════════════════════════════════════════════════════════════════ -->
+<style>
+/* ── The trophy ────────────────────────────────────────────────── */
+.rc-trophy{
+  display:inline-flex; align-items:center; justify-content:center;
+  line-height:1;
+  /* Lit from above like everything else on the card: a dark seat below
+     the mark, then a warm bloom around it. */
+  filter:drop-shadow(0 1px 0 rgba(0,0,0,.55))
+         drop-shadow(0 0 10px rgba(255,190,60,.55));
+}
+.rc-trophy svg{ display:block; width:100%; height:100%; overflow:visible; }
+#homeContent [data-home-slot="hero"] .rc-stat .rc-trophy{
+  margin-left:auto !important;
+  align-self:center;
+  width:30px !important; height:30px !important;
+  font-size:0 !important;   /* nothing left to size — it is a drawing now */
+}
+/* The cell it lives in gets a matching lift rather than the mark
+   floating on a flat panel. */
+#homeContent [data-home-slot="hero"] .rc-stat.rc-stat-100{
+  position:relative; overflow:hidden;
+}
+#homeContent [data-home-slot="hero"] .rc-stat.rc-stat-100::after{
+  content:''; position:absolute; inset:0; pointer-events:none;
+  background:radial-gradient(70% 120% at 100% 50%,
+    rgba(255,200,80,.16) 0%, transparent 70%);
+}
+
+/* ── Play ──────────────────────────────────────────────────────── */
+.rc-play{
+  position:relative; overflow:hidden;
+  padding:11px 20px 11px 14px !important;
+  border-radius:12px !important;
+  gap:10px !important;
+  font-size:13px !important; letter-spacing:.9px !important;
+  text-transform:uppercase;
+  color:#04240f !important;
+  background:linear-gradient(180deg,#4ade80 0%,#22c55e 52%,#15a34a 100%) !important;
+  box-shadow:
+    /* lit top edge, seated bottom edge, then the glow */
+    inset 0 1px 0 rgba(255,255,255,.62),
+    inset 0 -1px 0 rgba(0,0,0,.22),
+    0 2px 4px rgba(0,0,0,.35),
+    0 10px 24px rgba(34,197,94,.34) !important;
+}
+.rc-play:hover{
+  filter:brightness(1.06);
+  box-shadow:
+    inset 0 1px 0 rgba(255,255,255,.7),
+    inset 0 -1px 0 rgba(0,0,0,.22),
+    0 3px 6px rgba(0,0,0,.35),
+    0 14px 32px rgba(34,197,94,.46) !important;
+}
+/* The glyph gets its own disc, so the button reads as a control with a
+   part rather than a word with a triangle stuck to it. */
+.rc-play-disc{
+  display:inline-flex; align-items:center; justify-content:center;
+  width:23px; height:23px; border-radius:50%;
+  background:rgba(255,255,255,.34);
+  box-shadow:inset 0 1px 0 rgba(255,255,255,.5);
+  flex:0 0 auto;
+}
+.rc-play-disc svg{ width:10px !important; height:10px !important; margin-left:1.5px; }
+/* A sheen that crosses once on hover. */
+.rc-play::after{
+  content:''; position:absolute; top:0; bottom:0; left:-60%; width:45%;
+  background:linear-gradient(100deg, transparent, rgba(255,255,255,.42), transparent);
+  transform:skewX(-18deg);
+  transition:left .55s cubic-bezier(.22,1,.36,1);
+  pointer-events:none;
+}
+.rc-play:hover::after{ left:130%; }
+
+/* Steam sits beside it as the quieter option and matches its height. */
+#homeContent [data-home-slot="hero"] .rc-actions .rc-cta{
+  padding:11px 17px !important;
+  border-radius:12px !important;
+  font-size:12px !important;
+}
+
+/* ── The disc on a grid card ───────────────────────────────────── */
+.rc-play-mini{
+  width:38px !important; height:38px !important;
+  border:0 !important;
+  background:linear-gradient(180deg,#4ade80 0%,#22c55e 52%,#15a34a 100%) !important;
+  color:#04240f !important;
+  box-shadow:
+    inset 0 1px 0 rgba(255,255,255,.6),
+    0 2px 4px rgba(0,0,0,.4),
+    0 8px 20px rgba(34,197,94,.4) !important;
+}
+.rc-play-mini:hover{ filter:brightness(1.08); transform:scale(1.06) !important; }
+
+@media (prefers-reduced-motion: reduce){
+  .rc-play::after{ transition:none; }
+}
+</style>
+<script>
+(function () {
+  'use strict';
+
+  /* The gradient every trophy points at, defined once. */
+  function defs(){
+    if (document.getElementById('lobbyGoldDefs')) return;
+    var wrap = document.createElement('div');
+    wrap.id = 'lobbyGoldDefs';
+    wrap.setAttribute('aria-hidden', 'true');
+    wrap.style.cssText = 'position:absolute;width:0;height:0;overflow:hidden';
+    wrap.innerHTML =
+      '<svg xmlns="http://www.w3.org/2000/svg"><defs>' +
+        '<linearGradient id="lobbyGold" x1="0" y1="0" x2="0" y2="1">' +
+          '<stop offset="0%" stop-color="#fff1b8"/>' +
+          '<stop offset="38%" stop-color="#ffd35c"/>' +
+          '<stop offset="72%" stop-color="#e8a520"/>' +
+          '<stop offset="100%" stop-color="#b3760c"/>' +
+        '</linearGradient>' +
+      '</defs></svg>';
+    document.body.appendChild(wrap);
+  }
+
+  var TROPHY =
+    '<svg viewBox="0 0 24 24" fill="none" aria-hidden="true">' +
+      /* handles, behind the cup */
+      '<path d="M7.2 5.2H4.3v1.6a4 4 0 0 0 3.6 4" stroke="url(#lobbyGold)" ' +
+        'stroke-width="1.7" stroke-linecap="round"/>' +
+      '<path d="M16.8 5.2h2.9v1.6a4 4 0 0 1-3.6 4" stroke="url(#lobbyGold)" ' +
+        'stroke-width="1.7" stroke-linecap="round"/>' +
+      /* cup */
+      '<path d="M6.8 3.4h10.4v5.4a5.2 5.2 0 0 1-10.4 0V3.4Z" fill="url(#lobbyGold)"/>' +
+      /* the light on the left of the cup, which is what stops it reading flat */
+      '<path d="M8.5 4.6v4.2a3.5 3.5 0 0 0 1.5 2.9c-1.9-.5-3.2-2-3.2-3.9V4.6h1.7Z" ' +
+        'fill="#fff" fill-opacity=".34"/>' +
+      /* stem and base */
+      '<path d="M12 14v2.9" stroke="url(#lobbyGold)" stroke-width="1.9" stroke-linecap="round"/>' +
+      '<path d="M8.1 20.6h7.8l-.7-2.3a1.1 1.1 0 0 0-1.1-.8h-4.2a1.1 1.1 0 0 0-1.1.8l-.7 2.3Z" ' +
+        'fill="url(#lobbyGold)"/>' +
+    '</svg>';
+
+  var PLAY_DISC =
+    '<span class="rc-play-disc"><svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">' +
+      '<path d="M8 5.14v13.72a1 1 0 0 0 1.52.86l11.14-6.86a1 1 0 0 0 0-1.72L9.52 4.28A1 1 0 0 0 8 5.14z"/>' +
+    '</svg></span>';
+
+  function sweep(){
+    /* The deck controller writes the emoji when it builds the stat row,
+       so this replaces it wherever it turns up rather than only once. */
+    document.querySelectorAll('.rc-trophy').forEach(function (el){
+      if (el.__gold) return;
+      el.__gold = true;
+      el.innerHTML = TROPHY;
+      el.setAttribute('title', 'Every achievement unlocked');
+      el.setAttribute('aria-label', 'Every achievement unlocked');
+    });
+    document.querySelectorAll('.rc-play').forEach(function (el){
+      if (el.__disc) return;
+      el.__disc = true;
+      el.innerHTML = PLAY_DISC + 'Play';
+    });
+  }
+
+  var pending = null;
+  function schedule(){
+    if (pending) return;
+    pending = requestAnimationFrame(function (){ pending = null; sweep(); });
+  }
+
+  function start(){
+    defs();
+    sweep();
+    var host = document.getElementById('homeContent');
+    if (!host) { setTimeout(start, 250); return; }
+    new MutationObserver(schedule).observe(host, { childList:true, subtree:true });
+  }
+
+  if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', start);
+  else start();
+})();
+</script>
+
 </body>
 </html>
