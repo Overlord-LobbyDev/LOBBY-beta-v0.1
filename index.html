@@ -52074,28 +52074,34 @@ body[data-feed-position="split"].feed-anim-out #socialFeed{
   body.feed-anim-out #socialFeed{ animation:none; }
 }
 
-/* ── The Feed's own transitions, aligned to the same timing ──────
-   #socialFeed sets `opacity .32s ease, filter .35s ease` on itself. The
-   Sidebar has no equivalent pair, so even with identical keyframes the
-   feed's fade and de-blur were driven ~30% faster and on a different
-   curve (plain `ease`) wherever the transition — rather than the
-   animation — was doing the work: toggleFeed() clears .collapsed and
-   forces a reflow BEFORE adding .feed-anim-in, which starts the
-   transition, and it runs again once the class is removed.
+/* ── Let ONLY the keyframes drive the entrance ───────────────────
+   Matching the keyframes was not enough, because both panels also carry
+   their own transitions on the very same properties, and they disagree:
 
-   Only opacity, filter and transform are retimed. left/right stay at
-   .55s because they slide the page edge, not the panel, and
-   border-radius/box-shadow are cosmetic settle. transition is a
-   shorthand, so the untouched entries must be restated. */
-#socialFeed{
-  transition:
-    left  .55s var(--feed-ease),
-    right .55s var(--feed-ease),
-    transform var(--dock-in-dur) var(--dock-in-ease),
-    opacity   var(--dock-in-dur) var(--dock-in-ease),
-    filter    var(--dock-in-dur) var(--dock-in-ease),
-    border-radius .35s ease,
-    box-shadow .35s ease;
+     #lobbyInfoRail  three separate `transition` declarations
+                     (transform .28s / .34s / .55s, opacity .26s / .42s,
+                     filter .35s) — which one applies is decided per
+                     property by source order
+     #socialFeed     transform .42s, opacity .32s, filter .35s
+
+   Whenever a transition — not the animation — was doing the work, each
+   panel moved on its own clock. That is why retiming the keyframes kept
+   producing a different surprise on each panel instead of matching them.
+
+   Killing the transitions for the length of the animation removes the
+   whole class of problem: the keyframes are then the ONLY thing moving
+   either panel, so all three states are identical by construction.
+
+   `transition` is safe to mark !important here — it is `!important` on an
+   ANIMATED PROPERTY that would break things (it outranks animations), and
+   this touches neither transform, opacity nor filter directly. */
+body.rail-anim-in  #lobbyInfoRail,
+body.rail-anim-out #lobbyInfoRail,
+body.rail-swap-out #lobbyInfoRail > *,
+body.rail-swap-in  #lobbyInfoRail > *,
+body.feed-anim-in  #socialFeed,
+body.feed-anim-out #socialFeed{
+  transition: none !important;
 }
 </style>
 </body>
