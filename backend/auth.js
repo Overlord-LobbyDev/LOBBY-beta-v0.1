@@ -4070,6 +4070,16 @@ function _tourneyStatus(row) {
 const _TOURNEY_SELECT = `
   SELECT t.*,
     (SELECT COUNT(*)::int FROM tournament_players WHERE tournament_id = t.id) AS entrants,
+    -- The first few entrants, for the card that shows who is actually in
+    -- a bracket rather than only how many. LIMIT 6 against an indexed
+    -- tournament_id, so it costs a fraction of the count above it.
+    (SELECT COALESCE(json_agg(f), '[]'::json) FROM (
+      SELECT tp.user_id AS id, tp.username, u.avatar_url
+      FROM tournament_players tp
+      LEFT JOIN users u ON u.id = tp.user_id
+      WHERE tp.tournament_id = t.id
+      ORDER BY tp.joined_at LIMIT 6
+    ) f) AS faces,
     u.username AS host_name,
     s.name     AS lobby_name
   FROM tournaments t
@@ -4084,6 +4094,9 @@ function _tourneyCard(r) {
     game: r.game_tag || r.api_game || null,
     status: _tourneyStatus(r),
     entrants: r.entrants || 0,
+    faces: (r.faces || []).map(f => ({
+      id: f.id, name: f.username || null, avatar: f.avatar_url || null,
+    })),
     maxPlayers: r.max_players || r.player_count || null,
     prize: r.prize || null,
     format: r.format,
@@ -4236,6 +4249,11 @@ function _lobbyCard(s) {
     fallback: "linear-gradient(135deg,#2a2d3a,#15161e)",
     initial: String(s.name || "?").charAt(0).toUpperCase(),
     description: s.description || "",
+    faces: (s.faces || []).map(f => ({
+      id: f.id,
+      name: f.display_name || f.username || null,
+      avatar: f.avatar_url || null,
+    })),
     badge: null,
   };
 }
@@ -4245,7 +4263,19 @@ app.get("/lobbies/public", async (req, res) => {
   try {
     const r = await pool.query(`
       SELECT s.*,
-        (SELECT COUNT(*)::int FROM server_members WHERE server_id = s.id) AS member_count
+        (SELECT COUNT(*)::int FROM server_members WHERE server_id = s.id) AS member_count,
+        -- Who is actually in there. Owner and moderators first so the
+        -- faces on the card are the people you would meet, not whoever
+        -- happened to join first.
+        (SELECT COALESCE(json_agg(f), '[]'::json) FROM (
+          SELECT u.id, u.username, u.display_name, u.avatar_url
+          FROM server_members sm
+          JOIN users u ON u.id = sm.user_id
+          WHERE sm.server_id = s.id
+          ORDER BY CASE sm.role WHEN 'owner' THEN 0 WHEN 'moderator' THEN 1 ELSE 2 END,
+                   sm.joined_at
+          LIMIT 6
+        ) f) AS faces
       FROM servers s
       WHERE ` + _PUBLIC_LOBBY_WHERE + `
       ORDER BY member_count DESC, s.created_at DESC
