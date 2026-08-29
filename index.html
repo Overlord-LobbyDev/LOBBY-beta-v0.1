@@ -54040,5 +54040,708 @@ body.double-dock[data-feed-position="right"].feed-open:not(.rail-hidden) #hofOve
   width:100% !important; height:100% !important; margin:0 !important;
 }
 </style>
+
+<!-- ══════════════════════════════════════════════════════════════════
+     LOBBY SETTINGS — full page, left nav, section registry
+
+     Replaces the old modal, which was a stock dialog dropped into the
+     app: bright #3BA5F0 save buttons against a gold/blurple product,
+     platform emoji as section icons, an empty grey banner well and
+     generic fields.
+
+     Sections come from one registry. Adding a section is a single entry
+     in SECTIONS — that is the scalability the brief asked for, and the
+     reason this is a page with a nav rather than a row of tabs that runs
+     out of room at six.
+
+     Every section is wired to an endpoint that actually exists. Where
+     one does not, the section says so plainly rather than showing a
+     control that silently does nothing:
+       moderation   — no lobby ban / timeout / slowmode endpoints exist;
+                      removing a member is the only real action today
+       invite links — only direct user invites exist, no shareable links
+                      with expiry or max uses
+       visibility   — `servers` has no visibility column at all, so the
+                      old modal's Public/Private toggle was saving
+                      nothing. It is not reproduced here.
+     ══════════════════════════════════════════════════════════════════ -->
+<style>
+#lsRoot{
+  --ls-ink:#f3f4f7;
+  --ls-ink2:rgba(243,244,247,.66);
+  --ls-ink3:rgba(243,244,247,.40);
+  --ls-line:rgba(255,255,255,.08);
+  --ls-surface:#101219;
+  --ls-mono:'JetBrains Mono',ui-monospace,Consolas,monospace;
+  --ls-head:'Archivo','Inter',system-ui,sans-serif;
+  position:fixed;
+  top:calc(72px + var(--ph-row-h, 0px)); left:0; right:0; bottom:0;
+  z-index:9100; display:none;
+  background:linear-gradient(180deg,#0b0d13 0%,#08090e 100%);
+  color:var(--ls-ink); font-family:'Inter',system-ui,sans-serif;
+}
+#lsRoot.open{ display:flex; flex-direction:column; }
+#lsRoot *{ box-sizing:border-box; }
+
+/* Give up the right edge to whichever dock is open — the same treatment
+   every other page gets, and the omission that had the Coliseum and the
+   Hall overlapping them. */
+body.feed-closed.lobby-selected:not(.rail-hidden) #lsRoot{ right:var(--lir-w); }
+body[data-feed-position="right"].feed-open #lsRoot{ right:var(--feed-w); }
+body[data-feed-position="left"].feed-open #lsRoot{ left:calc(var(--feed-left-edge) + var(--feed-w)); }
+body.double-dock[data-feed-position="right"].feed-open:not(.rail-hidden) #lsRoot{
+  right:calc(var(--feed-w) + var(--lir-w));
+}
+
+.ls-top{
+  display:flex; align-items:center; gap:14px;
+  padding:18px 26px; border-bottom:1px solid var(--ls-line);
+  background:linear-gradient(90deg, rgba(255,255,255,.03), transparent 60%);
+  flex:none;
+}
+.ls-crest{
+  width:42px; height:42px; border-radius:11px; flex:none; overflow:hidden;
+  background:linear-gradient(135deg, var(--accent), color-mix(in srgb,var(--accent) 40%,#000));
+  display:grid; place-items:center; color:#fff;
+  font-family:'Bebas Neue',sans-serif; font-size:20px;
+}
+.ls-crest img{ width:100%; height:100%; object-fit:cover; display:block; }
+.ls-name{ font-family:'Bebas Neue',sans-serif; font-size:24px; letter-spacing:1px; line-height:1; }
+.ls-id{
+  font-family:var(--ls-mono); font-size:10px; letter-spacing:.6px;
+  color:var(--ls-ink3); margin-top:3px;
+}
+.ls-close{
+  margin-left:auto; width:34px; height:34px; border-radius:9px; cursor:pointer;
+  background:rgba(255,255,255,.05); border:1px solid var(--ls-line);
+  color:var(--ls-ink2); font-size:17px; line-height:1;
+}
+.ls-close:hover{ background:rgba(255,255,255,.1); color:#fff; }
+
+.ls-body{ display:grid; grid-template-columns:236px minmax(0,1fr); flex:1; min-height:0; }
+.ls-nav{
+  border-right:1px solid var(--ls-line); padding:20px 14px;
+  overflow-y:auto; background:rgba(255,255,255,.012);
+}
+.ls-nav-group{
+  font-family:var(--ls-head); font-size:9px; font-weight:800;
+  letter-spacing:1.8px; text-transform:uppercase; color:var(--ls-ink3);
+  margin:18px 10px 8px;
+}
+.ls-nav-group:first-child{ margin-top:0; }
+.ls-nav-item{
+  display:flex; align-items:center; gap:10px; width:100%;
+  padding:9px 11px; border-radius:9px; cursor:pointer; text-align:left;
+  background:transparent; border:1px solid transparent; color:var(--ls-ink2);
+  font-family:var(--ls-head); font-size:13px; font-weight:600;
+  transition:background .14s, color .14s, border-color .14s;
+}
+.ls-nav-item:hover{ background:rgba(255,255,255,.05); color:#fff; }
+.ls-nav-item.active{
+  background:color-mix(in srgb, var(--accent) 16%, transparent);
+  border-color:color-mix(in srgb, var(--accent) 34%, transparent);
+  color:#fff;
+}
+.ls-nav-item .ico{ width:15px; height:15px; flex:none; opacity:.8; }
+.ls-nav-item .ico svg{ width:15px; height:15px; display:block; }
+
+.ls-panel{ overflow-y:auto; padding:30px 34px 60px; min-width:0; }
+.ls-panel-in{ max-width:720px; }
+.ls-h{
+  font-family:var(--ls-head); font-size:20px; font-weight:800;
+  letter-spacing:-.2px; margin:0 0 5px;
+}
+.ls-sub{ font-size:13px; color:var(--ls-ink3); margin:0 0 26px; line-height:1.6; }
+
+.ls-field{ margin-bottom:20px; }
+.ls-label{
+  display:block; font-family:var(--ls-head); font-size:10px; font-weight:800;
+  letter-spacing:1.5px; text-transform:uppercase; color:var(--ls-ink3);
+  margin-bottom:7px;
+}
+.ls-input, .ls-textarea, .ls-select{
+  width:100%; padding:11px 13px; border-radius:10px;
+  background:#0a0c12; border:1px solid var(--ls-line); color:var(--ls-ink);
+  font-family:'Inter',system-ui,sans-serif; font-size:13.5px;
+  transition:border-color .14s, background .14s;
+}
+.ls-input:focus, .ls-textarea:focus, .ls-select:focus{
+  outline:none; border-color:color-mix(in srgb, var(--accent) 55%, transparent);
+  background:#0d1017;
+}
+.ls-textarea{ min-height:92px; resize:vertical; line-height:1.55; }
+.ls-hint{ font-size:11.5px; color:var(--ls-ink3); margin-top:7px; line-height:1.5; }
+
+.ls-btn{
+  padding:10px 18px; border-radius:10px; cursor:pointer;
+  font-family:var(--ls-head); font-size:12.5px; font-weight:700; letter-spacing:.4px;
+  background:rgba(255,255,255,.05); border:1px solid var(--ls-line); color:var(--ls-ink2);
+  transition:background .14s, border-color .14s, color .14s;
+}
+.ls-btn:hover{ background:rgba(255,255,255,.09); color:#fff; }
+/* The product's accent, not a stock blue. */
+.ls-btn.pri{
+  background:color-mix(in srgb, var(--accent) 26%, transparent);
+  border-color:color-mix(in srgb, var(--accent) 58%, transparent); color:#fff;
+}
+.ls-btn.pri:hover{ background:color-mix(in srgb, var(--accent) 36%, transparent); }
+.ls-btn.danger{ border-color:rgba(237,66,69,.45); color:#ff9a9a; }
+.ls-btn.danger:hover{ background:rgba(237,66,69,.16); color:#fff; }
+.ls-btn.sm{ padding:6px 11px; font-size:11px; border-radius:8px; }
+.ls-actions{
+  display:flex; gap:10px; align-items:center; margin-top:26px;
+  padding-top:20px; border-top:1px solid var(--ls-line);
+}
+.ls-saved{ font-size:12px; color:#5ee08a; opacity:0; transition:opacity .2s; }
+.ls-saved.on{ opacity:1; }
+
+.ls-row{
+  display:flex; align-items:center; gap:12px;
+  padding:12px 14px; border-radius:11px; margin-bottom:9px;
+  background:var(--ls-surface); border:1px solid var(--ls-line);
+}
+.ls-row .nm{ font-family:var(--ls-head); font-weight:600; font-size:13.5px; }
+.ls-row .meta{ font-size:11px; color:var(--ls-ink3); margin-top:2px; }
+.ls-row .grow{ flex:1; min-width:0; }
+.ls-av{
+  width:34px; height:34px; border-radius:50%; flex:none; overflow:hidden;
+  background:rgba(255,255,255,.08); display:grid; place-items:center;
+  font-size:11px; font-weight:800; color:var(--ls-ink2);
+}
+.ls-av img{ width:100%; height:100%; object-fit:cover; display:block; }
+.ls-tag{
+  font-family:var(--ls-mono); font-size:9px; letter-spacing:1px; text-transform:uppercase;
+  padding:3px 8px; border-radius:99px; border:1px solid var(--ls-line); color:var(--ls-ink3);
+}
+.ls-tag.owner{ border-color:color-mix(in srgb,var(--accent) 45%,transparent); color:color-mix(in srgb,var(--accent) 92%,white); }
+.ls-tag.mod{ border-color:rgba(94,224,138,.4); color:#5ee08a; }
+
+.ls-media{
+  border:1px dashed var(--ls-line); border-radius:12px;
+  background:#0a0c12; overflow:hidden; position:relative;
+}
+.ls-banner{ height:150px; background-size:cover; background-position:center; }
+.ls-media-empty{
+  height:150px; display:grid; place-items:center;
+  font-size:12.5px; color:var(--ls-ink3);
+}
+.ls-note{
+  padding:14px 16px; border-radius:11px; font-size:12.5px; line-height:1.6;
+  background:rgba(240,178,50,.07); border:1px solid rgba(240,178,50,.24);
+  color:var(--ls-ink2); margin-bottom:18px;
+}
+.ls-note b{ color:#f0b232; }
+.ls-empty{ font-size:13px; color:var(--ls-ink3); padding:8px 2px; }
+
+@media (max-width:900px){
+  .ls-body{ grid-template-columns:1fr; }
+  .ls-nav{ border-right:0; border-bottom:1px solid var(--ls-line); display:flex; gap:6px; overflow-x:auto; padding:12px; }
+  .ls-nav-group{ display:none; }
+  .ls-nav-item{ width:auto; white-space:nowrap; }
+}
+</style>
+<script>
+(function () {
+  'use strict';
+
+  function $(id){ return document.getElementById(id); }
+  function esc(s){
+    return String(s == null ? '' : s)
+      .replace(/&/g,'&amp;').replace(/"/g,'&quot;')
+      .replace(/</g,'&lt;').replace(/>/g,'&gt;');
+  }
+  function initials(n){ return String(n || '?').trim().slice(0,2).toUpperCase(); }
+  function toast(m, t){ if (typeof showToast === 'function') showToast(m, t || ''); }
+
+  function server(){
+    try { if (typeof selectedServer !== 'undefined' && selectedServer) return selectedServer; } catch(e){}
+    return window.selectedServer || null;
+  }
+  function myRole(){
+    try { if (typeof myServerRole !== 'undefined') return myServerRole; } catch(e){}
+    return 'member';
+  }
+  function canManage(){ return myRole() === 'owner' || myRole() === 'moderator'; }
+
+  var state = { id:null, srv:null, section:'overview', members:[], channels:[], friends:[] };
+
+  var ICON = {
+    overview:  '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="3"/><path d="M3 9h18"/></svg>',
+    appearance:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M12 3a9 9 0 0 0 0 18 4.5 4.5 0 0 0 0-9 4.5 4.5 0 0 1 0-9z"/></svg>',
+    lounges:   '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><line x1="9" y1="3" x2="7" y2="21"/><line x1="17" y1="3" x2="15" y2="21"/><line x1="3" y1="9" x2="21" y2="9"/><line x1="3" y1="15" x2="21" y2="15"/></svg>',
+    order:     '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><line x1="4" y1="7" x2="20" y2="7"/><line x1="4" y1="12" x2="14" y2="12"/><line x1="4" y1="17" x2="18" y2="17"/></svg>',
+    members:   '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.87"/></svg>',
+    invites:   '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 4h16v16H4z"/><path d="m4 7 8 6 8-6"/></svg>',
+    moderation:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3l8 4v5c0 5-3.4 8.4-8 9-4.6-.6-8-4-8-9V7z"/></svg>'
+  };
+
+  /* ── The registry. One entry per section — this is the whole
+     extension point: add an object, get a nav item and a panel. ── */
+  var SECTIONS = [
+    { id:'overview',   group:'Identity', label:'Overview',      icon:ICON.overview,   render:renderOverview },
+    { id:'appearance', group:'Identity', label:'Crest & banner',icon:ICON.appearance, render:renderAppearance },
+    { id:'lounges',    group:'Lobby',    label:'Lounges',       icon:ICON.lounges,    render:renderLounges },
+    { id:'order',      group:'Lobby',    label:'Section order', icon:ICON.order,      render:renderOrder },
+    { id:'members',    group:'People',   label:'Members',       icon:ICON.members,    render:renderMembers },
+    { id:'invites',    group:'People',   label:'Invites',       icon:ICON.invites,    render:renderInvites },
+    { id:'moderation', group:'People',   label:'Moderation',    icon:ICON.moderation, render:renderModeration }
+  ];
+
+  function root(){
+    var el = $('lsRoot');
+    if (el && el.isConnected) return el;
+    el = document.createElement('div');
+    el.id = 'lsRoot';
+    document.body.appendChild(el);
+    el.addEventListener('click', onClick);
+    return el;
+  }
+
+  function navHtml(){
+    var out = '', group = null;
+    SECTIONS.forEach(function(s){
+      if (s.group !== group){ group = s.group; out += '<div class="ls-nav-group">' + esc(group) + '</div>'; }
+      out += '<button class="ls-nav-item' + (s.id === state.section ? ' active' : '') +
+             '" data-sec="' + esc(s.id) + '">' +
+             '<span class="ico">' + s.icon + '</span>' + esc(s.label) + '</button>';
+    });
+    return out;
+  }
+
+  function paint(){
+    var el = root(), s = state.srv;
+    if (!s) return;
+    var sec = SECTIONS.find(function(x){ return x.id === state.section; }) || SECTIONS[0];
+    var icon = s.icon_url || s.iconUrl || s.icon;
+
+    el.innerHTML =
+      '<div class="ls-top">' +
+        '<div class="ls-crest">' +
+          (icon ? '<img src="' + esc(icon) + '" alt="" onerror="this.remove()">' : esc(initials(s.name))) +
+        '</div>' +
+        '<div><div class="ls-name">' + esc(String(s.name || 'Lobby').toUpperCase()) + '</div>' +
+          '<div class="ls-id">' + (s.unique_id ? '#' + esc(s.unique_id) + ' · ' : '') + 'Lobby settings</div></div>' +
+        '<button class="ls-close" data-ls="close" title="Close">&times;</button>' +
+      '</div>' +
+      '<div class="ls-body">' +
+        '<nav class="ls-nav">' + navHtml() + '</nav>' +
+        '<div class="ls-panel"><div class="ls-panel-in" id="lsPanel"></div></div>' +
+      '</div>';
+
+    try { sec.render($('lsPanel')); }
+    catch(e){
+      console.error('[settings] ' + sec.id, e);
+      $('lsPanel').innerHTML = '<div class="ls-empty">This section failed to load.</div>';
+    }
+  }
+
+  /* ── Sections ─────────────────────────────────────────────── */
+
+  function renderOverview(p){
+    var s = state.srv;
+    p.innerHTML =
+      '<h2 class="ls-h">Overview</h2>' +
+      '<p class="ls-sub">The name and description people see in Discover, on the Coliseum and anywhere this lobby is listed.</p>' +
+      (canManage() ? '' : '<div class="ls-note">You are a <b>member</b> of this lobby, so these fields are read-only.</div>') +
+      '<div class="ls-field"><label class="ls-label">Lobby name</label>' +
+        '<input class="ls-input" id="lsName" value="' + esc(s.name || '') + '" maxlength="60"' +
+        (canManage() ? '' : ' disabled') + '></div>' +
+      '<div class="ls-field"><label class="ls-label">Description</label>' +
+        '<textarea class="ls-textarea" id="lsDesc" maxlength="300"' + (canManage() ? '' : ' disabled') + '>' +
+        esc(s.description || '') + '</textarea>' +
+        '<div class="ls-hint">One or two lines on what this lobby is for. This is what a first-time visitor reads.</div></div>' +
+      (s.unique_id
+        ? '<div class="ls-field"><label class="ls-label">Unique lobby ID</label>' +
+          '<div style="display:flex;gap:9px">' +
+            '<input class="ls-input" value="' + esc(s.unique_id) + '" readonly>' +
+            '<button class="ls-btn" data-ls="copy-id">Copy</button>' +
+          '</div>' +
+          '<div class="ls-hint">People can search <code>' + esc(s.name || 'lobby') + '#' + esc(s.unique_id) +
+          '</code> to find this lobby directly.</div></div>'
+        : '') +
+      (canManage()
+        ? '<div class="ls-actions"><button class="ls-btn pri" data-ls="save-overview">Save changes</button>' +
+          '<span class="ls-saved" id="lsSaved">Saved</span></div>'
+        : '');
+  }
+
+  function renderAppearance(p){
+    var s = state.srv;
+    var banner = s.banner_url || s.bannerUrl || s.banner;
+    var icon = s.icon_url || s.iconUrl || s.icon;
+    p.innerHTML =
+      '<h2 class="ls-h">Crest &amp; banner</h2>' +
+      '<p class="ls-sub">The crest is the tile in the lobby strip. The banner sits behind the Coliseum header, so wide artwork works best.</p>' +
+      '<div class="ls-field"><label class="ls-label">Banner</label>' +
+        '<div class="ls-media">' +
+          (banner ? '<div class="ls-banner" style="background-image:url(\'' + esc(banner) + '\')"></div>'
+                  : '<div class="ls-media-empty">No banner set</div>') +
+        '</div>' +
+        (canManage() ? '<div style="margin-top:10px"><button class="ls-btn" data-ls="pick-banner">Upload banner</button></div>' : '') +
+        '<div class="ls-hint">Shown at roughly 1400×300. The left third sits under the lobby name, so keep faces and logos to the right.</div>' +
+      '</div>' +
+      '<div class="ls-field"><label class="ls-label">Crest</label>' +
+        '<div style="display:flex;align-items:center;gap:14px">' +
+          '<div class="ls-crest" style="width:64px;height:64px;border-radius:16px;font-size:28px">' +
+            (icon ? '<img src="' + esc(icon) + '" alt="" onerror="this.remove()">' : esc(initials(s.name))) +
+          '</div>' +
+          (canManage() ? '<button class="ls-btn" data-ls="pick-icon">Upload crest</button>' : '') +
+        '</div>' +
+        '<div class="ls-hint">Square images only — it is cropped to a rounded tile everywhere it appears.</div>' +
+      '</div>' +
+      '<input type="file" id="lsFile" accept="image/*" style="display:none">';
+  }
+
+  function renderLounges(p){
+    var chs = state.channels;
+    var kinds = { voice:'Voice room', announcement:'Announcements', text:'Text lounge' };
+    p.innerHTML =
+      '<h2 class="ls-h">Lounges</h2>' +
+      '<p class="ls-sub">Every room in this lobby. Deleting one removes its messages permanently.</p>' +
+      (canManage()
+        ? '<div class="ls-row" style="background:transparent;border-style:dashed">' +
+            '<input class="ls-input grow" id="lsNewCh" placeholder="New lounge name" maxlength="40" style="width:auto">' +
+            '<select class="ls-select" id="lsNewChType" style="width:150px">' +
+              '<option value="text">Text lounge</option>' +
+              '<option value="voice">Voice room</option>' +
+              '<option value="announcement">Announcements</option>' +
+            '</select>' +
+            '<button class="ls-btn pri" data-ls="add-lounge">Create</button>' +
+          '</div>'
+        : '') +
+      (chs.length ? chs.map(function(c){
+        return '<div class="ls-row">' +
+          '<div class="grow"><div class="nm">' + esc(String(c.name || '').replace(/^#/,'')) + '</div>' +
+          '<div class="meta">' + esc(kinds[c.type] || 'Lounge') + '</div></div>' +
+          (canManage()
+            ? '<button class="ls-btn sm danger" data-ls="del-lounge" data-ch="' + esc(c.id) +
+              '" data-name="' + esc(c.name || '') + '">Delete</button>'
+            : '') +
+        '</div>';
+      }).join('') : '<div class="ls-empty">No lounges yet.</div>');
+  }
+
+  function renderOrder(p){
+    /* The endpoint validates against exactly these five keys, so the UI
+       offers exactly these five — no more, no fewer. */
+    var KEYS = [
+      { k:'announcements', label:'Announcements', meta:'Pinned messages from admins' },
+      { k:'text',          label:'Text lounges',  meta:'General chat rooms' },
+      { k:'voice',         label:'Voice rooms',   meta:'Voice and video' },
+      { k:'tournaments',   label:'Tournaments',   meta:'Brackets and competitions' },
+      { k:'events',        label:'Events',        meta:'Scheduled lobby events' }
+    ];
+    var saved = [];
+    try { saved = JSON.parse(localStorage.getItem('ls_order_' + state.id) || '[]'); } catch(e){}
+    var order = (Array.isArray(saved) && saved.length ? saved : KEYS.map(function(x){ return x.k; }))
+      .filter(function(k){ return KEYS.some(function(x){ return x.k === k; }); });
+    KEYS.forEach(function(x){ if (order.indexOf(x.k) < 0) order.push(x.k); });
+    state._order = order;
+
+    p.innerHTML =
+      '<h2 class="ls-h">Section order</h2>' +
+      '<p class="ls-sub">The order these groups appear in the sidebar, for <b>every member</b> of this lobby.</p>' +
+      order.map(function(k, i){
+        var x = KEYS.find(function(y){ return y.k === k; });
+        return '<div class="ls-row">' +
+          '<span class="ls-tag">' + (i + 1) + '</span>' +
+          '<div class="grow"><div class="nm">' + esc(x.label) + '</div><div class="meta">' + esc(x.meta) + '</div></div>' +
+          /* Buttons rather than drag: keyboard-reachable, and it cannot
+             half-work on a touchpad the way a drag handle can. */
+          '<button class="ls-btn sm" data-ls="ord-up" data-k="' + esc(k) + '"' + (i === 0 ? ' disabled' : '') + '>↑</button>' +
+          '<button class="ls-btn sm" data-ls="ord-down" data-k="' + esc(k) + '"' + (i === order.length - 1 ? ' disabled' : '') + '>↓</button>' +
+        '</div>';
+      }).join('') +
+      (canManage()
+        ? '<div class="ls-actions"><button class="ls-btn pri" data-ls="save-order">Save order</button>' +
+          '<span class="ls-saved" id="lsSaved">Saved</span></div>'
+        : '');
+  }
+
+  function renderMembers(p){
+    var mem = state.members;
+    p.innerHTML =
+      '<h2 class="ls-h">Members</h2>' +
+      '<p class="ls-sub">' + mem.length + ' in this lobby. Owners can promote moderators and remove members.</p>' +
+      (mem.length ? mem.map(function(m){
+        var nm = m.display_name || m.username || 'Member';
+        var role = String(m.role || 'member').toLowerCase();
+        var isMe = window.me && String(m.id) === String(window.me.id);
+        return '<div class="ls-row">' +
+          '<div class="ls-av">' +
+            (m.avatar_url ? '<img src="' + esc(m.avatar_url) + '" alt="" onerror="this.remove()">' : esc(initials(nm))) +
+          '</div>' +
+          '<div class="grow"><div class="nm">' + esc(nm) + (isMe ? ' <span class="ls-tag">You</span>' : '') + '</div>' +
+          '<div class="meta">@' + esc(m.username || '') + '</div></div>' +
+          '<span class="ls-tag ' + (role === 'owner' ? 'owner' : role === 'moderator' ? 'mod' : '') + '">' + esc(role) + '</span>' +
+          (myRole() === 'owner' && !isMe && role !== 'owner'
+            ? '<button class="ls-btn sm" data-ls="role" data-uid="' + esc(m.id) + '" data-role="' +
+                (role === 'moderator' ? 'member' : 'moderator') + '">' +
+                (role === 'moderator' ? 'Demote' : 'Make mod') + '</button>' +
+              '<button class="ls-btn sm danger" data-ls="kick" data-uid="' + esc(m.id) +
+                '" data-name="' + esc(nm) + '">Remove</button>'
+            : '') +
+        '</div>';
+      }).join('') : '<div class="ls-empty">No members loaded.</div>');
+  }
+
+  function renderInvites(p){
+    var f = state.friends;
+    var inLobby = {};
+    state.members.forEach(function(m){ inLobby[String(m.id)] = true; });
+    var invitable = f.filter(function(x){ return !inLobby[String(x.other_id)]; });
+
+    p.innerHTML =
+      '<h2 class="ls-h">Invites</h2>' +
+      '<p class="ls-sub">Invite friends straight into this lobby. They get a request they can accept or decline.</p>' +
+      '<div class="ls-note">Shareable invite <b>links</b> — with an expiry and a max number of uses — do not exist yet. ' +
+      'The backend only supports inviting a specific user, which is what this does.</div>' +
+      (invitable.length ? invitable.map(function(x){
+        var nm = x.username || 'Friend';
+        return '<div class="ls-row">' +
+          '<div class="ls-av">' +
+            (x.avatar_url ? '<img src="' + esc(x.avatar_url) + '" alt="" onerror="this.remove()">' : esc(initials(nm))) +
+          '</div>' +
+          '<div class="grow"><div class="nm">' + esc(nm) + '</div></div>' +
+          '<button class="ls-btn sm pri" data-ls="invite" data-uid="' + esc(x.other_id) +
+            '" data-name="' + esc(nm) + '">Invite</button>' +
+        '</div>';
+      }).join('')
+      : '<div class="ls-empty">' +
+        (f.length ? 'Every friend is already in this lobby.' : 'No friends to invite yet.') + '</div>');
+  }
+
+  function renderModeration(p){
+    p.innerHTML =
+      '<h2 class="ls-h">Moderation</h2>' +
+      '<p class="ls-sub">Tools for keeping the lobby in order.</p>' +
+      '<div class="ls-note">Most of this needs backend work before it can exist. There are currently ' +
+      '<b>no endpoints</b> for lobby bans, timeouts, slowmode or an audit log — only global admin bans, which ' +
+      'are site-wide and not scoped to a lobby. Removing a member is the one real action available today, and it ' +
+      'lives under <b>Members</b>.</div>' +
+      '<div class="ls-field"><label class="ls-label">Available now</label>' +
+        '<div class="ls-row"><div class="grow"><div class="nm">Remove a member</div>' +
+        '<div class="meta">Takes them out of the lobby; they can be invited back</div></div>' +
+        '<button class="ls-btn sm" data-sec="members">Go to Members</button></div>' +
+      '</div>' +
+      '<div class="ls-field"><label class="ls-label">Needs an endpoint first</label>' +
+        ['Ban a member from the lobby','Timeout / mute for a duration','Slowmode per lounge',
+         'Restrict who can post in announcements','Moderation audit log'].map(function(t){
+          return '<div class="ls-row" style="opacity:.55"><div class="grow"><div class="nm">' + esc(t) + '</div></div>' +
+                 '<span class="ls-tag">Not built</span></div>';
+        }).join('') +
+      '</div>';
+  }
+
+  /* ── Data ─────────────────────────────────────────────────── */
+  function loadAll(){
+    var id = state.id;
+    if (typeof api !== 'function') return;
+    Promise.resolve(api('/servers/' + id + '/members')).then(function(m){
+      if (String(state.id) !== String(id)) return;
+      state.members = Array.isArray(m) ? m : [];
+      if (state.section === 'members' || state.section === 'invites') paint();
+    }).catch(function(){});
+    Promise.resolve(api('/servers/' + id + '/channels')).then(function(c){
+      if (String(state.id) !== String(id)) return;
+      state.channels = Array.isArray(c) ? c : [];
+      if (state.section === 'lounges') paint();
+    }).catch(function(){});
+    Promise.resolve(api('/friends')).then(function(f){
+      if (String(state.id) !== String(id)) return;
+      state.friends = (Array.isArray(f) ? f : []).filter(function(x){ return x.status === 'accepted'; });
+      if (state.section === 'invites') paint();
+    }).catch(function(){});
+  }
+
+  function flashSaved(){
+    var el = $('lsSaved');
+    if (!el) return;
+    el.classList.add('on');
+    setTimeout(function(){ el.classList.remove('on'); }, 1800);
+  }
+
+  /* ── Actions ──────────────────────────────────────────────── */
+  function onClick(e){
+    var nav = e.target.closest('[data-sec]');
+    if (nav){ state.section = nav.getAttribute('data-sec'); paint(); return; }
+
+    var btn = e.target.closest('[data-ls]');
+    if (!btn) return;
+    var act = btn.getAttribute('data-ls');
+    var id = state.id;
+
+    if (act === 'close'){ close(); return; }
+
+    if (act === 'copy-id'){
+      try { navigator.clipboard.writeText(state.srv.unique_id || ''); toast('Lobby ID copied', 'success'); } catch(_){}
+      return;
+    }
+
+    if (act === 'save-overview'){
+      var name = ($('lsName') || {}).value || '';
+      var desc = ($('lsDesc') || {}).value || '';
+      if (!name.trim()) { toast('A lobby needs a name', 'error'); return; }
+      var fd = new FormData();
+      fd.append('name', name.trim());
+      fd.append('description', desc);
+      /* FormData, not JSON: the endpoint runs its multipart parser first
+         so it can accept banner/icon files on the same route. */
+      api('/servers/' + id, { method:'PATCH', body: fd }).then(function(r){
+        if (r && r.error){ toast(r.error, 'error'); return; }
+        state.srv.name = name.trim();
+        state.srv.description = desc;
+        try { if (typeof selectedServer !== 'undefined' && selectedServer &&
+                  String(selectedServer.id) === String(id)){
+          selectedServer.name = name.trim(); selectedServer.description = desc;
+        } } catch(_){}
+        flashSaved(); paint();
+        if (typeof loadServers === 'function') loadServers();
+      }).catch(function(){ toast('Could not save', 'error'); });
+      return;
+    }
+
+    if (act === 'pick-banner' || act === 'pick-icon'){
+      var input = $('lsFile');
+      if (!input) return;
+      input.value = '';
+      input.onchange = function(){
+        var file = input.files && input.files[0];
+        if (!file) return;
+        var fd2 = new FormData();
+        fd2.append(act === 'pick-banner' ? 'banner' : 'icon', file);
+        toast('Uploading…', '');
+        api('/servers/' + id, { method:'PATCH', body: fd2 }).then(function(r){
+          if (r && r.error){ toast(r.error, 'error'); return; }
+          if (r && r.banner_url) state.srv.banner_url = r.banner_url;
+          if (r && r.icon_url)   state.srv.icon_url   = r.icon_url;
+          toast('Updated', 'success'); paint();
+          if (typeof loadServers === 'function') loadServers();
+        }).catch(function(){ toast('Upload failed', 'error'); });
+      };
+      input.click();
+      return;
+    }
+
+    if (act === 'add-lounge'){
+      var nm = ($('lsNewCh') || {}).value || '';
+      var tp = ($('lsNewChType') || {}).value || 'text';
+      if (!nm.trim()){ toast('Give the lounge a name', 'error'); return; }
+      api('/servers/' + id + '/channels', {
+        method:'POST',
+        headers:{ 'Content-Type':'application/json' },
+        body: JSON.stringify({ name: nm.trim(), type: tp })
+      }).then(function(r){
+        if (r && r.error){ toast(r.error, 'error'); return; }
+        toast('Lounge created', 'success');
+        loadAll();
+      }).catch(function(){ toast('Could not create', 'error'); });
+      return;
+    }
+
+    if (act === 'del-lounge'){
+      var chId = btn.getAttribute('data-ch');
+      if (!confirm('Delete #' + btn.getAttribute('data-name') + '? Its messages go too, permanently.')) return;
+      api('/servers/' + id + '/channels/' + chId, { method:'DELETE' }).then(function(){
+        toast('Lounge deleted', 'success'); loadAll();
+      }).catch(function(){ toast('Could not delete', 'error'); });
+      return;
+    }
+
+    if (act === 'ord-up' || act === 'ord-down'){
+      var k = btn.getAttribute('data-k');
+      var arr = state._order.slice();
+      var i = arr.indexOf(k);
+      var j = act === 'ord-up' ? i - 1 : i + 1;
+      if (i < 0 || j < 0 || j >= arr.length) return;
+      arr[i] = arr[j]; arr[j] = k;
+      try { localStorage.setItem('ls_order_' + id, JSON.stringify(arr)); } catch(_){}
+      paint();
+      return;
+    }
+
+    if (act === 'save-order'){
+      api('/servers/' + id + '/sidebar-order', {
+        method:'PUT',
+        headers:{ 'Content-Type':'application/json' },
+        body: JSON.stringify({ order: state._order })
+      }).then(function(r){
+        if (r && r.error){ toast(r.error, 'error'); return; }
+        flashSaved(); toast('Order saved for everyone', 'success');
+      }).catch(function(){ toast('Could not save order', 'error'); });
+      return;
+    }
+
+    if (act === 'role'){
+      var uid = btn.getAttribute('data-uid'), role = btn.getAttribute('data-role');
+      api('/servers/' + id + '/members/' + uid + '/role', {
+        method:'PATCH',
+        headers:{ 'Content-Type':'application/json' },
+        body: JSON.stringify({ role: role })
+      }).then(function(r){
+        if (r && r.error){ toast(r.error, 'error'); return; }
+        toast(role === 'moderator' ? 'Promoted to moderator' : 'Demoted to member', 'success');
+        loadAll();
+      }).catch(function(){ toast('Could not change role', 'error'); });
+      return;
+    }
+
+    if (act === 'kick'){
+      var kid = btn.getAttribute('data-uid');
+      if (!confirm('Remove ' + btn.getAttribute('data-name') + ' from this lobby?')) return;
+      api('/servers/' + id + '/members/' + kid, { method:'DELETE' }).then(function(){
+        toast('Member removed', 'success'); loadAll();
+      }).catch(function(){ toast('Could not remove', 'error'); });
+      return;
+    }
+
+    if (act === 'invite'){
+      var iid = btn.getAttribute('data-uid');
+      api('/servers/' + id + '/invite', {
+        method:'POST',
+        headers:{ 'Content-Type':'application/json' },
+        body: JSON.stringify({ userId: Number(iid) })
+      }).then(function(r){
+        if (r && r.error){ toast(r.error, 'error'); return; }
+        toast('Invite sent to ' + btn.getAttribute('data-name'), 'success');
+        btn.textContent = 'Invited'; btn.disabled = true;
+      }).catch(function(){ toast('Could not invite', 'error'); });
+      return;
+    }
+  }
+
+  function open(lobbyId){
+    var s = server();
+    if (!s || (lobbyId != null && String(s.id) !== String(lobbyId))){
+      // Settings for a lobby you are not currently in is not supported by
+      // the data we have to hand — say so rather than open an empty page.
+      if (!s){ toast('Open the lobby first', 'error'); return; }
+    }
+    state.id = s.id;
+    state.srv = s;
+    state.section = 'overview';
+    state.members = []; state.channels = []; state.friends = [];
+    root().classList.add('open');
+    paint();
+    loadAll();
+  }
+  function close(){
+    var el = $('lsRoot');
+    if (el) el.classList.remove('open');
+  }
+
+  window.openServerSettings = open;
+  window.closeServerSettings = close;
+
+  document.addEventListener('keydown', function(e){
+    if (e.key === 'Escape'){
+      var el = $('lsRoot');
+      if (el && el.classList.contains('open')) close();
+    }
+  });
+
+  console.log('[settings] lobby settings page ready — ' + SECTIONS.length + ' sections');
+})();
+</script>
 </body>
 </html>
