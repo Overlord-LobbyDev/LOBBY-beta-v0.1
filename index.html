@@ -53011,5 +53011,41 @@ body.coliseum-mode #coliseumRoot .col-canvas{ display:none !important; }
   else start();
 })();
 </script>
+
+<!-- ══════════════════════════════════════════════════════════════════
+     THE RAIL WORKS IN THE COLISEUM TOO
+
+     Sidebar and Messages did nothing in the Coliseum while Feed worked
+     fine. The Coliseum's own stylesheet hides the rail outright —
+     `body.coliseum-mode #lobbyInfoRail { display:none !important }` — as
+     part of the block that hides the legacy panels behind it. Feed was
+     never in that list, which is why it alone survived. Messages lives
+     in the rail, so it went down with it.
+
+     Un-hiding is enough on its own: the rail is position:fixed at
+     z-index 95 against the Coliseum's 60, so it already layers on top,
+     and .rail-hidden still slides it away exactly as elsewhere.
+
+     The Coliseum then has to give up the width, or its content sits
+     underneath the rail. Same treatment the app gives every other page
+     (`right: var(--lir-w)`), including the ambient backdrop, which is
+     its own fixed layer and would otherwise glow through.
+     ══════════════════════════════════════════════════════════════════ -->
+<style>
+/* Outranks the display:none — same element, but two classes deeper. */
+body.coliseum-mode.lobby-selected #lobbyInfoRail{
+  display:flex !important;
+}
+body.coliseum-mode.feed-closed.lobby-selected:not(.rail-hidden) #coliseumRoot,
+body.coliseum-mode.feed-closed.lobby-selected:not(.rail-hidden) .col-amb{
+  right:var(--lir-w) !important;
+}
+/* Keep the width transition in step with the rail's own entrance so the
+   page edge and the panel move together rather than one snapping. */
+body.coliseum-mode #coliseumRoot{
+  transition:right var(--dock-in-dur, .46s) var(--dock-in-ease, cubic-bezier(.22,1,.36,1));
+}
+body.lobby-reduce-motion #coliseumRoot{ transition:none !important; }
+</style>
 </body>
 </html>
