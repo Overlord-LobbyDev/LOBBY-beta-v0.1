@@ -20114,9 +20114,18 @@ function renderChatArea({ icon, name, placeholder, readonly = false, isDm = fals
   // DM mode → keeps the simpler .chat-header (no channel list to swap between).
   const activeChId = (typeof currentView !== 'undefined' && currentView && currentView.type === 'channel') ? currentView.id : null;
   const ribbonHtml = !isDm ? renderChannelRibbon(activeChId) : '';
-  // Channel hero card — premium intro at the top of the messages stream.
-  const heroHtml = (!isDm && activeChId) ? renderChannelHero(activeChId, name) : '';
-  const legacyHeaderHtml = (isDm || !ribbonHtml) ? `
+  /* The channel hero card is GONE. It was the big "# GENERAL / TEXT
+     LOUNGE / Welcome to the start of..." slab at the top of the stream —
+     the most visible piece of the old chat page. The ribbon already
+     names the channel and carries its member count, so the hero only
+     ever repeated it and pushed the conversation down the page. */
+  const heroHtml = '';
+
+  /* The legacy .chat-header is now DM-only. It used to render whenever
+     the ribbon came back empty, which is what let the old layout return
+     whenever channel data was late. There is no longer a fallback path
+     that produces the old page. */
+  const legacyHeaderHtml = isDm ? `
     <div class="chat-header">
       ${headerIcon}
       <div>
@@ -55610,6 +55619,92 @@ body.double-dock[data-feed-position="right"].feed-open:not(.rail-hidden) #settin
     new MutationObserver(function(){ idx = 0; apply(); }).observe(t, { childList:true });
     apply();
     console.log('[recents] landscape circular carousel active');
+  }
+
+  if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', start);
+  else start();
+})();
+</script>
+
+<!-- ══════════════════════════════════════════════════════════════════
+     THE OLD CHAT PAGE CANNOT RENDER
+
+     Three things kept bringing it back, and removing the bail in
+     renderChannelRibbon only closed one of them:
+
+       the channel hero card — removed at source
+       the legacy .chat-header fallback — now DM-only, so there is no
+         path that swaps the ribbon for it
+       the styling gate — this file
+
+     Every modern chat rule is written as `.chat-main:has(.chat-ribbon)`.
+     That makes the entire design conditional on one element existing, so
+     ANY route that renders the panel without it — a stale render, a
+     partially-initialised lobby, markup written by something that
+     predates the ribbon — silently falls back to the old look. Rather
+     than duplicate dozens of rules onto a different selector, this
+     guarantees the element: if the chat panel is showing a lobby channel
+     and has no ribbon, an empty one is inserted, and the modern styling
+     applies. The tabs fill in on the next real render.
+     ══════════════════════════════════════════════════════════════════ -->
+<style>
+/* Belt and braces: if either ever comes back from a path not covered
+   above, it stays hidden rather than reintroducing the old page. */
+#chatPanel .ch-hero{ display:none !important; }
+body.lobby-selected #chatPanel .chat-header{ display:none !important; }
+/* An injected shell has no tabs, so it must not draw as an empty bar. */
+#chatRibbon.cr-shell-only{
+  min-height:0 !important; padding-top:0 !important; padding-bottom:0 !important;
+  border:0 !important; background:none !important;
+}
+</style>
+<script>
+(function () {
+  'use strict';
+
+  function inLobbyChannel(){
+    var b = document.body;
+    if (!b.classList.contains('lobby-selected')) return false;
+    if (b.classList.contains('coliseum-mode')) return false;
+    var v;
+    // currentView is a top-level `let` — not a window property.
+    try { if (typeof currentView !== 'undefined') v = currentView; } catch(e){}
+    if (!v) v = window.currentView;
+    return !!(v && v.type === 'channel');
+  }
+
+  function ensure(){
+    var main = document.getElementById('chatMain');
+    if (!main || !inLobbyChannel()) return;
+    if (main.querySelector('.chat-ribbon')) return;
+
+    /* Nothing else in the app inserts this, so its presence is a
+       reliable signal that the panel was rendered by an older path. */
+    var shell = document.createElement('div');
+    shell.className = 'chat-ribbon cr-shell-only';
+    shell.id = 'chatRibbon';
+    main.insertBefore(shell, main.firstChild);
+
+    /* Ask for a proper render now that we know one is missing. Reopening
+       the channel rebuilds the ribbon with its tabs. */
+    try {
+      var v = (typeof currentView !== 'undefined') ? currentView : window.currentView;
+      var chs = window.cachedServerChannels;
+      if (v && v.type === 'channel' && Array.isArray(chs) && chs.length &&
+          typeof window.openChannel === 'function'){
+        var cur = chs.find(function(c){ return String(c.id) === String(v.id); });
+        if (cur) window.openChannel(cur.id, cur.name, cur.type || 'text');
+      }
+    } catch(e){}
+  }
+
+  function start(){
+    var main = document.getElementById('chatMain');
+    if (main) new MutationObserver(ensure).observe(main, { childList:true });
+    new MutationObserver(ensure).observe(document.body, { attributes:true, attributeFilter:['class'] });
+    setInterval(ensure, 1200);
+    ensure();
+    console.log('[chat] old chat layout retired — ribbon guaranteed');
   }
 
   if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', start);
