@@ -55044,9 +55044,15 @@ body.double-dock[data-feed-position="right"].feed-open:not(.rail-hidden) #settin
   /* 38%, not 46%: at 46% the column was 414x392 -- almost square, so
      portrait art cropped a third of its height away. Narrower is much
      closer to the 2:3 of library_600x900, so far less is lost. */
-  width:38% !important; height:100% !important;
-  object-fit:cover !important; object-position:center !important;
-  flex:0 0 38% !important;
+  /* contain, NOT cover. Cover crops to fill, and every game ships a
+     different aspect ratio, so the crop lands somewhere different each
+     time -- there is no single box that flatters them all. contain shows
+     the WHOLE artwork every time; the space around it is filled by the
+     blurred copy of that same art behind it, so nothing looks empty. */
+  width:42% !important; height:100% !important;
+  object-fit:contain !important; object-position:center !important;
+  flex:0 0 42% !important;
+  background:transparent !important;
   border-radius:0 !important;
   /* Positioned so it paints ABOVE the ambient ::before. A positioned
      pseudo with z-index:0 otherwise covers in-flow content, and the
@@ -55054,7 +55060,7 @@ body.double-dock[data-feed-position="right"].feed-open:not(.rail-hidden) #settin
   position:relative; z-index:1;
 }
 #homeRecents .game-card-placeholder{
-  width:38% !important; height:100% !important; flex:0 0 38%;
+  width:42% !important; height:100% !important; flex:0 0 42%;
   font-size:56px !important;
   position:relative; z-index:1;
 }
@@ -55083,7 +55089,7 @@ body.double-dock[data-feed-position="right"].feed-open:not(.rail-hidden) #settin
 /* Art bleeds into the detail column rather than stopping at a hard
    seam — the join is the thing that made the split look pasted. */
 #homeRecents .game-card::after{
-  content:''; position:absolute; top:0; bottom:0; left:38%;
+  content:''; position:absolute; top:0; bottom:0; left:42%;
   width:110px; pointer-events:none; z-index:1;
   background:linear-gradient(90deg, rgba(11,13,19,0), rgba(11,13,19,.92) 70%, #0b0d13);
 }
@@ -55145,9 +55151,17 @@ body.double-dock[data-feed-position="right"].feed-open:not(.rail-hidden) #settin
 #homeRecents .game-card-achievements{
   margin-top:16px !important; padding-top:14px !important;
   border-top:1px solid rgba(255,255,255,.07) !important;
-  flex:1 1 auto; min-height:0; overflow:hidden;
+  flex:0 1 auto; min-height:0; overflow:hidden;
   display:flex; flex-direction:column; gap:6px;
 }
+.rc-more{
+  font-family:'Archivo', var(--font), sans-serif;
+  font-size:10px; font-weight:800; letter-spacing:1.2px; text-transform:uppercase;
+  color:var(--text-3); padding:2px 2px 0;
+}
+/* Pushes the action to the bottom edge whatever the list length, so the
+   card's footer is in the same place on every game. */
+#homeRecents .game-card.rc-active .rc-cta{ margin-top:auto !important; }
 #homeRecents .game-card-ach-label{
   font-family:'Archivo', var(--font), sans-serif !important;
   font-size:9px !important; font-weight:800 !important;
@@ -55352,6 +55366,22 @@ body.double-dock[data-feed-position="right"].feed-open:not(.rail-hidden) #settin
     }
 
     meta.insertAdjacentHTML('afterend', out);
+
+    /* Cap the list at three. The column has a fixed height, so a longer
+       list gets sliced mid-row by overflow — a half-drawn achievement
+       reads as a rendering fault. Three complete rows plus a count is
+       the same information, stated deliberately. */
+    var achWrap = card.querySelector('.game-card-achievements');
+    if (achWrap){
+      var rows = Array.prototype.slice.call(achWrap.querySelectorAll('.game-card-ach'));
+      if (rows.length > 3){
+        rows.slice(3).forEach(function(r){ r.style.display = 'none'; });
+        var more = document.createElement('div');
+        more.className = 'rc-more';
+        more.textContent = '+' + (rows.length - 3) + ' more';
+        achWrap.appendChild(more);
+      }
+    }
 
     /* The whole active card already opens Steam; this states it rather
        than leaving the card silently clickable. */
