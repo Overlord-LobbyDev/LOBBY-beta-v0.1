@@ -57931,9 +57931,14 @@ async function reactComment(ev, id, btn){
 }
 #homeContent > section[data-home-slot="hero"] > .hero-wash{
   position:absolute; z-index:0;
-  /* Ends INSIDE the section's bottom edge. It used to bleed 26px past
-     it, straight into the row beneath. */
-  inset:-30px -18px 4px; pointer-events:none;
+  /* Runs a long way past the section now — 120px into the row beneath.
+     That is safe in a way the original 26px bleed was not: back then the
+     wash was still half opaque when it was clipped, so the overlap had a
+     hard edge. The tail below is transparent long before it gets there,
+     so what reaches the next row is the last of a gradient rather than a
+     boundary. The col panels below carry a near-transparent background
+     and paint after this, so the colour still reads through them. */
+  inset:-30px -18px -120px; pointer-events:none;
 
   /* overflow:hidden is gone, and it was the hard line. The radial was
      still about half opaque where it met the container's bottom edge,
@@ -57943,8 +57948,8 @@ async function reactComment(ev, id, btn){
      This one runs top to bottom: solid where the card is, gone by the
      foot of the section, so the colour dissolves into the page instead
      of stopping at a boundary. */
-  -webkit-mask-image:linear-gradient(180deg, #000 0%, #000 36%, rgba(0,0,0,.42) 72%, transparent 100%);
-  mask-image:linear-gradient(180deg, #000 0%, #000 36%, rgba(0,0,0,.42) 72%, transparent 100%);
+  -webkit-mask-image:linear-gradient(180deg, #000 0%, #000 30%, rgba(0,0,0,.62) 58%, rgba(0,0,0,.22) 80%, transparent 100%);
+  mask-image:linear-gradient(180deg, #000 0%, #000 30%, rgba(0,0,0,.62) 58%, rgba(0,0,0,.22) 80%, transparent 100%);
 }
 #homeContent > section[data-home-slot="col"] > .hero-wash{ display:none !important; }
 
@@ -57963,7 +57968,7 @@ async function reactComment(ev, id, btn){
   transition:opacity .85s cubic-bezier(.4,0,.2,1);
   will-change:opacity;
 }
-.hero-wash > i.on{ opacity:.34; }
+.hero-wash > i.on{ opacity:.44; }
 
 @media (prefers-reduced-motion: reduce){
   .hero-wash > i{ transition:none; }
