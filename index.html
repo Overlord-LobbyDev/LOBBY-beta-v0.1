@@ -27325,67 +27325,16 @@ const DC_CAROUSEL_MS = 7000;
 // promote big global tournaments or special launches.
 let _dcEditorialFeatured = null;
 
-window.openDiscoverPanel = async function() {
+// Opens the panel. It no longer loads anything: the rails below own
+// their own data and pull it a page at a time, and the three requests
+// that used to fire here fed variables only the retired grid renderer
+// ever read.
+window.openDiscoverPanel = function() {
   window.showOverlay('discoverOverlay', () => {
     _renderDiscoverTabs();
     _renderDiscoverGrid();
-    _startDiscoverCarousel();
     if (typeof _wireOverlayShrinkOnScroll === 'function') _wireOverlayShrinkOnScroll('discoverOverlay');
   });
-  // Editorial pick — server-curated, falls back to null on failure so
-  // the recommendation engine just takes over.
-  try {
-    const r = await api('/featured/spotlight').catch(() => null);
-    if (r && r.id && r.name) {
-      _dcEditorialFeatured = {
-        ...r,
-        kind: r.kind || 'lobby',   // 'lobby' | 'tournament'
-        isEditorial: true,
-        badge: 'editorial',
-      };
-      _renderDiscoverGrid();
-    }
-  } catch {}
-  // Try the public-lobbies endpoint and merge in real data when available.
-  // Server is authoritative — never localStorage — these merge ON TOP of
-  // the curated placeholders so brand-new servers don't ship empty.
-  try {
-    const r = await api('/lobbies/public').catch(() => null);
-    if (Array.isArray(r) && r.length) {
-      const real = r.map(s => ({
-        id: s.id, name: s.name, tag: s.tag, members: s.members||0,
-        // NOT s.online||0 — that turns "the server did not tell us" into a
-        // confident "nobody is online". Left undefined so the honest
-        // em-dash path below actually triggers.
-        online: (typeof s.online === 'number' ? s.online : undefined),
-        cover: s.cover || '', fallback: s.fallback || 'linear-gradient(135deg,#2a2d3a,#15161e)',
-        initial: (s.name||'?')[0].toUpperCase(),
-        tags: s.tags || (s.tag ? [s.tag] : []),
-        badge: s.badge || null, kind: 'lobby',
-        // Carried through because the deck card has room for a pitch and
-        // an icon; the old grid tile had neither and dropped both.
-        description: s.description || '',
-        icon: s.icon || '',
-        isReal: true,
-      }));
-      // The server is the only source now, so this is an assignment
-      // rather than a merge over placeholders.
-      _dcLobbies = real;
-      _renderDiscoverGrid();
-    }
-  } catch {}
-  // Also merge real tournaments from /tournaments/global as discover cards
-  try {
-    const t = await api('/tournaments/global').catch(() => null);
-    if (Array.isArray(t) && t.length) {
-      _dcTournaments = t.map(r => ({
-        id: 't-' + r.id, name: r.name, kind: 'tournament',
-        gameId: r.game, status: r.status, entrants: r.entrants, prize: r.prize,
-        isReal: true,
-      }));
-      _renderDiscoverGrid();
-    }
-  } catch {}
 };
 window.closeDiscoverPanel = function() {
   _stopDiscoverCarousel();
@@ -61174,54 +61123,114 @@ async function reactComment(ev, id, btn){
     return u ? "url('" + String(u).replace(/\\/g, '%5C').replace(/'/g, "%27") + "')" : '';
   }
 
-  /* Top-level const/let are in the global LEXICAL scope, NOT on window,
-     so these are reached by name behind a typeof guard. Read fresh each
-     call because openDiscoverPanel reassigns _dcLobbies. */
-  function rawLobbies(){
-    try { if (typeof _dcLobbies !== 'undefined' && Array.isArray(_dcLobbies)) return _dcLobbies; } catch(e){}
-    return [];
-  }
-  function rawTournaments(){
-    try { if (typeof _dcTournaments !== 'undefined' && Array.isArray(_dcTournaments)) return _dcTournaments; } catch(e){}
-    return [];
+  /* ── The store ───────────────────────────────────────────────────
+     One page cursor per rail. Everything Discover shows comes from
+     here, so nothing can be clobbered by somebody else's response --
+     which is what used to happen when races and people were merged into
+     _dcLobbies and /lobbies/public then assigned over the top of them.
+
+     PAGE is 50 and the server caps a page at 100, so a rail cannot ask
+     for the whole table in one go. done is set when a short page comes
+     back, which is the only reliable end-of-list signal when the total
+     is not returned. */
+  var PAGE = 50;
+
+  var MAP = {
+    lobbies: function (sv){
+      return {
+        id:sv.id, kind:'lobby', name:sv.name, tag:sv.tag,
+        members:(typeof sv.members === 'number' ? sv.members : 0),
+        /* NOT sv.online || 0 -- presence lives in the websocket process,
+           not the one that served this, so it genuinely does not know.
+           Left undefined, the card prints a dash instead of a confident
+           "nobody is here". */
+        online:(typeof sv.online === 'number' ? sv.online : undefined),
+        cover:sv.cover || '', icon:sv.icon || '',
+        fallback:sv.fallback || 'linear-gradient(135deg,#2a2d3a,#15161e)',
+        initial:String(sv.name || '?').charAt(0).toUpperCase(),
+        tags:sv.tags || (sv.tag ? [sv.tag] : []),
+        description:sv.description || '',
+        faces:sv.faces || [],
+        badge:sv.badge || null, isReal:true,
+      };
+    },
+    tournaments: function (t){
+      return {
+        id:'t-' + t.id, kind:'tournament', name:t.name,
+        gameId:t.game, status:t.status, entrants:t.entrants,
+        prize:t.prize, faces:t.faces || [], isReal:true,
+      };
+    },
+    races: function (x){
+      return {
+        id:'race-' + x.id, raceId:x.id, kind:'race',
+        name:x.title || ((x.game || 'Speedrun') + ' race'),
+        game:x.game, category:x.category, prize:x.prize,
+        runners:x.runners, status:x.status, faces:x.faces || [],
+      };
+    },
+    people: function (u){
+      return {
+        id:'person-' + u.id, userId:u.id, kind:'person',
+        name:u.display_name || u.username || 'Player',
+        avatar:u.avatar_url || null, sub:u.bio || null,
+      };
+    },
+  };
+
+  var STORE = {
+    lobbies:     { url:'/lobbies/public',     items:[], offset:0, done:false, loading:false },
+    tournaments: { url:'/tournaments/global', items:[], offset:0, done:false, loading:false },
+    races:       { url:'/speedrun/races',     items:[], offset:0, done:false, loading:false, single:true },
+    people:      { url:'/users/discover',     items:[], offset:0, done:false, loading:false },
+  };
+
+  async function loadPage(railId){
+    var st = STORE[railId];
+    if (!st || st.loading || st.done) return false;
+    if (typeof window.api !== 'function') return false;
+    st.loading = true;
+    var grew = false;
+    try {
+      if (st.single){
+        /* /speedrun/races answers with { active, upcoming } rather than a
+           list, so there is no cursor to advance -- it arrives whole. */
+        var r = await window.api(st.url);
+        var all = ((r && r.active) || []).concat((r && r.upcoming) || []);
+        st.items = all.map(MAP.races);
+        st.done = true;
+        grew = true;
+      } else {
+        var page = await window.api(st.url + '?limit=' + PAGE + '&offset=' + st.offset);
+        if (!Array.isArray(page)){
+          st.done = true;
+        } else {
+          var have = {};
+          st.items.forEach(function (x){ have[String(x.id)] = 1; });
+          page.map(MAP[railId]).forEach(function (x){
+            if (have[String(x.id)]) return;
+            st.items.push(x);
+            grew = true;
+          });
+          st.offset += page.length;
+          /* A short page is the end. Nothing returns a total, so this is
+             the only signal available -- and asking once more after an
+             exactly-full last page is cheaper than getting it wrong. */
+          if (page.length < PAGE) st.done = true;
+        }
+      }
+    } catch (e){
+      st.done = true;
+    }
+    st.loading = false;
+    return grew;
   }
 
-  /* Races and people are held here rather than merged into _dcLobbies.
-     openDiscoverPanel ASSIGNS that array when /lobbies/public resolves,
-     so anything merged in beforehand was silently dropped -- which is
-     why People read 0 with four people to show. Own arrays cannot be
-     overwritten by someone else's response. */
-  var _races = [], _people = [];
-
-  async function loadExtras(){
-    if (typeof window.api !== 'function') return;
-    var jobs = [
-      window.api('/speedrun/races').then(function (r){
-        if (!r) return;
-        _races = (r.active || []).concat(r.upcoming || []).map(function (x){
-          return {
-            id:'race-' + x.id, raceId:x.id, kind:'race',
-            name:x.title || ((x.game || 'Speedrun') + ' race'),
-            game:x.game, category:x.category, prize:x.prize,
-            runners:x.runners, status:x.status, faces:x.faces || [],
-          };
-        });
-      }).catch(function(){}),
-      /* NOT /users/search -- it returns nothing for an empty query by
-         design, so it cannot back a browse surface. */
-      window.api('/users/discover').then(function (r){
-        if (!Array.isArray(r)) return;
-        _people = r.slice(0, 24).map(function (u){
-          return {
-            id:'person-' + u.id, userId:u.id, kind:'person',
-            name:u.display_name || u.username || 'Player',
-            avatar:u.avatar_url || null, sub:u.bio || null,
-          };
-        });
-      }).catch(function(){}),
-    ];
-    await Promise.all(jobs);
-    render();
+  /* First page of every rail, in parallel. */
+  function loadExtras(){
+    Object.keys(STORE).forEach(function (railId){
+      loadPage(railId).then(function (grew){ if (grew) render(); });
+    });
   }
   function query(){
     try { if (typeof _dcSearch !== 'undefined') return String(_dcSearch || ''); } catch(e){}
@@ -61341,10 +61350,9 @@ async function reactComment(ev, id, btn){
   /* ── Collect, filter, sort ───────────────────────────────────── */
   function collect(){
     var out = [];
-    rawLobbies().forEach(function (x){ var c = toCard(x); if (c) out.push(c); });
-    rawTournaments().forEach(function (x){ var c = toCard(x); if (c) out.push(c); });
-    _races.forEach(function (x){ var c = toCard(x); if (c) out.push(c); });
-    _people.forEach(function (x){ var c = toCard(x); if (c) out.push(c); });
+    Object.keys(STORE).forEach(function (railId){
+      STORE[railId].items.forEach(function (x){ var c = toCard(x); if (c) out.push(c); });
+    });
     var seen = {};
     return out.filter(function (c){
       var id = c.rail + ':' + c.key;
@@ -61600,8 +61608,29 @@ async function reactComment(ev, id, btn){
       '</div>';
     }
 
+    /* Under the carousel, the whole list. The deck and the shelf are a
+       highlight reel; this is the part you browse, and it grows as you
+       reach the bottom of it rather than making you ask. */
+    var st = STORE[railId] || {};
+    var all = n > (slot === 'hero' ? 1 : 4)
+      ? '<div class="dcx-all">' +
+          '<div class="dcx-all-head">' +
+            '<span class="dcx-all-title">All ' + esc(RAILS[railId].word) + '</span>' +
+            '<span class="dcx-all-n">' + n + (st.done ? '' : '+') + '</span>' +
+          '</div>' +
+          '<div class="dcx-all-grid" data-dcx-grid="' + railId + '">' +
+            cards.map(function (c){ return cardHtml(c, 'rail'); }).join('') +
+          '</div>' +
+          (st.done
+            ? ''
+            : '<div class="dcx-sentinel" data-dcx-sentinel="' + railId + '">' +
+                '<span class="dcx-spin"></span>Loading more' + esc(RAILS[railId].word) +
+              '</div>') +
+        '</div>'
+      : '';
+
     return '<section class="dcx-rail" data-dcx-rail="' + railId + '" data-dcx-slot="' + slot + '">' +
-      head + body + '</section>';
+      head + body + all + '</section>';
   }
 
   /* ── Filter bar ──────────────────────────────────────────────── */
@@ -61673,7 +61702,39 @@ async function reactComment(ev, id, btn){
 
     shown.forEach(function (railId, i){ if (i === 0) applyDeck(railId); });
     syncShelfArrows();
+    watchSentinels();
     wash();
+  }
+
+  /* ── Load more on approach ───────────────────────────────────────
+     An observer rather than a scroll handler: the browser reports the
+     intersection itself, so nothing runs on the frames in between.
+     rootMargin starts the fetch while the sentinel is still a screen
+     below the fold, so the next page is usually there before the bottom
+     of the list is. */
+  var io = null;
+  function watchSentinels(){
+    if (!('IntersectionObserver' in window)) return;
+    var root = document.querySelector('#discoverOverlay > div[style*="overflow-y"]');
+    if (!io){
+      io = new IntersectionObserver(function (entries){
+        entries.forEach(function (en){
+          if (!en.isIntersecting) return;
+          var railId = en.target.getAttribute('data-dcx-sentinel');
+          if (!railId) return;
+          var st = STORE[railId];
+          if (!st || st.loading || st.done) return;
+          loadPage(railId).then(function (){ render(); });
+        });
+      }, { root:root || null, rootMargin:'600px 0px' });
+    }
+    /* render() rebuilds the stage, so every sentinel from the previous
+       pass is now detached. Dropping them keeps the observer's list the
+       length of the page rather than the length of the session. */
+    io.disconnect();
+    document.querySelectorAll('#discoverList [data-dcx-sentinel]').forEach(function (el){
+      io.observe(el);
+    });
   }
 
   /* The page was called DISCOVER LOBBIES while showing four kinds of
@@ -62353,6 +62414,178 @@ async function reactComment(ev, id, btn){
   else start();
 })();
 </script>
+
+
+<!-- ══════════════════════════════════════════════════════════════════
+     DISCOVER — the full list, and a bigger deck
+
+     THE LIST. A carousel is a highlight reel: it shows a handful well
+     and hides the rest behind an arrow nobody presses forty times. Under
+     each one there is now the whole list, fifty at a time, growing as
+     you reach the bottom of it. The deck stays what it is good at --
+     one thing, large, in focus -- and browsing stops depending on it.
+
+     WHY THE OVERRIDES SHOUT. These tiles live INSIDE a rail, and the
+     hero rail's rules are written against .dcx-rail[data-dcx-slot=
+     "hero"] .dcx-card -- a descendant selector, so it reaches them too
+     and would make every tile an absolutely-positioned 1040px deck card
+     stacked on the same point. Class-for-class the specificity ties, so
+     source order alone would decide it; !important on the handful of
+     properties that actually matter says so out loud instead of relying
+     on this block staying last in the file.
+
+     THE ZOOM. The deck was sized for a narrower window than it turned
+     out to live in. Everything grows about 15%.
+     ══════════════════════════════════════════════════════════════════ -->
+<style>
+/* ── Zoom ──────────────────────────────────────────────────────── */
+#discoverList.dcx-stage{ max-width:1820px; }
+
+.dcx-rail[data-dcx-slot="hero"] .dcx-body{ height:452px; }
+.dcx-rail[data-dcx-slot="hero"] .dcx-card{ width:1040px; height:432px; }
+.dcx-rail[data-dcx-slot="hero"] .dcx-art{ flex:0 0 344px; width:344px; }
+.dcx-rail[data-dcx-slot="hero"] .dcx-info{ padding:28px 34px 26px; }
+.dcx-rail[data-dcx-slot="hero"] .dcx-name{ font-size:31px; }
+.dcx-rail[data-dcx-slot="hero"] .dcx-desc{ font-size:14.5px; }
+.dcx-rail[data-dcx-slot="hero"] .dcx-stat b{ font-size:20px; }
+.dcx-rail[data-dcx-slot="hero"] .dcx-face{ width:42px; height:42px; flex-basis:42px; font-size:15px; }
+.dcx-rail[data-dcx-slot="rail"] .dcx-card{ flex:0 0 292px; width:292px; }
+
+@media (max-width:1500px){
+  .dcx-rail[data-dcx-slot="hero"] .dcx-card{ width:900px; height:412px; }
+  .dcx-rail[data-dcx-slot="hero"] .dcx-body{ height:432px; }
+  .dcx-rail[data-dcx-slot="hero"] .dcx-art{ flex-basis:300px; width:300px; }
+}
+
+/* ── The full list ─────────────────────────────────────────────── */
+.dcx-all{ margin-top:26px; }
+.dcx-all-head{
+  display:flex; align-items:center; gap:11px;
+  margin:0 4px 14px;
+  padding-bottom:11px;
+  border-bottom:1px solid rgba(255,255,255,.07);
+}
+.dcx-all-title{
+  font-family:'Archivo', var(--font), sans-serif;
+  font-size:12px; font-weight:800; letter-spacing:1.8px; text-transform:uppercase;
+  color:var(--text-2);
+}
+.dcx-all-n{
+  font-family:'JetBrains Mono', ui-monospace, monospace;
+  font-size:10.5px; font-weight:800; font-variant-numeric:tabular-nums;
+  padding:2px 8px; border-radius:99px;
+  color:color-mix(in srgb, var(--hub-accent) 88%, white);
+  background:color-mix(in srgb, var(--hub-accent) 13%, transparent);
+  border:1px solid color-mix(in srgb, var(--hub-accent) 30%, transparent);
+}
+.dcx-all-grid{
+  display:grid;
+  grid-template-columns:repeat(auto-fill, minmax(248px, 1fr));
+  gap:16px;
+}
+
+/* Tiles. See the note above on why these are !important. */
+.dcx-rail .dcx-all .dcx-card{
+  position:relative !important;
+  width:auto !important; height:auto !important;
+  flex:none !important; left:auto !important; top:auto !important;
+  transform:none !important; opacity:1 !important; filter:none !important;
+  z-index:auto !important;
+  display:flex !important; flex-direction:column !important;
+  border-radius:15px; overflow:hidden; cursor:pointer;
+  background:linear-gradient(135deg,#14161f 0%,#0b0d13 100%);
+  border:1px solid rgba(255,255,255,.07);
+  box-shadow:0 8px 22px rgba(0,0,0,.42);
+  transition:transform .22s cubic-bezier(.22,1,.36,1),
+             border-color .22s ease, box-shadow .22s ease !important;
+}
+.dcx-rail .dcx-all .dcx-card:hover{
+  transform:translateY(-5px) !important;
+  border-color:color-mix(in srgb, var(--hub-accent) 52%, transparent);
+  box-shadow:0 20px 42px rgba(0,0,0,.6),
+             0 0 26px color-mix(in srgb, var(--hub-accent) 16%, transparent);
+}
+.dcx-rail .dcx-all .dcx-card::before{ display:none !important; }
+.dcx-rail .dcx-all .dcx-art{
+  flex:none !important; width:100% !important; height:auto !important;
+  aspect-ratio:16/9;
+  background-size:cover; background-position:center; background-color:#10131b;
+}
+.dcx-rail .dcx-all .dcx-art::after{
+  background:linear-gradient(180deg, transparent 45%, rgba(9,11,16,.92) 100%) !important;
+}
+.dcx-rail .dcx-all .dcx-art-glyph{ font-size:44px !important; }
+.dcx-rail .dcx-all .dcx-avatar > *{ width:66px !important; height:66px !important; font-size:25px !important; }
+.dcx-rail .dcx-all .dcx-info{
+  padding:12px 14px 14px !important;
+  gap:7px; display:flex !important; flex-direction:column !important;
+  border-top:1px solid rgba(255,255,255,.06);
+  background:#0b0d12; isolation:isolate; overflow:hidden;
+}
+.dcx-rail .dcx-all .dcx-info::before{
+  content:''; position:absolute; inset:-40%; z-index:-1; pointer-events:none;
+  background-image:var(--dcx-card-art, none);
+  background-size:cover; background-position:center;
+  filter:blur(34px) saturate(1.15) brightness(.85);
+  opacity:.22;
+}
+.dcx-rail .dcx-all .dcx-name{
+  font-size:14.5px !important; font-weight:800 !important;
+  line-height:1.25 !important; margin:0 !important;
+  display:-webkit-box; -webkit-line-clamp:2; line-clamp:2;
+  -webkit-box-orient:vertical; overflow:hidden;
+}
+.dcx-rail .dcx-all .dcx-desc{ display:none !important; }
+.dcx-rail .dcx-all .dcx-who{ display:none !important; }
+.dcx-rail .dcx-all .dcx-foot{ display:none !important; }
+.dcx-rail .dcx-all .dcx-stats{
+  display:flex !important; gap:12px; flex-wrap:wrap;
+  grid-template-columns:none !important;
+  padding:0 !important; margin:0 !important;
+  background:none !important; border:0 !important; box-shadow:none !important;
+  font-family:'JetBrains Mono', ui-monospace, monospace;
+  font-size:10px; font-weight:700; letter-spacing:.6px;
+  color:var(--text-3); text-transform:uppercase;
+}
+.dcx-rail .dcx-all .dcx-stat{
+  padding:0 !important; background:none !important; border:0 !important;
+  display:inline !important;
+}
+.dcx-rail .dcx-all .dcx-stat b{
+  display:inline !important;
+  font-size:10px !important; color:#fff !important;
+  font-variant-numeric:tabular-nums;
+}
+.dcx-rail .dcx-all .dcx-stat span{
+  display:inline !important; margin:0 0 0 4px !important;
+  font-size:10px !important; letter-spacing:.6px !important;
+  color:var(--text-3) !important;
+}
+.dcx-rail .dcx-all .dcx-chips{
+  display:flex !important; gap:5px; flex-wrap:wrap;
+  margin:0 !important; height:20px; overflow:hidden;
+}
+
+/* ── The sentinel ──────────────────────────────────────────────── */
+.dcx-sentinel{
+  display:flex; align-items:center; justify-content:center; gap:10px;
+  padding:26px 0 10px;
+  font-family:'JetBrains Mono', ui-monospace, monospace;
+  font-size:10px; font-weight:700; letter-spacing:1.8px; text-transform:uppercase;
+  color:var(--text-3);
+}
+.dcx-spin{
+  width:13px; height:13px; border-radius:50%;
+  border:2px solid rgba(255,255,255,.14);
+  border-top-color:var(--hub-accent);
+  animation:dcxSpin .7s linear infinite;
+}
+@keyframes dcxSpin{ to{ transform:rotate(360deg); } }
+@media (prefers-reduced-motion: reduce){
+  .dcx-spin{ animation-duration:2.4s; }
+  .dcx-rail .dcx-all .dcx-card{ transition:none !important; }
+}
+</style>
 
 </body>
 </html>
