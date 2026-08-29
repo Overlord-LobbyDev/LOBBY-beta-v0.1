@@ -52929,23 +52929,30 @@ body.feed-anim-out #socialFeed{
 </script>
 
 <!-- ══════════════════════════════════════════════════════════════════
-     COLISEUM — CONTROL ROOM
-     Direction 01A. Rebuilt to match the approved mock; the first attempt
-     drifted from it in ways that flattened the whole thing:
+<!-- ══════════════════════════════════════════════════════════════════
+     COLISEUM — CONTROL ROOM (community build)
 
-       the hero was a short flat-black strip instead of a tall band with
-       the electric radial and grid lines that give it depth
-       the stats became a stretched full-width telemetry bar instead of a
-       compact score block inside the hero
-       bracket cards were one-line slivers instead of tall name/VS/name
-       rooms were giant empty thumbnails instead of rows with an action
-       TOURNAMENTS rendered twice — once as the rail, once as a deck row
-       the canvas was 1560px, so every element stretched thin
+     Lobby is a community app, not a tournament app, so the page carries
+     the whole of it: identity, people, memory, activity — with the
+     broadcast desk as the frame rather than the entire content.
 
-     The old .col-canvas stays hidden but present: populate() keeps
-     writing into it harmlessly, and this reads the same sources it does
-     (cachedServerMembers / cachedServerChannels / lobbyTournaments), so
-     there is one set of data and no second fetch.
+     The four sections that were missing are ADOPTED, not rebuilt: the
+     real .col-identity-card, .col-const, .col-featured, .col-hof and
+     .col-chronicle nodes are moved out of the hidden canvas into this
+     layout. populate() keeps filling them with live data and their
+     existing handlers keep working (Customize Alter Ego, Open in Hall,
+     the composer's Post button) — they are only re-skinned here. Nothing
+     is re-implemented, so nothing can drift out of sync.
+
+     That forces one structural rule: the shell is built ONCE and the
+     dynamic parts write into their own containers. Re-rendering the
+     whole innerHTML each tick would destroy the adopted nodes, and they
+     no longer exist anywhere else to recover from.
+
+     Type is the Bebas + Archivo split: Bebas for the lobby name so it
+     matches the rest of the app, Archivo for section headings and card
+     titles where Bebas is unreadable small, JetBrains Mono only for the
+     ticker read-out, where it is doing real work.
      ══════════════════════════════════════════════════════════════════ -->
 <style>
 body.coliseum-mode #coliseumRoot .col-canvas{ display:none !important; }
@@ -52953,38 +52960,39 @@ body.coliseum-mode #coliseumRoot .col-canvas{ display:none !important; }
 #crRoot{
   --cr-live:#ff3b3b;
   --cr-elec:#5865f2;
+  --cr-gold:#d8a648;
   --cr-ink:#f3f4f7;
-  --cr-ink2:rgba(243,244,247,.64);
-  --cr-ink3:rgba(243,244,247,.38);
-  --cr-line:rgba(255,255,255,.09);
-  --cr-mono:'JetBrains Mono',ui-monospace,'Cascadia Code',Consolas,monospace;
+  --cr-ink2:rgba(243,244,247,.66);
+  --cr-ink3:rgba(243,244,247,.40);
+  --cr-line:rgba(255,255,255,.08);
+  --cr-surface:#0e1017;
+  --cr-mono:'JetBrains Mono',ui-monospace,Consolas,monospace;
   --cr-head:'Archivo','Inter',system-ui,sans-serif;
-  /* 1280, not 1560: the wider canvas was stretching every row thin. */
   position:relative; z-index:2;
-  max-width:1280px; margin:0 auto; padding:26px 26px 120px;
+  max-width:1400px; margin:0 auto; padding:26px 30px 140px;
   font-family:'Inter',system-ui,sans-serif; color:var(--cr-ink);
 }
 #crRoot *{ box-sizing:border-box; }
 
 .cr-shell{
-  border:1px solid var(--cr-line); border-radius:14px; overflow:hidden;
+  border:1px solid var(--cr-line); border-radius:16px; overflow:hidden;
   background:#0a0c12; box-shadow:0 30px 70px rgba(0,0,0,.5);
 }
 
-/* ── Hero ───────────────────────────────────────────────────────
-   The electric radial and the vertical rules are what make this read
-   as a broadcast frame rather than a dark box. */
+/* ── Hero ──────────────────────────────────────────────────────── */
 .cr-hero{
-  position:relative; min-height:270px; display:flex; align-items:flex-end;
-  padding:26px 28px;
+  position:relative; min-height:300px; display:flex; align-items:flex-end;
+  padding:34px 36px;
   background:
-    radial-gradient(900px 420px at 78% 18%, color-mix(in srgb, var(--cr-elec) 34%, transparent), transparent 62%),
+    radial-gradient(920px 440px at 78% 18%, color-mix(in srgb, var(--cr-elec) 32%, transparent), transparent 62%),
     linear-gradient(180deg,#10131f 0%,#07080c 100%);
-  border-bottom:1px solid color-mix(in srgb, var(--cr-elec) 30%, transparent);
+  border-bottom:1px solid color-mix(in srgb, var(--cr-elec) 28%, transparent);
 }
-.cr-hero-art{
-  position:absolute; inset:0; background-size:cover; background-position:center;
-  opacity:.22; pointer-events:none;
+.cr-hero-art{ position:absolute; inset:0; background-size:cover; background-position:center; opacity:.26; }
+/* The banner's own LOBBY wordmark was reading through the title. */
+.cr-hero-art::after{
+  content:''; position:absolute; inset:0;
+  background:linear-gradient(90deg, rgba(7,8,12,.94) 0%, rgba(7,8,12,.78) 42%, rgba(7,8,12,.30) 100%);
 }
 .cr-hero::before{
   content:''; position:absolute; inset:0; pointer-events:none;
@@ -52992,58 +53000,50 @@ body.coliseum-mode #coliseumRoot .col-canvas{ display:none !important; }
   -webkit-mask-image:linear-gradient(90deg, transparent, #000 38%, #000 72%, transparent);
   mask-image:linear-gradient(90deg, transparent, #000 38%, #000 72%, transparent);
 }
-.cr-hero::after{
-  content:''; position:absolute; inset:0; pointer-events:none;
-  background:linear-gradient(180deg, rgba(7,8,12,.45) 0%, transparent 34%, rgba(7,8,12,.55) 100%);
-}
-.cr-badge{ position:absolute; top:20px; left:28px; z-index:2; }
+.cr-badge{ position:absolute; top:24px; left:36px; z-index:3; }
 .cr-tag{
-  display:inline-flex; align-items:center; gap:7px;
-  background:var(--cr-live); color:#fff;
-  font-size:10px; font-weight:900; letter-spacing:1.8px;
-  padding:5px 11px; border-radius:5px;
+  display:inline-flex; align-items:center; gap:7px; background:var(--cr-live); color:#fff;
+  font-size:10px; font-weight:900; letter-spacing:1.8px; padding:5px 11px; border-radius:5px;
 }
-.cr-tag i{ width:6px; height:6px; border-radius:50%; background:#fff; display:block;
-  animation:crBlink 1.4s ease-in-out infinite; }
+.cr-tag i{ width:6px; height:6px; border-radius:50%; background:#fff; display:block; animation:crBlink 1.4s ease-in-out infinite; }
 @keyframes crBlink{ 0%,100%{opacity:1} 50%{opacity:.25} }
 .cr-tag.off{ background:rgba(255,255,255,.12); color:var(--cr-ink2); }
 .cr-tag.off i{ background:var(--cr-ink3); animation:none; }
 @media (prefers-reduced-motion: reduce){ .cr-tag i{ animation:none; } }
 
-.cr-hero-in{ position:relative; z-index:2; display:flex; gap:22px; align-items:flex-end; width:100%; }
+.cr-hero-in{ position:relative; z-index:2; display:flex; gap:26px; align-items:flex-end; width:100%; }
 .cr-crest{
-  width:92px; height:92px; border-radius:16px; flex:0 0 92px; overflow:hidden;
+  width:104px; height:104px; border-radius:18px; flex:0 0 104px; overflow:hidden;
   background:linear-gradient(135deg, var(--cr-elec), #242a66);
   display:flex; align-items:center; justify-content:center;
-  font-family:'Bebas Neue',sans-serif; font-size:44px; color:#fff;
-  box-shadow:0 0 0 1px rgba(255,255,255,.18), 0 18px 44px rgba(0,0,0,.65);
+  font-family:'Bebas Neue',sans-serif; font-size:50px; color:#fff;
+  box-shadow:0 0 0 1px rgba(255,255,255,.18), 0 20px 50px rgba(0,0,0,.7);
 }
 .cr-crest img{ width:100%; height:100%; object-fit:cover; }
+/* Bebas, like the rest of the app. */
 .cr-name{
-  font-family:var(--cr-head); font-weight:900;
-  font-size:clamp(30px,3.5vw,46px); line-height:.94; letter-spacing:-1px;
-  margin:0; text-shadow:0 2px 26px rgba(0,0,0,.7);
+  font-family:'Bebas Neue',sans-serif; font-weight:400;
+  font-size:clamp(38px,4vw,60px); line-height:.92; letter-spacing:1.5px;
+  margin:0; text-shadow:0 2px 28px rgba(0,0,0,.8);
 }
-.cr-desc{ font-size:13px; color:var(--cr-ink2); margin:8px 0 0; max-width:46ch; }
-
-/* Score block: inside the hero, right-aligned — not a full-width bar. */
+.cr-desc{ font-size:13.5px; color:var(--cr-ink2); margin:10px 0 0; max-width:46ch; line-height:1.55; }
 .cr-score{ margin-left:auto; display:flex; text-align:center; flex:0 0 auto; }
-.cr-score > div{ padding:0 20px; border-left:1px solid rgba(255,255,255,.14); }
+.cr-score > div{ padding:0 22px; border-left:1px solid rgba(255,255,255,.14); }
 .cr-score b{
-  display:block; font-family:var(--cr-head); font-weight:900;
-  font-size:32px; line-height:1; color:#fff; font-variant-numeric:tabular-nums;
+  display:block; font-family:var(--cr-head); font-weight:900; font-size:34px;
+  line-height:1; color:#fff; font-variant-numeric:tabular-nums;
 }
 .cr-score b.hot{ color:#5ee08a; }
-.cr-score span{ font-size:9px; letter-spacing:1.7px; font-weight:800; color:var(--cr-ink3); text-transform:uppercase; }
+.cr-score span{ font-size:9px; letter-spacing:1.8px; font-weight:800; color:var(--cr-ink3); text-transform:uppercase; }
 
-/* ── NOW strip ─────────────────────────────────────────────────── */
+/* ── NOW ───────────────────────────────────────────────────────── */
 .cr-now{
-  display:flex; align-items:center; gap:13px; flex-wrap:wrap;
-  padding:12px 28px; font-size:12.5px; color:var(--cr-ink2);
-  background:linear-gradient(90deg, rgba(255,59,59,.17), transparent 62%);
+  display:flex; align-items:center; gap:14px; flex-wrap:wrap;
+  padding:14px 36px; font-size:13px; color:var(--cr-ink2);
+  background:linear-gradient(90deg, rgba(255,59,59,.16), transparent 62%);
   border-bottom:1px solid var(--cr-line);
 }
-.cr-now.standby{ background:linear-gradient(90deg, rgba(255,255,255,.06), transparent 62%); }
+.cr-now.standby{ background:linear-gradient(90deg, rgba(255,255,255,.055), transparent 62%); }
 .cr-now b{ color:#fff; }
 .cr-now .mono{ font-family:var(--cr-mono); font-size:11px; letter-spacing:.4px; color:var(--cr-ink3); }
 .cr-pill{
@@ -53052,82 +53052,130 @@ body.coliseum-mode #coliseumRoot .col-canvas{ display:none !important; }
 }
 .cr-pill.hot{ border-color:rgba(255,59,59,.5); color:#ff9a9a; }
 
-/* ── Sections ──────────────────────────────────────────────────── */
-.cr-sec{ padding:18px 28px; border-bottom:1px solid var(--cr-line); }
+/* ── Body: main + side ─────────────────────────────────────────── */
+.cr-body{ display:grid; grid-template-columns:minmax(0,1fr) 340px; gap:0; }
+.cr-main{ min-width:0; border-right:1px solid var(--cr-line); }
+.cr-side{ min-width:0; background:rgba(255,255,255,.012); }
+.cr-sec{ padding:26px 36px; border-bottom:1px solid var(--cr-line); }
+.cr-side .cr-sec{ padding:24px 22px; }
 .cr-sec:last-child{ border-bottom:0; }
 .cr-h{
-  font-family:var(--cr-mono); font-size:10px; font-weight:800; letter-spacing:2.2px;
-  text-transform:uppercase; color:var(--cr-ink3); margin:0 0 13px;
+  font-family:var(--cr-head); font-size:11.5px; font-weight:800; letter-spacing:2px;
+  text-transform:uppercase; color:var(--cr-ink3); margin:0 0 16px;
   display:flex; align-items:center; gap:10px;
 }
-.cr-h .more{ margin-left:auto; font-size:10px; cursor:pointer; letter-spacing:.6px; color:var(--cr-ink3); }
+.cr-h .more{ margin-left:auto; font-size:10px; cursor:pointer; letter-spacing:.6px; color:var(--cr-ink3); font-weight:700; }
 .cr-h .more:hover{ color:#fff; }
 
-/* Bracket: tall cards, name over VS over name — as in the mock. */
-.cr-brk{ display:grid; grid-template-columns:repeat(auto-fit,minmax(230px,1fr)); gap:11px; }
+.cr-brk{ display:grid; grid-template-columns:repeat(auto-fit,minmax(220px,1fr)); gap:13px; }
 .cr-match{
-  border:1px solid var(--cr-line); border-radius:10px; padding:14px 16px;
+  border:1px solid var(--cr-line); border-radius:12px; padding:17px 18px;
   background:linear-gradient(180deg,#141722,#0b0d14); cursor:pointer;
   transition:border-color .16s, transform .16s;
 }
 .cr-match:hover{ border-color:rgba(255,255,255,.26); transform:translateY(-2px); }
-.cr-match.on{ border-color:rgba(255,59,59,.5); box-shadow:0 0 24px rgba(255,59,59,.16); }
-.cr-match b{ font-size:13.5px; display:block; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
-.cr-match .vs{
-  color:var(--cr-ink3); font-size:10px; font-weight:800;
-  letter-spacing:1.5px; margin:6px 0; font-family:var(--cr-mono);
-}
-.cr-match .st{ color:var(--cr-ink3); font-size:10px; font-family:var(--cr-mono); letter-spacing:1.2px; }
+.cr-match.on{ border-color:rgba(255,59,59,.5); box-shadow:0 0 26px rgba(255,59,59,.15); }
+.cr-match b{ font-family:var(--cr-head); font-weight:700; font-size:14px; display:block; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+.cr-match .vs{ color:var(--cr-ink3); font-size:10px; font-weight:800; letter-spacing:1.5px; margin:8px 0; font-family:var(--cr-mono); }
+.cr-match .st{ color:var(--cr-ink3); font-size:10.5px; font-family:var(--cr-mono); letter-spacing:1.1px; }
 
-/* Rooms: rows with an action, not thumbnails. */
-.cr-rooms{ display:grid; grid-template-columns:repeat(auto-fit,minmax(260px,1fr)); gap:11px; }
+.cr-rooms{ display:grid; grid-template-columns:repeat(auto-fit,minmax(250px,1fr)); gap:12px; }
 .cr-room{
-  display:flex; align-items:center; gap:11px;
-  border:1px solid var(--cr-line); border-radius:10px; padding:13px 15px;
-  background:#0e1017; cursor:pointer; font-size:13px; font-weight:600;
+  display:flex; align-items:center; gap:12px;
+  border:1px solid var(--cr-line); border-radius:12px; padding:15px 17px;
+  background:var(--cr-surface); cursor:pointer; font-size:13.5px; font-weight:600;
   transition:border-color .16s, background .16s;
 }
 .cr-room:hover{ border-color:color-mix(in srgb, var(--cr-elec) 55%, transparent); background:#11141d; }
-.cr-room .ic{ font-size:16px; line-height:1; }
-.cr-room .go{
-  margin-left:auto; font-size:10px; font-weight:900; letter-spacing:1.3px;
-  color:color-mix(in srgb, var(--cr-elec) 90%, white);
-}
-.cr-room .who{ margin-left:auto; font-size:11px; color:#5ee08a; font-weight:700; }
-.cr-room.live{ border-color:rgba(35,165,90,.4); background:linear-gradient(90deg, rgba(35,165,90,.12), #0e1017); }
+.cr-room .ic{ font-size:17px; line-height:1; }
+.cr-room .go{ margin-left:auto; font-size:10px; font-weight:900; letter-spacing:1.3px; color:color-mix(in srgb, var(--cr-elec) 92%, white); }
+.cr-room .who{ margin-left:auto; font-size:11.5px; color:#5ee08a; font-weight:700; }
+.cr-room.live{ border-color:rgba(35,165,90,.4); background:linear-gradient(90deg, rgba(35,165,90,.12), var(--cr-surface)); }
 
-/* Tournament strip — one row, scrollable, no wall of trophies. */
-.cr-tlist{ display:flex; flex-direction:column; gap:8px; }
+.cr-tlist{ display:flex; flex-direction:column; gap:9px; }
 .cr-trow{
   display:flex; align-items:center; gap:12px;
-  border:1px solid var(--cr-line); border-radius:9px; padding:11px 14px;
+  border:1px solid var(--cr-line); border-radius:10px; padding:13px 16px;
   background:#0d0f16; cursor:pointer; transition:border-color .16s, background .16s;
 }
 .cr-trow:hover{ border-color:rgba(255,255,255,.24); background:#11141b; }
 .cr-trow.live{ border-color:rgba(255,59,59,.42); background:linear-gradient(90deg, rgba(255,59,59,.1), #0d0f16); }
-.cr-trow .nm{ font-size:13px; font-weight:600; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
-.cr-trow .st{
-  margin-left:auto; font-family:var(--cr-mono); font-size:9.5px;
-  letter-spacing:1.3px; color:var(--cr-ink3); text-transform:uppercase;
-}
+.cr-trow .nm{ font-size:13.5px; font-weight:600; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+.cr-trow .st{ margin-left:auto; font-family:var(--cr-mono); font-size:9.5px; letter-spacing:1.3px; color:var(--cr-ink3); text-transform:uppercase; }
 .cr-trow .st.on{ color:#ff9a9a; }
 .cr-trow .st.done{ color:rgba(120,220,150,.85); }
 
 .cr-btn{
-  border:1px solid var(--cr-line); background:rgba(255,255,255,.05);
-  color:var(--cr-ink2); border-radius:8px; padding:8px 14px;
-  font-size:11.5px; font-weight:700; letter-spacing:.5px; cursor:pointer;
-  transition:border-color .15s, color .15s, background .15s;
+  border:1px solid var(--cr-line); background:rgba(255,255,255,.05); color:var(--cr-ink2);
+  border-radius:9px; padding:9px 16px; font-size:12px; font-weight:700; letter-spacing:.5px;
+  cursor:pointer; transition:border-color .15s, color .15s, background .15s;
 }
 .cr-btn:hover{ border-color:rgba(255,255,255,.3); color:#fff; background:rgba(255,255,255,.09); }
-.cr-btn.pri{
-  border-color:color-mix(in srgb, var(--cr-elec) 60%, transparent);
-  color:#fff; background:color-mix(in srgb, var(--cr-elec) 26%, transparent);
-}
+.cr-btn.pri{ border-color:color-mix(in srgb, var(--cr-elec) 60%, transparent); color:#fff; background:color-mix(in srgb, var(--cr-elec) 26%, transparent); }
 .cr-btn.live{ border-color:rgba(255,59,59,.55); color:#ffb3b3; background:rgba(255,59,59,.15); }
-.cr-acts{ display:flex; gap:8px; flex-wrap:wrap; margin-top:14px; }
-.cr-empty{ font-size:12.5px; color:var(--cr-ink3); }
+.cr-acts{ display:flex; gap:9px; flex-wrap:wrap; margin-top:18px; }
+.cr-empty{ font-size:13px; color:var(--cr-ink3); }
 
+/* ══ Adopted sections, re-skinned to the Control Room ════════════
+   These carry their original .col-* classes and their original CSS, so
+   each rule below is undoing a piece of the old look rather than
+   styling from scratch. */
+#crRoot .col-identity-card,
+#crRoot .col-const,
+#crRoot .col-featured,
+#crRoot .col-hof,
+#crRoot .col-chron-card,
+#crRoot .col-composer{
+  background:var(--cr-surface) !important;
+  border:1px solid var(--cr-line) !important;
+  border-radius:12px !important;
+  box-shadow:none !important;
+  padding:18px !important;
+  margin:0 !important;
+}
+#crRoot .col-chronicle{ display:block !important; }
+#crRoot .col-chronicle .col-chron-card + .col-chron-card{ margin-top:13px !important; }
+/* Section headings inside adopted blocks speak the new language. */
+#crRoot .col-chron-title,
+#crRoot .col-const-title,
+#crRoot .col-hof-title,
+#crRoot .col-featured-title{
+  font-family:var(--cr-head) !important; font-weight:800 !important;
+  font-size:13px !important; letter-spacing:1.6px !important; text-transform:uppercase;
+  color:var(--cr-ink) !important;
+}
+#crRoot .col-chron-eyebrow,
+#crRoot .col-const-eyebrow,
+#crRoot .col-featured-eyebrow,
+#crRoot .col-ic-eyebrow{
+  font-family:var(--cr-head) !important; font-size:9.5px !important;
+  letter-spacing:1.8px !important; color:var(--cr-ink3) !important;
+}
+/* The Moment slab's neon-yellow gradient was the one object on the page
+   in a different language; bronze keeps it loud without breaking out. */
+#crRoot .col-featured{
+  background:
+    radial-gradient(500px 200px at 88% 30%, color-mix(in srgb, var(--cr-gold) 16%, transparent), transparent 64%),
+    linear-gradient(180deg,#15120a,#0b0c12) !important;
+  border-color:color-mix(in srgb, var(--cr-gold) 26%, transparent) !important;
+  display:block !important;
+}
+#crRoot .col-featured-media{ display:none !important; }   /* the floating sparks read as clip-art at this size */
+#crRoot .col-hof{
+  background:
+    radial-gradient(420px 160px at 12% 0%, color-mix(in srgb, var(--cr-gold) 13%, transparent), transparent 62%),
+    var(--cr-surface) !important;
+  border-color:color-mix(in srgb, var(--cr-gold) 22%, transparent) !important;
+}
+#crRoot .col-ic-av-wrap .col-ic-av,
+#crRoot .col-ic-av{ width:74px !important; height:74px !important; }
+#crRoot .col-composer{ display:flex !important; align-items:center; gap:12px; }
+#crRoot .col-const-orbs{ gap:7px !important; }
+
+@media (max-width:1100px){
+  .cr-body{ grid-template-columns:1fr; }
+  .cr-main{ border-right:0; border-bottom:1px solid var(--cr-line); }
+}
 @media (max-width:860px){
   .cr-hero-in{ flex-wrap:wrap; }
   .cr-score{ margin-left:0; width:100%; justify-content:flex-start; }
@@ -53139,6 +53187,7 @@ body.coliseum-mode #coliseumRoot .col-canvas{ display:none !important; }
   'use strict';
 
   function $(id){ return document.getElementById(id); }
+  function q(sel){ return document.querySelector(sel); }
   function esc(s){
     return String(s == null ? '' : s)
       .replace(/&/g,'&amp;').replace(/"/g,'&quot;')
@@ -53146,7 +53195,7 @@ body.coliseum-mode #coliseumRoot .col-canvas{ display:none !important; }
   }
   function initials(n){ return String(n || '?').trim().slice(0,2).toUpperCase(); }
 
-  /* selectedServer is a top-level `let` — not on window. */
+  /* selectedServer is a top-level `let` — not a window property. */
   function server(){
     try { if (typeof selectedServer !== 'undefined' && selectedServer) return selectedServer; } catch(e){}
     return window.selectedServer || null;
@@ -53165,38 +53214,112 @@ body.coliseum-mode #coliseumRoot .col-canvas{ display:none !important; }
     return (typeof window._lirPresenceOf === 'function') ? window._lirPresenceOf(m) : 'offline';
   }
   function statusOf(t){ return String(t && t.status || 'setup').toLowerCase(); }
-  function isLive(t){ var s = statusOf(t); return s === 'live' || s === 'active' || s === 'in_progress' || s === 'in-progress'; }
-  function isDone(t){ var s = statusOf(t); return s === 'done' || s === 'finished' || s === 'complete' || s === 'completed'; }
+  function isLive(t){ var s = statusOf(t); return s==='live'||s==='active'||s==='in_progress'||s==='in-progress'; }
+  function isDone(t){ var s = statusOf(t); return s==='done'||s==='finished'||s==='complete'||s==='completed'; }
 
-  function root(){
+  /* ── Shell, built exactly once ────────────────────────────────
+     Adopted nodes live inside it, so a full innerHTML rewrite would
+     destroy them — the dynamic parts each own a container instead. */
+  function shell(){
     var host = $('coliseumRoot');
     if (!host) return null;
     var el = $('crRoot');
-    if (!el || !el.isConnected){
-      el = document.createElement('div');
-      el.id = 'crRoot';
-      host.appendChild(el);
-    }
+    if (el && el.isConnected) return el;
+
+    el = document.createElement('div');
+    el.id = 'crRoot';
+    el.innerHTML =
+      '<div class="cr-shell">' +
+        '<div class="cr-hero" id="crHero"></div>' +
+        '<div class="cr-now" id="crNow"></div>' +
+        '<div class="cr-body">' +
+          '<div class="cr-main">' +
+            '<div class="cr-sec" id="crBracketSec"></div>' +
+            '<div class="cr-sec"><p class="cr-h">Rooms</p><div class="cr-rooms" id="crRooms"></div></div>' +
+            '<div class="cr-sec" id="crSayS"><p class="cr-h">Say something</p><div id="crSay"></div></div>' +
+            '<div class="cr-sec" id="crPulseS"><p class="cr-h">Lobby pulse</p><div id="crPulse"></div></div>' +
+            '<div class="cr-sec" id="crTourneySec"></div>' +
+          '</div>' +
+          '<div class="cr-side">' +
+            '<div class="cr-sec" id="crEgoS"><p class="cr-h">Your alter ego</p><div id="crEgo"></div></div>' +
+            '<div class="cr-sec" id="crWhoS"><p class="cr-h">Who is around</p><div id="crWho"></div></div>' +
+            '<div class="cr-sec" id="crHofS"><p class="cr-h">Hall of fame</p><div id="crHof"></div></div>' +
+          '</div>' +
+        '</div>' +
+      '</div>';
+    host.appendChild(el);
     return el;
   }
 
+  /* Move the REAL nodes over. populate() keeps writing into them and
+     their own handlers keep working; only the skin changes. */
+  function adopt(){
+    function move(sel, mountId){
+      var node = q('#coliseumRoot ' + sel);
+      var mount = $(mountId);
+      if (node && mount && node.parentNode !== mount) mount.appendChild(node);
+      return node;
+    }
+    move('.col-identity-card', 'crEgo');
+    move('.col-const',         'crWho');
+    move('.col-composer',      'crSay');
+    move('.col-featured',      'crHof');
+    move('.col-hof',           'crHof');
+
+    // Chronicle holds two cards: activity, then upcoming events.
+    var cards = document.querySelectorAll('#coliseumRoot .col-chronicle .col-chron-card');
+    var pulse = $('crPulse');
+    if (pulse) Array.prototype.forEach.call(cards, function(c){
+      if (c.parentNode !== pulse) pulse.appendChild(c);
+    });
+
+    // A mount whose section never received anything stays out of the way.
+    [['crSay','crSayS'],['crPulse','crPulseS'],['crEgo','crEgoS'],
+     ['crWho','crWhoS'],['crHof','crHofS']].forEach(function(p){
+      var m = $(p[0]), s = $(p[1]);
+      if (m && s) s.style.display = m.children.length ? '' : 'none';
+    });
+  }
+
   function render(){
-    var el = root(), s = server();
+    var el = shell(), s = server();
     if (!el || !s) return;
 
     var mem = members(), chs = channels(), ts = tournaments();
     var online = mem.filter(function(m){ return presence(m) !== 'offline'; });
     var voice  = mem.filter(function(m){ return presence(m) === 'voice'; });
-
-    var active  = ts.filter(isLive)[0] || null;
+    var active = ts.filter(isLive)[0] || null;
     var matches = active ? (active.matches || active.current_matches || []) : [];
-    var banner  = s.banner_url || s.bannerUrl || s.banner;
-    var icon    = s.icon_url || s.iconUrl || s.icon;
+    var banner = s.banner_url || s.bannerUrl || s.banner;
+    var icon   = s.icon_url || s.iconUrl || s.icon;
 
-    /* ── NOW strip. STANDBY carries real content — the last result and
-       the count on file — so a quiet lobby still reads as a running
-       desk rather than an empty page. ── */
-    var now;
+    $('crHero').innerHTML =
+      (banner ? '<div class="cr-hero-art" style="background-image:url(\'' + esc(banner) + '\')"></div>' : '') +
+      '<div class="cr-badge">' +
+        (active ? '<span class="cr-tag"><i></i>LIVE</span>' : '<span class="cr-tag off"><i></i>STANDBY</span>') +
+      '</div>' +
+      '<div class="cr-hero-in">' +
+        '<div class="cr-crest">' + (icon ? '<img src="' + esc(icon) + '" alt="">' : esc(initials(s.name))) + '</div>' +
+        '<div style="min-width:0">' +
+          '<h1 class="cr-name">' + esc(String(s.name || 'Lobby').toUpperCase()) + '</h1>' +
+          '<p class="cr-desc">' + esc(s.description || s.motto || 'No description set.') + '</p>' +
+          '<div class="cr-acts">' +
+            (voice.length
+              ? '<button class="cr-btn live" data-act="joinvoice">Join voice · ' + voice.length + '</button>'
+              : '<button class="cr-btn pri" data-act="startvoice">Start a room</button>') +
+            '<button class="cr-btn" data-act="calendar">Calendar</button>' +
+            '<button class="cr-btn" data-act="settings">Settings</button>' +
+            '<button class="cr-btn" data-act="invite">Invite</button>' +
+          '</div>' +
+        '</div>' +
+        '<div class="cr-score">' +
+          '<div><b>' + mem.length + '</b><span>Members</span></div>' +
+          '<div><b class="' + (online.length ? 'hot' : '') + '">' + online.length + '</b><span>Online</span></div>' +
+          '<div><b>' + ts.length + '</b><span>Events</span></div>' +
+        '</div>' +
+      '</div>';
+
+    var now, standby = false;
     if (active){
       now = '<span class="cr-pill hot">NOW</span>' +
         '<span><b>' + esc(active.name || active.title || 'Tournament') + '</b> is running</span>' +
@@ -53206,146 +53329,93 @@ body.coliseum-mode #coliseumRoot .col-canvas{ display:none !important; }
         '<span><b>' + voice.length + '</b> in voice right now</span>' +
         '<span class="mono">NO EVENT RUNNING</span>';
     } else {
+      standby = true;
       var last = ts.filter(isDone)[0];
       now = '<span class="cr-pill">STANDBY</span>' +
         '<span>Nobody in voice — <b>start a room</b> and it headlines here</span>' +
         '<span class="mono">' + (last ? 'LAST: ' + esc(String(last.name || last.title).toUpperCase()) + ' · ' : '') +
-          ts.length + ' TOURNAMENTS ON FILE</span>';
+        ts.length + ' TOURNAMENTS ON FILE</span>';
     }
+    $('crNow').className = 'cr-now' + (standby ? ' standby' : '');
+    $('crNow').innerHTML = now;
 
-    /* ── Bracket. Real matches when the data has them; otherwise the
-       tournaments that are actually waiting to run — never both, which
-       is why TOURNAMENTS was appearing twice. ── */
     var pending = ts.filter(function(t){ return !isDone(t); });
-    var brkTitle, brkHtml;
+    var title, html;
     if (matches.length){
-      brkTitle = 'Bracket · ' + esc(String(active.name || active.title || '').toUpperCase());
-      brkHtml = matches.slice(0,4).map(function(m){
+      title = 'Bracket · ' + esc(String(active.name || active.title || '').toUpperCase());
+      html = matches.slice(0,4).map(function(m){
         var a = m.team_a || m.a || {}, b = m.team_b || m.b || {};
         return '<div class="cr-match ' + (m.live ? 'on' : '') + '" data-act="tourneys">' +
           '<b>' + esc(a.name || 'TBD') + '</b>' +
           '<div class="vs">' + (m.live ? esc((m.score_a != null ? m.score_a : 0) + ' – ' + (m.score_b != null ? m.score_b : 0)) : 'VS') + '</div>' +
-          '<b>' + esc(b.name || 'TBD') + '</b>' +
-          '</div>';
+          '<b>' + esc(b.name || 'TBD') + '</b></div>';
       }).join('');
     } else if (pending.length){
-      brkTitle = 'Up next';
-      brkHtml = pending.slice(0,4).map(function(t){
+      title = 'Up next';
+      html = pending.slice(0,4).map(function(t){
         return '<div class="cr-match ' + (isLive(t) ? 'on' : '') + '" data-act="tourneys">' +
           '<b>' + esc(t.name || t.title || 'Tournament') + '</b>' +
           '<div class="vs">' + (isLive(t) ? 'RUNNING' : 'WAITING TO START') + '</div>' +
-          '<div class="st">' + esc(String(t.format || 'Single elimination')) + '</div>' +
-          '</div>';
+          '<div class="st">' + esc(String(t.format || 'Single elimination')) + '</div></div>';
       }).join('');
-    } else {
-      brkTitle = 'Bracket';
-      brkHtml = '';
-    }
+    } else { title = ''; html = ''; }
+    var bs = $('crBracketSec');
+    bs.style.display = html ? '' : 'none';
+    if (html) bs.innerHTML = '<p class="cr-h">' + title +
+      '<span class="more" data-act="tourneys">View all ' + ts.length + ' →</span></p>' +
+      '<div class="cr-brk">' + html + '</div>';
 
-    var roomsHtml = chs.length ? chs.map(function(c){
+    $('crRooms').innerHTML = chs.length ? chs.map(function(c){
       var isVoice = c.type === 'voice';
-      var here = isVoice
-        ? mem.filter(function(m){ return m && (m.voiceChannelId === c.id || m.voice_channel_id === c.id); }).length
-        : 0;
+      var here = isVoice ? mem.filter(function(m){ return m && (m.voiceChannelId === c.id || m.voice_channel_id === c.id); }).length : 0;
       return '<div class="cr-room ' + (here ? 'live' : '') + '" data-ch="' + esc(c.id) +
         '" data-type="' + esc(c.type || 'text') + '" data-name="' + esc(c.name || 'channel') + '">' +
         '<span class="ic">' + (isVoice ? '🎙' : c.type === 'announcement' ? '📣' : '💬') + '</span>' +
         '<span>' + esc(String(c.name || 'channel').replace(/^#/, '')) + '</span>' +
         (here ? '<span class="who">' + here + ' here</span>'
-              : '<span class="go">' + (isVoice ? 'JOIN' : 'OPEN') + '</span>') +
-        '</div>';
+              : '<span class="go">' + (isVoice ? 'JOIN' : 'OPEN') + '</span>') + '</div>';
     }).join('') : '<div class="cr-empty">No channels yet — create one in Settings.</div>';
 
-    /* Compact rows, not a wall of identical trophy tiles. */
-    var histHtml = ts.slice(0,6).map(function(t){
-      var live = isLive(t), done = isDone(t);
-      return '<div class="cr-trow ' + (live ? 'live' : '') + '" data-act="tourneys">' +
-        '<span class="nm">' + esc(t.name || t.title || 'Tournament') + '</span>' +
-        '<span class="st ' + (live ? 'on' : done ? 'done' : '') + '">' + esc(statusOf(t).replace(/_/g,' ')) + '</span>' +
-        '</div>';
-    }).join('');
+    var tsec = $('crTourneySec');
+    tsec.style.display = ts.length ? '' : 'none';
+    if (ts.length) tsec.innerHTML = '<p class="cr-h">All tournaments' +
+      '<span class="more" data-act="newt">+ New tournament</span></p><div class="cr-tlist">' +
+      ts.slice(0,6).map(function(t){
+        var live = isLive(t), done = isDone(t);
+        return '<div class="cr-trow ' + (live ? 'live' : '') + '" data-act="tourneys">' +
+          '<span class="nm">' + esc(t.name || t.title || 'Tournament') + '</span>' +
+          '<span class="st ' + (live ? 'on' : done ? 'done' : '') + '">' + esc(statusOf(t).replace(/_/g,' ')) + '</span></div>';
+      }).join('') + '</div>';
 
-    el.innerHTML =
-      '<div class="cr-shell">' +
-        '<div class="cr-hero">' +
-          (banner ? '<div class="cr-hero-art" style="background-image:url(\'' + esc(banner) + '\')"></div>' : '') +
-          '<div class="cr-badge">' +
-            (active ? '<span class="cr-tag"><i></i>LIVE</span>'
-                    : '<span class="cr-tag off"><i></i>STANDBY</span>') +
-          '</div>' +
-          '<div class="cr-hero-in">' +
-            '<div class="cr-crest">' + (icon ? '<img src="' + esc(icon) + '" alt="">' : esc(initials(s.name))) + '</div>' +
-            '<div style="min-width:0">' +
-              '<h1 class="cr-name">' + esc(String(s.name || 'Lobby').toUpperCase()) + '</h1>' +
-              '<p class="cr-desc">' + esc(s.description || s.motto || 'No description set.') + '</p>' +
-              '<div class="cr-acts">' +
-                (voice.length
-                  ? '<button class="cr-btn live" data-act="joinvoice">Join voice · ' + voice.length + '</button>'
-                  : '<button class="cr-btn pri" data-act="startvoice">Start a room</button>') +
-                '<button class="cr-btn" data-act="calendar">Calendar</button>' +
-                '<button class="cr-btn" data-act="settings">Settings</button>' +
-                '<button class="cr-btn" data-act="invite">Invite</button>' +
-              '</div>' +
-            '</div>' +
-            '<div class="cr-score">' +
-              '<div><b>' + mem.length + '</b><span>Members</span></div>' +
-              '<div><b class="' + (online.length ? 'hot' : '') + '">' + online.length + '</b><span>Online</span></div>' +
-              '<div><b>' + ts.length + '</b><span>Events</span></div>' +
-            '</div>' +
-          '</div>' +
-        '</div>' +
-        '<div class="cr-now ' + (active || voice.length ? '' : 'standby') + '">' + now + '</div>' +
-        (brkHtml ? '<div class="cr-sec"><p class="cr-h">' + brkTitle +
-          '<span class="more" data-act="tourneys">View all ' + ts.length + ' →</span></p>' +
-          '<div class="cr-brk">' + brkHtml + '</div></div>' : '') +
-        '<div class="cr-sec"><p class="cr-h">Rooms</p><div class="cr-rooms">' + roomsHtml + '</div></div>' +
-        (histHtml ? '<div class="cr-sec"><p class="cr-h">All tournaments' +
-          '<span class="more" data-act="newt">+ New tournament</span></p>' +
-          '<div class="cr-tlist">' + histHtml + '</div></div>' : '') +
-      '</div>';
+    adopt();
   }
 
   function wire(){
-    var el = root();
+    var el = shell();
     if (!el || el.__wired) return;
     el.addEventListener('click', function(e){
       var s = server();
       var room = e.target.closest('[data-ch]');
       if (room){
-        var id = room.getAttribute('data-ch');
-        var nm = room.getAttribute('data-name');
-        var tp = room.getAttribute('data-type');
-        if (tp === 'voice'){
-          if (typeof window.joinVoiceChannel === 'function') window.joinVoiceChannel(id, nm);
-        } else if (typeof window.openChannel === 'function'){
-          window.openChannel(id, nm, tp || 'text');
-        }
+        var id = room.getAttribute('data-ch'), nm = room.getAttribute('data-name'), tp = room.getAttribute('data-type');
+        if (tp === 'voice'){ if (typeof window.joinVoiceChannel === 'function') window.joinVoiceChannel(id, nm); }
+        else if (typeof window.openChannel === 'function'){ window.openChannel(id, nm, tp || 'text'); }
         return;
       }
       var act = e.target.closest('[data-act]');
       if (!act || !s) return;
       switch (act.getAttribute('data-act')){
-        case 'calendar':
-          if (typeof window.openLobbyCalendar === 'function') window.openLobbyCalendar(s.id, s.name);
-          break;
-        case 'settings':
-          if (typeof window.openServerSettings === 'function') window.openServerSettings(s.id);
-          break;
-        case 'invite':
-          if (typeof window.inviteFriendToServer === 'function') window.inviteFriendToServer(s.id);
-          break;
+        case 'calendar': if (typeof window.openLobbyCalendar === 'function') window.openLobbyCalendar(s.id, s.name); break;
+        case 'settings': if (typeof window.openServerSettings === 'function') window.openServerSettings(s.id); break;
+        case 'invite':   if (typeof window.inviteFriendToServer === 'function') window.inviteFriendToServer(s.id); break;
         case 'joinvoice':
         case 'startvoice': {
           var vc = channels().find(function(c){ return c.type === 'voice'; });
           if (vc && typeof window.joinVoiceChannel === 'function') window.joinVoiceChannel(vc.id, vc.name);
           break;
         }
-        case 'tourneys':
-          if (typeof window.showOverlay === 'function') window.showOverlay('myTournamentsOverlay');
-          break;
-        case 'newt':
-          if (typeof window.openModal === 'function') window.openModal('createTournamentModal');
-          break;
+        case 'tourneys': if (typeof window.showOverlay === 'function') window.showOverlay('myTournamentsOverlay'); break;
+        case 'newt':     if (typeof window.openModal === 'function') window.openModal('createTournamentModal'); break;
       }
     });
     el.__wired = true;
@@ -53362,12 +53432,11 @@ body.coliseum-mode #coliseumRoot .col-canvas{ display:none !important; }
 
   function start(){
     new MutationObserver(schedule).observe(document.body, { attributes:true, attributeFilter:['class'] });
-    // Presence and tournament data arrive over the socket after paint.
     setInterval(function(){
       if (document.body.classList.contains('coliseum-mode')) { wire(); render(); }
     }, 2500);
     schedule();
-    console.log('[coliseum] Control Room active');
+    console.log('[coliseum] Control Room — community build');
   }
 
   if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', start);
