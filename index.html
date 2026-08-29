@@ -32378,7 +32378,16 @@ async function loadRecents() {
         </div>`
       : `<div style="font-size:11px;color:var(--text-3);padding-top:6px;border-top:1px solid rgba(255,255,255,.06)">No public achievements for this game</div>`;
 
-    return `<div class="game-card" onclick="window.open('https://store.steampowered.com/app/${g.appid}','_blank')">
+    // The true counts travel on the element. Everything downstream used to
+    // count .game-card-ach rows, which is the DISPLAY list and is capped at
+    // five — so a player with 40 achievements read as 5.
+    const achU = g.achievementsUnlocked != null
+      ? g.achievementsUnlocked
+      : (g.achievements || []).length;
+    const achT = g.achievementsTotal || 0;
+    const achC = g.achievementsComplete ? 1 : 0;
+
+    return `<div class="game-card" data-ach-unlocked="${achU}" data-ach-total="${achT}" data-ach-complete="${achC}" onclick="window.open('https://store.steampowered.com/app/${g.appid}','_blank')">
       <img class="game-card-hero"
         src="${g.header_img}"
         onerror="this.outerHTML='<div class=\\'game-card-placeholder\\'>🎮</div>'"
