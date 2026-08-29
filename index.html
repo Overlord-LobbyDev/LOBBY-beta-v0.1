@@ -55929,13 +55929,14 @@ body.lobby-selected #chatPanel .chat-header{ display:none !important; }
 
 .hs-main{ width:100%; display:flex; flex-direction:column; align-items:center; }
 
-/* The index, the source and the live count sit ABOVE the name, not
-   beside it — that is what keeps the title itself dead centre. */
+/* The index, the source and the live count sit UNDER the name now, and
+   still on their own row — never beside the words, which is what keeps
+   the title itself dead centre rather than merely balanced. */
 .hs-kicker{
   display:inline-flex; align-items:center; gap:10px;
   font-family:'JetBrains Mono', ui-monospace, monospace;
   font-size:10px; font-weight:700; letter-spacing:2.2px; text-transform:uppercase;
-  color:var(--text-3); margin-bottom:9px;
+  color:var(--text-3); margin-top:13px;
   padding:5px 13px; border-radius:99px;
   background:rgba(255,255,255,.035);
   border:1px solid rgba(255,255,255,.07);
@@ -55943,7 +55944,7 @@ body.lobby-selected #chatPanel .chat-header{ display:none !important; }
 /* A short accent bar under the name instead of rules running off to the
    page edges — it marks the section without the centred-hairline look. */
 .hs-bar{
-  width:64px; height:3px; border-radius:99px; margin-top:12px;
+  width:64px; height:3px; border-radius:99px; margin-top:11px;
   background:linear-gradient(90deg,
     transparent,
     color-mix(in srgb, var(--accent) 95%, white) 35%,
@@ -55969,11 +55970,12 @@ body.lobby-selected #chatPanel .chat-header{ display:none !important; }
 
 #homeContent .home-section-title{
   font-family:'Bebas Neue', var(--font), sans-serif !important;
-  /* 46 -> 37 -> 30px, two 20% steps down. Tracking stays at 5.5px rather
-     than scaling with the size, so the words keep getting proportionally
-     wider as they get shorter. */
-  font-size:30px !important; font-weight:400 !important;
-  letter-spacing:5.5px !important; line-height:.95 !important;
+  /* 46 -> 37 -> 30 -> 27px. Tracking comes back from 5.5px to 4.2px:
+     it was held at the 46px value through two shrinks, and by 27px that
+     much air between letters was pulling the words apart rather than
+     giving them width. */
+  font-size:27px !important; font-weight:400 !important;
+  letter-spacing:4.2px !important; line-height:.95 !important;
   color:#fff !important;
   /* Solid, not a gradient fill. The fade read as a shortcut for
      interest; at this size the type carries itself. */
@@ -56071,10 +56073,14 @@ body.lobby-selected #chatPanel .chat-header{ display:none !important; }
         var bar = document.createElement('span');
         bar.className = 'hs-bar';
 
+        /* Name first, then the accent, then the stats. The pill sat above
+           the title originally to keep the title itself dead centre --
+           that still holds underneath it, because it is its own row
+           either way and never shares a line with the words. */
         var oldWrap = title.parentElement;
-        main.appendChild(kicker);
         main.appendChild(title);
         main.appendChild(bar);
+        main.appendChild(kicker);
         if (sub) main.appendChild(sub);
 
         head.insertBefore(main, head.firstChild);
