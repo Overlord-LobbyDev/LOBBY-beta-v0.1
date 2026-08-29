@@ -55082,7 +55082,11 @@ body.double-dock[data-feed-position="right"].feed-open:not(.rail-hidden) #settin
   box-shadow:0 30px 70px rgba(0,0,0,.72),
              0 0 0 1px color-mix(in srgb, var(--accent) 30%, transparent);
 }
-#homeContent [data-home-slot="hero"] .game-card:not(.rc-active):hover{ --rc-o:.85 !important; }
+/* Brighten on hover, do not fade IN — the cards are opaque now, and
+   raising opacity toward .85 would only make this one see-through. */
+#homeContent [data-home-slot="hero"] .game-card:not(.rc-active):hover{
+  --rc-b:.78 !important; --rc-sat:.9 !important;
+}
 
 /* ── Art column ─────────────────────────────────────────────────── */
 /* ── Art column ─────────────────────────────────────────────────
@@ -55648,13 +55652,17 @@ body.double-dock[data-feed-position="right"].feed-open:not(.rail-hidden) #settin
         s.setProperty('--rc-o','1');    s.setProperty('--rc-sat','1');
         s.setProperty('--rc-b','1');    s.zIndex = 30;
       } else if (a === 1){
+        /* Opaque. Depth comes from dimming and desaturating, NOT from
+           opacity -- a card at 62% lets the one behind it show straight
+           through, which is what made the stack look like it was melting
+           together rather than sitting in front of itself. */
         s.setProperty('--rc-x',(off * STEP) + 'px'); s.setProperty('--rc-s','.8');
-        s.setProperty('--rc-o','.62');  s.setProperty('--rc-sat','.5');
-        s.setProperty('--rc-b','.62');  s.zIndex = 20;
+        s.setProperty('--rc-o','1');    s.setProperty('--rc-sat','.62');
+        s.setProperty('--rc-b','.52');  s.zIndex = 20;
       } else if (a === 2){
         s.setProperty('--rc-x',(off / a * STEP2) + 'px'); s.setProperty('--rc-s','.66');
-        s.setProperty('--rc-o','.26');  s.setProperty('--rc-sat','.35');
-        s.setProperty('--rc-b','.5');   s.zIndex = 10;
+        s.setProperty('--rc-o','1');    s.setProperty('--rc-sat','.42');
+        s.setProperty('--rc-b','.34');  s.zIndex = 10;
       } else {
         s.setProperty('--rc-x',(off > 0 ? STEP2 + 200 : -(STEP2 + 200)) + 'px');
         s.setProperty('--rc-s','.6');   s.setProperty('--rc-o','0');
@@ -56422,7 +56430,11 @@ body[data-feed-position="split"].feed-open #homeContent > [data-home-slot="col"]
   box-shadow:0 30px 70px rgba(0,0,0,.72),
              0 0 0 1px color-mix(in srgb, var(--accent) 30%, transparent);
 }
-#homeContent [data-home-slot="hero"] .community-card:not(.rc-active):hover{ --rc-o:.85 !important; }
+/* Brighten on hover, do not fade IN — the cards are opaque now, and
+   raising opacity toward .85 would only make this one see-through. */
+#homeContent [data-home-slot="hero"] .community-card:not(.rc-active):hover{
+  --rc-b:.78 !important; --rc-sat:.9 !important;
+}
 
 /* Art column. The banner is the only artwork a lobby has, so it carries
    the column the way cover art carries a game card — and a blurred copy
@@ -57065,7 +57077,11 @@ body[data-feed-position="split"].feed-open #homeContent > [data-home-slot="col"]
   box-shadow:0 30px 70px rgba(0,0,0,.72),
              0 0 0 1px color-mix(in srgb, var(--accent) 30%, transparent);
 }
-#homeContent [data-home-slot="hero"] .spotlight-card:not(.rc-active):hover{ --rc-o:.85 !important; }
+/* Brighten on hover, do not fade IN — the cards are opaque now, and
+   raising opacity toward .85 would only make this one see-through. */
+#homeContent [data-home-slot="hero"] .spotlight-card:not(.rc-active):hover{
+  --rc-b:.78 !important; --rc-sat:.9 !important;
+}
 
 /* ── Media column ─────────────────────────────────────────────── */
 #homeContent [data-home-slot="hero"] .spotlight-card-media{
