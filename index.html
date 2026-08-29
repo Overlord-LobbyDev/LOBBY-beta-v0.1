@@ -52955,6 +52955,40 @@ body.coliseum-mode #coliseumRoot .col-canvas{ display:none !important; }
 
 /* Consistent breathing room between stacked adopted cards. */
 #crRoot .cr-sec > div > .col-chron-card + .col-chron-card{ margin-top:16px !important; }
+
+/* ── Empty Moment / empty Hall ───────────────────────────────────
+   With nothing to show these still rendered a full-size card: an author
+   row reading "-", a reaction bubble reading 0, three "-" stats and two
+   actions with nothing to act on. Filler is what made them mostly dead
+   space, so the empty case drops to just the sentence that explains
+   what will appear there. */
+#crRoot #crMoment.is-empty .col-featured-author,
+#crRoot #crMoment.is-empty .col-featured-stats,
+#crRoot #crMoment.is-empty .col-featured-actions{ display:none !important; }
+#crRoot #crMoment.is-empty .col-featured{
+  padding:16px 18px !important;
+  min-height:0 !important;
+}
+#crRoot #crMoment.is-empty .col-featured-title{
+  font-family:var(--cr-head) !important; font-size:14px !important;
+  line-height:1.3 !important; margin:0 0 6px !important;
+}
+#crRoot #crMoment.is-empty .col-featured-desc{
+  font-size:12.5px !important; line-height:1.55 !important; margin:0 !important;
+}
+
+/* The Hall's action sat above its own empty message, floated right, with
+   the message centred underneath — two different alignments in one small
+   card. Message first, action under it, both aligned left. */
+#crRoot .col-hof{ display:flex !important; flex-direction:column; gap:14px; }
+#crRoot .col-hof-track{ order:1; }
+#crRoot .col-hof-head{ order:2; justify-content:flex-start !important; }
+#crRoot #crHall.is-empty .col-hof-empty{
+  font-style:normal !important; text-align:left !important;
+  font-size:12.5px !important; color:var(--cr-ink3) !important;
+  padding:0 !important;
+}
+#crRoot #crHall.is-empty .col-hof{ padding:16px 18px !important; }
 #crRoot .col-hof{
   background:
     radial-gradient(420px 160px at 12% 0%, color-mix(in srgb, var(--cr-gold) 13%, transparent), transparent 62%),
@@ -53183,6 +53217,17 @@ body.coliseum-mode #coliseumRoot .col-canvas{ display:none !important; }
       var m = $(p[0]), s = $(p[1]);
       if (m && s) s.style.display = m.children.length ? '' : 'none';
     });
+
+    /* Flag the empty cases so the CSS can collapse them. An empty Moment
+       still renders an author row, a reaction count and two actions —
+       all of them "-" or 0, and all of them meaningless with no moment
+       to act on. That filler is what made these cards mostly dead space. */
+    var ftl = $('colFeaturedTitle');
+    var mom = $('crMoment');
+    if (mom) mom.classList.toggle('is-empty',
+      !!ftl && /^no featured moment/i.test((ftl.textContent || '').trim()));
+    var hall = $('crHall');
+    if (hall) hall.classList.toggle('is-empty', !!q('#crHall .col-hof-empty'));
   }
 
   function render(){
