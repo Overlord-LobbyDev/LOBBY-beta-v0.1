@@ -55170,8 +55170,8 @@ body.double-dock[data-feed-position="right"].feed-open:not(.rail-hidden) #settin
    and would push the list straight through the bottom of the card
    instead of scrolling inside it. */
 #homeRecents .game-card-achievements{
-  margin-top:16px !important; padding-top:14px !important;
-  border-top:1px solid rgba(255,255,255,.07) !important;
+  margin-top:0 !important; padding-top:0 !important;
+  border-top:0 !important;
   flex:1 1 auto; min-height:0; overflow-y:auto; overflow-x:hidden;
   display:flex; flex-direction:column; gap:6px;
   padding-right:6px !important;
@@ -55186,11 +55186,13 @@ body.double-dock[data-feed-position="right"].feed-open:not(.rail-hidden) #settin
 /* Rows keep their height under pressure, so one can never be half-drawn
    at the scroll edge. */
 #homeRecents .game-card-ach{ flex:0 0 auto !important; }
-/* The label stays put while the rows move under it. */
+/* The label now sits outside the scrollport, so it needs the separator
+   the list used to carry — and the list drops its own, or there would be
+   two rules stacked. */
 #homeRecents .game-card-ach-label{
-  position:sticky; top:0; z-index:2;
-  background:linear-gradient(180deg, rgba(11,13,19,.98) 70%, rgba(11,13,19,0));
-  padding-bottom:6px !important;
+  flex:none;
+  margin:16px 0 8px !important; padding-top:14px !important;
+  border-top:1px solid rgba(255,255,255,.07);
 }
 .rc-more{
   font-family:'Archivo', var(--font), sans-serif;
@@ -55453,6 +55455,14 @@ body.double-dock[data-feed-position="right"].feed-open:not(.rail-hidden) #settin
     if (achWrap){
       var rows = Array.prototype.slice.call(achWrap.querySelectorAll('.game-card-ach'));
       rows.slice(10).forEach(function(r){ r.remove(); });
+
+      /* Lift the label OUT of the scrolling list. Sticky was not enough:
+         rows scroll into the container's own padding, which sits above
+         the sticky element's resting position, so they appeared over it —
+         and the label's fading background let them show through anyway.
+         Outside the scrollport there is nothing to scroll past it. */
+      var label = achWrap.querySelector('.game-card-ach-label');
+      if (label) achWrap.parentNode.insertBefore(label, achWrap);
     }
 
     /* Opening Steam belongs to this button alone — see the click guard
