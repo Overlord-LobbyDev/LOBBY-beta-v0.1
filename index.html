@@ -56175,6 +56175,11 @@ body.lobby-selected #chatPanel .chat-header{ display:none !important; }
    IS the user order — these classes just read it. */
 #homeContent > .bn-hero{ grid-column:span 4; order:0; }
 #homeContent > .bn-main{ grid-column:span 3; grid-row:span 2; order:1; }
+/* Any section holding the carousel gets the same protection, whichever
+   slot the user drags it into. */
+#homeContent > #homeRecents.bn-main,
+#homeContent > #homeRecents.bn-wide,
+#homeContent > #homeRecents.bn-hero{ min-height:640px !important; overflow:hidden !important; }
 /* When the carousel takes the 3x2 slot it is forced full width above, so
    the two small tiles would be stranded on a row of their own. Letting
    them span two keeps that row honest instead of half empty. */
@@ -56210,7 +56215,14 @@ body.lobby-selected #chatPanel .chat-header{ display:none !important; }
 #homeContent > #homeRecents{
   grid-column:span 4 !important;
   grid-row:auto !important;
-  min-height:560px;            /* absolute cards contribute no height */
+  /* The track is a fixed 450px of absolutely positioned cards, which
+     contribute NO height — so the grid row sized itself to the title
+     alone and the cards spilled over whatever tile came next, painting
+     on top of it. An explicit height gives the row something real to
+     measure, and overflow:hidden guarantees nothing can leave the
+     section even if an inner container stops clipping. */
+  min-height:640px !important;
+  overflow:hidden !important;
 }
 /* The carousel keeps its own presentation wherever it sits — a tile
    frame would fight the card it already draws. */
