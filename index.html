@@ -53047,5 +53047,49 @@ body.coliseum-mode #coliseumRoot{
 }
 body.lobby-reduce-motion #coliseumRoot{ transition:none !important; }
 </style>
+
+<!-- ══════════════════════════════════════════════════════════════════
+     THE FEED PUSHES THE COLISEUM TOO
+
+     Messages and Sidebar reflowed the Coliseum but the Feed sat on top
+     of it, covering the whole right column.
+
+     The app reserves --feed-w on every page through one explicit list
+     (#homePanel, #chatPanel, #calendarPanel, #vcPanel, #profilePage,
+     .lobby-overlay). #coliseumRoot is not in it — the Coliseum was built
+     after that rule and never added, so it was the one page the feed had
+     nothing to push.
+
+     Same variables and the same .55s --feed-ease as the originals, so
+     the Coliseum reflows identically to every other page rather than
+     merely similarly. The ambient backdrop is a separate fixed layer and
+     needs the same treatment or it shows through beside the feed.
+     ══════════════════════════════════════════════════════════════════ -->
+<style>
+/* LEFT dock — parks next to the sidebar, exactly as the panel rule does. */
+body[data-feed-position="left"].coliseum-mode.feed-open #coliseumRoot,
+body[data-feed-position="left"].coliseum-mode.feed-open .col-amb{
+  left:calc(var(--feed-left-edge) + var(--feed-w)) !important;
+  transition:left .55s var(--feed-ease);
+}
+/* RIGHT dock */
+body[data-feed-position="right"].coliseum-mode.feed-open #coliseumRoot,
+body[data-feed-position="right"].coliseum-mode.feed-open .col-amb{
+  right:var(--feed-w) !important;
+  transition:right .55s var(--feed-ease);
+}
+
+/* Double Dock: the feed and the rail share the right edge, so the page
+   has to clear BOTH. Keyed on the app's own .double-dock class rather
+   than inferred from "feed open and rail not hidden" — outside Double
+   Dock the rail only gets .rail-hidden after its 300ms exit, so an
+   inferred rule would fire during the handoff and jump the page width.
+   The extra class also beats the single-edge rule above outright,
+   instead of tying on specificity and letting source order decide. */
+body.double-dock[data-feed-position="right"].coliseum-mode.feed-open:not(.rail-hidden) #coliseumRoot,
+body.double-dock[data-feed-position="right"].coliseum-mode.feed-open:not(.rail-hidden) .col-amb{
+  right:calc(var(--feed-w) + var(--lir-w)) !important;
+}
+</style>
 </body>
 </html>
