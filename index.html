@@ -55044,11 +55044,38 @@ body.double-dock[data-feed-position="right"].feed-open:not(.rail-hidden) #settin
   width:46% !important; height:100% !important;
   object-fit:cover !important; flex:0 0 46% !important;
   border-radius:0 !important;
+  /* Positioned so it paints ABOVE the ambient ::before. A positioned
+     pseudo with z-index:0 otherwise covers in-flow content, and the
+     blurred layer would sit on top of the art it was made from. */
+  position:relative; z-index:1;
 }
 #homeRecents .game-card-placeholder{
   width:46% !important; height:100% !important; flex:0 0 46%;
   font-size:56px !important;
+  position:relative; z-index:1;
 }
+/* ── Ambient colour, taken from the game's own art ───────────────
+   A heavily blurred, over-scaled copy of the cover sits behind the whole
+   card, so each game tints its own card in its own colours.
+
+   Done with the image rather than by sampling a dominant colour: reading
+   pixels needs a canvas, and Steam's CDN does not send CORS headers, so
+   the canvas would be tainted and getImageData would throw. This gets
+   real colour off the real artwork with nothing to be blocked. */
+#homeRecents .game-card::before{
+  content:''; position:absolute; inset:-20%;
+  background-image:var(--rc-art, none);
+  background-size:cover; background-position:center;
+  filter:blur(48px) saturate(2.2) brightness(.85);
+  opacity:var(--rc-art-o, .5);
+  z-index:0; pointer-events:none;
+  transition:opacity .4s ease;
+}
+/* The detail column needs a floor under it or the tint eats the text. */
+#homeRecents .game-card-body{
+  background:linear-gradient(180deg, rgba(11,13,19,.86), rgba(11,13,19,.94)) !important;
+}
+
 /* Art bleeds into the detail column rather than stopping at a hard
    seam — the join is the thing that made the split look pasted. */
 #homeRecents .game-card::after{
@@ -55197,9 +55224,79 @@ body.double-dock[data-feed-position="right"].feed-open:not(.rail-hidden) #settin
     return raw;
   }
 
+  /* Steam serves cover art under several different paths and filenames,
+     and header.jpg is missing for a lot of apps — that is what the wall
+     of 404s in the console was, and why some cards fell back to the
+     controller placeholder. Try the known locations in turn and take the
+     first that loads, instead of giving up after one. */
+  function artUrls(appid){
+    var A = 'https://cdn.cloudflare.steamstatic.com/steam/apps/' + appid + '/';
+    var B = 'https://cdn.akamai.steamstatic.com/steam/apps/' + appid + '/';
+    var C = 'https://shared.cloudflare.steamstatic.com/store_item_assets/steam/apps/' + appid + '/';
+    return [
+      A + 'header.jpg',            C + 'header.jpg',            B + 'header.jpg',
+      A + 'capsule_616x353.jpg',   C + 'capsule_616x353.jpg',
+      A + 'library_hero.jpg',      C + 'library_hero.jpg',
+      A + 'library_600x900.jpg',   C + 'library_600x900.jpg',
+      A + 'capsule_231x87.jpg'
+    ];
+  }
+
+  function appIdOf(card){
+    var on = card.getAttribute('onclick') || '';
+    var m = on.match(/\/app\/(\d+)/);
+    return m ? m[1] : null;
+  }
+
+  /* Resolve the artwork, then hand the winning URL to the CSS so the
+     ambient layer tints the card with it. */
+  function artwork(card){
+    var appid = appIdOf(card);
+    var hero = card.querySelector('.game-card-hero');
+    var ph   = card.querySelector('.game-card-placeholder');
+
+    function use(url){
+      card.style.setProperty('--rc-art', 'url("' + url + '")');
+      if (hero){ hero.src = url; return; }
+      // The inline onerror already swapped the img out for a placeholder;
+      // put a real image back in its place.
+      if (ph){
+        var img = document.createElement('img');
+        img.className = 'game-card-hero';
+        img.alt = '';
+        img.src = url;
+        ph.replaceWith(img);
+      }
+    }
+
+    // Already loaded fine — just feed the tint.
+    if (hero && hero.complete && hero.naturalWidth > 0){
+      card.style.setProperty('--rc-art', 'url("' + hero.src + '")');
+      return;
+    }
+    if (!appid) return;
+
+    var list = artUrls(appid), i = 0;
+    (function next(){
+      if (i >= list.length) return;              // genuinely no art — keep the placeholder
+      var url = list[i++];
+      var probe = new Image();
+      probe.onload = function(){ use(url); };
+      probe.onerror = next;
+      probe.src = url;
+    })();
+  }
+
   function enhance(card){
     if (card.__rc) return;
     card.__rc = true;
+
+    /* Kill the inline onerror first: it replaces the <img> with a
+       placeholder the moment one URL fails, which would tear out the
+       element the fallback chain is trying to fix. */
+    var h = card.querySelector('.game-card-hero');
+    if (h) h.removeAttribute('onerror');
+    artwork(card);
 
     var meta = card.querySelector('.game-card-meta');
     var body = card.querySelector('.game-card-body');
