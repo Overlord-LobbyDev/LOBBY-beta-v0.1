@@ -59597,5 +59597,219 @@ async function reactComment(ev, id, btn){
      name; the websocket handlers guard it the same way. */
 })();
 </script>
+
+<!-- ══════════════════════════════════════════════════════════════════
+     HOST A RACE / ANNOUNCE A RUN
+
+     openCreateRace was a TODO stub that showed a toast saying the form
+     was "coming up". So the race hub had a Host button on three screens
+     and no way to host, and /speedrun/live and /speedrun/scheduled could
+     never contain anything, because nothing in the app could create an
+     attempt. Endpoints without a way to reach them are not a working
+     feature.
+
+     One modal, two things, because the fields are nearly the same:
+
+       Race   — several people, same game, someone wins. POST /speedrun/races
+       Run    — one person announcing an attempt. POST /speedrun/attempts
+
+     Start now or schedule. "Start now" is what puts a row into
+     /speedrun/live, which is what turns off the "showing latest verified
+     runs instead" banner on the hub.
+     ══════════════════════════════════════════════════════════════════ -->
+<div class="modal-overlay" id="hostRaceModal" onclick="if(event.target===this)window.closeCreateRace()">
+  <div class="modal" style="width:min(620px,94vw);padding:0;overflow:hidden;background:linear-gradient(180deg,rgba(255,107,0,.08) 0%,var(--bg-1) 60%)">
+    <div style="padding:20px 24px 12px;border-bottom:1px solid rgba(255,255,255,.06);display:flex;align-items:center;justify-content:space-between">
+      <div>
+        <div style="font-size:10.5px;font-weight:800;letter-spacing:1.6px;text-transform:uppercase;color:#ff8a3a">★ Host</div>
+        <h2 id="hrTitle" style="margin:6px 0 0;font-family:'Archivo',var(--font),sans-serif;font-weight:900;font-size:22px;letter-spacing:1.2px;text-transform:uppercase;color:var(--text-1)">Host a race</h2>
+        <div id="hrSub" style="font-size:11.5px;color:var(--text-3);margin-top:3px">Everyone runs the same category. First to finish takes it.</div>
+      </div>
+      <button class="lc-modal-close" onclick="window.closeCreateRace()" aria-label="Close">✕</button>
+    </div>
+
+    <form onsubmit="window.hostRaceSubmit(event)" style="padding:18px 24px 22px;display:flex;flex-direction:column;gap:12px">
+      <div>
+        <label class="lp-modal-label">What are you starting</label>
+        <div class="hr-seg" id="hrKind">
+          <button type="button" class="hr-seg-btn is-on" data-kind="race" onclick="window._hrKind('race')">Race</button>
+          <button type="button" class="hr-seg-btn" data-kind="run" onclick="window._hrKind('run')">Solo run</button>
+        </div>
+      </div>
+
+      <div id="hrTitleRow">
+        <label class="lp-modal-label">Race name</label>
+        <input id="hrName" class="lp-modal-input" type="text" maxlength="80" placeholder="Friday night Any% throwdown">
+      </div>
+
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
+        <div>
+          <label class="lp-modal-label">Game</label>
+          <input id="hrGame" class="lp-modal-input" type="text" placeholder="Super Mario 64" required>
+        </div>
+        <div>
+          <label class="lp-modal-label">Category</label>
+          <input id="hrCategory" class="lp-modal-input" type="text" placeholder="Any% / 120 Star…">
+        </div>
+      </div>
+
+      <div id="hrPrizeRow">
+        <label class="lp-modal-label">Prize <span style="color:var(--text-3);font-weight:600;text-transform:none;letter-spacing:.3px">— optional</span></label>
+        <input id="hrPrize" class="lp-modal-input" type="text" maxlength="80" placeholder="Bragging rights">
+      </div>
+
+      <div>
+        <label class="lp-modal-label">When</label>
+        <div class="hr-seg" id="hrWhen">
+          <button type="button" class="hr-seg-btn is-on" data-when="now" onclick="window._hrWhen('now')">Start now</button>
+          <button type="button" class="hr-seg-btn" data-when="later" onclick="window._hrWhen('later')">Schedule</button>
+        </div>
+        <input id="hrWhenAt" class="lp-modal-input" type="datetime-local" style="margin-top:10px;display:none">
+      </div>
+
+      <div style="display:flex;gap:10px;justify-content:flex-end;margin-top:6px">
+        <button type="button" class="q-cta-secondary" onclick="window.closeCreateRace()">Cancel</button>
+        <button type="submit" class="sr-cta-secondary" id="hrGo" style="background:linear-gradient(135deg,#ff6b00,#ff3c3c);border:none;color:#fff;font-weight:800;padding:10px 20px;border-radius:10px;cursor:pointer;font-family:var(--font)">Go live →</button>
+      </div>
+    </form>
+  </div>
+</div>
+<style>
+.hr-seg{ display:inline-flex; gap:6px; margin-top:6px; }
+.hr-seg-btn{
+  font-family:var(--font); font-size:12px; font-weight:700;
+  padding:8px 14px; border-radius:9px; cursor:pointer;
+  background:rgba(255,255,255,.04);
+  border:1px solid rgba(255,255,255,.1);
+  color:var(--text-2);
+  transition:background .15s, border-color .15s, color .15s;
+}
+.hr-seg-btn:hover{ background:rgba(255,255,255,.08); color:var(--text-1); }
+.hr-seg-btn.is-on{
+  background:rgba(255,107,0,.16);
+  border-color:rgba(255,107,0,.5);
+  color:#ffb07a;
+}
+</style>
+<script>
+(function () {
+  'use strict';
+
+  var kind = 'race';
+  var when = 'now';
+
+  function $(id){ return document.getElementById(id); }
+  function seg(host, attr, val){
+    var h = $(host);
+    if (!h) return;
+    h.querySelectorAll('.hr-seg-btn').forEach(function (b) {
+      b.classList.toggle('is-on', b.getAttribute(attr) === val);
+    });
+  }
+
+  window._hrKind = function (k) {
+    kind = k;
+    seg('hrKind', 'data-kind', k);
+    var isRace = k === 'race';
+    if ($('hrTitleRow')) $('hrTitleRow').style.display = isRace ? '' : 'none';
+    if ($('hrPrizeRow')) $('hrPrizeRow').style.display = isRace ? '' : 'none';
+    if ($('hrTitle')) $('hrTitle').textContent = isRace ? 'Host a race' : 'Announce a run';
+    if ($('hrSub')) $('hrSub').textContent = isRace
+      ? 'Everyone runs the same category. First to finish takes it.'
+      : 'Tell people you are running. They can RSVP and turn up.';
+  };
+
+  window._hrWhen = function (w) {
+    when = w;
+    seg('hrWhen', 'data-when', w);
+    if ($('hrWhenAt')) $('hrWhenAt').style.display = w === 'later' ? '' : 'none';
+    if ($('hrGo')) $('hrGo').textContent = w === 'later' ? 'Schedule →' : 'Go live →';
+  };
+
+  /* Replaces the stub that only showed a toast. */
+  window.openCreateRace = function () {
+    var m = $('hostRaceModal');
+    if (!m) return;
+    window._hrKind('race');
+    window._hrWhen('now');
+    ['hrName','hrGame','hrCategory','hrPrize','hrWhenAt'].forEach(function (id) {
+      if ($(id)) $(id).value = '';
+    });
+    m.classList.add('open');
+  };
+  window.closeCreateRace = function () {
+    var m = $('hostRaceModal');
+    if (m) m.classList.remove('open');
+  };
+
+  window.hostRaceSubmit = async function (ev) {
+    if (ev) ev.preventDefault();
+    if (typeof window.api !== 'function') return;
+
+    var game = ($('hrGame') || {}).value || '';
+    game = game.trim();
+    if (!game) return;
+
+    var at = null;
+    if (when === 'later'){
+      var raw = ($('hrWhenAt') || {}).value;
+      /* A schedule with no time is just "now" with extra steps, so it is
+         rejected rather than silently starting. */
+      if (!raw){
+        if (typeof showToast === 'function') showToast('Pick a time, or choose Start now.', 'error');
+        return;
+      }
+      at = new Date(raw).toISOString();
+    }
+
+    var btn = $('hrGo');
+    if (btn) { btn.disabled = true; btn.textContent = 'Working…'; }
+
+    try {
+      var r;
+      if (kind === 'race'){
+        r = await window.api('/speedrun/races', {
+          method: 'POST', headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            title: (($('hrName') || {}).value || '').trim() || null,
+            game: game,
+            category: (($('hrCategory') || {}).value || '').trim() || null,
+            prize: (($('hrPrize') || {}).value || '').trim() || null,
+            scheduledFor: at,
+          }),
+        }).catch(function () { return null; });
+      } else {
+        r = await window.api('/speedrun/attempts', {
+          method: 'POST', headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            game: game,
+            category: (($('hrCategory') || {}).value || '').trim() || null,
+            scheduledFor: at,
+            live: when === 'now',
+          }),
+        }).catch(function () { return null; });
+      }
+
+      if (r && r.id){
+        if (typeof showToast === 'function'){
+          showToast(kind === 'race'
+            ? (when === 'now' ? 'Race is live — people can join now.' : 'Race scheduled.')
+            : (when === 'now' ? 'You are live.' : 'Run scheduled — people can RSVP.'), 'success');
+        }
+        window.closeCreateRace();
+        /* Refresh whichever lists this affects, so the thing just created
+           is actually on screen rather than needing a reopen. */
+        if (typeof _srLoadRaces === 'function') _srLoadRaces();
+        if (typeof _srLoadLive === 'function') _srLoadLive();
+        if (typeof _srLoadStats === 'function') _srLoadStats();
+      } else {
+        if (typeof showToast === 'function') showToast('Could not create that — try again.', 'error');
+      }
+    } finally {
+      if (btn) { btn.disabled = false; window._hrWhen(when); }
+    }
+  };
+})();
+</script>
 </body>
 </html>
