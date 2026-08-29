@@ -57353,5 +57353,95 @@ async function reactComment(ev, id, btn){
   btn.dataset.busy = '0';
 }
 </script>
+
+<!-- ══════════════════════════════════════════════════════════════════
+     SPOTLIGHT DECK — three fixes off the built card
+
+       The COMMENTS label sat flush against the stat strip. .rc-stats is
+       written margin:16px 0 0 — no bottom — because on a game card the
+       next thing is a bar with its own spacing. Here it butts straight
+       into the label.
+
+       An empty thread pinned its one line to the top of a tall column,
+       leaving the card looking unfinished rather than simply quiet.
+       Centred, it reads as a state instead of a gap.
+
+       The rank badge is given a translucent colour inline by the
+       renderer — rgba(251,191,36,.25) for first — which is fine over a
+       small poster but washes out over a large bright image. It keeps
+       its rank colour, now as a ring and a tint over a solid ground.
+     ══════════════════════════════════════════════════════════════════ -->
+<style>
+#homeContent [data-home-slot="hero"] .spotlight-card .rc-stats{
+  margin:0 0 16px !important;
+}
+
+/* A quiet thread should look composed, not truncated. */
+#homeContent [data-home-slot="hero"] .sp-comments:has(.sp-c-empty){
+  align-items:center; justify-content:center; text-align:center;
+}
+#homeContent [data-home-slot="hero"] .sp-comments .sp-c-empty{
+  font-size:13px; color:rgba(255,255,255,.34);
+  display:flex; flex-direction:column; align-items:center; gap:8px;
+}
+#homeContent [data-home-slot="hero"] .sp-comments .sp-c-empty::before{
+  content:'💬'; font-size:26px; opacity:.5; line-height:1;
+}
+
+/* Solid ground under the rank colour, which the controller re-applies as
+   a ring and a tint. */
+#homeContent [data-home-slot="hero"] .spotlight-rank-badge{
+  background:rgba(10,12,17,.82) !important;
+  backdrop-filter:blur(10px);
+  border-width:1.5px !important;
+  font-weight:900 !important;
+  box-shadow:0 6px 18px rgba(0,0,0,.5);
+}
+</style>
+<script>
+(function () {
+  'use strict';
+
+  /* The renderer writes the rank colour straight onto the badge as a
+     translucent background. Lift it off and use it as the ring and the
+     text colour instead, so the badge keeps its rank identity but stops
+     fighting whatever image is behind it. */
+  function fixBadge(card){
+    var b = card.querySelector('.spotlight-rank-badge');
+    if (!b || b.__rank) return;
+    b.__rank = true;
+    var col = (b.style.background || '').trim();
+    if (!col) return;
+    /* The inline colours arrive at .25 alpha, chosen to sit over a
+       poster. Opaque enough to read as a colour here. */
+    var ring = col.replace(/rgba\(([^)]+),\s*[\d.]+\)/, 'rgba($1, .9)');
+    b.style.background = '';
+    b.style.borderColor = ring;
+    b.style.color = ring;
+  }
+
+  function sweep(){
+    document.querySelectorAll(
+      '#homeContent [data-home-slot="hero"] .spotlight-card'
+    ).forEach(fixBadge);
+  }
+
+  function start(){
+    var hc = document.getElementById('homeContent');
+    if (!hc) { setTimeout(start, 200); return; }
+    var queued = false;
+    function ping(){
+      if (queued) return;
+      queued = true;
+      requestAnimationFrame(function () { queued = false; sweep(); });
+    }
+    new MutationObserver(ping).observe(hc, { childList: true, subtree: true });
+    sweep();
+  }
+
+  if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', start);
+  else start();
+})();
+</script>
 </body>
 </html>
