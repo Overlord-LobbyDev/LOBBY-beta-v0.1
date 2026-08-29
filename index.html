@@ -54984,5 +54984,195 @@ body.double-dock[data-feed-position="right"].feed-open:not(.rail-hidden) #settin
   else start();
 })();
 </script>
+
+<!-- ══════════════════════════════════════════════════════════════════
+     RECENTLY PLAYED — featured carousel
+
+     Was a flat horizontal strip of eight identical 300px cards that
+     scrolled three at a time, so nothing was the subject and the row
+     just ran off the edge of the screen.
+
+     Now the Steam featured shape, tighter: one large card in front with
+     its hero art and achievements, its neighbours smaller, dimmed and
+     set back behind it. Arrows and dots move the focus; clicking a card
+     behind brings it forward rather than opening Steam, so a mis-click
+     costs a step instead of a new browser tab.
+
+     The card markup is untouched — this restyles and re-centres what
+     loadRecentGames() already renders, so the Steam fields, capsule art
+     and achievement rows keep working exactly as they do now.
+     ══════════════════════════════════════════════════════════════════ -->
+<style>
+#homeRecents .spotlight-carousel-wrap{ padding:6px 0 4px; }
+
+/* The track centres its active card rather than paging by a fixed
+   pixel step — cards are different widths now, so the offset has to be
+   measured from the DOM, not calculated. */
+#homeRecents .home-games-grid{
+  display:flex !important; align-items:center !important;
+  gap:14px !important; overflow:visible !important;
+  transition:transform .42s cubic-bezier(.22,1,.36,1) !important;
+  padding:10px 0 !important;
+}
+#homeRecents .home-games-grid::-webkit-scrollbar{ display:none; }
+
+#homeRecents .game-card{
+  flex:0 0 auto;
+  width:250px;
+  opacity:.42;
+  transform:scale(.94);
+  filter:saturate(.6);
+  cursor:pointer;
+  transition:width .42s cubic-bezier(.22,1,.36,1),
+             opacity .3s ease, transform .42s cubic-bezier(.22,1,.36,1),
+             filter .3s ease, box-shadow .3s ease;
+  will-change:width, transform;
+}
+#homeRecents .game-card:hover{ opacity:.7; }
+
+#homeRecents .game-card.rc-active{
+  width:620px;
+  opacity:1;
+  transform:scale(1);
+  filter:none;
+  box-shadow:0 26px 60px rgba(0,0,0,.62),
+             0 0 0 1px color-mix(in srgb, var(--accent) 26%, transparent);
+  cursor:default;
+}
+/* The hero carries the card once it is the subject. */
+#homeRecents .game-card .game-card-hero{
+  height:118px !important; object-fit:cover; transition:height .42s cubic-bezier(.22,1,.36,1);
+}
+#homeRecents .game-card.rc-active .game-card-hero{ height:250px !important; }
+
+/* Detail belongs to the front card only. Behind it, a name and hours is
+   all that reads at that size anyway. */
+#homeRecents .game-card:not(.rc-active) .game-card-achievements,
+#homeRecents .game-card:not(.rc-active) .game-card-capsule{ display:none !important; }
+#homeRecents .game-card:not(.rc-active) .game-card-body{ padding:11px 13px !important; }
+#homeRecents .game-card:not(.rc-active) .game-card-name{ font-size:13px !important; }
+
+/* Dots */
+.rc-dots{ display:flex; justify-content:center; gap:7px; margin-top:14px; }
+.rc-dot{
+  width:7px; height:7px; border-radius:99px; cursor:pointer; border:0; padding:0;
+  background:rgba(255,255,255,.18); transition:background .2s, width .2s;
+}
+.rc-dot:hover{ background:rgba(255,255,255,.34); }
+.rc-dot.on{ width:20px; background:color-mix(in srgb, var(--accent) 85%, white); }
+
+/* The arrows sit against the big card, not the old 70px offset. */
+#homeRecents .spotlight-carousel-btn{ top:50% !important; transform:translateY(-50%) !important; z-index:4; }
+#homeRecents .spotlight-carousel-btn:disabled{ opacity:.25; pointer-events:none; }
+
+@media (max-width:1200px){
+  #homeRecents .game-card.rc-active{ width:480px; }
+  #homeRecents .game-card{ width:200px; }
+}
+@media (prefers-reduced-motion: reduce){
+  #homeRecents .home-games-grid,
+  #homeRecents .game-card,
+  #homeRecents .game-card .game-card-hero{ transition:none !important; }
+}
+</style>
+<script>
+(function () {
+  'use strict';
+
+  var idx = 0;
+
+  function track(){ return document.getElementById('recentGamesList'); }
+  function cards(){
+    var t = track();
+    return t ? Array.prototype.slice.call(t.querySelectorAll('.game-card')) : [];
+  }
+
+  /* Centre the active card inside the visible window. Measured rather
+     than stepped: the active card is far wider than the rest, so a fixed
+     card-width stride would drift further out of line with every move. */
+  function apply(){
+    var t = track(), list = cards();
+    if (!t || !list.length) return;
+    idx = Math.max(0, Math.min(idx, list.length - 1));
+
+    list.forEach(function(c, i){ c.classList.toggle('rc-active', i === idx); });
+
+    // Let the width transition start from the new classes before measuring.
+    requestAnimationFrame(function(){
+      var wrap = t.parentElement;                 // the overflow:hidden window
+      if (!wrap) return;
+      var active = list[idx];
+      var centre = active.offsetLeft + (active.offsetWidth / 2);
+      var shift  = (wrap.clientWidth / 2) - centre;
+      t.style.transform = 'translateX(' + Math.round(shift) + 'px)';
+    });
+
+    var prev = document.getElementById('recentsPrev');
+    var next = document.getElementById('recentsNext');
+    if (prev) prev.disabled = idx <= 0;
+    if (next) next.disabled = idx >= list.length - 1;
+
+    dots(list.length);
+  }
+
+  function dots(n){
+    var wrap = document.querySelector('#homeRecents .spotlight-carousel-wrap');
+    if (!wrap || !wrap.parentElement) return;
+    var host = document.getElementById('rcDots');
+    if (!host){
+      host = document.createElement('div');
+      host.id = 'rcDots';
+      host.className = 'rc-dots';
+      wrap.parentElement.insertBefore(host, wrap.nextSibling);
+      host.addEventListener('click', function(e){
+        var b = e.target.closest('.rc-dot');
+        if (!b) return;
+        idx = Number(b.getAttribute('data-i')) || 0;
+        apply();
+      });
+    }
+    // Only rebuild when the count changes — otherwise this runs on every
+    // move and throws away the dot you are about to click.
+    if (host.children.length !== n){
+      var out = '';
+      for (var i = 0; i < n; i++) out += '<button class="rc-dot" data-i="' + i + '" aria-label="Game ' + (i + 1) + '"></button>';
+      host.innerHTML = out;
+    }
+    Array.prototype.forEach.call(host.children, function(b, i){ b.classList.toggle('on', i === idx); });
+  }
+
+  /* Replaces the old paging nav, which stepped by a fixed 316px and
+     assumed three equal cards were visible. */
+  window.recentsNav = function(dir){ idx += (dir > 0 ? 1 : -1); apply(); };
+  window.recentsUpdateNav = function(){ apply(); };
+
+  function start(){
+    var t = track();
+    if (!t) return;
+
+    /* A card behind the front one brings itself forward instead of
+       opening Steam. Capture phase, because the card's own onclick would
+       otherwise fire first and open a tab you did not ask for. */
+    t.addEventListener('click', function(e){
+      var card = e.target.closest('.game-card');
+      if (!card || card.classList.contains('rc-active')) return;
+      e.preventDefault(); e.stopPropagation();
+      idx = cards().indexOf(card);
+      apply();
+    }, true);
+
+    // loadRecentGames() rewrites the track; re-centre whenever it does.
+    new MutationObserver(function(){ idx = 0; apply(); })
+      .observe(t, { childList:true });
+
+    window.addEventListener('resize', function(){ apply(); });
+    apply();
+    console.log('[recents] featured carousel active');
+  }
+
+  if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', start);
+  else start();
+})();
+</script>
 </body>
 </html>
