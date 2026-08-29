@@ -57934,8 +57934,10 @@ async function reactComment(ev, id, btn){
   inset:-26px -18px; pointer-events:none;
   border-radius:28px; overflow:hidden;
   /* No findable edge: gone well before the section boundary. */
-  -webkit-mask-image:radial-gradient(115% 92% at 50% 46%, #000 22%, transparent 76%);
-  mask-image:radial-gradient(115% 92% at 50% 46%, #000 22%, transparent 76%);
+  /* Wider solid core to go with the stronger wash — at .34 a tight core
+     made the falloff itself visible as a ring. */
+  -webkit-mask-image:radial-gradient(120% 96% at 50% 46%, #000 34%, transparent 80%);
+  mask-image:radial-gradient(120% 96% at 50% 46%, #000 34%, transparent 80%);
 }
 #homeContent > section[data-home-slot="col"] > .hero-wash{ display:none !important; }
 
@@ -57947,7 +57949,7 @@ async function reactComment(ev, id, btn){
   transition:opacity .85s cubic-bezier(.4,0,.2,1);
   will-change:opacity;
 }
-.hero-wash > i.on{ opacity:.2; }
+.hero-wash > i.on{ opacity:.34; }
 
 @media (prefers-reduced-motion: reduce){
   .hero-wash > i{ transition:none; }
