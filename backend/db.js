@@ -568,6 +568,84 @@ async function initDb() {
       );
     `);
 
+    // ── Speedrunning ───────────────────────────────────────────────
+    // Reference data -- games, categories, world records -- comes from
+    // speedrun.com directly in the client, which is CORS-open. What
+    // lives here is only the part speedrun.com has no equivalent for:
+    // Lobby's own submissions, scheduled attempts with RSVPs, and races.
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS speedrun_runs (
+        id           SERIAL PRIMARY KEY,
+        user_id      INTEGER REFERENCES users(id) ON DELETE CASCADE,
+        game         TEXT NOT NULL,
+        category     TEXT NOT NULL DEFAULT 'Any%',
+        time_text    TEXT NOT NULL,
+        -- Parsed alongside the text so runs can be ranked. The text is
+        -- kept exactly as entered, because that is what gets displayed
+        -- and reformatting someone's time is not this table's job.
+        time_ms      BIGINT,
+        video_url    TEXT DEFAULT NULL,
+        notes        TEXT DEFAULT NULL,
+        status       TEXT NOT NULL DEFAULT 'pending',
+        submitted_at TIMESTAMPTZ DEFAULT NOW(),
+        verified_at  TIMESTAMPTZ DEFAULT NULL
+      );
+    `);
+
+    // An attempt is somebody saying "I am running this, now or later".
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS speedrun_attempts (
+        id            SERIAL PRIMARY KEY,
+        user_id       INTEGER REFERENCES users(id) ON DELETE CASCADE,
+        game          TEXT NOT NULL,
+        category      TEXT DEFAULT NULL,
+        state         TEXT NOT NULL DEFAULT 'scheduled',
+        scheduled_for TIMESTAMPTZ DEFAULT NULL,
+        started_at    TIMESTAMPTZ DEFAULT NULL,
+        ended_at      TIMESTAMPTZ DEFAULT NULL,
+        video_url     TEXT DEFAULT NULL,
+        created_at    TIMESTAMPTZ DEFAULT NOW()
+      );
+    `);
+
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS speedrun_attempt_rsvps (
+        id         SERIAL PRIMARY KEY,
+        attempt_id INTEGER REFERENCES speedrun_attempts(id) ON DELETE CASCADE,
+        user_id    INTEGER REFERENCES users(id) ON DELETE CASCADE,
+        created_at TIMESTAMPTZ DEFAULT NOW(),
+        UNIQUE(attempt_id, user_id)
+      );
+    `);
+
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS speedrun_races (
+        id            SERIAL PRIMARY KEY,
+        host_id       INTEGER REFERENCES users(id) ON DELETE CASCADE,
+        title         TEXT NOT NULL,
+        game          TEXT NOT NULL,
+        category      TEXT DEFAULT NULL,
+        prize         TEXT DEFAULT NULL,
+        status        TEXT NOT NULL DEFAULT 'upcoming',
+        scheduled_for TIMESTAMPTZ DEFAULT NULL,
+        started_at    TIMESTAMPTZ DEFAULT NULL,
+        ended_at      TIMESTAMPTZ DEFAULT NULL,
+        created_at    TIMESTAMPTZ DEFAULT NOW()
+      );
+    `);
+
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS speedrun_race_entrants (
+        id          SERIAL PRIMARY KEY,
+        race_id     INTEGER REFERENCES speedrun_races(id) ON DELETE CASCADE,
+        user_id     INTEGER REFERENCES users(id) ON DELETE CASCADE,
+        joined_at   TIMESTAMPTZ DEFAULT NOW(),
+        finished_at TIMESTAMPTZ DEFAULT NULL,
+        time_ms     BIGINT DEFAULT NULL,
+        UNIQUE(race_id, user_id)
+      );
+    `);
+
     // ── Matchmaking queue ──────────────────────────────────────────
     // A session is one group being assembled. People join an existing
     // searching session rather than being paired off in a separate
@@ -664,6 +742,14 @@ async function initDb() {
     // post_reactions — reaction counts and per-user checks
     await pool.query(`CREATE INDEX IF NOT EXISTS idx_post_reactions_post       ON post_reactions(post_id);`).catch(() => {});
     await pool.query(`CREATE INDEX IF NOT EXISTS idx_post_reactions_post_user  ON post_reactions(post_id, user_id);`).catch(() => {});
+
+    // speedrun — the PB lookup ranks within a game+category, and the
+    // hub lists by state on every open.
+    await pool.query(`CREATE INDEX IF NOT EXISTS idx_sr_runs_board   ON speedrun_runs(game, category, status, time_ms);`).catch(() => {});
+    await pool.query(`CREATE INDEX IF NOT EXISTS idx_sr_runs_user    ON speedrun_runs(user_id, status);`).catch(() => {});
+    await pool.query(`CREATE INDEX IF NOT EXISTS idx_sr_attempts     ON speedrun_attempts(state, scheduled_for);`).catch(() => {});
+    await pool.query(`CREATE INDEX IF NOT EXISTS idx_sr_races        ON speedrun_races(status, scheduled_for);`).catch(() => {});
+    await pool.query(`CREATE INDEX IF NOT EXISTS idx_sr_race_entrants ON speedrun_race_entrants(race_id);`).catch(() => {});
 
     // queue — the matcher scans open sessions by game on every intent,
     // and the roster is read on every status poll.

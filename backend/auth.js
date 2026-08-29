@@ -3173,6 +3173,334 @@ app.post("/tournaments/create", requireAuth, async (req, res) => {
 
 // Get tournament details
 // ══════════════════════════════════════════════════════════════════
+// SPEEDRUNNING
+//
+// Reference data -- games, categories, world records -- is fetched from
+// speedrun.com directly by the client, which is CORS-open, so none of
+// that is proxied here. What lives here is the part speedrun.com has no
+// equivalent for: Lobby submissions, scheduled attempts with RSVPs, and
+// races.
+//
+// The hub is already honest about the gap. When /speedrun/live returns
+// nothing it falls back to recently-verified runs from speedrun.com AND
+// labels them as a proxy, and its counters show 0 rather than a made-up
+// number. These endpoints fill the gap without touching that behaviour.
+// ══════════════════════════════════════════════════════════════════
+
+// "1:23:45.678" / "23:45" / "45.6" -> milliseconds. Returns null on
+// anything unparseable rather than guessing a number, because a wrong
+// time silently ranks a run in the wrong place.
+function _srParseTime(txt) {
+  const t = String(txt || "").trim();
+  if (!t) return null;
+  const m = t.match(/^(?:(\d+):)?(?:(\d+):)?(\d+)(?:[.,](\d{1,3}))?$/);
+  if (!m) return null;
+  const a = m[1] ? parseInt(m[1], 10) : null;
+  const b = m[2] ? parseInt(m[2], 10) : null;
+  const c = parseInt(m[3], 10);
+  const frac = m[4] ? parseInt(m[4].padEnd(3, "0"), 10) : 0;
+  let h = 0, min = 0, sec = 0;
+  if (a !== null && b !== null) { h = a; min = b; sec = c; }
+  else if (a !== null)          { min = a; sec = c; }
+  else                          { sec = c; }
+  if (min > 59 || sec > 59) return null;
+  return ((h * 3600) + (min * 60) + sec) * 1000 + frac;
+}
+
+function _srFmt(ms) {
+  if (ms == null) return null;
+  const total = Math.floor(ms / 1000);
+  const h = Math.floor(total / 3600);
+  const m = Math.floor((total % 3600) / 60);
+  const s2 = total % 60;
+  const frac = ms % 1000;
+  const base = (h ? h + ":" + String(m).padStart(2, "0") : String(m)) +
+               ":" + String(s2).padStart(2, "0");
+  return frac ? base + "." + String(frac).padStart(3, "0") : base;
+}
+
+// GET /speedrun/server-counters — the hub stat strip.
+app.get("/speedrun/server-counters", async (req, res) => {
+  try {
+    const r = await pool.query(`
+      SELECT
+        (SELECT COUNT(*)::int FROM speedrun_attempts WHERE state = 'live') AS live,
+        (SELECT COUNT(*)::int FROM speedrun_races
+          WHERE created_at > NOW() - INTERVAL '1 day') AS races_today
+    `);
+    const row = r.rows[0] || {};
+    res.json({ live: row.live || 0, racesToday: row.races_today || 0 });
+  } catch (e) {
+    console.error("[speedrun/server-counters]", e.message);
+    res.json({ live: 0, racesToday: 0 });
+  }
+});
+
+// GET /speedrun/live — attempts running right now.
+app.get("/speedrun/live", async (req, res) => {
+  try {
+    const r = await pool.query(`
+      SELECT a.*, u.username, u.avatar_url,
+        (SELECT COUNT(*)::int FROM speedrun_attempt_rsvps v WHERE v.attempt_id = a.id) AS viewers
+      FROM speedrun_attempts a JOIN users u ON u.id = a.user_id
+      WHERE a.state = 'live'
+      ORDER BY a.started_at DESC NULLS LAST LIMIT 20
+    `);
+    res.json(r.rows.map(x => ({
+      id: x.id,
+      runner: x.username,
+      runnerAvatar: x.avatar_url,
+      game: x.game,
+      category: x.category,
+      startedAt: x.started_at,
+      videoUrl: x.video_url,
+      viewerCount: x.viewers || 0,
+      // isRecent marks the speedrun.com proxy path. These are genuinely
+      // live, so it is false -- which is what removes the "showing latest
+      // verified runs" banner the client puts above proxied rows.
+      isRecent: false,
+    })));
+  } catch (e) {
+    console.error("[speedrun/live]", e.message);
+    res.json([]);
+  }
+});
+
+// GET /speedrun/scheduled — upcoming attempts you can RSVP to.
+app.get("/speedrun/scheduled", async (req, res) => {
+  try {
+    const r = await pool.query(`
+      SELECT a.*, u.username, u.avatar_url,
+        (SELECT COUNT(*)::int FROM speedrun_attempt_rsvps v WHERE v.attempt_id = a.id) AS rsvps
+      FROM speedrun_attempts a JOIN users u ON u.id = a.user_id
+      WHERE a.state = 'scheduled' AND (a.scheduled_for IS NULL OR a.scheduled_for > NOW())
+      ORDER BY a.scheduled_for ASC NULLS LAST LIMIT 20
+    `);
+    res.json(r.rows.map(x => ({
+      id: x.id,
+      runner: x.username,
+      runnerAvatar: x.avatar_url,
+      game: x.game,
+      category: x.category,
+      scheduledFor: x.scheduled_for,
+      rsvps: x.rsvps || 0,
+    })));
+  } catch (e) {
+    console.error("[speedrun/scheduled]", e.message);
+    res.json([]);
+  }
+});
+
+// POST /speedrun/scheduled/:id/rsvp — toggle, so the button can undo.
+app.post("/speedrun/scheduled/:id/rsvp", requireAuth, async (req, res) => {
+  try {
+    const had = await pool.query(
+      "SELECT 1 FROM speedrun_attempt_rsvps WHERE attempt_id = $1 AND user_id = $2",
+      [req.params.id, req.userId]
+    );
+    if (had.rows.length) {
+      await pool.query(
+        "DELETE FROM speedrun_attempt_rsvps WHERE attempt_id = $1 AND user_id = $2",
+        [req.params.id, req.userId]
+      );
+    } else {
+      await pool.query(`
+        INSERT INTO speedrun_attempt_rsvps (attempt_id, user_id) VALUES ($1,$2)
+        ON CONFLICT (attempt_id, user_id) DO NOTHING
+      `, [req.params.id, req.userId]);
+    }
+    const c = await pool.query(
+      "SELECT COUNT(*)::int AS n FROM speedrun_attempt_rsvps WHERE attempt_id = $1",
+      [req.params.id]
+    );
+    res.json({ ok: true, going: !had.rows.length, rsvps: (c.rows[0] || {}).n || 0 });
+  } catch (e) {
+    console.error("[speedrun/rsvp]", e.message);
+    res.status(500).json({ error: "Could not RSVP" });
+  }
+});
+
+// POST /speedrun/attempts — announce a run, now or later.
+app.post("/speedrun/attempts", requireAuth, async (req, res) => {
+  const { game, category, scheduledFor, videoUrl, live } = req.body || {};
+  if (!game) return res.status(400).json({ error: "game is required" });
+  try {
+    const r = await pool.query(`
+      INSERT INTO speedrun_attempts (user_id, game, category, state, scheduled_for, started_at, video_url)
+      VALUES ($1,$2,$3,$4,$5,$6,$7) RETURNING *
+    `, [
+      req.userId, game, category || null,
+      live ? "live" : "scheduled",
+      scheduledFor || null,
+      live ? new Date() : null,
+      videoUrl || null,
+    ]);
+    res.json({ ok: true, id: r.rows[0].id });
+  } catch (e) {
+    console.error("[speedrun/attempts]", e.message);
+    res.status(500).json({ error: "Could not create the attempt" });
+  }
+});
+
+// GET /speedrun/races — { active, upcoming }, the shape the hub reads.
+app.get("/speedrun/races", async (req, res) => {
+  try {
+    const r = await pool.query(`
+      SELECT r.*, u.username AS host_name,
+        (SELECT COUNT(*)::int FROM speedrun_race_entrants e WHERE e.race_id = r.id) AS runners
+      FROM speedrun_races r LEFT JOIN users u ON u.id = r.host_id
+      WHERE r.status IN ('live','upcoming')
+      ORDER BY r.scheduled_for ASC NULLS LAST, r.created_at DESC
+      LIMIT 40
+    `);
+    const card = x => ({
+      id: x.id,
+      title: x.title,
+      game: x.game,
+      category: x.category,
+      prize: x.prize,
+      status: x.status,
+      runners: x.runners || 0,
+      host: x.host_name || null,
+      scheduledFor: x.scheduled_for,
+    });
+    res.json({
+      active:   r.rows.filter(x => x.status === "live").map(card),
+      upcoming: r.rows.filter(x => x.status === "upcoming").map(card),
+    });
+  } catch (e) {
+    console.error("[speedrun/races]", e.message);
+    res.json({ active: [], upcoming: [] });
+  }
+});
+
+// POST /speedrun/races — host one. The host is entered automatically:
+// a race with a host who is not running it is a scheduling mistake.
+app.post("/speedrun/races", requireAuth, async (req, res) => {
+  const { title, game, category, prize, scheduledFor } = req.body || {};
+  if (!game)  return res.status(400).json({ error: "game is required" });
+  try {
+    const r = await pool.query(`
+      INSERT INTO speedrun_races (host_id, title, game, category, prize, scheduled_for, status)
+      VALUES ($1,$2,$3,$4,$5,$6,$7) RETURNING *
+    `, [
+      req.userId,
+      title || (game + " race"),
+      game, category || null, prize || null,
+      scheduledFor || null,
+      scheduledFor ? "upcoming" : "live",
+    ]);
+    const race = r.rows[0];
+    await pool.query(
+      "INSERT INTO speedrun_race_entrants (race_id, user_id) VALUES ($1,$2) ON CONFLICT DO NOTHING",
+      [race.id, req.userId]
+    ).catch(() => {});
+    res.json({ ok: true, id: race.id });
+  } catch (e) {
+    console.error("[speedrun/races create]", e.message);
+    res.status(500).json({ error: "Could not create the race" });
+  }
+});
+
+// POST /speedrun/races/:id/join
+app.post("/speedrun/races/:id/join", requireAuth, async (req, res) => {
+  try {
+    const race = await pool.query("SELECT * FROM speedrun_races WHERE id = $1", [req.params.id]);
+    if (!race.rows.length) return res.status(404).json({ error: "No such race" });
+    if (["done", "cancelled"].includes(race.rows[0].status)) {
+      return res.status(400).json({ error: "That race has finished" });
+    }
+    await pool.query(`
+      INSERT INTO speedrun_race_entrants (race_id, user_id) VALUES ($1,$2)
+      ON CONFLICT (race_id, user_id) DO NOTHING
+    `, [req.params.id, req.userId]);
+    const c = await pool.query(
+      "SELECT COUNT(*)::int AS n FROM speedrun_race_entrants WHERE race_id = $1",
+      [req.params.id]
+    );
+    res.json({ ok: true, runners: (c.rows[0] || {}).n || 0 });
+  } catch (e) {
+    console.error("[speedrun/races join]", e.message);
+    res.status(500).json({ error: "Could not join the race" });
+  }
+});
+
+// POST /speedrun/submit — a run, for review.
+//
+// Everything lands as pending. The client already tells the user their
+// run is queued for moderation, so auto-verifying would make that copy a
+// lie and would put unreviewed times on a leaderboard.
+app.post("/speedrun/submit", requireAuth, async (req, res) => {
+  const { game, category, time, videoUrl, notes } = req.body || {};
+  if (!game || !String(game).trim()) return res.status(400).json({ error: "game is required" });
+  if (!time || !String(time).trim()) return res.status(400).json({ error: "time is required" });
+  const ms = _srParseTime(time);
+  try {
+    const r = await pool.query(`
+      INSERT INTO speedrun_runs (user_id, game, category, time_text, time_ms, video_url, notes)
+      VALUES ($1,$2,$3,$4,$5,$6,$7) RETURNING *
+    `, [
+      req.userId, String(game).trim(),
+      (category && String(category).trim()) || "Any%",
+      String(time).trim(), ms,
+      (videoUrl && String(videoUrl).trim()) || null,
+      (notes && String(notes).trim()) || null,
+    ]);
+    const q = await pool.query(`
+      SELECT COUNT(*)::int AS n FROM speedrun_runs
+      WHERE status = 'pending' AND submitted_at <= $1
+    `, [r.rows[0].submitted_at]);
+    res.json({
+      ok: true,
+      id: r.rows[0].id,
+      queuePosition: (q.rows[0] || {}).n || 1,
+      // Said plainly so the client never has to infer it.
+      parsedTimeMs: ms,
+      status: "pending",
+    });
+  } catch (e) {
+    console.error("[speedrun/submit]", e.message);
+    res.status(500).json({ error: "Could not submit the run" });
+  }
+});
+
+// GET /me/speedrun/pb — your best VERIFIED run, and where it ranks.
+//
+// Verified only: the card says "verified <date>" beside the time, and a
+// pending run shown there would be claiming a standing it has not been
+// given. A run with an unparseable time is excluded from ranking rather
+// than sorted arbitrarily.
+app.get("/me/speedrun/pb", requireAuth, async (req, res) => {
+  try {
+    const r = await pool.query(`
+      SELECT * FROM speedrun_runs
+      WHERE user_id = $1 AND status = 'verified' AND time_ms IS NOT NULL
+      ORDER BY time_ms ASC LIMIT 1
+    `, [req.userId]);
+    if (!r.rows.length) return res.json(null);
+    const pb = r.rows[0];
+    const rank = await pool.query(`
+      SELECT COUNT(*)::int + 1 AS rank FROM speedrun_runs
+      WHERE game = $1 AND category = $2 AND status = 'verified'
+        AND time_ms IS NOT NULL AND time_ms < $3
+    `, [pb.game, pb.category, pb.time_ms]);
+    res.json({
+      id: pb.id,
+      game: pb.game,
+      category: pb.category,
+      time: pb.time_text,
+      timeMs: pb.time_ms,
+      videoUrl: pb.video_url,
+      rank: (rank.rows[0] || {}).rank || null,
+      verifiedAt: pb.verified_at,
+    });
+  } catch (e) {
+    console.error("[me/speedrun/pb]", e.message);
+    res.json(null);
+  }
+});
+
+// ══════════════════════════════════════════════════════════════════
 // MATCHMAKING QUEUE
 //
 // The client had a written contract for this and no implementation, so
