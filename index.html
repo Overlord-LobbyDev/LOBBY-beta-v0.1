@@ -60127,5 +60127,252 @@ async function reactComment(ev, id, btn){
   .lobby-overlay .q-game-tile:hover img{ transform:none !important; }
 }
 </style>
+
+<!-- ══════════════════════════════════════════════════════════════════
+     DISCOVER — everything public, not just lobbies
+
+     Discover was a lobby browser with tournaments merged in. It is meant
+     to be the place you find anything public, so races and people join
+     them, and Tournaments finally gets the tab its own filter was
+     already written for.
+
+     BUILT BY EXTENSION, NOT REWRITING. The grid's own dispatch is
+     `it.kind === 'tournament' ? tournamentCard : lobbyCard` — so
+     _dcLobbyCardHtml is already the fallback for every other kind. It is
+     wrapped here to route races and people to their own cards and hand
+     everything else back to the original. The tab filter compares
+     it.tag to the active tab, so new categories work by tagging their
+     items. Nothing in the existing renderer had to change, which means
+     the carousel, the recommender and the search all keep working on the
+     new kinds for free.
+
+     PUBLIC MEANS PUBLIC. Races come from /speedrun/races and people from
+     /users/discover. Nothing new is exposed — profiles are already public
+     and already searchable by name — and banned accounts are excluded.
+     There is no per-user "hide me from discovery" flag in the schema
+     though: post_visibility governs posts, not the profile. If people
+     should be able to opt out of being browsed, that column needs adding
+     first.
+     ══════════════════════════════════════════════════════════════════ -->
+<style>
+.dc-kindbadge{
+  position:absolute; top:10px; left:10px; z-index:5;
+  font-size:9.5px; font-weight:800; letter-spacing:.9px; text-transform:uppercase;
+  padding:3px 9px; border-radius:99px; color:#fff;
+  background:rgba(8,10,14,.72); border:1px solid rgba(255,255,255,.18);
+  backdrop-filter:blur(10px);
+}
+.dc-kindbadge.race{ color:#ffb07a; border-color:rgba(255,140,60,.5); }
+.dc-kindbadge.person{ color:#8fd6ff; border-color:rgba(88,200,255,.5); }
+
+/* People read as a person, not a product: a portrait ground and a big
+   avatar rather than a wide banner with a face crushed into it. */
+.dc-person-art{
+  position:relative; display:flex; align-items:center; justify-content:center;
+  aspect-ratio:16/9;
+  background:linear-gradient(150deg,#1b2130,#0c0e14);
+}
+.dc-person-av{
+  width:74px; height:74px; border-radius:50%;
+  overflow:hidden; display:flex; align-items:center; justify-content:center;
+  font-family:'Archivo',var(--font),sans-serif; font-weight:900; font-size:28px;
+  color:#fff; background:linear-gradient(135deg,#3a4a6b,#1a2030);
+  border:2px solid rgba(255,255,255,.16);
+  box-shadow:0 8px 24px rgba(0,0,0,.5);
+}
+.dc-person-av img{ width:100%; height:100%; object-fit:cover; }
+
+.dc-race-art{
+  position:relative; aspect-ratio:16/9; overflow:hidden;
+  background:linear-gradient(150deg,#2a1408,#0d0a08);
+  display:flex; align-items:center; justify-content:center;
+}
+.dc-race-art img{ position:absolute; inset:0; width:100%; height:100%; object-fit:cover; opacity:.55; }
+.dc-race-glyph{ position:relative; font-size:34px; opacity:.85; }
+</style>
+<script>
+(function () {
+  'use strict';
+
+  function esc(v){
+    return String(v == null ? '' : v)
+      .replace(/&/g,'&amp;').replace(/</g,'&lt;')
+      .replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+  }
+  function api(){ return (typeof window.api === 'function') ? window.api : null; }
+
+  /* Top-level const/let live in the global lexical scope and are NOT on
+     window, so these are reached by name behind a guard. */
+  function tabs(){
+    try { if (typeof DISCOVER_TABS !== 'undefined') return DISCOVER_TABS; } catch (e) {}
+    return null;
+  }
+  function lobbies(){
+    try { if (typeof _dcLobbies !== 'undefined') return _dcLobbies; } catch (e) {}
+    return null;
+  }
+
+  var added = false;
+  function addTabs(){
+    var t = tabs();
+    if (!t || added) return;
+    added = true;
+    var have = {};
+    t.forEach(function (x) { have[x.id] = true; });
+    /* Tournaments last-but-one: the grid's filter already understood
+       'tournaments' but no tab ever offered it. */
+    [ { id:'tournaments', label:'Tournaments' },
+      { id:'races',       label:'Races' },
+      { id:'people',      label:'People' } ].forEach(function (x) {
+      if (!have[x.id]) t.push(x);
+    });
+  }
+
+  /* Cards. Kept to the existing .dc-card skeleton so the hover, the
+     hairline and the caption tint from the shared card pass all apply. */
+  function raceCard(r){
+    var runners = r.runners || 0;
+    var live = String(r.status || '').toLowerCase() === 'live';
+    return '' +
+      '<div class="dc-card" style="--dc-fallback:linear-gradient(135deg,#3a1a08,#12100e)" ' +
+        'onclick="window.discoverOpenRace(' + Number(r.raceId) + ')">' +
+        '<div class="dc-card-art dc-race-art">' +
+          '<span class="dc-race-glyph">🏁</span>' +
+          '<span class="dc-kindbadge race">' + (live ? 'Live race' : 'Race') + '</span>' +
+        '</div>' +
+        '<div class="dc-card-info">' +
+          '<div class="dc-card-name">' + esc(r.name) + '</div>' +
+          '<div class="dc-card-meta">' +
+            '<span class="dc-card-meta-item">' +
+              (live ? '<span class="dc-online-dot"></span>' : '') +
+              esc(r.game || 'Any game') + '</span>' +
+            '<span class="dc-card-meta-item">🏃 ' + runners + '</span>' +
+          '</div>' +
+          '<div class="dc-card-tags">' +
+            (r.category ? '<span class="dc-card-tag">' + esc(r.category) + '</span>' : '') +
+            (r.prize ? '<span class="dc-card-tag">' + esc(r.prize) + '</span>' : '') +
+          '</div>' +
+          '<div class="dc-card-join">' + (live ? 'Join race →' : 'View race →') + '</div>' +
+        '</div>' +
+      '</div>';
+  }
+
+  function personCard(p){
+    var initial = String(p.name || '?').trim().charAt(0).toUpperCase();
+    var av = p.avatar
+      ? '<img src="' + esc(p.avatar) + '" alt="" loading="lazy">'
+      : esc(initial);
+    return '' +
+      '<div class="dc-card" style="--dc-fallback:linear-gradient(135deg,#1b2130,#0c0e14)" ' +
+        'onclick="window.discoverOpenPerson(' + Number(p.userId) + ')">' +
+        '<div class="dc-card-art dc-person-art">' +
+          '<div class="dc-person-av">' + av + '</div>' +
+          '<span class="dc-kindbadge person">Player</span>' +
+        '</div>' +
+        '<div class="dc-card-info">' +
+          '<div class="dc-card-name">' + esc(p.name) + '</div>' +
+          '<div class="dc-card-meta">' +
+            '<span class="dc-card-meta-item">' + esc(p.sub || 'On Lobby') + '</span>' +
+          '</div>' +
+          '<div class="dc-card-tags"></div>' +
+          '<div class="dc-card-join">View profile →</div>' +
+        '</div>' +
+      '</div>';
+  }
+
+  /* The grid sends every non-tournament kind here, so wrapping it adds
+     kinds without touching the renderer. */
+  function wrapCardRenderer(){
+    var orig = window._dcLobbyCardHtml;
+    if (typeof orig !== 'function' || orig.__dcWrapped) return;
+    var wrapped = function (it) {
+      if (it && it.kind === 'race')   return raceCard(it);
+      if (it && it.kind === 'person') return personCard(it);
+      return orig.apply(this, arguments);
+    };
+    wrapped.__dcWrapped = true;
+    window._dcLobbyCardHtml = wrapped;
+  }
+
+  window.discoverOpenRace = function (id) {
+    if (typeof window.closeDiscoverPanel === 'function') window.closeDiscoverPanel();
+    if (typeof window.openSpeedrunHub === 'function') window.openSpeedrunHub();
+  };
+  window.discoverOpenPerson = function (id) {
+    if (typeof window.openProfilePanel === 'function') window.openProfilePanel(id);
+  };
+
+  /* Merge into the same array the grid already reads, tagged so the
+     existing tab filter picks them up. */
+  function merge(items){
+    var L = lobbies();
+    if (!L || !items.length) return;
+    var have = {};
+    L.forEach(function (x) { have[String(x.id)] = true; });
+    items.forEach(function (x) { if (!have[String(x.id)]) L.push(x); });
+    if (typeof _renderDiscoverTabs === 'function') _renderDiscoverTabs();
+    if (typeof _renderDiscoverGrid === 'function') _renderDiscoverGrid();
+  }
+
+  async function loadRaces(){
+    var a = api();
+    if (!a) return;
+    var r = await a('/speedrun/races').catch(function () { return null; });
+    if (!r) return;
+    var all = (r.active || []).concat(r.upcoming || []);
+    merge(all.map(function (x) {
+      return {
+        id: 'race-' + x.id, raceId: x.id, kind: 'race', tag: 'races',
+        name: x.title || (x.game + ' race'),
+        game: x.game, category: x.category, prize: x.prize,
+        runners: x.runners, status: x.status,
+        isReal: true,
+      };
+    }));
+  }
+
+  async function loadPeople(){
+    var a = api();
+    if (!a) return;
+    /* NOT /users/search — it returns nothing for an empty query by
+       design, so it cannot back a browse surface. */
+    var r = await a('/users/discover').catch(function () { return null; });
+    if (!Array.isArray(r)) return;
+    merge(r.slice(0, 24).map(function (u) {
+      return {
+        id: 'person-' + u.id, userId: u.id, kind: 'person', tag: 'people',
+        name: u.username || u.display_name || 'Player',
+        avatar: u.avatar_url || null,
+        sub: u.bio || null,
+        isReal: true,
+      };
+    }));
+  }
+
+  function start(){
+    addTabs();
+    wrapCardRenderer();
+
+    /* Load when the panel opens, not at boot: nobody pays for Discover's
+       data until they ask for Discover. */
+    var origOpen = window.openDiscoverPanel;
+    if (typeof origOpen === 'function' && !origOpen.__dcWrapped){
+      var wrapped = function () {
+        var out = origOpen.apply(this, arguments);
+        addTabs();
+        wrapCardRenderer();
+        loadRaces();
+        loadPeople();
+        return out;
+      };
+      wrapped.__dcWrapped = true;
+      window.openDiscoverPanel = wrapped;
+    }
+  }
+
+  if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', start);
+  else start();
+})();
+</script>
 </body>
 </html>

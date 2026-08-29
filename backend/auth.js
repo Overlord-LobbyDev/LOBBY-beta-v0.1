@@ -1311,6 +1311,44 @@ app.get("/friends", requireAuth, async (req, res) => {
   res.json(r.rows);
 });
 
+// GET /users/discover — people to find on the Discover page.
+//
+// /users/search deliberately returns nothing for an empty query, so it
+// cannot back a browse surface. This is the browse case.
+//
+// Nothing new is exposed: profiles are already public and already
+// searchable by name. Banned accounts are excluded, and so are accounts
+// with nothing on them -- no avatar, no bio, no display name -- because
+// a wall of empty profiles is not discovery, it is a user dump.
+//
+// NOTE: there is no per-user "hide me from discovery" flag in the
+// schema. post_visibility governs posts, not the profile. If people
+// should be able to opt out of being browsed, that column does not
+// exist yet and this endpoint cannot honour it.
+app.get("/users/discover", requireAuth, async (req, res) => {
+  try {
+    const r = await pool.query(`
+      SELECT id, username, display_name, avatar_url, bio, created_at
+      FROM users
+      WHERE COALESCE(is_banned, FALSE) = FALSE
+        AND id <> $1
+        AND (avatar_url IS NOT NULL OR bio IS NOT NULL OR display_name IS NOT NULL)
+      ORDER BY created_at DESC
+      LIMIT 40
+    `, [req.userId]);
+    res.json(r.rows.map(u => ({
+      id: u.id,
+      username: u.username,
+      display_name: u.display_name,
+      avatar_url: u.avatar_url,
+      bio: u.bio,
+    })));
+  } catch (e) {
+    console.error("[users/discover]", e.message);
+    res.json([]);
+  }
+});
+
 app.get("/users/search", requireAuth, async (req, res) => {
   const q = (req.query.q || "").trim();
   if (q.length < 2) return res.json([]);
