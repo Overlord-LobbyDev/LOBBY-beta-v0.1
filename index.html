@@ -58363,5 +58363,116 @@ async function reactComment(ev, id, btn){
   else start();
 })();
 </script>
+
+<!-- ══════════════════════════════════════════════════════════════════
+     POSTER CARDS — art and text stop fighting
+
+     Two faults, both from printing the text onto the artwork.
+
+     Ragged baselines. The plate was pinned to the bottom of the card, so
+     a one-line title (TEKKEN 8) sat lower than a two-line one (MARVEL
+     Tokon), and across a row the text stepped up and down. Nothing about
+     the grid looked deliberate because nothing lined up.
+
+     A scrim over the best part of the poster. Cover art puts its subject
+     low — Red Dead's riders, Halo's visor, Batman's gargoyle — and the
+     plate darkened exactly that band to buy back legibility it had only
+     lost by being there.
+
+     So the plate comes off the art. The poster is 2:3 and complete, and
+     a fixed-height caption sits beneath it. Every card is then art plus
+     the same footer, which makes the rows level by construction rather
+     than by a min-height holding two lines open.
+
+     The footer is tinted with the game's own artwork — heavily blurred,
+     barely there — so the cards still carry their colour without any of
+     it being painted over the picture.
+     ══════════════════════════════════════════════════════════════════ -->
+<style>
+#homeContent [data-home-slot="col"] .game-card{
+  aspect-ratio:auto !important;
+  display:flex !important; flex-direction:column !important;
+  background:#0f1118 !important;
+}
+
+/* ── Poster, complete and unobscured ──────────────────────────── */
+#homeContent [data-home-slot="col"] .rc-art,
+#homeContent [data-home-slot="col"] .game-card-placeholder{
+  position:relative !important; inset:auto !important;
+  width:100% !important; height:auto !important;
+  aspect-ratio:2 / 3 !important;
+  flex:0 0 auto !important;
+  border-radius:0 !important;
+  z-index:0;
+}
+#homeContent [data-home-slot="col"] .rc-art{ overflow:hidden; }
+
+/* ── Caption ──────────────────────────────────────────────────── */
+#homeContent [data-home-slot="col"] .game-card-body{
+  position:relative !important; inset:auto !important;
+  flex:1 1 auto !important;
+  display:flex !important; flex-direction:column !important;
+  justify-content:center !important;
+  /* Fixed, so every card is the same total height whether its title
+     takes one line or two. This is what levels the rows. */
+  min-height:66px !important;
+  padding:9px 11px 10px !important;
+  background:#0c0e14 !important;
+  border-top:1px solid rgba(255,255,255,.07) !important;
+  z-index:1;
+  overflow:hidden;
+}
+/* The game's colour, in the caption rather than over the art. */
+#homeContent [data-home-slot="col"] .game-card-body::before{
+  content:'' !important; display:block !important;
+  position:absolute; inset:-40%; z-index:-1; pointer-events:none;
+  background-image:var(--rc-art, none);
+  background-size:cover; background-position:center;
+  filter:blur(30px) saturate(2.2);
+  opacity:.42;
+}
+
+#homeContent [data-home-slot="col"] .game-card-name{
+  font-size:12.5px !important; font-weight:800 !important;
+  line-height:1.26 !important; letter-spacing:.1px !important;
+  color:#fff !important; margin:0 0 3px !important;
+  display:-webkit-box !important; -webkit-line-clamp:2; line-clamp:2;
+  -webkit-box-orient:vertical; overflow:hidden;
+  white-space:normal !important; min-height:0 !important;
+  /* Against a caption panel now, not artwork, so this only needs to
+     seat the type rather than rescue it. */
+  text-shadow:0 1px 2px rgba(0,0,0,.55) !important;
+}
+#homeContent [data-home-slot="col"] .gc-meta{
+  font-size:10.5px !important; margin-top:0 !important;
+  color:rgba(255,255,255,.62) !important;
+  text-shadow:none !important;
+}
+#homeContent [data-home-slot="col"] .gc-meta b{ color:rgba(255,255,255,.94) !important; }
+
+/* ── Art treatment ────────────────────────────────────────────── */
+#homeContent [data-home-slot="col"] .rc-art::after{
+  content:'' !important; display:block !important;
+  position:absolute; inset:0; pointer-events:none;
+  /* A touch of shade at the very foot of the poster so it meets the
+     caption instead of butting against it. Nowhere near the subject. */
+  background:linear-gradient(180deg, transparent 78%, rgba(6,7,10,.55) 100%);
+}
+
+/* No artwork: the caption below already names the game, so this panel
+   only has to be a surface, not a label. */
+#homeContent [data-home-slot="col"] .game-card-placeholder{
+  font-size:34px !important; letter-spacing:5px !important;
+  color:rgba(255,255,255,.17) !important;
+  gap:11px;
+}
+
+/* The ring sits over the whole card, caption included. */
+#homeContent [data-home-slot="col"] .game-card::after{
+  border-radius:13px;
+  box-shadow:inset 0 0 0 1px rgba(255,255,255,.075);
+}
+#homeContent [data-home-slot="col"] .gc-badge{ z-index:2; }
+</style>
 </body>
 </html>
