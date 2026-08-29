@@ -52574,6 +52574,59 @@ body.coliseum-mode #coliseumRoot .col-canvas{ display:none !important; }
 }
 #crRoot .cr-rooms{ display:grid; grid-template-columns:repeat(auto-fit,minmax(250px,1fr)); gap:12px; }
 
+/* ── Main events ─────────────────────────────────────────────────
+   Tournaments, calendar events and announcements in one feed, each
+   keeping its own colour so three different kinds of thing stay
+   distinguishable in a single ordered list. */
+#crRoot .cr-ev{
+  --ev:var(--cr-elec);
+  position:relative; display:flex; flex-direction:column; gap:8px;
+  padding:15px 16px 14px; min-height:112px;
+  border:1px solid var(--cr-line); border-radius:12px;
+  background:linear-gradient(160deg, color-mix(in srgb, var(--ev) 10%, transparent), #0b0d14 58%);
+  cursor:pointer; overflow:hidden;
+  transition:border-color .16s, transform .16s;
+}
+#crRoot .cr-ev::before{
+  content:''; position:absolute; top:0; left:0; right:0; height:2px;
+  background:linear-gradient(90deg, var(--ev), transparent 72%);
+}
+#crRoot .cr-ev:hover{
+  border-color:color-mix(in srgb, var(--ev) 55%, transparent);
+  transform:translateY(-2px);
+}
+#crRoot .cr-ev.live{ --ev:var(--cr-live); }
+#crRoot .cr-ev.event{ --ev:var(--cr-gold); }
+#crRoot .cr-ev.tourney{ --ev:var(--cr-elec); }
+#crRoot .cr-ev.announce{ --ev:#b98cff; }
+
+#crRoot .cr-ev-chip{
+  align-self:flex-start; font-family:var(--cr-mono); font-size:9px; font-weight:800;
+  letter-spacing:1.3px; text-transform:uppercase;
+  padding:3px 9px; border-radius:99px;
+  color:color-mix(in srgb, var(--ev) 92%, white);
+  background:color-mix(in srgb, var(--ev) 14%, transparent);
+  border:1px solid color-mix(in srgb, var(--ev) 34%, transparent);
+}
+#crRoot .cr-ev.live .cr-ev-chip::before{
+  content:''; display:inline-block; width:5px; height:5px; border-radius:50%;
+  background:var(--cr-live); margin-right:6px; vertical-align:middle;
+  animation:crBlink 1.4s ease-in-out infinite;
+}
+@media (prefers-reduced-motion: reduce){
+  #crRoot .cr-ev.live .cr-ev-chip::before{ animation:none; }
+}
+#crRoot .cr-ev-title{
+  font-family:var(--cr-head); font-weight:700; font-size:14.5px; line-height:1.3;
+  color:var(--cr-ink);
+  display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical; overflow:hidden;
+}
+#crRoot .cr-ev-meta{
+  margin-top:auto; font-family:var(--cr-mono); font-size:9.5px;
+  letter-spacing:1px; text-transform:uppercase; color:var(--cr-ink3);
+  overflow:hidden; text-overflow:ellipsis; white-space:nowrap;
+}
+
 /* One prioritised column rather than a type-grouped grid: with 30
    lounges the thing you want is almost never the first one alphabetically
    in its group, and a single ordered list puts it at the top. */
@@ -52922,6 +52975,66 @@ body.coliseum-mode #coliseumRoot .col-canvas{ display:none !important; }
      is the state that keeps the section a constant height. */
   var loungesExpanded = false;
 
+  /* ── Announcements for Main Events ───────────────────────────────
+     Tournaments and calendar events are already cached by the app;
+     announcements are not, so they are fetched once per lobby. render()
+     runs on a 2.5s tick, so this is keyed by lobby id and guarded by an
+     in-flight flag — without both it would hammer the endpoint. */
+  var annCache = { id: null, items: [], loading: false };
+
+  /* `srv`, not `server` — a parameter of that name would shadow the
+     server() accessor this function needs to re-check against. */
+  function loadAnnouncements(srv, chans){
+    if (!srv || annCache.loading) return;
+    if (String(annCache.id) === String(srv.id)) return;
+    var ch = chans.filter(function(c){ return c.type === 'announcement'; })[0];
+    if (!ch){ annCache = { id: srv.id, items: [], loading: false }; return; }
+    if (typeof api !== 'function') return;
+
+    annCache.loading = true;
+    var forId = srv.id;
+    Promise.resolve(api('/channels/' + ch.id + '/messages'))
+      .then(function(msgs){
+        // The lobby may have changed while this was in flight.
+        var now = server();
+        if (now && String(now.id) !== String(forId)){ annCache.loading = false; return; }
+        var list = Array.isArray(msgs) ? msgs.slice(-3).reverse() : [];
+        annCache = {
+          id: forId,
+          items: list.map(function(m){
+            return {
+              kind: 'announcement',
+              title: String(m.content || m.text || '').slice(0, 90) || 'Announcement',
+              when: m.created_at || m.createdAt || m.timestamp || null,
+              who: (m.author && (m.author.display_name || m.author.username)) ||
+                   m.display_name || m.username || '',
+              chId: ch.id, chName: ch.name
+            };
+          }),
+          loading: false
+        };
+      })
+      .catch(function(){ annCache = { id: forId, items: [], loading: false }; });
+  }
+
+  /* When something happens, in words rather than a raw timestamp. */
+  function whenLabel(iso){
+    if (!iso) return '';
+    var d = new Date(iso);
+    if (isNaN(d)) return '';
+    var diff = d.getTime() - Date.now();
+    var mins = Math.round(Math.abs(diff) / 60000);
+    var past = diff < 0;
+    if (mins < 1)  return 'just now';
+    if (mins < 60) return past ? mins + 'm ago' : 'in ' + mins + 'm';
+    var hrs = Math.round(mins / 60);
+    if (hrs < 24)  return past ? hrs + 'h ago' : 'in ' + hrs + 'h';
+    var days = Math.round(hrs / 24);
+    if (days < 7)  return past ? days + 'd ago'
+                               : d.toLocaleString('en-GB', { weekday:'short', hour:'2-digit', minute:'2-digit' });
+    return d.toLocaleDateString('en-GB', { day:'numeric', month:'short' });
+  }
+
   function statusOf(t){ return String(t && t.status || 'setup').toLowerCase(); }
   function isLive(t){ var s = statusOf(t); return s==='live'||s==='active'||s==='in_progress'||s==='in-progress'; }
   function isDone(t){ var s = statusOf(t); return s==='done'||s==='finished'||s==='complete'||s==='completed'; }
@@ -53064,31 +53177,92 @@ body.coliseum-mode #coliseumRoot .col-canvas{ display:none !important; }
     $('crNow').className = 'cr-now' + (standby ? ' standby' : '');
     $('crNow').innerHTML = now;
 
-    var pending = ts.filter(function(t){ return !isDone(t); });
-    var title, html;
-    if (matches.length){
-      title = 'Bracket · ' + esc(String(active.name || active.title || '').toUpperCase());
-      html = matches.slice(0,4).map(function(m){
-        var a = m.team_a || m.a || {}, b = m.team_b || m.b || {};
-        return '<div class="cr-match ' + (m.live ? 'on' : '') + '" data-act="tourneys">' +
-          '<b>' + esc(a.name || 'TBD') + '</b>' +
-          '<div class="vs">' + (m.live ? esc((m.score_a != null ? m.score_a : 0) + ' – ' + (m.score_b != null ? m.score_b : 0)) : 'VS') + '</div>' +
-          '<b>' + esc(b.name || 'TBD') + '</b></div>';
-      }).join('');
-    } else if (pending.length){
-      title = 'Up next';
-      html = pending.slice(0,4).map(function(t){
-        return '<div class="cr-match ' + (isLive(t) ? 'on' : '') + '" data-act="tourneys">' +
-          '<b>' + esc(t.name || t.title || 'Tournament') + '</b>' +
-          '<div class="vs chip">' + (isLive(t) ? 'RUNNING' : 'WAITING') + '</div>' +
-          '<div class="st">' + esc(String(t.format || 'Single elimination')) + '</div></div>';
-      }).join('');
-    } else { title = ''; html = ''; }
+    /* ── MAIN EVENTS ────────────────────────────────────────────────
+       Everything the lobby has coming up, not just tournaments: live
+       matches, scheduled calendar events and the latest announcements,
+       in one ordered feed. Each keeps its own colour and verb so the
+       three read as different things in the same list. */
+    loadAnnouncements(s, chs);
+
+    var evs = [];
+    try {
+      evs = (window.lobbyEvents && window.lobbyEvents[s.id]) || window.cachedLobbyEvents || [];
+    } catch(e){ evs = []; }
+    if (!Array.isArray(evs)) evs = [];
+
+    var feed = [];
+
+    // 1. A live match outranks everything — it is happening right now.
+    matches.filter(function(m){ return m && m.live; }).slice(0, 2).forEach(function(m){
+      var a = m.team_a || m.a || {}, b = m.team_b || m.b || {};
+      feed.push({
+        kind:'live', chip:'Live match', act:'tourneys',
+        title:(a.name || 'TBD') + ' vs ' + (b.name || 'TBD'),
+        meta:(m.score_a != null ? m.score_a : 0) + ' – ' + (m.score_b != null ? m.score_b : 0) +
+             ' · ' + (active && (active.name || active.title) || 'tournament')
+      });
+    });
+
+    // 2. Running tournaments.
+    ts.filter(isLive).slice(0, 2).forEach(function(t){
+      feed.push({
+        kind:'live', chip:'Running', act:'tourneys',
+        title:t.name || t.title || 'Tournament',
+        meta:String(t.format || 'Tournament') + ' · in progress'
+      });
+    });
+
+    // 3. Scheduled events, soonest first, past ones dropped.
+    evs.map(function(e){
+      var iso = e.date || e.starts_at || e.startsAt || null;
+      return { e:e, t: iso ? new Date(iso).getTime() : 0, iso:iso };
+    }).filter(function(x){ return !x.t || x.t > Date.now() - 3600000; })
+      .sort(function(x, y){ return x.t - y.t; })
+      .slice(0, 3)
+      .forEach(function(x){
+        feed.push({
+          kind:'event', chip:'Event', act:'calendar',
+          title:x.e.title || x.e.name || 'Event',
+          meta:(whenLabel(x.iso) || x.e.subtitle || 'Scheduled')
+        });
+      });
+
+    // 4. Tournaments waiting to start.
+    ts.filter(function(t){ return !isLive(t) && !isDone(t); }).slice(0, 3).forEach(function(t){
+      feed.push({
+        kind:'tourney', chip:'Tournament', act:'tourneys',
+        title:t.name || t.title || 'Tournament',
+        meta:String(t.format || 'Single elimination') + ' · waiting to start'
+      });
+    });
+
+    // 5. Latest announcements.
+    annCache.items.slice(0, 2).forEach(function(a){
+      feed.push({
+        kind:'announce', chip:'Announcement', act:'announce',
+        title:a.title,
+        meta:(a.who ? a.who + ' · ' : '') + (whenLabel(a.when) || 'announcements'),
+        chId:a.chId, chName:a.chName
+      });
+    });
+
     var bs = $('crBracketSec');
-    bs.style.display = html ? '' : 'none';
-    if (html) bs.innerHTML = '<p class="cr-h">' + title +
-      '<span class="more" data-act="tourneys">View all ' + ts.length + ' →</span></p>' +
-      '<div class="cr-brk">' + html + '</div>';
+    bs.style.display = feed.length ? '' : 'none';
+    if (feed.length){
+      bs.innerHTML = '<p class="cr-h">Main events' +
+        '<span class="n">' + feed.length + '</span>' +
+        '<span class="more" data-act="tourneys">View all ' + ts.length + ' →</span></p>' +
+        '<div class="cr-brk">' + feed.slice(0, 4).map(function(f){
+          return '<div class="cr-ev ' + f.kind + '"' +
+            ' data-act="' + esc(f.act) + '"' +
+            (f.chId ? ' data-ann="' + esc(f.chId) + '" data-ann-name="' + esc(f.chName || 'announcements') + '"' : '') +
+            '>' +
+            '<span class="cr-ev-chip">' + esc(f.chip) + '</span>' +
+            '<span class="cr-ev-title">' + esc(f.title) + '</span>' +
+            '<span class="cr-ev-meta">' + esc(f.meta) + '</span>' +
+            '</div>';
+        }).join('') + '</div>';
+    }
 
     /* ── Rooms, grouped by kind ────────────────────────────────
        A voice room you drop into and a channel you read are different
@@ -53273,6 +53447,15 @@ body.coliseum-mode #coliseumRoot .col-canvas{ display:none !important; }
         case 'tourneys': if (typeof window.showOverlay === 'function') window.showOverlay('myTournamentsOverlay'); break;
         case 'newt':     if (typeof window.openModal === 'function') window.openModal('createTournamentModal'); break;
         case 'lounges':  loungesExpanded = !loungesExpanded; render(); break;
+        case 'announce': {
+          // Open the announcement channel the item came from.
+          var host = act.closest('[data-ann]');
+          if (host && typeof window.openChannel === 'function')
+            window.openChannel(host.getAttribute('data-ann'),
+                               host.getAttribute('data-ann-name') || 'announcements',
+                               'announcement');
+          break;
+        }
       }
     });
     el.__wired = true;
