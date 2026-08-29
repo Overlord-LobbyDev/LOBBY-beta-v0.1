@@ -55846,5 +55846,40 @@ body.lobby-selected #chatPanel .chat-header{ display:none !important; }
   else start();
 })();
 </script>
+
+<!-- ══════════════════════════════════════════════════════════════════
+     HOME PAGE SCALE
+
+     Everything on Home rendered small against a large window. Scaled up
+     20% with `zoom` rather than `transform: scale()`, because zoom
+     participates in layout: the scroll height, the click targets and the
+     scrollbar all follow the new size. transform would paint it larger
+     while the page still reserved the old box, so the last section would
+     be clipped and every hit area would sit where the small version was.
+
+     Applied to the content, NOT the whole app: the top bars, the rail
+     and the docks are already sized to the chrome and would only get
+     cramped by 20% less room. If the whole app should scale, this is the
+     one selector to change.
+
+     Media queries still measure the REAL viewport, so the carousel's
+     breakpoints keep firing at the same window widths — the scaled card
+     is comfortably inside the space at each of them.
+     ══════════════════════════════════════════════════════════════════ -->
+<style>
+#homeContent{ zoom:1.2; }
+
+/* zoom divides the space the content sees, so the carousel steps in a
+   window that is effectively 20% narrower. Bring the breakpoints up by
+   the same factor, or the large card would hold on past the width that
+   can actually fit it. */
+@media (max-width:1800px){
+  #homeRecents .game-card{ width:780px !important; height:400px !important; }
+  #homeRecents .home-games-grid{ height:420px !important; }
+  #homeRecents .rc-art{ flex:0 0 267px !important; width:267px !important; }
+  #homeRecents .game-card-placeholder{ width:267px !important; flex:0 0 267px; }
+  #homeRecents .game-card-name{ font-size:22px !important; }
+}
+</style>
 </body>
 </html>
