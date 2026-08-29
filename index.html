@@ -52485,28 +52485,54 @@ body.coliseum-mode #coliseumRoot .col-canvas{ display:none !important; }
 .cr-h .more{ margin-left:auto; font-size:10px; cursor:pointer; letter-spacing:.6px; color:var(--cr-ink3); font-weight:700; }
 .cr-h .more:hover{ color:#fff; }
 
-.cr-brk{ display:grid; grid-template-columns:repeat(auto-fit,minmax(220px,1fr)); gap:13px; }
+/* Fixed 4 columns rather than auto-fit: at 220px min the four cards came
+   to 919px against ~920px of space, so the last one wrapped onto its own
+   row and left a ragged hole. Equal tracks always divide cleanly. */
+.cr-brk{ display:grid; grid-template-columns:repeat(4,minmax(0,1fr)); gap:13px; }
+@media (max-width:1500px){ .cr-brk{ grid-template-columns:repeat(3,minmax(0,1fr)); } }
+@media (max-width:1100px){ .cr-brk{ grid-template-columns:repeat(2,minmax(0,1fr)); } }
+@media (max-width:640px){  .cr-brk{ grid-template-columns:1fr; } }
 .cr-match{
-  border:1px solid var(--cr-line); border-radius:12px; padding:17px 18px;
+  border:1px solid var(--cr-line); border-radius:12px; padding:16px 17px;
   background:linear-gradient(180deg,#141722,#0b0d14); cursor:pointer;
   transition:border-color .16s, transform .16s;
+  display:flex; flex-direction:column; gap:9px;   /* equal heights, aligned rows */
+  min-height:104px;
 }
 .cr-match:hover{ border-color:rgba(255,255,255,.26); transform:translateY(-2px); }
 .cr-match.on{ border-color:rgba(255,59,59,.5); box-shadow:0 0 26px rgba(255,59,59,.15); }
 .cr-match b{ font-family:var(--cr-head); font-weight:700; font-size:14px; display:block; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
-.cr-match .vs{ color:var(--cr-ink3); font-size:10px; font-weight:800; letter-spacing:1.5px; margin:8px 0; font-family:var(--cr-mono); }
-.cr-match .st{ color:var(--cr-ink3); font-size:10.5px; font-family:var(--cr-mono); letter-spacing:1.1px; }
+.cr-match .vs{
+  color:var(--cr-ink3); font-size:10px; font-weight:800; letter-spacing:1.5px;
+  margin:0; font-family:var(--cr-mono);
+}
+/* Status as a chip, so "waiting to start" stops competing with the name
+   for attention the way three stacked lines of text did. */
+.cr-match .vs.chip{
+  align-self:flex-start; padding:3px 9px; border-radius:99px;
+  border:1px solid var(--cr-line); color:var(--cr-ink2); letter-spacing:1.1px;
+}
+.cr-match.on .vs.chip{ border-color:rgba(255,59,59,.5); color:#ff9a9a; }
+.cr-match .st{
+  color:var(--cr-ink3); font-size:10.5px; font-family:var(--cr-mono);
+  letter-spacing:1.1px; margin-top:auto;      /* pin to the bottom edge */
+}
 
 /* Rooms are grouped by kind: a voice room you can drop into and a text
    channel you read are different objects, and one flat row of identical
-   cards said nothing about which was which. */
-.cr-group + .cr-group{ margin-top:22px; }
-.cr-group-h{
-  display:flex; align-items:center; gap:9px; margin:0 0 11px;
+   cards said nothing about which was which.
+
+   Named crx-, NOT cr-group: `.cr-group` is already the chat ribbon's
+   channel-group class (`display:inline-flex`, line ~871). Sharing the
+   name broke it in both directions — the ribbon's rule laid my labels
+   out beside the cards, and my rules leaked into the lobby top bar. */
+#crRoot .crx-group + .crx-group{ margin-top:24px; }
+#crRoot .crx-group-h{
+  display:flex; align-items:center; gap:9px; margin:0 0 12px;
   font-family:var(--cr-head); font-size:10px; font-weight:800;
   letter-spacing:1.8px; text-transform:uppercase; color:var(--cr-ink3);
 }
-.cr-group-h .n{
+#crRoot .crx-group-h .n{
   font-family:var(--cr-mono); font-size:9.5px; padding:1px 7px; border-radius:99px;
   background:rgba(255,255,255,.06); color:var(--cr-ink2);
 }
@@ -52787,7 +52813,12 @@ body.coliseum-mode #coliseumRoot .col-canvas{ display:none !important; }
         (active ? '<span class="cr-tag"><i></i>LIVE</span>' : '<span class="cr-tag off"><i></i>STANDBY</span>') +
       '</div>' +
       '<div class="cr-hero-in">' +
-        '<div class="cr-crest">' + (icon ? '<img src="' + esc(icon) + '" alt="">' : esc(initials(s.name))) + '</div>' +
+        /* onerror: a lobby whose icon URL 404s was rendering the browser's
+           broken-image glyph inside the crest. Drop the <img> and fall
+           back to initials, which is what a lobby with no icon shows. */
+        '<div class="cr-crest">' + (icon
+          ? '<img src="' + esc(icon) + '" alt="" onerror="this.remove()">'
+          : esc(initials(s.name))) + '</div>' +
         '<div style="min-width:0">' +
           '<h1 class="cr-name">' + esc(String(s.name || 'Lobby').toUpperCase()) + '</h1>' +
           '<p class="cr-desc">' + esc(s.description || s.motto || 'No description set.') + '</p>' +
@@ -52843,7 +52874,7 @@ body.coliseum-mode #coliseumRoot .col-canvas{ display:none !important; }
       html = pending.slice(0,4).map(function(t){
         return '<div class="cr-match ' + (isLive(t) ? 'on' : '') + '" data-act="tourneys">' +
           '<b>' + esc(t.name || t.title || 'Tournament') + '</b>' +
-          '<div class="vs">' + (isLive(t) ? 'RUNNING' : 'WAITING TO START') + '</div>' +
+          '<div class="vs chip">' + (isLive(t) ? 'RUNNING' : 'WAITING') + '</div>' +
           '<div class="st">' + esc(String(t.format || 'Single elimination')) + '</div></div>';
       }).join('');
     } else { title = ''; html = ''; }
@@ -52880,7 +52911,8 @@ body.coliseum-mode #coliseumRoot .col-canvas{ display:none !important; }
                 var nm = m.display_name || m.username || '?';
                 var url = m.avatar_url || m.avatarUrl;
                 return '<span class="av" title="' + esc(nm) + '">' +
-                  (url ? '<img src="' + esc(url) + '" alt="">' : esc(initials(nm))) + '</span>';
+                  (url ? '<img src="' + esc(url) + '" alt="" onerror="this.remove()">'
+                       : esc(initials(nm))) + '</span>';
               }).join('') + (here.length > 8 ? '<span class="av">+' + (here.length - 8) + '</span>' : '')
             : '<span class="empty">Empty — be the first in</span>') +
         '</div></div>';
@@ -52901,8 +52933,8 @@ body.coliseum-mode #coliseumRoot .col-canvas{ display:none !important; }
 
     function group(label, items, render){
       if (!items.length) return '';
-      return '<div class="cr-group">' +
-        '<p class="cr-group-h">' + label + '<span class="n">' + items.length + '</span></p>' +
+      return '<div class="crx-group">' +
+        '<p class="crx-group-h">' + label + '<span class="n">' + items.length + '</span></p>' +
         '<div class="cr-rooms">' + items.map(render).join('') + '</div></div>';
     }
 
