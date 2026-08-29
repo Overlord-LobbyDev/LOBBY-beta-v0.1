@@ -60450,5 +60450,96 @@ async function reactComment(ev, id, btn){
   grid-template-columns:repeat(auto-fit, minmax(104px, 1fr)) !important;
 }
 </style>
+
+<!-- ══════════════════════════════════════════════════════════════════
+     100% — the whole card, not one cell
+
+     A completed game marked only its achievement cell, which read as a
+     note about achievements rather than a statement about the game. The
+     card already carries data-ach-complete, so the whole thing can
+     respond: the rim goes gold, and the entire stat strip goes with it —
+     hours, fortnight, achievements.
+
+     Deliberately restrained about WHICH gold. The rim and the strip are
+     tinted; the figures are gold; the card's artwork, its title and its
+     achievement list are untouched. Gilding the art as well would fight
+     the cover rather than frame it, and this has to sit beside four
+     other cards without shouting over them.
+
+     Applies in the deck and on the small grid cards, since both know the
+     completion state — but the back cards of the deck get it quietly,
+     because they are already dimmed and a bright rim would pull the eye
+     off the card in front.
+     ══════════════════════════════════════════════════════════════════ -->
+<style>
+/* ── The rim ──────────────────────────────────────────────────── */
+#homeContent [data-home-slot="hero"] .game-card[data-ach-complete="1"]{
+  border:1px solid color-mix(in srgb, #ffd35c 62%, transparent) !important;
+}
+#homeContent [data-home-slot="hero"] .game-card[data-ach-complete="1"].rc-active{
+  box-shadow:
+    0 30px 70px rgba(0,0,0,.72),
+    0 0 0 1px color-mix(in srgb, #ffd35c 72%, transparent),
+    0 0 44px color-mix(in srgb, #ffb020 26%, transparent) !important;
+}
+/* Quietly on the cards behind: they are dimmed already, and a bright rim
+   back there would pull the eye off the front card. */
+#homeContent [data-home-slot="hero"] .game-card[data-ach-complete="1"]:not(.rc-active){
+  border-color:color-mix(in srgb, #ffd35c 34%, transparent) !important;
+}
+
+/* ── The whole strip ──────────────────────────────────────────── */
+#homeContent [data-home-slot="hero"] [data-ach-complete="1"] .rc-stats{
+  background:color-mix(in srgb, #ffd35c 20%, transparent) !important;
+  border-color:color-mix(in srgb, #ffd35c 34%, transparent) !important;
+  box-shadow:0 0 26px color-mix(in srgb, #ffb020 14%, transparent);
+}
+/* Every cell, not just the achievements one — hours and fortnight
+   included, which is the point. */
+#homeContent [data-home-slot="hero"] [data-ach-complete="1"] .rc-stat{
+  background:
+    linear-gradient(180deg,
+      color-mix(in srgb, #ffd35c 9%, transparent),
+      color-mix(in srgb, #b8860b 5%, transparent)),
+    #0d0f16 !important;
+}
+#homeContent [data-home-slot="hero"] [data-ach-complete="1"] .rc-stat b{
+  color:#ffd964 !important;
+  -webkit-text-fill-color:#ffd964 !important;
+  text-shadow:0 0 20px rgba(255,200,60,.35), 0 1px 0 rgba(0,0,0,.5);
+}
+#homeContent [data-home-slot="hero"] [data-ach-complete="1"] .rc-stat > span{
+  color:color-mix(in srgb, #ffd35c 62%, #fff) !important;
+}
+/* The "2 weeks" cell highlights itself when there is recent play; on a
+   completed game that accent would fight the gold. */
+#homeContent [data-home-slot="hero"] [data-ach-complete="1"] .rc-stat.hot b{
+  color:#ffe08a !important;
+  -webkit-text-fill-color:#ffe08a !important;
+}
+
+/* The playtime bar picks it up too, so the panel reads as one thing. */
+#homeContent [data-home-slot="hero"] [data-ach-complete="1"] .rc-bar-f{
+  background:linear-gradient(90deg,
+    color-mix(in srgb, #ffd35c 85%, white),
+    #ffb020) !important;
+}
+#homeContent [data-home-slot="hero"] [data-ach-complete="1"] .rc-bar-l span:last-child{
+  color:#ffd964 !important;
+}
+
+/* ── Small grid cards ─────────────────────────────────────────── */
+#homeContent [data-home-slot="col"] .game-card[data-ach-complete="1"]{
+  border-color:color-mix(in srgb, #ffd35c 52%, transparent) !important;
+}
+#homeContent [data-home-slot="col"] .game-card[data-ach-complete="1"]::after{
+  box-shadow:inset 0 0 0 1px color-mix(in srgb, #ffd35c 42%, transparent) !important;
+}
+#homeContent [data-home-slot="col"] .game-card[data-ach-complete="1"]:hover{
+  border-color:color-mix(in srgb, #ffd35c 78%, transparent) !important;
+  box-shadow:0 18px 40px rgba(0,0,0,.6),
+             0 0 30px color-mix(in srgb, #ffb020 20%, transparent) !important;
+}
+</style>
 </body>
 </html>
