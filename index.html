@@ -55493,8 +55493,19 @@ body.double-dock[data-feed-position="right"].feed-open:not(.rail-hidden) #settin
   }
 
   /* The grid cards need the same art resolution, so it is reachable
-     from outside the deck rather than duplicated there. */
-  window.__rcArtwork = artwork;
+     from outside the deck rather than duplicated there.
+
+     It must carry the onerror strip with it. artwork() alone is only half
+     the routine — enhance() removes the inline onerror FIRST, and without
+     that the handler swaps the <img> for a placeholder the moment the
+     first URL 404s, tearing out the element the fallback chain is trying
+     to repair. Exposing the bare function let the grid lose that race on
+     any game whose header.jpg is missing. */
+  window.__rcArtwork = function (card) {
+    var h = card.querySelector('.game-card-hero');
+    if (h){ h.removeAttribute('onerror'); h.setAttribute('alt', ''); }
+    artwork(card);
+  };
 
   function enhance(card){
     if (card.__rc) return;
@@ -57698,6 +57709,163 @@ async function reactComment(ev, id, btn){
     document.querySelectorAll(
       '#homeContent [data-home-slot="col"] .game-card'
     ).forEach(tighten);
+  }
+
+  function start(){
+    var hc = document.getElementById('homeContent');
+    if (!hc) { setTimeout(start, 200); return; }
+    var queued = false;
+    function ping(){
+      if (queued) return;
+      queued = true;
+      requestAnimationFrame(function () { queued = false; sweep(); });
+    }
+    new MutationObserver(ping).observe(hc, { childList: true, subtree: true });
+    sweep();
+  }
+
+  if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', start);
+  else start();
+})();
+</script>
+
+<!-- ══════════════════════════════════════════════════════════════════
+     POSTER CARDS — the finish
+
+     Three things were doing the cheapening:
+
+       A solid tan pill across the top of the artwork. A filled shape in
+       the accent colour competes with the art it is sitting on. It is
+       now dark glass with a single accent dot — the colour still marks
+       it, without a slab of colour over the picture.
+
+       An emoji trophy in the meta line. Emoji render in their own
+       colours at their own weight and never match the type around them,
+       which is exactly what makes a UI look assembled rather than
+       designed. Replaced with a drawn glyph that takes currentColor.
+
+       Two enormous letters in an empty slab where art failed. It read as
+       a broken image. Quieter initials over a ruled ground, with a small
+       mark above, read as a card that has no artwork — which is the
+       truth, and is not an error.
+
+     The art failures themselves were a bug, fixed separately: the
+     resolver was exposed without the onerror strip that has to precede
+     it, so the inline handler replaced the <img> before the fallback
+     chain could finish.
+     ══════════════════════════════════════════════════════════════════ -->
+<style>
+/* ── Badge: dark glass, not a colour slab ─────────────────────── */
+#homeContent [data-home-slot="col"] .gc-badge{
+  top:8px !important; left:8px !important;
+  gap:5px !important;
+  padding:3.5px 9px !important;
+  font-size:10px !important; font-weight:700 !important; letter-spacing:.2px !important;
+  color:rgba(255,255,255,.95) !important;
+  background:rgba(8,10,14,.66) !important;
+  border:1px solid rgba(255,255,255,.14) !important;
+  box-shadow:0 2px 10px rgba(0,0,0,.5) !important;
+  backdrop-filter:blur(12px) saturate(1.4);
+}
+.gc-dotmark{
+  width:5px; height:5px; border-radius:50%; flex:0 0 auto;
+  background:var(--accent);
+  box-shadow:0 0 7px color-mix(in srgb, var(--accent) 75%, transparent);
+}
+.gc-unit{ opacity:.6; font-weight:600; }
+
+/* ── Meta: drawn glyph, aligned to the type ───────────────────── */
+#homeContent [data-home-slot="col"] .gc-meta{
+  gap:6px !important; font-size:11px !important;
+  color:rgba(255,255,255,.66) !important;
+}
+#homeContent [data-home-slot="col"] .gc-meta b{
+  color:#fff !important; font-weight:800 !important;
+}
+.gc-ico{
+  width:11px; height:11px; flex:0 0 auto;
+  vertical-align:-1px; opacity:.75;
+}
+#homeContent [data-home-slot="col"] .gc-ach{ gap:4px !important; }
+
+/* ── No artwork: a card without art, not a broken one ─────────── */
+#homeContent [data-home-slot="col"] .game-card-placeholder{
+  flex-direction:column; gap:14px;
+  font-size:30px !important; letter-spacing:6px !important;
+  /* Letter-spacing adds its gap AFTER the last glyph too, so a centred
+     box sits half a gap right of where the letters look centred. */
+  text-indent:3px;
+  color:rgba(255,255,255,.22) !important;
+  background:
+    repeating-linear-gradient(-38deg,
+      rgba(255,255,255,.022) 0 1px,
+      transparent 1px 9px),
+    radial-gradient(90% 60% at 50% 22%, rgba(255,255,255,.055), transparent 70%),
+    linear-gradient(158deg,#1c212e 0%,#0b0d13 100%) !important;
+  box-shadow:inset 0 0 0 1px rgba(255,255,255,.05) !important;
+}
+#homeContent [data-home-slot="col"] .game-card-placeholder::before{
+  content:'';
+  width:34px; height:2px; flex:0 0 auto; border-radius:2px;
+  background:linear-gradient(90deg, transparent, currentColor, transparent);
+  opacity:.55;
+}
+
+/* A poster with no art has nothing to zoom. */
+#homeContent [data-home-slot="col"] .game-card:hover .game-card-placeholder{
+  transform:none;
+}
+
+/* ── Art edge ─────────────────────────────────────────────────── */
+/* A hairline inside the radius stops cover art from meeting the card
+   edge flat — the thing that makes a grid of images look pasted on. */
+#homeContent [data-home-slot="col"] .game-card::after{
+  content:'' !important; display:block !important;
+  position:absolute; inset:0; z-index:3; pointer-events:none;
+  border-radius:13px;
+  /* Ring only. This layer sits above the title plate, so an inset
+     bottom shadow here would darken the type rather than the art
+     behind it. */
+  box-shadow:inset 0 0 0 1px rgba(255,255,255,.07);
+}
+</style>
+<script>
+(function () {
+  'use strict';
+
+  var TROPHY =
+    '<svg class="gc-ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" ' +
+    'stroke-width="2" stroke-linecap="round" stroke-linejoin="round">' +
+    '<path d="M8 21h8M12 17v4M7 4h10v5a5 5 0 0 1-10 0z"/>' +
+    '<path d="M17 5h2.5a1.5 1.5 0 0 1 0 5H17M7 5H4.5a1.5 1.5 0 0 0 0 5H7"/></svg>';
+
+  function polish(card){
+    if (card.__pol) return;
+
+    /* The badge is written by an earlier pass; wait for it rather than
+       marking this card done and never coming back. */
+    var b = card.querySelector('.gc-badge');
+    if (b && !b.__pol){
+      var m = String(b.textContent || '').match(/([\d.]+)\s*h/i);
+      if (m){
+        b.__pol = true;
+        b.innerHTML = '<i class="gc-dotmark"></i>' + m[1] +
+                      'h <span class="gc-unit">/ 2wk</span>';
+      }
+    }
+
+    var ach = card.querySelector('.gc-ach');
+    if (ach && !ach.__pol && /🏆/.test(ach.textContent)){
+      ach.__pol = true;
+      ach.innerHTML = ach.innerHTML.replace('🏆', TROPHY);
+      card.__pol = true;
+    }
+  }
+
+  function sweep(){
+    document.querySelectorAll(
+      '#homeContent [data-home-slot="col"] .game-card'
+    ).forEach(polish);
   }
 
   function start(){
