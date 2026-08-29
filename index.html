@@ -27288,85 +27288,21 @@ window.storeBuy = function(id) {
   }
 };
 
-// ── Premium Discover ──────────────────────────────────────
-// Each lobby links to a real game header image (Steam CDN) where possible,
-// with a `fallback` gradient + initial glyph for branded titles that
-// aren't on Steam. `badge` is optional: 'trending' | 'featured' | 'live' | 'fresh'.
+// ── Discover ─────────────────────────────────────────
+// Everything on this page is real. There used to be twelve hand-written
+// placeholder lobbies here -- CS2 Premier Hub, Apex Squads, Valorant
+// Ranked Hub and the rest -- so a brand-new install would not open onto
+// an empty grid. They are gone.
 //
-// IMPORTANT: members/online stats are intentionally NOT hardcoded here.
-// The card renderer shows "—" for absent stats and only displays real
-// numbers when the server returns them via /lobbies/public. The seed
-// script at backend/seed-discover-lobbies.js creates these as real
-// lobbies owned by Overlord (#1226) so the numbers become honest.
-const DISCOVER_LOBBIES = [
-  { id:'spotlight-1', name:'Tekken Pro Circuit', tag:'fighting',
-    spotlight:true, badge:'featured', kind:'lobby',
-    desc:'Where the Tekken 8 pros warm up. Daily ranked rooms, weekly $500 throwdowns, frame-data nerds welcome.',
-    tags:['Fighting','Competitive','Verified'],
-    cover:'https://cdn.cloudflare.steamstatic.com/steam/apps/1778820/header.jpg',
-    heroHi:'https://cdn.cloudflare.steamstatic.com/steam/apps/1778820/library_hero.jpg',
-    fallback:'linear-gradient(135deg,#5e0c14 0%,#1a0309 100%)', initial:'T' },
-
-  { id:'demo-1',  name:'CS2 Premier Hub',     tag:'shooter', badge:'trending',
-    tags:['Shooter','Ranked'],
-    cover:'https://cdn.cloudflare.steamstatic.com/steam/apps/730/header.jpg',
-    heroHi:'https://cdn.cloudflare.steamstatic.com/steam/apps/730/library_hero.jpg',
-    fallback:'linear-gradient(135deg,#d68f1e 0%,#1a1a1a 100%)', initial:'CS' },
-
-  { id:'demo-2',  name:'Apex Squads',         tag:'shooter', badge:'live',
-    tags:['Shooter','Battle Royale'],
-    cover:'https://cdn.cloudflare.steamstatic.com/steam/apps/1172470/header.jpg',
-    heroHi:'https://cdn.cloudflare.steamstatic.com/steam/apps/1172470/library_hero.jpg',
-    fallback:'linear-gradient(135deg,#da292a 0%,#1a0606 100%)', initial:'A' },
-
-  { id:'demo-3',  name:'Street Fighter Salty',tag:'fighting',
-    tags:['Fighting','Casual'],
-    cover:'https://cdn.cloudflare.steamstatic.com/steam/apps/1364780/header.jpg',
-    heroHi:'https://cdn.cloudflare.steamstatic.com/steam/apps/1364780/library_hero.jpg',
-    fallback:'linear-gradient(135deg,#ffba00 0%,#5a1300 100%)', initial:'SF' },
-
-  { id:'demo-4',  name:'Rocket League 3v3',   tag:'shooter', badge:'fresh',
-    tags:['Sports','Arcade'],
-    cover:'https://cdn.cloudflare.steamstatic.com/steam/apps/252950/header.jpg',
-    heroHi:'https://cdn.cloudflare.steamstatic.com/steam/apps/252950/library_hero.jpg',
-    fallback:'linear-gradient(135deg,#0091ff 0%,#001b3d 100%)', initial:'RL' },
-
-  { id:'demo-5',  name:'Valorant Ranked Hub', tag:'shooter', badge:'trending',
-    tags:['Shooter','Ranked'],
-    cover:'', fallback:'linear-gradient(135deg,#ff4655 0%,#0f1923 100%)', initial:'V' },
-
-  { id:'demo-6',  name:'Smash Bros Weekly',   tag:'fighting',
-    tags:['Fighting','Tournaments'],
-    cover:'', fallback:'linear-gradient(135deg,#ff3b3b 0%,#1d0808 100%)', initial:'★' },
-
-  { id:'demo-7',  name:'League of Legends LCQ',tag:'strategy',
-    tags:['MOBA','Competitive'],
-    cover:'', fallback:'linear-gradient(135deg,#c89b3c 0%,#0a1428 100%)', initial:'L' },
-
-  { id:'demo-8',  name:'StarCraft GMs',       tag:'strategy',
-    tags:['Strategy','RTS'],
-    cover:'', fallback:'linear-gradient(135deg,#3aa6ff 0%,#08183d 100%)', initial:'SC' },
-
-  { id:'demo-9',  name:'Indie Game Night',    tag:'indie', badge:'fresh',
-    tags:['Indie','Co-op'],
-    cover:'', fallback:'linear-gradient(135deg,#9b59ff 0%,#1a073d 100%)', initial:'I' },
-
-  { id:'demo-10', name:'Couch Co-op Chill',   tag:'casual',
-    tags:['Casual','Chill'],
-    cover:'', fallback:'linear-gradient(135deg,#5865f2 0%,#1a1d3d 100%)', initial:'CC' },
-
-  { id:'demo-11', name:'EA FC Pro Clubs',     tag:'shooter',
-    tags:['Sports','Pro Clubs'],
-    cover:'https://cdn.cloudflare.steamstatic.com/steam/apps/2669320/header.jpg',
-    heroHi:'https://cdn.cloudflare.steamstatic.com/steam/apps/2669320/library_hero.jpg',
-    fallback:'linear-gradient(135deg,#00d762 0%,#012b14 100%)', initial:'FC' },
-
-  { id:'demo-12', name:'Warzone Trio Grind',  tag:'shooter',
-    tags:['Shooter','Battle Royale'],
-    cover:'https://cdn.cloudflare.steamstatic.com/steam/apps/1938090/header.jpg',
-    heroHi:'https://cdn.cloudflare.steamstatic.com/steam/apps/1938090/library_hero.jpg',
-    fallback:'linear-gradient(135deg,#4a7d2c 0%,#0d1709 100%)', initial:'CoD' },
-];
+// The reason is that they could not be told apart from the real thing.
+// They carried the same badges, sat in the same recommendation ranking,
+// and answered a click by trying to join a lobby that does not exist.
+// A discovery page whose contents are mostly fictional is worse than a
+// short one: it teaches people that what is on it is not worth clicking.
+//
+// So the seed is empty and every rail is fed from the server. An empty
+// rail says so, and offers the thing you would actually do about it.
+const DISCOVER_LOBBIES = [];
 
 const DISCOVER_TABS = [
   { id:'all',       label:'All' },
@@ -27426,11 +27362,15 @@ window.openDiscoverPanel = async function() {
         initial: (s.name||'?')[0].toUpperCase(),
         tags: s.tags || (s.tag ? [s.tag] : []),
         badge: s.badge || null, kind: 'lobby',
+        // Carried through because the deck card has room for a pitch and
+        // an icon; the old grid tile had neither and dropped both.
+        description: s.description || '',
+        icon: s.icon || '',
         isReal: true,
       }));
-      // Prepend real lobbies and dedupe by id
-      const seen = new Set(real.map(l => l.id));
-      _dcLobbies = [...real, ...DISCOVER_LOBBIES.filter(l => !seen.has(l.id))];
+      // The server is the only source now, so this is an assignment
+      // rather than a merge over placeholders.
+      _dcLobbies = real;
       _renderDiscoverGrid();
     }
   } catch {}
@@ -60547,5 +60487,1418 @@ async function reactComment(ev, id, btn){
              0 0 30px color-mix(in srgb, #ffb020 20%, transparent) !important;
 }
 </style>
+
+<!-- ══════════════════════════════════════════════════════════════════
+     DISCOVER — THE DECK, THE RAILS, AND THE USER'S OWN ORDER
+
+     Discover was a wall. One grid, every kind of thing in it, sorted by
+     a score nobody could see, under tabs that mixed "Fighting" with
+     "Tournaments" as if those were the same question. It shared no
+     language with the front page beyond a colour.
+
+     Rebuilt on the front page's own idea: presentation follows the slot.
+
+       hero   the top — the circular deck, one big card in focus
+       rail   below   — a horizontal shelf you scan and scroll
+
+     Discover's sections are Lobbies, Tournaments, Races and People, and
+     the user decides their order. Whichever they put first gets the
+     deck. Someone who is here for brackets drags Tournaments to the top
+     once and Discover is a tournament browser from then on. The order is
+     stored per ACCOUNT, not per browser, so it follows them to another
+     machine.
+
+     WHAT THE FILTERS BECAME. There are two questions, and they now get
+     two rows instead of being flattened into one strip of pills. The
+     first row is WHAT you are browsing, and it doubles as navigation:
+     pick Tournaments and everything else stands down and brackets take
+     the deck. The second row is HOW you want it narrowed — genre, live
+     only, sort — and the genres are read out of the data that is
+     actually present, so there is never a "Fighting 0" to click.
+
+     WHY IT IS NOT JUST THE HOME PAGE AGAIN. Home is about you: your
+     games, your hours, your achievements. Discover is about everyone
+     else, so its deck card leads with the pitch and the people, and the
+     whole page is washed in the colour of whatever is in focus — its own
+     cyan, not the app accent. Same grammar, different subject.
+
+     REUSED, NOT REDRAWN. The rail headers are .home-section-header with
+     the same .hs-kicker / .hs-bar parts the front page builds, so the
+     numbering, the accent bar and the live count are one design in two
+     places rather than two that drift.
+     ══════════════════════════════════════════════════════════════════ -->
+<style>
+/* ── The stage ─────────────────────────────────────────────────── */
+#discoverOverlay{ position:relative; }
+
+/* Ambient wash taken from whatever is in focus, exactly as the front
+   page does it — but anchored to the top of the overlay and faded out
+   long before the rails below, so it colours the page without tinting
+   the content sitting on it. */
+#discoverOverlay .dcx-wash{
+  position:absolute; top:0; left:0; right:0; height:780px;
+  z-index:0; pointer-events:none;
+  background-image:var(--dcx-art, none);
+  background-size:cover; background-position:center 22%;
+  filter:blur(90px) saturate(1.7) brightness(.85);
+  opacity:0;
+  transition:opacity .55s ease;
+  -webkit-mask-image:linear-gradient(180deg, #000 0%, rgba(0,0,0,.72) 38%, rgba(0,0,0,.28) 66%, transparent 96%);
+          mask-image:linear-gradient(180deg, #000 0%, rgba(0,0,0,.72) 38%, rgba(0,0,0,.28) 66%, transparent 96%);
+}
+#discoverOverlay .dcx-wash.on{ opacity:.42; }
+#discoverOverlay > .discover-hero,
+#discoverOverlay > div[style*="overflow-y"]{ position:relative; z-index:1; }
+
+#discoverList.dcx-stage{
+  display:flex !important; flex-direction:column !important;
+  grid-template-columns:none !important;
+  gap:8px !important;
+  max-width:1680px; margin:0 auto;
+}
+
+/* ── Filter bar ────────────────────────────────────────────────── */
+#discoverOverlay .discover-tabs{
+  display:flex !important; flex-direction:column !important;
+  align-items:stretch !important; gap:12px !important;
+  flex-wrap:nowrap !important;
+}
+.dcx-kinds{
+  display:flex; align-items:center; gap:4px;
+  padding:4px; border-radius:14px;
+  background:rgba(8,11,16,.55);
+  border:1px solid rgba(255,255,255,.07);
+  box-shadow:inset 0 1px 0 rgba(255,255,255,.04);
+  backdrop-filter:blur(12px);
+  align-self:flex-start;
+}
+.dcx-kind{
+  position:relative;
+  display:inline-flex; align-items:center; gap:9px;
+  padding:9px 16px; border-radius:11px;
+  border:0; background:transparent; cursor:pointer;
+  font-family:'Archivo', var(--font), sans-serif;
+  font-size:11.5px; font-weight:800; letter-spacing:1.3px; text-transform:uppercase;
+  color:var(--text-3);
+  transition:color .18s ease, background .18s ease;
+}
+.dcx-kind:hover{ color:var(--text-1); background:rgba(255,255,255,.045); }
+.dcx-kind.on{
+  color:#04121a;
+  background:linear-gradient(180deg,
+    color-mix(in srgb, var(--hub-accent) 96%, white),
+    var(--hub-accent));
+  box-shadow:0 4px 16px color-mix(in srgb, var(--hub-accent) 34%, transparent),
+             inset 0 1px 0 rgba(255,255,255,.45);
+}
+.dcx-kind-ico{ display:inline-flex; }
+.dcx-kind-ico svg{ width:14px; height:14px; display:block; }
+.dcx-kind-n{
+  font-family:'JetBrains Mono', ui-monospace, monospace;
+  font-size:10px; font-weight:800; font-variant-numeric:tabular-nums;
+  padding:2px 6px; border-radius:99px;
+  background:rgba(255,255,255,.08); color:var(--text-2);
+}
+.dcx-kind.on .dcx-kind-n{ background:rgba(0,0,0,.22); color:#04121a; }
+.dcx-kind[disabled]{ opacity:.34; cursor:default; }
+.dcx-kind[disabled]:hover{ color:var(--text-3); background:transparent; }
+
+/* Row two: the narrowing controls. Quieter than row one on purpose —
+   row one is where you are, row two is a refinement of it. */
+.dcx-refine{
+  display:flex; align-items:center; gap:8px; flex-wrap:wrap;
+  padding-left:2px;
+}
+.dcx-refine-label{
+  font-family:'JetBrains Mono', ui-monospace, monospace;
+  font-size:9.5px; font-weight:700; letter-spacing:1.8px; text-transform:uppercase;
+  color:var(--text-3); margin-right:2px;
+}
+.dcx-pill{
+  display:inline-flex; align-items:center; gap:6px;
+  padding:6px 12px; border-radius:99px; cursor:pointer;
+  border:1px solid rgba(255,255,255,.09);
+  background:rgba(255,255,255,.028);
+  color:var(--text-2);
+  font-family:'Archivo', var(--font), sans-serif;
+  font-size:11px; font-weight:700; letter-spacing:.4px;
+  transition:border-color .18s ease, background .18s ease, color .18s ease;
+}
+.dcx-pill:hover{ color:#fff; border-color:rgba(255,255,255,.2); background:rgba(255,255,255,.06); }
+.dcx-pill.on{
+  color:#fff;
+  border-color:color-mix(in srgb, var(--hub-accent) 62%, transparent);
+  background:color-mix(in srgb, var(--hub-accent) 16%, transparent);
+  box-shadow:0 0 18px color-mix(in srgb, var(--hub-accent) 18%, transparent);
+}
+.dcx-pill .dcx-livedot{
+  width:6px; height:6px; border-radius:50%; background:rgba(255,255,255,.25);
+}
+.dcx-pill.on .dcx-livedot{
+  background:#ff4d4d; box-shadow:0 0 9px rgba(255,77,77,.85);
+  animation:dcxPulse 1.6s ease-in-out infinite;
+}
+@keyframes dcxPulse{ 50%{ opacity:.4; } }
+.dcx-sep{ width:1px; height:18px; background:rgba(255,255,255,.09); margin:0 4px; }
+
+/* ── Rails ─────────────────────────────────────────────────────── */
+.dcx-rail{ position:relative; padding:14px 0 30px; }
+.dcx-rail + .dcx-rail{ border-top:1px solid rgba(255,255,255,.055); }
+
+/* The header is the front page's, so the numbering, the accent bar and
+   the live count are one design used twice rather than two that drift.
+   Only the colour changes: Discover's cyan instead of the app accent. */
+#discoverOverlay .home-section-header{
+  display:flex !important; flex-direction:column !important;
+  align-items:center !important; justify-content:center !important;
+  gap:0 !important; position:relative;
+  margin:0 0 22px !important; padding:6px 0 !important;
+  text-align:center !important;
+  cursor:grab;
+}
+#discoverOverlay .home-section-header:active{ cursor:grabbing; }
+#discoverOverlay .home-section-header.dcx-dragging{ opacity:.38; }
+#discoverOverlay .home-section-header.dcx-over::after{
+  content:''; position:absolute; left:12%; right:12%; top:-9px; height:3px;
+  border-radius:99px; background:var(--hub-accent);
+  box-shadow:0 0 16px color-mix(in srgb, var(--hub-accent) 80%, transparent);
+}
+#discoverOverlay .home-section-title{
+  font-family:'Archivo', var(--font), sans-serif !important;
+  text-transform:uppercase !important;
+  font-size:25px !important; font-weight:900 !important;
+  letter-spacing:2.2px !important; line-height:1.06 !important;
+  color:#fff !important; -webkit-text-fill-color:#fff !important;
+  background:none !important;
+  position:relative !important; isolation:isolate;
+  padding-bottom:2px !important;
+  text-shadow:
+    0 -1px 0 rgba(255,255,255,.30),
+    0 1px 0 rgba(0,0,0,.55),
+    0 3px 7px rgba(0,0,0,.42),
+    0 0 42px color-mix(in srgb, var(--hub-accent) 34%, transparent) !important;
+}
+#discoverOverlay .home-section-title::before{
+  content:attr(data-text);
+  position:absolute; left:0; right:0; top:0;
+  z-index:-1; pointer-events:none;
+  color:transparent; -webkit-text-fill-color:transparent;
+  background:none; text-shadow:none;
+  -webkit-text-stroke:1px rgba(255,255,255,.115);
+  transform:translateY(1px) scale(1.055);
+  transform-origin:center center;
+}
+#discoverOverlay .home-section-title:not([data-text])::before{ content:none; }
+#discoverOverlay .home-section-sub{
+  font-size:12.5px !important; color:var(--text-3) !important;
+  margin-top:7px !important; letter-spacing:.2px;
+}
+#discoverOverlay .hs-idx,
+#discoverOverlay .hs-ico{ color:color-mix(in srgb, var(--hub-accent) 88%, white); }
+#discoverOverlay .hs-bar{
+  background:linear-gradient(90deg, transparent,
+    color-mix(in srgb, var(--hub-accent) 95%, white) 35%,
+    color-mix(in srgb, var(--hub-accent) 95%, white) 65%, transparent);
+}
+#discoverOverlay .hs-count .dot{
+  background:color-mix(in srgb, var(--hub-accent) 90%, white);
+  box-shadow:0 0 9px color-mix(in srgb, var(--hub-accent) 70%, transparent);
+}
+
+/* Header-right controls: promote this rail, or grab it. Absolute so they
+   cannot shift what the centred rows are centred on — the same reason
+   the front page's refresh button is absolute. */
+.dcx-railtools{
+  position:absolute; right:0; top:50%; transform:translateY(-50%);
+  display:flex; align-items:center; gap:7px;
+}
+.dcx-tool{
+  display:inline-flex; align-items:center; gap:7px;
+  padding:8px 13px; border-radius:9px; cursor:pointer;
+  border:1px solid rgba(255,255,255,.09);
+  background:rgba(255,255,255,.05);
+  color:var(--text-2);
+  font-family:'Archivo', var(--font), sans-serif;
+  font-size:11px; font-weight:700; letter-spacing:.5px;
+  transition:background .18s ease, color .18s ease, border-color .18s ease;
+}
+.dcx-tool:hover{
+  background:color-mix(in srgb, var(--hub-accent) 16%, transparent);
+  border-color:color-mix(in srgb, var(--hub-accent) 46%, transparent);
+  color:#fff;
+}
+.dcx-tool svg{ width:13px; height:13px; }
+.dcx-grip{
+  display:inline-flex; align-items:center; justify-content:center;
+  width:32px; height:32px; border-radius:9px;
+  border:1px solid rgba(255,255,255,.07);
+  background:rgba(255,255,255,.035);
+  color:var(--text-3); cursor:grab;
+}
+.dcx-grip:hover{ color:#fff; background:rgba(255,255,255,.08); }
+@media (max-width:1100px){
+  .dcx-railtools{ position:static; transform:none; margin-top:14px; justify-content:center; }
+}
+
+/* ── HERO SLOT: the deck ───────────────────────────────────────── */
+.dcx-rail[data-dcx-slot="hero"] .dcx-body{
+  position:relative; height:440px; overflow:visible;
+}
+.dcx-rail[data-dcx-slot="hero"] .dcx-track{
+  position:relative; height:100%; overflow:visible;
+}
+.dcx-rail[data-dcx-slot="hero"] .dcx-card{
+  position:absolute; top:0; left:50%;
+  width:900px; max-width:none; height:420px;
+  margin:0; border-radius:18px; overflow:hidden;
+  display:flex; flex-direction:row; align-items:stretch;
+  transform-origin:center center;
+  transform:translateX(calc(-50% + var(--rc-x, 0px))) scale(var(--rc-s, 1));
+  filter:saturate(var(--rc-sat, 1)) brightness(var(--rc-b, 1));
+  opacity:var(--rc-o, 1);
+  transition:transform .46s cubic-bezier(.22,1,.36,1),
+             opacity .36s ease, filter .36s ease, box-shadow .36s ease;
+  will-change:transform;
+  backface-visibility:hidden;
+  background:linear-gradient(135deg,#14161f 0%,#0b0d13 100%);
+  border:1px solid rgba(255,255,255,.08);
+  box-shadow:0 20px 50px rgba(0,0,0,.5);
+  cursor:pointer;
+}
+.dcx-rail[data-dcx-slot="hero"] .dcx-card.on{
+  cursor:default;
+  box-shadow:0 30px 70px rgba(0,0,0,.72),
+             0 0 0 1px color-mix(in srgb, var(--hub-accent) 32%, transparent);
+}
+.dcx-rail[data-dcx-slot="hero"] .dcx-card:not(.on):hover{
+  --rc-b:.8; --rc-sat:.92;
+}
+/* The item's own art, blurred, tinting its card the way a front-page
+   deck card is tinted by its cover. */
+.dcx-rail[data-dcx-slot="hero"] .dcx-card::before{
+  content:''; position:absolute; inset:0; z-index:0; pointer-events:none;
+  background-image:var(--dcx-card-art, none);
+  background-size:cover; background-position:center;
+  filter:blur(46px) saturate(1.5); opacity:.34; transform:scale(1.25);
+}
+.dcx-rail[data-dcx-slot="hero"] .dcx-art{
+  position:relative; z-index:2;
+  flex:0 0 300px; width:300px; height:100%;
+  background-size:cover; background-position:center;
+  background-color:#0b0d13;
+}
+.dcx-rail[data-dcx-slot="hero"] .dcx-art::after{
+  content:''; position:absolute; inset:0;
+  background:linear-gradient(90deg, transparent 52%, rgba(11,13,19,.92) 100%);
+}
+.dcx-rail[data-dcx-slot="hero"] .dcx-art-glyph{
+  position:absolute; inset:0; display:flex; align-items:center; justify-content:center;
+  font-family:'Archivo', var(--font), sans-serif;
+  font-size:74px; font-weight:900; color:rgba(255,255,255,.13);
+  letter-spacing:-2px;
+}
+.dcx-rail[data-dcx-slot="hero"] .dcx-info{
+  position:relative; z-index:2;
+  flex:1 1 auto; min-width:0;
+  display:flex; flex-direction:column;
+  padding:28px 32px 26px;
+}
+.dcx-rail[data-dcx-slot="hero"] .dcx-name{
+  font-family:'Archivo', var(--font), sans-serif;
+  font-size:30px; font-weight:900; line-height:1.08;
+  letter-spacing:.2px; color:#fff; margin:0 0 9px;
+  text-shadow:0 1px 2px rgba(0,0,0,.6);
+  display:-webkit-box; -webkit-line-clamp:2; line-clamp:2;
+  -webkit-box-orient:vertical; overflow:hidden;
+}
+.dcx-rail[data-dcx-slot="hero"] .dcx-desc{
+  font-size:14px; line-height:1.55; color:rgba(255,255,255,.72);
+  margin:0 0 16px; max-width:52ch;
+  display:-webkit-box; -webkit-line-clamp:3; line-clamp:3;
+  -webkit-box-orient:vertical; overflow:hidden;
+}
+.dcx-rail[data-dcx-slot="hero"] .dcx-stats{
+  display:grid; grid-template-columns:repeat(auto-fit, minmax(104px, 1fr));
+  gap:8px; margin:0 0 15px;
+  padding:9px; border-radius:12px;
+  background:rgba(255,255,255,.035);
+  border:1px solid rgba(255,255,255,.07);
+}
+.dcx-rail[data-dcx-slot="hero"] .dcx-stat{
+  padding:9px 12px; border-radius:9px; background:#0d0f16;
+  border:1px solid rgba(255,255,255,.05);
+}
+.dcx-rail[data-dcx-slot="hero"] .dcx-stat b{
+  display:block;
+  font-family:'JetBrains Mono', ui-monospace, monospace;
+  font-size:19px; font-weight:800; color:#fff;
+  font-variant-numeric:tabular-nums; line-height:1.1;
+}
+.dcx-rail[data-dcx-slot="hero"] .dcx-stat span{
+  display:block; margin-top:4px;
+  font-size:8.5px; font-weight:700; letter-spacing:1.3px; text-transform:uppercase;
+  color:var(--text-3);
+}
+.dcx-rail[data-dcx-slot="hero"] .dcx-chips{ display:flex; gap:6px; flex-wrap:wrap; margin:0 0 15px; }
+.dcx-rail[data-dcx-slot="hero"] .dcx-foot{ margin-top:auto; display:flex; gap:9px; align-items:center; }
+/* Only the card in focus offers its action — a card behind is a target
+   to step to and nothing else, exactly as on the front page. */
+.dcx-rail[data-dcx-slot="hero"] .dcx-card:not(.on) .dcx-foot,
+.dcx-rail[data-dcx-slot="hero"] .dcx-card:not(.on) .dcx-stats,
+.dcx-rail[data-dcx-slot="hero"] .dcx-card:not(.on) .dcx-chips{
+  opacity:0; pointer-events:none;
+}
+.dcx-rail[data-dcx-slot="hero"] .dcx-card:not(.on) .dcx-desc{ -webkit-line-clamp:2; line-clamp:2; }
+
+/* ── RAIL SLOT: the shelf ──────────────────────────────────────── */
+.dcx-rail[data-dcx-slot="rail"] .dcx-body{ position:relative; }
+.dcx-rail[data-dcx-slot="rail"] .dcx-track{
+  display:flex; gap:16px;
+  overflow-x:auto; overflow-y:hidden;
+  scroll-behavior:smooth; scroll-snap-type:x proximity;
+  padding:6px 4px 16px;
+  scrollbar-width:thin; scrollbar-color:rgba(255,255,255,.16) transparent;
+  /* Fade the ends so a shelf reads as continuing rather than stopping
+     at an arbitrary hard edge. */
+  -webkit-mask-image:linear-gradient(90deg, transparent 0, #000 26px, #000 calc(100% - 26px), transparent 100%);
+          mask-image:linear-gradient(90deg, transparent 0, #000 26px, #000 calc(100% - 26px), transparent 100%);
+}
+.dcx-rail[data-dcx-slot="rail"] .dcx-track::-webkit-scrollbar{ height:6px; }
+.dcx-rail[data-dcx-slot="rail"] .dcx-track::-webkit-scrollbar-track{ background:transparent; }
+.dcx-rail[data-dcx-slot="rail"] .dcx-track::-webkit-scrollbar-thumb{
+  background:rgba(255,255,255,.14); border-radius:99px;
+}
+.dcx-rail[data-dcx-slot="rail"] .dcx-card{
+  position:relative; flex:0 0 262px; width:262px;
+  scroll-snap-align:start;
+  display:flex; flex-direction:column;
+  border-radius:15px; overflow:hidden; cursor:pointer;
+  background:linear-gradient(135deg,#14161f 0%,#0b0d13 100%);
+  border:1px solid rgba(255,255,255,.07);
+  box-shadow:0 8px 22px rgba(0,0,0,.42);
+  transition:transform .22s cubic-bezier(.22,1,.36,1),
+             border-color .22s ease, box-shadow .22s ease;
+}
+.dcx-rail[data-dcx-slot="rail"] .dcx-card:hover{
+  transform:translateY(-5px);
+  border-color:color-mix(in srgb, var(--hub-accent) 52%, transparent);
+  box-shadow:0 20px 42px rgba(0,0,0,.6),
+             0 0 26px color-mix(in srgb, var(--hub-accent) 16%, transparent);
+}
+.dcx-rail[data-dcx-slot="rail"] .dcx-art{
+  position:relative; aspect-ratio:16/9; width:100%;
+  background-size:cover; background-position:center;
+  background-color:#10131b;
+}
+.dcx-rail[data-dcx-slot="rail"] .dcx-art::after{
+  content:''; position:absolute; inset:0;
+  background:linear-gradient(180deg, transparent 45%, rgba(9,11,16,.92) 100%);
+}
+.dcx-rail[data-dcx-slot="rail"] .dcx-art-glyph{
+  position:absolute; inset:0; display:flex; align-items:center; justify-content:center;
+  font-family:'Archivo', var(--font), sans-serif;
+  font-size:44px; font-weight:900; color:rgba(255,255,255,.12);
+}
+.dcx-rail[data-dcx-slot="rail"] .dcx-info{
+  position:relative; padding:12px 14px 14px;
+  display:flex; flex-direction:column; gap:7px;
+  /* The item's own art, low and desaturated, so the caption panel is in
+     the item's colour rather than card grey. */
+  isolation:isolate; overflow:hidden;
+  border-top:1px solid rgba(255,255,255,.06);
+  background:#0b0d12;
+}
+.dcx-rail[data-dcx-slot="rail"] .dcx-info::before{
+  content:''; position:absolute; inset:-40%; z-index:-1; pointer-events:none;
+  background-image:var(--dcx-card-art, none);
+  background-size:cover; background-position:center;
+  filter:blur(34px) saturate(1.15) brightness(.85);
+  opacity:.22;
+}
+.dcx-rail[data-dcx-slot="rail"] .dcx-name{
+  font-family:'Archivo', var(--font), sans-serif;
+  font-size:14.5px; font-weight:800; color:#fff; margin:0;
+  line-height:1.25; letter-spacing:.1px;
+  text-shadow:0 1px 2px rgba(0,0,0,.55);
+  display:-webkit-box; -webkit-line-clamp:2; line-clamp:2;
+  -webkit-box-orient:vertical; overflow:hidden;
+}
+.dcx-rail[data-dcx-slot="rail"] .dcx-desc{ display:none; }
+.dcx-rail[data-dcx-slot="rail"] .dcx-stats{
+  display:flex; gap:12px; flex-wrap:wrap;
+  font-family:'JetBrains Mono', ui-monospace, monospace;
+  font-size:10px; font-weight:700; letter-spacing:.6px;
+  color:var(--text-3); text-transform:uppercase;
+}
+.dcx-rail[data-dcx-slot="rail"] .dcx-stat b{
+  color:#fff; font-weight:800; font-variant-numeric:tabular-nums;
+}
+.dcx-rail[data-dcx-slot="rail"] .dcx-stat span{ margin-left:4px; }
+.dcx-rail[data-dcx-slot="rail"] .dcx-chips{ display:flex; gap:5px; flex-wrap:wrap; overflow:hidden; height:20px; }
+.dcx-rail[data-dcx-slot="rail"] .dcx-foot{ display:none; }
+
+/* Shelf arrows — only rendered when the shelf actually overflows. */
+.dcx-sarrow{
+  position:absolute; top:calc(50% - 14px); transform:translateY(-50%);
+  width:38px; height:38px; border-radius:50%; z-index:6;
+  display:flex; align-items:center; justify-content:center;
+  border:1px solid rgba(255,255,255,.12);
+  background:rgba(10,13,18,.82); backdrop-filter:blur(12px);
+  color:#fff; cursor:pointer; font-size:17px; line-height:1;
+  opacity:0; transition:opacity .2s ease, background .2s ease, transform .2s ease;
+}
+.dcx-rail[data-dcx-slot="rail"]:hover .dcx-sarrow{ opacity:1; }
+.dcx-sarrow:hover{ background:var(--hub-accent); color:#04121a; transform:translateY(-50%) scale(1.08); }
+.dcx-sarrow.prev{ left:-6px; }
+.dcx-sarrow.next{ right:-6px; }
+
+/* ── Shared card parts ─────────────────────────────────────────── */
+.dcx-badge{
+  position:absolute; top:11px; left:11px; z-index:5;
+  display:inline-flex; align-items:center; gap:5px;
+  padding:4px 10px; border-radius:99px;
+  font-family:'Archivo', var(--font), sans-serif;
+  font-size:9.5px; font-weight:800; letter-spacing:1.1px; text-transform:uppercase;
+  color:#fff; background:rgba(8,10,14,.74);
+  border:1px solid rgba(255,255,255,.16);
+  backdrop-filter:blur(10px);
+}
+.dcx-badge.lobby{ color:#8fd6ff; border-color:rgba(88,200,255,.5); }
+.dcx-badge.tournament{ color:#ffd964; border-color:rgba(255,211,61,.5); }
+.dcx-badge.race{ color:#ffb07a; border-color:rgba(255,140,60,.5); }
+.dcx-badge.person{ color:#b79cff; border-color:rgba(168,99,255,.5); }
+.dcx-badge.live{ color:#ff8f8f; border-color:rgba(255,90,90,.55); }
+.dcx-badge.live::before{
+  content:''; width:6px; height:6px; border-radius:50%; background:#ff4d4d;
+  box-shadow:0 0 8px rgba(255,77,77,.9);
+  animation:dcxPulse 1.6s ease-in-out infinite;
+}
+.dcx-chip{
+  display:inline-flex; align-items:center;
+  padding:3px 9px; border-radius:6px;
+  font-size:9.5px; font-weight:800; letter-spacing:.8px; text-transform:uppercase;
+  color:var(--text-2);
+  background:rgba(255,255,255,.055);
+  border:1px solid rgba(255,255,255,.08);
+}
+.dcx-cta{
+  display:inline-flex; align-items:center; gap:8px;
+  padding:11px 20px; border-radius:11px; border:0; cursor:pointer;
+  font-family:'Archivo', var(--font), sans-serif;
+  font-size:12.5px; font-weight:800; letter-spacing:.6px;
+  color:#04121a;
+  background:linear-gradient(180deg,
+    color-mix(in srgb, var(--hub-accent) 96%, white), var(--hub-accent));
+  box-shadow:0 8px 22px color-mix(in srgb, var(--hub-accent) 30%, transparent),
+             inset 0 1px 0 rgba(255,255,255,.4);
+  transition:transform .18s ease, filter .18s ease;
+}
+.dcx-cta:hover{ transform:translateY(-2px); filter:brightness(1.08); }
+.dcx-cta.ghost{
+  color:#fff; background:rgba(255,255,255,.06);
+  border:1px solid rgba(255,255,255,.12); box-shadow:none;
+}
+.dcx-cta.ghost:hover{ background:rgba(255,255,255,.12); }
+.dcx-cta[disabled]{ opacity:.55; cursor:default; transform:none; }
+
+/* Person cards show a face, not a banner. */
+.dcx-avatar{
+  position:absolute; inset:0; display:flex; align-items:center; justify-content:center;
+}
+.dcx-avatar > *{
+  width:76px; height:76px; border-radius:50%;
+  display:flex; align-items:center; justify-content:center; overflow:hidden;
+  font-family:'Archivo', var(--font), sans-serif; font-weight:900; font-size:29px; color:#fff;
+  background:linear-gradient(135deg,#3a4a6b,#1a2030);
+  border:2px solid rgba(255,255,255,.16);
+  box-shadow:0 10px 26px rgba(0,0,0,.55);
+}
+.dcx-avatar img{ width:100%; height:100%; object-fit:cover; border:0; box-shadow:none; }
+.dcx-rail[data-dcx-slot="hero"] .dcx-avatar > *{ width:132px; height:132px; font-size:50px; }
+
+/* ── Deck arrows and pager ─────────────────────────────────────── */
+.dcx-arrow{
+  position:absolute; top:50%; transform:translateY(-50%); z-index:40;
+  width:44px; height:44px; border-radius:50%;
+  display:flex; align-items:center; justify-content:center;
+  border:1px solid rgba(255,255,255,.14);
+  background:rgba(10,13,18,.72); backdrop-filter:blur(12px);
+  color:#fff; cursor:pointer; font-size:19px; line-height:1;
+  transition:background .2s ease, transform .2s ease, border-color .2s ease;
+}
+.dcx-arrow:hover{
+  background:var(--hub-accent); color:#04121a;
+  border-color:var(--hub-accent);
+  transform:translateY(-50%) scale(1.08);
+}
+.dcx-arrow.prev{ left:14px; }
+.dcx-arrow.next{ right:14px; }
+.dcx-dots{
+  display:flex; align-items:center; justify-content:center; gap:7px;
+  margin-top:14px;
+}
+.dcx-dot{
+  width:7px; height:7px; border-radius:50%; cursor:pointer;
+  background:rgba(255,255,255,.2);
+  transition:width .25s ease, background .25s ease;
+}
+.dcx-dot.on{
+  width:24px; border-radius:99px;
+  background:var(--hub-accent);
+  box-shadow:0 0 12px color-mix(in srgb, var(--hub-accent) 65%, transparent);
+}
+
+/* ── Empty states ──────────────────────────────────────────────── */
+.dcx-empty{
+  display:flex; flex-direction:column; align-items:center; justify-content:center;
+  gap:11px; padding:38px 24px; text-align:center;
+  border-radius:16px;
+  border:1px dashed rgba(255,255,255,.1);
+  background:rgba(255,255,255,.018);
+}
+.dcx-empty-ico{ font-size:26px; opacity:.5; }
+.dcx-empty-title{
+  font-family:'Archivo', var(--font), sans-serif;
+  font-size:14px; font-weight:800; color:var(--text-2); letter-spacing:.3px;
+}
+.dcx-empty-sub{ font-size:12px; color:var(--text-3); max-width:44ch; line-height:1.55; }
+.dcx-rail[data-dcx-slot="hero"] .dcx-empty{ height:320px; }
+
+@media (max-width:1240px){
+  .dcx-rail[data-dcx-slot="hero"] .dcx-card{ width:760px; height:400px; }
+  .dcx-rail[data-dcx-slot="hero"] .dcx-body{ height:420px; }
+  .dcx-rail[data-dcx-slot="hero"] .dcx-art{ flex-basis:250px; width:250px; }
+}
+@media (max-width:900px){
+  .dcx-rail[data-dcx-slot="hero"] .dcx-card{ width:92vw; height:auto; min-height:360px; flex-direction:column; }
+  .dcx-rail[data-dcx-slot="hero"] .dcx-art{ flex:0 0 150px; width:100%; height:150px; }
+  .dcx-rail[data-dcx-slot="hero"] .dcx-art::after{
+    background:linear-gradient(180deg, transparent 40%, rgba(11,13,19,.92) 100%);
+  }
+  .dcx-rail[data-dcx-slot="hero"] .dcx-body{ height:auto; }
+}
+@media (prefers-reduced-motion: reduce){
+  .dcx-rail[data-dcx-slot="hero"] .dcx-card{ transition:none; }
+  .dcx-rail[data-dcx-slot="rail"] .dcx-track{ scroll-behavior:auto; }
+  .dcx-badge.live::before, .dcx-pill.on .dcx-livedot{ animation:none; }
+}
+</style>
+<script>
+(function () {
+  'use strict';
+
+  /* ── Rail definitions ────────────────────────────────────────────
+     label/word/ico feed the shared .hs-kicker the front page builds, so
+     a Discover rail header reads "01 / OPEN TO JOIN · 7 LOBBIES" in the
+     same voice as "01 / STEAM · 10 GAMES" on home. */
+  var I = {
+    lobby:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="9" cy="8" r="3.2"/><path d="M3 20v-1.5A4.5 4.5 0 0 1 7.5 14h3A4.5 4.5 0 0 1 15 18.5V20"/><circle cx="17" cy="9" r="2.4"/><path d="M17.5 13.4A4 4 0 0 1 21 17.3V19"/></svg>',
+    tourn:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M7 4h10v5a5 5 0 0 1-10 0z"/><path d="M7 5H4v2a3 3 0 0 0 3 3"/><path d="M17 5h3v2a3 3 0 0 1-3 3"/><path d="M12 14v3"/><path d="M9 20h6"/></svg>',
+    race:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 21V4"/><path d="M4 4h13l-2 4 2 4H4"/></svg>',
+    person:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="8" r="3.6"/><path d="M5 20v-1.6A5.4 5.4 0 0 1 10.4 13h3.2A5.4 5.4 0 0 1 19 18.4V20"/></svg>',
+    all:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><polygon points="15.6 8.4 13.5 13.5 8.4 15.6 10.5 10.5 15.6 8.4"/></svg>'
+  };
+
+  var RAILS = {
+    lobbies: {
+      title:'Lobbies', sub:'Public communities open for anyone to join',
+      label:'Open to join', word:'lobbies', ico:I.lobby,
+      emptyIco:'🏠', emptyTitle:'No public lobbies yet',
+      emptySub:'Lobbies show up here the moment someone gives one a tag and makes it public. Start one and it will be the first.',
+      emptyCta:{ label:'Create a lobby', js:'window.dcxCreateLobby()' }
+    },
+    tournaments: {
+      title:'Tournaments', sub:'Brackets on the global circuit you can still enter',
+      label:'Global circuit', word:'brackets', ico:I.tourn,
+      emptyIco:'🏆', emptyTitle:'No open brackets',
+      emptySub:'Nothing is accepting entrants right now. The tournaments hub keeps the full history and lets you run one yourself.',
+      emptyCta:{ label:'Open tournaments', js:'window.dcxGoTournaments()' }
+    },
+    races: {
+      title:'Races', sub:'Speedrun races running now or scheduled soon',
+      label:'Speedrun', word:'races', ico:I.race,
+      emptyIco:'🏁', emptyTitle:'No races scheduled',
+      emptySub:'Races appear here as soon as someone hosts one. It takes about twenty seconds to set up.',
+      emptyCta:{ label:'Host a race', js:'window.dcxGoSpeedrun()' }
+    },
+    people: {
+      title:'People', sub:'Players on Lobby you have not met yet',
+      label:'On Lobby', word:'players', ico:I.person,
+      emptyIco:'👤', emptyTitle:'Nobody to show',
+      emptySub:'Players appear here once they have set up a profile — an avatar, a display name or a bio.',
+      emptyCta:null
+    }
+  };
+  var DEFAULT_ORDER = ['lobbies', 'tournaments', 'races', 'people'];
+  var PREF_KEY = 'discover_rail_order';
+  var LS_KEY   = 'lobby_dcx_rail_order_v1';
+
+  /* ── State ───────────────────────────────────────────────────── */
+  var order    = DEFAULT_ORDER.slice();
+  var kind     = 'all';       // all | one rail id
+  var genre    = 'all';
+  var liveOnly = false;
+  var sortBy   = 'rec';       // rec | busy | new
+  var deckIdx  = {};          // rail id -> focused card index
+  var booted   = false;
+
+  function esc(v){
+    return String(v == null ? '' : v)
+      .replace(/&/g,'&amp;').replace(/</g,'&lt;')
+      .replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+  }
+  function jsStr(v){ return JSON.stringify(String(v == null ? '' : v)).replace(/"/g,'&quot;'); }
+  function cssUrl(u){ return u ? 'url("' + String(u).replace(/"/g,'\\"') + '")' : ''; }
+
+  /* Top-level const/let are in the global LEXICAL scope, NOT on window,
+     so these are reached by name behind a typeof guard. Read fresh each
+     call because openDiscoverPanel reassigns _dcLobbies. */
+  function rawLobbies(){
+    try { if (typeof _dcLobbies !== 'undefined' && Array.isArray(_dcLobbies)) return _dcLobbies; } catch(e){}
+    return [];
+  }
+  function rawTournaments(){
+    try { if (typeof _dcTournaments !== 'undefined' && Array.isArray(_dcTournaments)) return _dcTournaments; } catch(e){}
+    return [];
+  }
+  function query(){
+    try { if (typeof _dcSearch !== 'undefined') return String(_dcSearch || ''); } catch(e){}
+    return '';
+  }
+  function gtGame(id){
+    try { if (typeof _gtGame === 'function') return _gtGame(id) || {}; } catch(e){}
+    return {};
+  }
+
+  /* ── Normalise every kind into one card shape ────────────────── */
+  function toCard(it){
+    if (!it) return null;
+    var k = it.kind || 'lobby';
+
+    if (k === 'tournament'){
+      var g = gtGame(it.gameId);
+      var live = String(it.status || '').toLowerCase() === 'in-progress'
+              || String(it.status || '').toLowerCase() === 'live';
+      return {
+        key:String(it.id), rail:'tournaments', badge:live ? 'live' : 'tournament',
+        badgeText:live ? 'Live now' : 'Tournament',
+        name:it.name || 'Tournament',
+        desc:(g.name ? g.name + ' · ' : '') + 'Bracket on the global circuit. Entries are open while seats last.',
+        art:g.heroHi || g.header || g.cover || '',
+        glyph:g.initial || (it.name || '?').charAt(0).toUpperCase(),
+        genre:(g.name || '').toLowerCase(),
+        chips:[g.name, it.prize && it.prize !== '—' ? '💰 ' + it.prize : null].filter(Boolean),
+        stats:[
+          { v:String(it.entrants || 0), l:'Entrants' },
+          { v:it.prize && it.prize !== '—' ? String(it.prize) : '—', l:'Prize' },
+          { v:live ? 'Live' : 'Open', l:'Status' }
+        ],
+        cta:{ label:'View bracket', js:'window.openGamePage(' + jsStr(g.id || '') + ')' },
+        live:live, weight:(it.entrants || 0)
+      };
+    }
+
+    if (k === 'race'){
+      var rlive = String(it.status || '').toLowerCase() === 'live';
+      var rg = gtGame(it.game);
+      return {
+        key:String(it.id), rail:'races', badge:rlive ? 'live' : 'race',
+        badgeText:rlive ? 'Race running' : 'Race',
+        name:it.name || 'Speedrun race',
+        desc:(it.game || 'Any game') + (it.category ? ' · ' + it.category : '')
+             + ' · ' + (rlive ? 'Running now.' : 'Scheduled — entries open.'),
+        art:rg.heroHi || rg.header || rg.cover || '',
+        glyph:'🏁',
+        genre:String(it.game || '').toLowerCase(),
+        chips:[it.category, it.prize].filter(Boolean),
+        stats:[
+          { v:String(it.runners || 0), l:'Runners' },
+          { v:it.category || 'Any%', l:'Category' },
+          { v:rlive ? 'Live' : 'Soon', l:'Status' }
+        ],
+        cta:{ label:rlive ? 'Watch race' : 'View race', js:'window.dcxGoSpeedrun()' },
+        live:rlive, weight:(it.runners || 0)
+      };
+    }
+
+    if (k === 'person'){
+      var initial = String(it.name || '?').trim().charAt(0).toUpperCase() || '?';
+      return {
+        key:String(it.id), rail:'people', badge:'person', badgeText:'Player',
+        name:it.name || 'Player',
+        desc:it.sub || 'On Lobby. No bio yet.',
+        art:'', avatar:it.avatar || '', glyph:initial,
+        genre:'',
+        chips:[],
+        stats:[],
+        cta:{ label:'View profile', js:'window.dcxOpenPerson(' + Number(it.userId) + ')' },
+        live:false, weight:0
+      };
+    }
+
+    /* Lobby. Stats stay honest: /lobbies/public is served by the REST
+       process, which genuinely does not know presence, so online is
+       absent rather than zero and renders as a dash. */
+    var hasOnline  = typeof it.online  === 'number';
+    var hasMembers = typeof it.members === 'number';
+    var tags = (it.tags || []).filter(Boolean);
+    return {
+      key:String(it.id), rail:'lobbies',
+      badge:'lobby', badgeText:it.badge === 'live' ? 'Live' : 'Lobby',
+      name:it.name || 'Lobby',
+      desc:it.description || (hasMembers && it.members
+        ? it.members.toLocaleString() + ' members and growing.'
+        : 'A new community ready to grow — be one of the first in.'),
+      art:it.cover || it.icon || '',
+      glyph:it.initial || String(it.name || '?').charAt(0).toUpperCase(),
+      genre:String(it.tag || '').toLowerCase(),
+      chips:tags.slice(0, 3),
+      stats:[
+        { v:hasMembers ? it.members.toLocaleString() : '—', l:'Members' },
+        { v:hasOnline ? String(it.online) : '—', l:'Online' },
+        { v:tags[0] || 'Open', l:'Category' }
+      ],
+      cta:{ label:'Join lobby', js:'window.discoverJoin(' + jsStr(it.id) + ',' + jsStr(it.name || '') + ')' },
+      live:it.badge === 'live', weight:(it.members || 0)
+    };
+  }
+
+  /* ── Collect, filter, sort ───────────────────────────────────── */
+  function collect(){
+    var out = [];
+    rawLobbies().forEach(function (x){ var c = toCard(x); if (c) out.push(c); });
+    rawTournaments().forEach(function (x){ var c = toCard(x); if (c) out.push(c); });
+    var seen = {};
+    return out.filter(function (c){
+      var id = c.rail + ':' + c.key;
+      if (seen[id]) return false;
+      seen[id] = 1;
+      return true;
+    });
+  }
+
+  function matches(c){
+    var q = query().toLowerCase().trim();
+    if (q){
+      var hay = (c.name + ' ' + c.desc + ' ' + c.chips.join(' ') + ' ' + c.genre).toLowerCase();
+      if (hay.indexOf(q) === -1) return false;
+    }
+    if (liveOnly && !c.live) return false;
+    if (genre !== 'all'){
+      var g = (c.genre + ' ' + c.chips.join(' ')).toLowerCase();
+      if (g.indexOf(genre) === -1) return false;
+    }
+    return true;
+  }
+
+  function sortCards(list){
+    var copy = list.slice();
+    if (sortBy === 'busy'){
+      copy.sort(function (a, b){ return (b.weight - a.weight) || (b.live - a.live); });
+    } else if (sortBy === 'az'){
+      copy.sort(function (a, b){ return a.name.localeCompare(b.name); });
+    } else {
+      /* Recommended. Live first, then the client's own affinity scorer if
+         it is around, then size. */
+      copy.sort(function (a, b){
+        if (a.live !== b.live) return b.live - a.live;
+        var sa = 0, sb = 0;
+        try {
+          if (typeof window._dcScore === 'function'){
+            sa = window._dcScore({ tags:a.chips, tag:a.genre, members:a.weight, isReal:true });
+            sb = window._dcScore({ tags:b.chips, tag:b.genre, members:b.weight, isReal:true });
+          }
+        } catch(e){}
+        return (sb - sa) || (b.weight - a.weight);
+      });
+    }
+    return copy;
+  }
+
+  function grouped(){
+    var all = collect();
+    var g = { lobbies:[], tournaments:[], races:[], people:[] };
+    all.forEach(function (c){ if (g[c.rail]) g[c.rail].push(c); });
+    Object.keys(g).forEach(function (k){ g[k] = sortCards(g[k].filter(matches)); });
+    return { groups:g, totals:countTotals(all) };
+  }
+
+  /* Counts on the kind buttons ignore the refine row but honour the
+     search box — the number has to describe what clicking will show. */
+  function countTotals(all){
+    var t = { all:0, lobbies:0, tournaments:0, races:0, people:0 };
+    var q = query().toLowerCase().trim();
+    all.forEach(function (c){
+      if (q){
+        var hay = (c.name + ' ' + c.desc + ' ' + c.chips.join(' ')).toLowerCase();
+        if (hay.indexOf(q) === -1) return;
+      }
+      t[c.rail]++; t.all++;
+    });
+    return t;
+  }
+
+  function genresPresent(){
+    var seen = {}, out = [];
+    collect().forEach(function (c){
+      if (kind !== 'all' && c.rail !== kind) return;
+      c.chips.concat([c.genre]).forEach(function (raw){
+        var g = String(raw || '').toLowerCase().trim();
+        if (!g || g.length > 22 || g.charAt(0) === '\uD83D' || g.charAt(0) === '\uD83C') return;
+        if (seen[g]) return;
+        seen[g] = 1;
+        out.push(g);
+      });
+    });
+    return out.sort().slice(0, 10);
+  }
+
+  /* ── Card markup ─────────────────────────────────────────────── */
+  function cardHtml(c, slot){
+    var artStyle = c.art ? 'background-image:' + cssUrl(c.art) : '';
+    var inner = c.avatar !== undefined
+      ? '<div class="dcx-avatar"><div>' + (c.avatar
+          ? '<img src="' + esc(c.avatar) + '" alt="" loading="lazy">'
+          : esc(c.glyph)) + '</div></div>'
+      : (c.art ? '' : '<div class="dcx-art-glyph">' + esc(c.glyph) + '</div>');
+
+    var stats = c.stats.length
+      ? '<div class="dcx-stats">' + c.stats.map(function (s){
+          return '<div class="dcx-stat"><b>' + esc(s.v) + '</b><span>' + esc(s.l) + '</span></div>';
+        }).join('') + '</div>'
+      : '';
+
+    var chips = c.chips.length
+      ? '<div class="dcx-chips">' + c.chips.map(function (t){
+          return '<span class="dcx-chip">' + esc(t) + '</span>';
+        }).join('') + '</div>'
+      : '';
+
+    /* On a shelf tile the whole card is the action. In the deck the card
+       is a step target and only the button acts, which is what stops a
+       click meant to bring a card forward from also joining it. */
+    var cardClick = slot === 'rail'
+      ? ' onclick="window.dcxTouch(' + jsStr(c.genre) + ');' + c.cta.js + '"'
+      : '';
+
+    return '<div class="dcx-card" data-key="' + esc(c.rail + ':' + c.key) + '"' +
+      ' data-genre="' + esc(c.genre) + '"' +
+      ' style="--dcx-card-art:' + (c.art ? cssUrl(c.art) : 'none') + '"' + cardClick + '>' +
+      '<div class="dcx-art" style="' + artStyle + '">' + inner +
+        '<span class="dcx-badge ' + esc(c.badge) + '">' + esc(c.badgeText) + '</span>' +
+      '</div>' +
+      '<div class="dcx-info">' +
+        '<div class="dcx-name">' + esc(c.name) + '</div>' +
+        '<div class="dcx-desc">' + esc(c.desc) + '</div>' +
+        stats + chips +
+        '<div class="dcx-foot">' +
+          '<button class="dcx-cta" onclick="event.stopPropagation();' + c.cta.js + '">' +
+            esc(c.cta.label) +
+            '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" ' +
+            'stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round">' +
+            '<polyline points="9 18 15 12 9 6"/></svg>' +
+          '</button>' +
+        '</div>' +
+      '</div>' +
+    '</div>';
+  }
+
+  function emptyHtml(railId){
+    var cfg = RAILS[railId];
+    var filtered = query() || liveOnly || genre !== 'all';
+    var title = filtered ? 'Nothing matches' : cfg.emptyTitle;
+    var sub   = filtered
+      ? 'No ' + cfg.word + ' match the filters you have set. Clear them to see everything here.'
+      : cfg.emptySub;
+    var cta = filtered
+      ? '<button class="dcx-cta ghost" onclick="window.dcxClearFilters()">Clear filters</button>'
+      : (cfg.emptyCta
+          ? '<button class="dcx-cta" onclick="' + cfg.emptyCta.js + '">' + esc(cfg.emptyCta.label) + '</button>'
+          : '');
+    return '<div class="dcx-empty">' +
+      '<div class="dcx-empty-ico">' + (filtered ? '🔍' : cfg.emptyIco) + '</div>' +
+      '<div class="dcx-empty-title">' + esc(title) + '</div>' +
+      '<div class="dcx-empty-sub">' + esc(sub) + '</div>' +
+      cta +
+    '</div>';
+  }
+
+  /* ── Rail markup ─────────────────────────────────────────────── */
+  function railHtml(railId, cards, slot, index, isFirst){
+    var cfg = RAILS[railId];
+    var n = cards.length;
+
+    var tools = '<div class="dcx-railtools">' +
+      (isFirst || kind !== 'all' ? '' :
+        '<button class="dcx-tool" onclick="window.dcxFeature(' + jsStr(railId) + ')" ' +
+          'title="Move this to the top and give it the big deck">' +
+          '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" ' +
+          'stroke-linecap="round" stroke-linejoin="round"><path d="M12 19V5"/><path d="m5 12 7-7 7 7"/></svg>' +
+          'Feature</button>') +
+      (kind === 'all'
+        ? '<span class="dcx-grip" title="Drag to reorder">' +
+            '<svg width="13" height="13" viewBox="0 0 24 24" fill="currentColor">' +
+            '<circle cx="9" cy="6" r="1.6"/><circle cx="15" cy="6" r="1.6"/>' +
+            '<circle cx="9" cy="12" r="1.6"/><circle cx="15" cy="12" r="1.6"/>' +
+            '<circle cx="9" cy="18" r="1.6"/><circle cx="15" cy="18" r="1.6"/></svg></span>'
+        : '') +
+    '</div>';
+
+    var kicker = '<div class="hs-kicker">' +
+      '<span class="hs-idx">' + ('0' + (index + 1)).slice(-2) + '</span>' +
+      '<span class="sep">/</span>' +
+      '<span class="hs-ico">' + cfg.ico + '</span>' +
+      '<span>' + esc(cfg.label) + '</span>' +
+      (n ? '<span class="sep2">·</span>' +
+           '<span class="hs-count"><span class="dot"></span><b>' + n + '</b> ' + esc(cfg.word) + '</span>'
+         : '') +
+    '</div>';
+
+    var head = '<div class="home-section-header" draggable="' + (kind === 'all' ? 'true' : 'false') + '">' +
+      '<div class="hs-main">' +
+        '<div class="home-section-title" data-text="' + esc(cfg.title) + '">' + esc(cfg.title) + '</div>' +
+        '<span class="hs-bar"></span>' +
+        kicker +
+        '<div class="home-section-sub">' + esc(cfg.sub) + '</div>' +
+      '</div>' + tools +
+    '</div>';
+
+    var body;
+    if (!n){
+      body = '<div class="dcx-body">' + emptyHtml(railId) + '</div>';
+    } else if (slot === 'hero'){
+      body = '<div class="dcx-body">' +
+        (n > 1 ? '<button class="dcx-arrow prev" onclick="window.dcxStep(' + jsStr(railId) + ',-1)" aria-label="Previous">←</button>' : '') +
+        '<div class="dcx-track">' + cards.map(function (c){ return cardHtml(c, 'hero'); }).join('') + '</div>' +
+        (n > 1 ? '<button class="dcx-arrow next" onclick="window.dcxStep(' + jsStr(railId) + ',1)" aria-label="Next">→</button>' : '') +
+      '</div>' +
+      (n > 1 ? '<div class="dcx-dots">' + cards.map(function (_, i){
+        return '<span class="dcx-dot" onclick="window.dcxGoto(' + jsStr(railId) + ',' + i + ')"></span>';
+      }).join('') + '</div>' : '');
+    } else {
+      body = '<div class="dcx-body">' +
+        '<button class="dcx-sarrow prev" onclick="window.dcxScroll(' + jsStr(railId) + ',-1)" aria-label="Scroll left">‹</button>' +
+        '<div class="dcx-track">' + cards.map(function (c){ return cardHtml(c, 'rail'); }).join('') + '</div>' +
+        '<button class="dcx-sarrow next" onclick="window.dcxScroll(' + jsStr(railId) + ',1)" aria-label="Scroll right">›</button>' +
+      '</div>';
+    }
+
+    return '<section class="dcx-rail" data-dcx-rail="' + railId + '" data-dcx-slot="' + slot + '">' +
+      head + body + '</section>';
+  }
+
+  /* ── Filter bar ──────────────────────────────────────────────── */
+  function kindsHtml(totals){
+    var defs = [{ id:'all', label:'All', ico:I.all }].concat(
+      DEFAULT_ORDER.map(function (id){
+        return { id:id, label:RAILS[id].title, ico:RAILS[id].ico };
+      }));
+    return '<div class="dcx-kinds">' + defs.map(function (d){
+      var n = totals[d.id] || 0;
+      var off = d.id !== 'all' && n === 0;
+      return '<button class="dcx-kind' + (kind === d.id ? ' on' : '') + '"' +
+        (off ? ' disabled' : '') +
+        ' onclick="window.dcxKind(' + jsStr(d.id) + ')">' +
+        '<span class="dcx-kind-ico">' + d.ico + '</span>' + esc(d.label) +
+        '<span class="dcx-kind-n">' + n + '</span></button>';
+    }).join('') + '</div>';
+  }
+
+  function refineHtml(){
+    var gs = genresPresent();
+    var out = '<div class="dcx-refine">';
+    if (gs.length){
+      out += '<span class="dcx-refine-label">Genre</span>';
+      out += '<button class="dcx-pill' + (genre === 'all' ? ' on' : '') +
+             '" onclick="window.dcxGenre(' + jsStr('all') + ')">Any</button>';
+      out += gs.map(function (g){
+        return '<button class="dcx-pill' + (genre === g ? ' on' : '') +
+               '" onclick="window.dcxGenre(' + jsStr(g) + ')">' + esc(g) + '</button>';
+      }).join('');
+      out += '<span class="dcx-sep"></span>';
+    }
+    out += '<button class="dcx-pill' + (liveOnly ? ' on' : '') + '" onclick="window.dcxLive()">' +
+           '<span class="dcx-livedot"></span>Live now</button>';
+    out += '<span class="dcx-sep"></span>';
+    out += '<span class="dcx-refine-label">Sort</span>';
+    /* No "Newest": /lobbies/public orders by size then age and the card
+       never carries a timestamp, so a newest sort here would be a guess
+       dressed up as an ordering. A-Z is something this data can actually
+       answer. */
+    [['rec','Recommended'], ['busy','Most active'], ['az','A–Z']].forEach(function (s){
+      out += '<button class="dcx-pill' + (sortBy === s[0] ? ' on' : '') +
+             '" onclick="window.dcxSort(' + jsStr(s[0]) + ')">' + s[1] + '</button>';
+    });
+    out += '</div>';
+    return out;
+  }
+
+  /* ── Render ──────────────────────────────────────────────────── */
+  function render(){
+    var list = document.getElementById('discoverList');
+    if (!list) return;
+    list.classList.add('dcx-stage');
+    list.classList.remove('discover-grid');
+
+    var g = grouped();
+
+    var tabs = document.getElementById('discoverTabs');
+    if (tabs) tabs.innerHTML = kindsHtml(g.totals) + refineHtml();
+
+    var shown = kind === 'all' ? order.slice() : [kind];
+    var html = shown.map(function (railId, i){
+      var slot = (i === 0) ? 'hero' : 'rail';
+      return railHtml(railId, g.groups[railId] || [], slot, i, i === 0);
+    }).join('');
+
+    list.innerHTML = html;
+
+    shown.forEach(function (railId, i){ if (i === 0) applyDeck(railId); });
+    syncShelfArrows();
+    wash();
+  }
+
+  /* ── The deck ────────────────────────────────────────────────── */
+  var STEP = 300, STEP2 = 520;
+
+  function deckCards(railId){
+    var sec = document.querySelector('.dcx-rail[data-dcx-rail="' + railId + '"][data-dcx-slot="hero"]');
+    if (!sec) return [];
+    return Array.prototype.slice.call(sec.querySelectorAll('.dcx-card'));
+  }
+
+  /* Shortest way round the ring, so stepping past the last card walks
+     forward into the first rather than scrolling all the way back. */
+  function offsetOf(i, idx, n){
+    var off = i - idx;
+    if (off >  n / 2) off -= n;
+    if (off < -n / 2) off += n;
+    return off;
+  }
+
+  function applyDeck(railId){
+    var cards = deckCards(railId), n = cards.length;
+    if (!n) return;
+    var idx = deckIdx[railId] || 0;
+    idx = ((idx % n) + n) % n;
+    deckIdx[railId] = idx;
+
+    cards.forEach(function (c, i){
+      var off = offsetOf(i, idx, n), a = Math.abs(off), s = c.style;
+      c.classList.toggle('on', off === 0);
+      if (a === 0){
+        s.setProperty('--rc-x', '0px');  s.setProperty('--rc-s', '1');
+        s.setProperty('--rc-o', '1');    s.setProperty('--rc-sat', '1');
+        s.setProperty('--rc-b', '1');    s.zIndex = 30;
+      } else if (a === 1){
+        /* Opaque. Depth is dimming and desaturation, never opacity — a
+           see-through card lets the one behind it read straight through
+           and the stack looks like it is melting together. */
+        s.setProperty('--rc-x', (off * STEP) + 'px'); s.setProperty('--rc-s', '.8');
+        s.setProperty('--rc-o', '1');   s.setProperty('--rc-sat', '.62');
+        s.setProperty('--rc-b', '.52'); s.zIndex = 20;
+      } else if (a === 2){
+        s.setProperty('--rc-x', (off / a * STEP2) + 'px'); s.setProperty('--rc-s', '.66');
+        s.setProperty('--rc-o', '1');   s.setProperty('--rc-sat', '.42');
+        s.setProperty('--rc-b', '.34'); s.zIndex = 10;
+      } else {
+        s.setProperty('--rc-x', (off > 0 ? STEP2 + 200 : -(STEP2 + 200)) + 'px');
+        s.setProperty('--rc-s', '.6');  s.setProperty('--rc-o', '0');
+        s.zIndex = 1;
+      }
+
+      /* A card behind is a step target: clicking it brings it forward
+         rather than firing its action. */
+      c.onclick = (off === 0) ? null : function (ev){
+        if (ev.target.closest('.dcx-cta')) return;
+        deckIdx[railId] = i;
+        applyDeck(railId);
+        wash();
+      };
+      /* Stepping a card into focus is a preference signal, and it is the
+         only one the deck produces -- without it "Recommended" scores
+         every item the same forever, because the affinity counter the
+         scorer reads was fed by the old grid's inline click handler. */
+      if (off === 0) touch(c.getAttribute('data-genre'));
+    });
+
+    var sec = document.querySelector('.dcx-rail[data-dcx-rail="' + railId + '"]');
+    if (sec){
+      var dots = sec.querySelectorAll('.dcx-dot');
+      for (var d = 0; d < dots.length; d++) dots[d].classList.toggle('on', d === idx);
+    }
+  }
+
+  window.dcxStep = function (railId, dir){
+    var n = deckCards(railId).length;
+    if (!n) return;
+    deckIdx[railId] = ((deckIdx[railId] || 0) + dir + n) % n;
+    applyDeck(railId);
+    wash();
+  };
+  window.dcxGoto = function (railId, i){
+    deckIdx[railId] = i;
+    applyDeck(railId);
+    wash();
+  };
+  window.dcxScroll = function (railId, dir){
+    var sec = document.querySelector('.dcx-rail[data-dcx-rail="' + railId + '"]');
+    var track = sec && sec.querySelector('.dcx-track');
+    if (!track) return;
+    track.scrollBy({ left: dir * Math.max(280, track.clientWidth * 0.8), behavior:'smooth' });
+  };
+
+  /* Arrows on a shelf that does not overflow are furniture. */
+  function syncShelfArrows(){
+    document.querySelectorAll('.dcx-rail[data-dcx-slot="rail"]').forEach(function (sec){
+      var track = sec.querySelector('.dcx-track');
+      var arrows = sec.querySelectorAll('.dcx-sarrow');
+      var over = track && track.scrollWidth > track.clientWidth + 8;
+      for (var i = 0; i < arrows.length; i++) arrows[i].style.display = over ? '' : 'none';
+    });
+  }
+
+  /* ── The wash ────────────────────────────────────────────────── */
+  function washEl(){
+    var ov = document.getElementById('discoverOverlay');
+    if (!ov) return null;
+    var el = ov.querySelector('.dcx-wash');
+    if (!el){
+      el = document.createElement('div');
+      el.className = 'dcx-wash';
+      ov.insertBefore(el, ov.firstChild);
+    }
+    return el;
+  }
+  function wash(){
+    var el = washEl();
+    if (!el) return;
+    var focused = document.querySelector('.dcx-rail[data-dcx-slot="hero"] .dcx-card.on');
+    var art = focused && focused.style.getPropertyValue('--dcx-card-art');
+    if (art && art !== 'none'){
+      el.style.setProperty('--dcx-art', art);
+      el.classList.add('on');
+    } else {
+      el.classList.remove('on');
+    }
+  }
+
+  /* ── Filter handlers ─────────────────────────────────────────── */
+  window.dcxKind = function (k){
+    kind = k;
+    /* Genre pills are derived from what is in view, so a genre that only
+       existed in another kind has to go or it filters everything out. */
+    if (genre !== 'all' && genresPresent().indexOf(genre) === -1) genre = 'all';
+    render();
+  };
+  window.dcxGenre = function (g){ genre = g; render(); };
+  window.dcxLive  = function (){ liveOnly = !liveOnly; render(); };
+  window.dcxSort  = function (s){ sortBy = s; render(); };
+  window.dcxClearFilters = function (){
+    genre = 'all'; liveOnly = false;
+    try { if (typeof window.discoverSearch === 'function') window.discoverSearch(''); } catch(e){}
+    var box = document.getElementById('discoverSearchInput');
+    if (box) box.value = '';
+    render();
+  };
+
+  /* ── Order: promote, drag, persist ───────────────────────────── */
+  window.dcxFeature = function (railId){
+    order = [railId].concat(order.filter(function (x){ return x !== railId; }));
+    saveOrder();
+    render();
+    var stage = document.getElementById('discoverList');
+    if (stage) stage.scrollIntoView({ behavior:'smooth', block:'start' });
+  };
+
+  function saveOrder(){
+    try { localStorage.setItem(LS_KEY, JSON.stringify(order)); } catch(e){}
+    /* Server too, so the order follows the account to another machine.
+       localStorage is written first because it is instant and works when
+       the request fails. */
+    try {
+      if (typeof window.api === 'function'){
+        window.api('/me/prefs/' + PREF_KEY, {
+          method:'POST',
+          headers:{ 'Content-Type':'application/json' },
+          body:JSON.stringify(order)
+        }).catch(function(){});
+      }
+    } catch(e){}
+  }
+
+  function sane(arr){
+    if (!Array.isArray(arr)) return null;
+    var keep = arr.filter(function (x){ return DEFAULT_ORDER.indexOf(x) !== -1; });
+    /* A rail added in a later version must not vanish because an old
+       saved order predates it. */
+    DEFAULT_ORDER.forEach(function (x){ if (keep.indexOf(x) === -1) keep.push(x); });
+    return keep.length ? keep : null;
+  }
+
+  /* Reads localStorage at module load so the first render already has the
+     right order; the server pass only reports back whether it changed
+     anything, so a re-render happens only when it actually differs. */
+  function loadLocalOrder(){
+    try {
+      var local = sane(JSON.parse(localStorage.getItem(LS_KEY) || 'null'));
+      if (local) order = local;
+    } catch(e){}
+  }
+
+  async function loadOrder(){
+    try {
+      if (typeof window.api !== 'function') return false;
+      var r = await window.api('/me/prefs/' + PREF_KEY).catch(function(){ return null; });
+      var remote = sane(r);
+      if (!remote) return false;
+      if (remote.join(',') === order.join(',')) return false;
+      order = remote;
+      try { localStorage.setItem(LS_KEY, JSON.stringify(order)); } catch(e){}
+      return true;
+    } catch(e){ return false; }
+  }
+
+  function initDrag(){
+    var stage = document.getElementById('discoverList');
+    if (!stage || stage.__dcxDrag) return;
+    stage.__dcxDrag = true;
+    var dragging = null, over = null;
+
+    stage.addEventListener('dragstart', function (e){
+      var head = e.target.closest && e.target.closest('.home-section-header');
+      if (!head || kind !== 'all') return;
+      dragging = head.closest('.dcx-rail');
+      if (!dragging) return;
+      head.classList.add('dcx-dragging');
+      e.dataTransfer.effectAllowed = 'move';
+      try { e.dataTransfer.setDragImage(new Image(), 0, 0); } catch(err){}
+    });
+
+    stage.addEventListener('dragover', function (e){
+      if (!dragging) return;
+      e.preventDefault();
+      var head = e.target.closest && e.target.closest('.home-section-header');
+      var target = head && head.closest('.dcx-rail');
+      if (!target || target === dragging) return;
+      if (over && over !== head) over.classList.remove('dcx-over');
+      over = head; head.classList.add('dcx-over');
+      var r = target.getBoundingClientRect();
+      if (e.clientY < r.top + r.height / 2) stage.insertBefore(dragging, target);
+      else stage.insertBefore(dragging, target.nextSibling);
+    });
+
+    stage.addEventListener('dragend', function (){
+      if (over){ over.classList.remove('dcx-over'); over = null; }
+      var head = dragging && dragging.querySelector('.home-section-header');
+      if (head) head.classList.remove('dcx-dragging');
+      dragging = null;
+      /* Read the order back out of the DOM rather than tracking indices
+         through the drag — the DOM is what the user just arranged. */
+      var next = Array.prototype.map.call(
+        document.querySelectorAll('#discoverList .dcx-rail'),
+        function (s){ return s.getAttribute('data-dcx-rail'); }
+      ).filter(Boolean);
+      if (next.length){ order = sane(next) || order; saveOrder(); }
+      render();
+    });
+  }
+
+  /* ── Actions ─────────────────────────────────────────────────── */
+  function touch(g){
+    g = String(g || '').trim().toLowerCase();
+    if (!g) return;
+    try { if (window._dcAffinity) window._dcAffinity.bump(g); } catch(e){}
+  }
+  window.dcxTouch = touch;
+
+  window.dcxOpenPerson = function (id){
+    if (typeof window.openProfilePanel === 'function') return window.openProfilePanel(id);
+    if (typeof openProfile === 'function') return openProfile(id);
+  };
+  window.dcxGoSpeedrun = function (){
+    if (typeof window.closeDiscoverPanel === 'function') window.closeDiscoverPanel();
+    if (typeof window.openSpeedrunHub === 'function') window.openSpeedrunHub();
+  };
+  window.dcxGoTournaments = function (){
+    if (typeof window.closeDiscoverPanel === 'function') window.closeDiscoverPanel();
+    if (typeof window.openGlobalTournaments === 'function') window.openGlobalTournaments();
+  };
+  window.dcxCreateLobby = function (){
+    if (typeof window.closeDiscoverPanel === 'function') window.closeDiscoverPanel();
+    /* The same modal the + in the lobby rail opens -- there is one
+       create-lobby flow and this is it, not a second one. */
+    if (typeof window.openModal === 'function') return window.openModal('createServerModal');
+    if (typeof showToast === 'function') showToast('Use the + button in the lobby rail to create one.', 'info');
+  };
+
+  /* Joining actually joins now. It used to raise a "coming soon" toast,
+     which was defensible while most of the page was placeholders — there
+     was nothing real behind the card to join. Every card is real, and
+     POST /servers/:id/join has been there the whole time. */
+  window.discoverJoin = async function (id, name){
+    if (!id) return;
+    var label = name || 'that lobby';
+    if (typeof window.api !== 'function') return;
+    try {
+      var r = await window.api('/servers/' + encodeURIComponent(id) + '/join', { method:'POST' });
+      if (r && r.error){
+        if (typeof showToast === 'function') showToast(r.error, 'error');
+        return;
+      }
+      if (typeof showToast === 'function') showToast('Joined ' + label, 'success');
+      if (typeof window.closeDiscoverPanel === 'function') window.closeDiscoverPanel();
+
+      /* Refresh the rail, then walk into the lobby the person just chose
+         — landing back on the same browse page would leave them to find
+         it again themselves. */
+      if (typeof loadServers === 'function') await loadServers();
+      var all = Array.isArray(window.servers) ? window.servers : [];
+      var target = all.filter(function (s){ return String(s.id) === String(id); })[0] || null;
+      if (target && typeof window.selectServer === 'function') window.selectServer(target);
+    } catch (e){
+      if (typeof showToast === 'function') showToast('Could not join ' + label, 'error');
+    }
+  };
+
+  /* ── Wire in ─────────────────────────────────────────────────── */
+  /* Function declarations at the top level ARE properties of the global
+     object, unlike const/let, so reassigning these actually redirects
+     every existing call site to the renderer below. */
+  window._renderDiscoverGrid = function (){ render(); initDrag(); };
+  window._renderDiscoverTabs = function (){ /* folded into render() */ };
+  /* The old rotating banner read .dc-slide elements that no longer
+     exist. Emptying the pool is what makes its start function a no-op. */
+  window._dcCarouselPool = [];
+
+  function start(){
+    if (booted) return;
+    booted = true;
+    loadLocalOrder();
+    washEl();
+    var origOpen = window.openDiscoverPanel;
+    if (typeof origOpen === 'function' && !origOpen.__dcxWrapped){
+      var wrapped = function (){
+        /* Open on the order already in localStorage, then reconcile with
+           the account's copy. Awaiting the server first would hold the
+           whole page behind one request to learn something the browser
+           usually already knows. */
+        var out = origOpen.apply(this, arguments);
+        render();
+        initDrag();
+        loadOrder().then(function (changed){ if (changed) render(); });
+        return out;
+      };
+      wrapped.__dcxWrapped = true;
+      window.openDiscoverPanel = wrapped;
+    }
+    window.addEventListener('resize', syncShelfArrows);
+  }
+
+  if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', start);
+  else start();
+})();
+</script>
+
 </body>
 </html>

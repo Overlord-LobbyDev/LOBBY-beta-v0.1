@@ -313,6 +313,21 @@ async function initDb() {
 
     // Home section order (user preference for Recently Played, Spotlight, Lobbies)
     await pool.query(`
+      -- Generic per-user UI preferences, keyed by surface.
+      --
+      -- home_section_order is a table that can hold exactly one kind of
+      -- preference. Rather than add a second single-purpose table every
+      -- time a surface becomes reorderable, this one is keyed by (user,
+      -- key) and holds arbitrary JSON. Discover rail order is the first
+      -- tenant.
+      CREATE TABLE IF NOT EXISTS ui_prefs (
+        user_id    INTEGER REFERENCES users(id) ON DELETE CASCADE,
+        pref_key   TEXT NOT NULL,
+        value_json TEXT NOT NULL,
+        updated_at TIMESTAMPTZ DEFAULT NOW(),
+        PRIMARY KEY (user_id, pref_key)
+      );
+
       CREATE TABLE IF NOT EXISTS home_section_order (
         id         SERIAL PRIMARY KEY,
         user_id    INTEGER REFERENCES users(id) ON DELETE CASCADE UNIQUE,

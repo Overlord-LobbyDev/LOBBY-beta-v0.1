@@ -4863,6 +4863,48 @@ process.on("uncaughtException", (err) => {
 });
 
 // ── Home Section Order Endpoints ─────────────────────────────────
+// ── Generic per-user UI preferences ──────────────────────────────
+//
+// Reorderable surfaces should not each need their own table and their
+// own pair of routes. Key is whitelisted rather than free-form so this
+// cannot become a per-user blob store, and the body is capped.
+const UI_PREF_KEYS = new Set(["discover_rail_order"]);
+
+app.get("/me/prefs/:key", requireAuth, async (req, res) => {
+  const key = String(req.params.key || "");
+  if (!UI_PREF_KEYS.has(key)) return res.status(404).json({ error: "unknown pref" });
+  try {
+    const r = await pool.query(
+      "SELECT value_json FROM ui_prefs WHERE user_id = $1 AND pref_key = $2",
+      [req.userId, key]
+    );
+    if (!r.rows.length) return res.json(null);
+    try { return res.json(JSON.parse(r.rows[0].value_json)); }
+    catch { return res.json(null); }
+  } catch (err) {
+    console.error("[prefs GET]", err.message);
+    res.json(null);
+  }
+});
+
+app.post("/me/prefs/:key", requireAuth, async (req, res) => {
+  const key = String(req.params.key || "");
+  if (!UI_PREF_KEYS.has(key)) return res.status(404).json({ error: "unknown pref" });
+  const body = JSON.stringify(req.body === undefined ? null : req.body);
+  if (body.length > 4000) return res.status(413).json({ error: "too large" });
+  try {
+    await pool.query(
+      "INSERT INTO ui_prefs (user_id, pref_key, value_json) VALUES ($1, $2, $3) " +
+      "ON CONFLICT (user_id, pref_key) DO UPDATE SET value_json = $3, updated_at = NOW()",
+      [req.userId, key, body]
+    );
+    res.json({ ok: true });
+  } catch (err) {
+    console.error("[prefs POST]", err.message);
+    res.status(500).json({ error: "save failed" });
+  }
+});
+
 app.get("/home/section-order", requireAuth, async (req, res) => {
   try {
     const header = req.headers.authorization || "";
