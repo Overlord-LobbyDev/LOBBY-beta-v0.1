@@ -51803,6 +51803,32 @@ body.chat-ctx-on #chatCtx{
   flex:0 0 auto; width:7px; height:7px; border-radius:50%;
   background:#23a55a; box-shadow:0 0 8px #23a55a;
 }
+/* Occupants nested under their voice lounge, indented and hung off a
+   rail so they read as belonging to the row above rather than as
+   more channels. */
+.cctx-vc{
+  margin:2px 0 6px 15px; padding-left:11px;
+  border-left:1px solid rgba(255,255,255,.09);
+  display:flex; flex-direction:column; gap:2px;
+}
+.cctx-vc-row{
+  display:flex; align-items:center; gap:7px; padding:3px 5px;
+  border-radius:6px; font-size:12px; color:var(--text-2);
+  min-width:0;
+}
+.cctx-vc-row:hover{ background:rgba(255,255,255,.04); }
+.cctx-vc-row.me{ color:var(--text-1); }
+.cctx-vc-row .av{
+  width:20px; height:20px; border-radius:50%; overflow:hidden; flex:0 0 20px;
+  background:rgba(255,255,255,.08); border:1px solid rgba(35,165,90,.5);
+  display:flex; align-items:center; justify-content:center;
+  font-size:8px; font-weight:800;
+}
+.cctx-vc-row .av img{ width:100%; height:100%; object-fit:cover; display:block; }
+.cctx-vc-row .nm{ overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+.cctx-vc-row .mut{ margin-left:auto; flex:0 0 auto; color:#ff6b6b; display:flex; }
+.cctx-vc-row .mut svg{ width:12px; height:12px; }
+
 .cctx-people{ display:flex; flex-wrap:wrap; gap:6px; padding:2px; }
 .cctx-av{
   width:26px; height:26px; border-radius:50%;
@@ -51947,12 +51973,38 @@ body.chat-ctx-on.lobby-selected #chatPanel #lobbyPulse{
     var myVc = myVoiceId();
     var unread = window.unreadChannels || {};
 
-    var inVoice = mem.filter(function(m){ return presence(m) === 'voice'; });
+    /* Voice membership lives in `vcChannelMembers` (channelId → [{userId,
+       username, avatarUrl, muted}]), a top-level `let` — so it is NOT on
+       window and has to be read lexically.
+
+       This is why the column said "Nobody in voice" while you were
+       connected: presence checks m.voiceChannelId on the MEMBER records,
+       and the app never writes your own join back onto those. The room
+       roster is the authority. */
+    function vcAll(){
+      try { if (typeof vcChannelMembers !== 'undefined') return vcChannelMembers || {}; } catch(e){}
+      return window.vcChannelMembers || {};
+    }
+    function vcIn(chId){
+      var m = vcAll()[chId];
+      return Array.isArray(m) ? m : [];
+    }
+
+    var vcMap = vcAll();
+    var inVoice = [];
+    Object.keys(vcMap).forEach(function(k){
+      (Array.isArray(vcMap[k]) ? vcMap[k] : []).forEach(function(p){ inVoice.push(p); });
+    });
     var online  = mem.filter(function(m){ var p = presence(m); return p !== 'offline'; });
 
     /* Signature guard — this runs on a poll, and rewriting innerHTML every
-       tick would drop hover states and restart the entrance animation. */
-    var next = [chs.length, mem.length, activeId, myVc, inVoice.length, online.length,
+       tick would drop hover states and restart the entrance animation.
+       The voice roster is part of the signature, or joining a room would
+       not repaint until something else happened to change. */
+    var vcSig = Object.keys(vcMap).map(function(k){
+      return k + ':' + vcIn(k).map(function(p){ return p.userId + (p.muted ? 'm' : ''); }).join(',');
+    }).join('|');
+    var next = [chs.length, mem.length, activeId, myVc, vcSig, online.length,
                 chs.map(function(c){ return c.id + ':' + (unread[c.id] || 0); }).join(',')].join('|');
     if (next === sig) return;
     sig = next;
@@ -51967,11 +52019,9 @@ body.chat-ctx-on.lobby-selected #chatPanel #lobbyPulse{
 
     var rows = sorted.map(function(c){
       var isVoice = c.type === 'voice';
-      var here = isVoice
-        ? mem.filter(function(m){ return m && (m.voiceChannelId === c.id || m.voice_channel_id === c.id); })
-        : [];
+      var here = isVoice ? vcIn(c.id) : [];
       var n = isVoice ? 0 : (unread[c.id] || 0);
-      return '<div class="cctx-row' + (String(c.id) === String(activeId) ? ' active' : '') + '"' +
+      var row = '<div class="cctx-row' + (String(c.id) === String(activeId) ? ' active' : '') + '"' +
         ' data-id="' + esc(c.id) + '" data-type="' + esc(c.type || 'text') +
         '" data-name="' + esc(c.name || 'channel') + '">' +
         '<span class="ico">' + icon(c.type) + '</span>' +
@@ -51979,6 +52029,28 @@ body.chat-ctx-on.lobby-selected #chatPanel #lobbyPulse{
         (here.length ? '<span class="live" title="' + here.length + ' in voice"></span>' : '') +
         (n ? '<span class="badge">' + n + '</span>' : '') +
         '</div>';
+
+      /* Whoever is in the room, listed under it — the Discord shape. The
+         voice lounge is the only channel whose occupants are worth
+         showing in the list, because they are who you'd be joining. */
+      if (isVoice && here.length){
+        row += '<div class="cctx-vc">' + here.map(function(p){
+          var nm = p.username || p.displayName || 'Someone';
+          var mine = window.me && String(p.userId) === String(window.me.id);
+          return '<div class="cctx-vc-row' + (mine ? ' me' : '') + '" title="' + esc(nm) + '">' +
+            '<span class="av">' +
+              (p.avatarUrl ? '<img src="' + esc(p.avatarUrl) + '" alt="" onerror="this.remove()">'
+                           : esc(String(nm).slice(0,2).toUpperCase())) +
+            '</span>' +
+            '<span class="nm">' + esc(nm) + '</span>' +
+            (p.muted ? '<span class="mut" title="Muted">' +
+              '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round">' +
+              '<line x1="4" y1="4" x2="20" y2="20"/><path d="M12 2a3 3 0 0 1 3 3v5"/>' +
+              '<path d="M19 10v1a7 7 0 0 1-1.2 3.9"/><path d="M5 10v1a7 7 0 0 0 10 6.4"/></svg></span>' : '') +
+            '</div>';
+        }).join('') + '</div>';
+      }
+      return row;
     }).join('');
 
     var html =
@@ -51989,7 +52061,12 @@ body.chat-ctx-on.lobby-selected #chatPanel #lobbyPulse{
       '<div class="cctx-sec">' +
         '<div class="cctx-h"><span>In voice</span><span class="n">' + inVoice.length + '</span></div>' +
         (inVoice.length
-          ? '<div class="cctx-people">' + inVoice.slice(0, 12).map(function(m){ return avatar(m, 'voice'); }).join('') + '</div>'
+          ? '<div class="cctx-people">' + inVoice.slice(0, 12).map(function(p){
+              var nm = p.username || p.displayName || '?';
+              return '<div class="cctx-av voice" title="' + esc(nm) + '">' +
+                (p.avatarUrl ? '<img src="' + esc(p.avatarUrl) + '" alt="" onerror="this.remove()">'
+                             : esc(String(nm).slice(0,2).toUpperCase())) + '</div>';
+            }).join('') + '</div>'
           : '<div class="cctx-empty">Nobody in voice yet.</div>') +
       '</div>' +
       '<div class="cctx-sec">' +
