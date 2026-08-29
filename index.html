@@ -60477,10 +60477,16 @@ async function reactComment(ev, id, btn){
   border:1px solid color-mix(in srgb, #ffd35c 62%, transparent) !important;
 }
 #homeContent [data-home-slot="hero"] .game-card[data-ach-complete="1"].rc-active{
+  /* ONE gold line, not two. The rule above puts a 1px gold border on the
+     card, and .rc-active adds a 0 0 0 1px ring immediately outside it --
+     two adjacent 1px lines, which is why the rim read heavier than it
+     was meant to. The ring is the active affordance and every other card
+     uses it, so the ring stays and the border stands down here. */
+  border-color:color-mix(in srgb, #ffd35c 14%, transparent) !important;
   box-shadow:
     0 30px 70px rgba(0,0,0,.72),
     0 0 0 1px color-mix(in srgb, #ffd35c 72%, transparent),
-    0 0 44px color-mix(in srgb, #ffb020 26%, transparent) !important;
+    0 0 44px color-mix(in srgb, #ffb020 22%, transparent) !important;
 }
 /* Quietly on the cards behind: they are dimmed already, and a bright rim
    back there would pull the eye off the front card. */
