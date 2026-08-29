@@ -55490,6 +55490,10 @@ body.double-dock[data-feed-position="right"].feed-open:not(.rail-hidden) #settin
     meta.insertAdjacentHTML('beforebegin', out);
   }
 
+  /* The grid cards need the same art resolution, so it is reachable
+     from outside the deck rather than duplicated there. */
+  window.__rcArtwork = artwork;
+
   function enhance(card){
     if (card.__rc) return;
     card.__rc = true;
@@ -56602,6 +56606,291 @@ body[data-feed-position="split"].feed-open #homeContent > [data-home-slot="col"]
     if (!hc) { setTimeout(start, 200); return; }
     stampSlots();
     new MutationObserver(stampSlots).observe(hc, { childList: true });
+  }
+
+  if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', start);
+  else start();
+})();
+</script>
+
+<!-- ══════════════════════════════════════════════════════════════════
+     GRID CARDS — the small game card, properly designed
+
+     What the first pass got wrong, from the screenshot:
+
+       Ragged heights. A game with no achievements renders a "No public
+       achievements" line that nothing hid, so that card stood taller
+       than its neighbours and broke the row.
+
+       Two lines of mostly-zero. "0.0h in last 2 weeks" on six of nine
+       cards is noise — it is the same non-fact repeated. Recent play is
+       the interesting signal exactly when there IS some, so it moves to
+       a badge that only appears then, and total hours join the one meta
+       line.
+
+       Names cut mid-word at one line. Two clamped lines with a fixed
+       min-height keeps the titles readable AND the cards level.
+
+       Flat grey. Every card was the same slab. They now carry a wash of
+       their own cover art, so the shelf reads as nine different games
+       rather than nine identical boxes.
+
+       Two cards fell back to a repeated controller emoji. A ghosted
+       initial from the game's own name is at least specific to it.
+
+     The art itself comes from the same fallback chain the deck uses —
+     library_600x900 first — which was previously only run on cards in
+     the deck. That is why several of these were soft: they were still
+     showing header.jpg at 460x215 scaled up.
+     ══════════════════════════════════════════════════════════════════ -->
+<style>
+#homeContent [data-home-slot="col"] .home-games-grid{
+  grid-template-columns:repeat(auto-fill, minmax(178px, 1fr)) !important;
+  gap:16px !important;
+}
+
+#homeContent [data-home-slot="col"] .game-card{
+  position:relative !important;
+  border-radius:14px !important;
+  overflow:hidden !important;
+  background:#101219 !important;
+  border:1px solid rgba(255,255,255,.07) !important;
+  isolation:isolate;
+  transition:transform .18s cubic-bezier(.22,1,.36,1),
+             box-shadow .18s ease, border-color .18s ease !important;
+}
+
+/* Each card lit by its own cover art, the same idea as the deck. */
+#homeContent [data-home-slot="col"] .game-card::before{
+  content:'' !important; display:block !important;
+  position:absolute; inset:0; z-index:0;
+  background-image:var(--rc-art, none);
+  background-size:cover; background-position:center;
+  filter:blur(34px) saturate(1.7);
+  opacity:.30; transform:scale(1.35);
+  pointer-events:none;
+}
+#homeContent [data-home-slot="col"] .game-card:hover{
+  transform:translateY(-3px) !important;
+  box-shadow:0 14px 34px rgba(0,0,0,.55) !important;
+  border-color:color-mix(in srgb, var(--accent) 45%, transparent) !important;
+}
+
+/* ── Art ──────────────────────────────────────────────────────── */
+#homeContent [data-home-slot="col"] .rc-art{
+  position:relative !important; z-index:1;
+  width:100% !important; height:auto !important;
+  aspect-ratio:16 / 9;
+  flex:0 0 auto !important;
+  border-radius:0 !important; overflow:hidden;
+  background:#0a0b0f;
+}
+#homeContent [data-home-slot="col"] .rc-art::before{ display:none !important; }
+#homeContent [data-home-slot="col"] .game-card-hero{
+  width:100% !important; height:100% !important;
+  object-fit:cover !important; object-position:center !important;
+  border-radius:0 !important; flex:none !important; display:block !important;
+  transition:transform .35s cubic-bezier(.22,1,.36,1);
+}
+#homeContent [data-home-slot="col"] .game-card:hover .game-card-hero{
+  transform:scale(1.06);
+}
+/* Art meets body through a fade rather than a hard seam. */
+#homeContent [data-home-slot="col"] .rc-art::after{
+  content:''; position:absolute; inset:auto 0 0 0; height:46%;
+  background:linear-gradient(180deg, transparent, rgba(16,18,25,.92));
+  pointer-events:none;
+}
+
+/* A game with no usable art gets its own initial, not a shared emoji. */
+#homeContent [data-home-slot="col"] .game-card-placeholder{
+  position:relative !important; z-index:1;
+  width:100% !important; height:auto !important; aspect-ratio:16 / 9;
+  flex:0 0 auto !important; border-radius:0 !important;
+  display:flex !important; align-items:center; justify-content:center;
+  font-family:'Bebas Neue', var(--font), sans-serif;
+  font-size:46px !important; letter-spacing:3px;
+  color:rgba(255,255,255,.16) !important;
+  background:linear-gradient(150deg,#1b1f2b,#0d0f15) !important;
+}
+
+/* ── Recent-play badge ────────────────────────────────────────── */
+.gc-badge{
+  position:absolute; z-index:3; top:8px; left:8px;
+  display:inline-flex; align-items:center; gap:4px;
+  padding:3px 8px; border-radius:99px;
+  font-size:10.5px; font-weight:800; letter-spacing:.4px;
+  color:#fff;
+  background:color-mix(in srgb, var(--accent) 82%, transparent);
+  border:1px solid rgba(255,255,255,.22);
+  box-shadow:0 4px 12px rgba(0,0,0,.45);
+  white-space:nowrap;
+}
+
+/* ── Body ─────────────────────────────────────────────────────── */
+#homeContent [data-home-slot="col"] .game-card-body{
+  position:relative !important; z-index:1;
+  padding:11px 13px 13px !important;
+  background:linear-gradient(180deg, rgba(10,11,15,.55), rgba(10,11,15,.9)) !important;
+  display:flex !important; flex-direction:column !important;
+  flex:1 1 auto !important;
+}
+#homeContent [data-home-slot="col"] .game-card-name{
+  font-size:13.5px !important; font-weight:800 !important;
+  line-height:1.3 !important; letter-spacing:.1px !important;
+  color:#fff !important; margin:0 0 6px !important;
+  display:-webkit-box !important; -webkit-line-clamp:2; line-clamp:2;
+  -webkit-box-orient:vertical; overflow:hidden;
+  white-space:normal !important; text-overflow:clip !important;
+  /* Two lines' worth, always — this is what keeps the row level. */
+  min-height:2.6em;
+  -webkit-text-stroke:0 !important; text-shadow:none !important;
+}
+/* The renderer's own hour lines are replaced by the meta row. */
+#homeContent [data-home-slot="col"] .game-card-hours,
+#homeContent [data-home-slot="col"] .game-card-hours-total{ display:none !important; }
+
+.gc-meta{
+  display:flex; align-items:center; gap:7px; margin-top:auto;
+  font-size:11.5px; color:rgba(255,255,255,.62);
+  font-variant-numeric:tabular-nums;
+}
+.gc-meta b{ color:rgba(255,255,255,.9); font-weight:800; }
+.gc-dot{ width:3px; height:3px; border-radius:50%; background:rgba(255,255,255,.3); flex:0 0 auto; }
+.gc-ach{ display:inline-flex; align-items:center; gap:3px; }
+
+/* Anything the deck built, or the renderer's achievement block, has no
+   place on a card this size. */
+#homeContent [data-home-slot="col"] .game-card-achievements,
+#homeContent [data-home-slot="col"] .game-card-ach-label,
+#homeContent [data-home-slot="col"] .gc-hide,
+#homeContent [data-home-slot="col"] .rc-stats,
+#homeContent [data-home-slot="col"] .rc-bar,
+#homeContent [data-home-slot="col"] .rc-cta{ display:none !important; }
+
+/* Built for the grid; the deck has its own stat strip and CTA. */
+#homeContent [data-home-slot="hero"] .gc-badge,
+#homeContent [data-home-slot="hero"] .gc-meta{ display:none !important; }
+
+@media (prefers-reduced-motion: reduce){
+  #homeContent [data-home-slot="col"] .game-card,
+  #homeContent [data-home-slot="col"] .game-card-hero{ transition:none !important; }
+  #homeContent [data-home-slot="col"] .game-card:hover{ transform:none !important; }
+  #homeContent [data-home-slot="col"] .game-card:hover .game-card-hero{ transform:none !important; }
+}
+</style>
+<script>
+(function () {
+  'use strict';
+
+  /* Everything here reads what loadRecents() already rendered and
+     restates it — no second call to Steam. */
+  function gridify(card){
+    if (card.__gc) return;
+    card.__gc = true;
+
+    var body = card.querySelector('.game-card-body');
+    var top  = card.querySelector('.game-card-top');
+    if (!body) return;
+
+    function hrs(sel){
+      var el = card.querySelector(sel);
+      if (!el) return null;
+      var m = String(el.textContent || '').match(/([\d.]+)\s*h/i);
+      return m ? parseFloat(m[1]) : null;
+    }
+    var recent = hrs('.game-card-hours');
+    var total  = hrs('.game-card-hours-total');
+    var achN   = card.querySelectorAll('.game-card-ach').length;
+
+    /* The "No public achievements for this game" line is a bare div with
+       no class, so there is nothing to hide it by. Mark every stray
+       child of the body that is not part of the design. */
+    Array.prototype.forEach.call(body.children, function (el) {
+      if (el === top) return;
+      if (el.classList.contains('game-card-achievements')) return;
+      if (el.classList.contains('game-card-ach-label')) return;
+      if (el.classList.contains('rc-stats') || el.classList.contains('rc-bar') ||
+          el.classList.contains('rc-cta')) return;
+      if (el.classList.contains('gc-meta')) return;
+      el.classList.add('gc-hide');
+    });
+
+    /* Recent play only earns space when there is some. Six of nine cards
+       reading "0.0h in last 2 weeks" said nothing nine times over. */
+    if (recent && recent > 0){
+      var art = card.querySelector('.rc-art') || card.querySelector('.game-card-placeholder');
+      if (art && !card.querySelector('.gc-badge')){
+        var b = document.createElement('div');
+        b.className = 'gc-badge';
+        b.innerHTML = '● ' + recent + 'h this fortnight';
+        (art.parentNode === card ? card : art).appendChild(b);
+      }
+    }
+
+    /* One meta line: lifetime hours, and achievements when there are any. */
+    if (!card.querySelector('.gc-meta')){
+      var m = document.createElement('div');
+      m.className = 'gc-meta';
+      var html = '<span><b>' + (total != null ? total : '—') + 'h</b> played</span>';
+      if (achN) html += '<span class="gc-dot"></span><span class="gc-ach"><b>' + achN + '</b> 🏆</span>';
+      m.innerHTML = html;
+      body.appendChild(m);
+    }
+
+    /* Registered-trademark marks are legal furniture, not part of a
+       title, and they eat characters a clamped name cannot spare. */
+    var nameEl = card.querySelector('.game-card-name');
+    if (nameEl && /[®™]/.test(nameEl.textContent)){
+      nameEl.textContent = nameEl.textContent.replace(/[®™]/g, '').replace(/\s{2,}/g, ' ').trim();
+    }
+  }
+
+  /* Give an art-less card the game's own initial. giveUp() in the deck
+     writes a controller emoji, which is identical on every card that
+     fails — an initial at least identifies this one. */
+  function initialise(card){
+    var ph = card.querySelector('.game-card-placeholder');
+    if (!ph || ph.__init) return;
+    var nameEl = card.querySelector('.game-card-name');
+    var name = (nameEl && (nameEl.getAttribute('title') || nameEl.textContent)) || '';
+    name = name.replace(/[^A-Za-z0-9 ]/g, ' ').trim();
+    if (!name) return;
+    ph.__init = true;
+    ph.textContent = name.split(/\s+/).slice(0, 2).map(function (w) {
+      return w.charAt(0).toUpperCase();
+    }).join('');
+  }
+
+  function sweep(){
+    var hc = document.getElementById('homeContent');
+    if (!hc) return;
+    hc.querySelectorAll('[data-home-slot="col"] .game-card').forEach(function (c) {
+      /* Resolve the sharp cover art the deck would have found. Without
+         this the grid keeps whatever loadRecents() set, which is
+         header.jpg at 460x215 — the blurry case. */
+      if (window.__rcArtwork && !c.__art && !c.__rc){
+        c.__art = true;
+        try { window.__rcArtwork(c); } catch (e) {}
+      }
+      gridify(c);
+      initialise(c);
+    });
+  }
+
+  window.__gcSweep = sweep;
+
+  function start(){
+    var hc = document.getElementById('homeContent');
+    if (!hc) { setTimeout(start, 200); return; }
+    var queued = false;
+    function ping(){
+      if (queued) return;
+      queued = true;
+      requestAnimationFrame(function () { queued = false; sweep(); });
+    }
+    new MutationObserver(ping).observe(hc, { childList: true, subtree: true });
+    sweep();
   }
 
   if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', start);
