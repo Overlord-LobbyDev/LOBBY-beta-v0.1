@@ -53679,5 +53679,45 @@ body.double-dock[data-feed-position="right"].coliseum-mode.feed-open:not(.rail-h
   right:calc(var(--feed-w) + var(--lir-w)) !important;
 }
 </style>
+
+<!-- ══════════════════════════════════════════════════════════════════
+     HALL OF FAME SITS BELOW THE TOP BARS
+
+     #hofOverlay is `position:fixed; inset:0`, so it started at y=0 and
+     drew its own header and toolbar straight over the app's top bar and
+     the secondary hotbar row. Every other page in the app offsets by
+     `72px + --ph-row-h`; this one never did.
+
+     It also ignored the right docks. At z-index 9000 it covers the rail
+     and the feed outright, so opening Messages or Feed lit the button
+     and showed nothing — the same omission that had the Coliseum
+     overlapping them, since both were written after the layout rules
+     that name each page individually.
+     ══════════════════════════════════════════════════════════════════ -->
+<style>
+/* !important because the original sets `inset:0` in one shorthand, which
+   would otherwise win on source order for `top`. */
+#hofOverlay{
+  top:calc(72px + var(--ph-row-h, 0px)) !important;
+}
+
+/* Give up the right edge to whichever dock is open, exactly as the app's
+   own panel rules do. */
+body.feed-closed.lobby-selected:not(.rail-hidden) #hofOverlay{
+  right:var(--lir-w) !important;
+}
+body[data-feed-position="right"].feed-open #hofOverlay{
+  right:var(--feed-w) !important;
+  transition:right .55s var(--feed-ease);
+}
+body[data-feed-position="left"].feed-open #hofOverlay{
+  left:calc(var(--feed-left-edge) + var(--feed-w)) !important;
+  transition:left .55s var(--feed-ease);
+}
+/* Double Dock: both share the right edge, so clear both. */
+body.double-dock[data-feed-position="right"].feed-open:not(.rail-hidden) #hofOverlay{
+  right:calc(var(--feed-w) + var(--lir-w)) !important;
+}
+</style>
 </body>
 </html>
