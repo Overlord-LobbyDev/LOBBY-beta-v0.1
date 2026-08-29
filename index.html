@@ -58601,62 +58601,80 @@ async function reactComment(ev, id, btn){
 </style>
 
 <!-- ══════════════════════════════════════════════════════════════════
-     GAME TITLE LOGOS
+     GAME TITLE LOGOS — trimmed, area-matched, centred
 
-     "Make the title match the game's own style" — the right answer is
-     not to approximate the lettering with a font, it is to use the
-     lettering. Steam ships every game's official logo as an asset
-     alongside the cover art the deck already pulls:
+     WHY SOME WERE STILL SMALL. Steam normalises the CANVAS, not the
+     artwork. Every logo.png is 640px wide whatever is on it:
 
-       logo.png / library_logo.png, transparent PNG, the wordmark as the
-       publisher drew it — TEKKEN 8's, Halo's, Rockstar's.
+       Tekken 8   640 x 88   — cropped tight to the wordmark
+       Batman     640 x 276
+       GTA V      640 x 360  — a 16:9 sheet with the logo floating in
+                               the middle of it, mostly transparent
 
-     Per-game fonts would not have worked anyway: the faces are licensed
-     and mostly custom, so a hundred games would need a hundred webfonts,
-     and the result would still only be an impression of each title. The
-     logo IS the title.
+     Sizing by area then counted GTA's empty space as though it were
+     lettering, so the actual wordmark came out around half the size of
+     Tekken's. It was never a tuning problem.
 
-     Same chain pattern as the cover art: probe the known locations in
-     turn, take the first that loads, and leave the text standing if
-     none do. That last part matters — plenty of apps have no logo asset
-     (a beta, a delisted re-release), and those must read as a normally
-     typeset title rather than as a gap.
+     I said earlier this could not be fixed because the canvas would be
+     tainted. That was wrong, and I checked instead of assuming this
+     time: cdn.cloudflare.steamstatic.com returns
+     Access-Control-Allow-Origin: *, so with crossOrigin the pixels can
+     be read. Each logo is now scanned for its alpha bounding box, cut
+     down to the ink, and only then area-matched — so what gets measured
+     is the lettering rather than the sheet it was delivered on.
 
-     Deck cards only. The grid captions are ~150px wide, where a
-     wordmark would be too small to read and the name is the thing doing
-     the work; there, type is genuinely better than art.
+     Also: centred, as asked. And the text fallback is now a designed
+     treatment in the same slot rather than the leftover it was, so a
+     game with no logo asset reads as a title rather than as a failure.
      ══════════════════════════════════════════════════════════════════ -->
 <style>
+#homeContent [data-home-slot="hero"] .game-card-name{
+  display:flex !important;
+  align-items:center; justify-content:center !important;
+  text-align:center !important;
+  min-height:92px !important;
+}
 .gl-logo{
-  /* Sized by the controller from the asset's real proportions, so the
-     two custom properties are the whole geometry. */
   display:block;
   width:var(--gl-w, auto); height:var(--gl-h, auto);
   max-width:100%;
-  object-fit:contain; object-position:left center;
-  /* Logos are drawn for a store page, so most are light with
-     transparency. A little shadow keeps a pale one from dissolving into
-     the card and gives a dark one an edge to sit on. */
-  filter:drop-shadow(0 2px 5px rgba(0,0,0,.6));
+  object-fit:contain; object-position:center;
+  filter:drop-shadow(0 2px 6px rgba(0,0,0,.55));
 }
 #homeContent [data-home-slot="hero"] .game-card-name.gl-has{
-  /* The element is a picture frame now — the type rules that shaped the
-     words would only constrain the image. */
   font-size:0 !important; line-height:0 !important;
   letter-spacing:0 !important; text-shadow:none !important;
-  min-height:0 !important; padding:0 !important;
-  margin:0 0 10px !important;
+  padding:0 !important; margin:0 0 10px !important;
 }
-/* Scaled from the computed size rather than re-capped, so a back card's
-   logo keeps the proportions the front card gave it. */
 #homeContent [data-home-slot="hero"] .game-card:not(.rc-active) .gl-logo{
   width:calc(var(--gl-w, 200px) * .5);
   height:calc(var(--gl-h, 40px) * .5);
+}
+#homeContent [data-home-slot="hero"] .game-card:not(.rc-active) .game-card-name{
+  min-height:0 !important;
+}
+
+/* No logo asset. Set as a wordmark in its own right — same slot, same
+   optical weight — so the card reads as designed rather than as one
+   where the image did not arrive. */
+#homeContent [data-home-slot="hero"] .game-card-name.gl-text{
+  font-family:'Archivo', var(--font), sans-serif !important;
+  font-weight:900 !important; text-transform:uppercase !important;
+  font-size:34px !important; line-height:1.04 !important;
+  letter-spacing:.5px !important;
+  text-shadow:0 -1px 0 rgba(255,255,255,.22),
+              0 2px 4px rgba(0,0,0,.6) !important;
+}
+#homeContent [data-home-slot="hero"] .game-card:not(.rc-active) .game-card-name.gl-text{
+  font-size:19px !important;
 }
 </style>
 <script>
 (function () {
   'use strict';
+
+  var TARGET_AREA = 300 * 64;
+  var MAX_W = 380, MAX_H = 92, MIN_H = 30;
 
   function appIdOf(card){
     var on = card.getAttribute('onclick') || '';
@@ -58664,47 +58682,61 @@ async function reactComment(ev, id, btn){
     return m ? m[1] : null;
   }
 
-  /* library_logo first: it is the asset Steam uses on the library shelf
-     and is the more consistently present of the two. */
+  /* store_item_assets 301s to a host that 404s for these, so it is not
+     in the chain — checked rather than assumed. */
   function logoUrls(id){
-    var A = 'https://cdn.cloudflare.steamstatic.com/steam/apps/' + id + '/';
-    var B = 'https://shared.cloudflare.steamstatic.com/store_item_assets/steam/apps/' + id + '/';
-    var C = 'https://cdn.akamai.steamstatic.com/steam/apps/' + id + '/';
     return [
-      B + 'library_logo.png', A + 'library_logo.png',
-      B + 'logo.png',         A + 'logo.png',  C + 'logo.png'
+      'https://cdn.cloudflare.steamstatic.com/steam/apps/' + id + '/logo.png',
+      'https://cdn.akamai.steamstatic.com/steam/apps/' + id + '/logo.png',
+      'https://cdn.cloudflare.steamstatic.com/steam/apps/' + id + '/library_logo.png'
     ];
   }
 
-  /* THE SIZING PROBLEM. Logos have wildly different proportions —
-     TEKKEN 8's wordmark is about 3.5:1, Batman Arkham City's is nearer
-     4:3 — so capping width and height independently makes them look
-     nothing like each other. A wide logo hits max-width and reads
-     enormous; a squarer one hits max-height and reads tiny, even though
-     both are technically 'at their limit'.
+  /* Cut the sheet down to the lettering. Returns null if the pixels
+     cannot be read after all, in which case the untrimmed image is used
+     rather than nothing. */
+  function trim(img){
+    var w = img.naturalWidth, h = img.naturalHeight;
+    if (!w || !h) return null;
+    try {
+      var c = document.createElement('canvas');
+      c.width = w; c.height = h;
+      var ctx = c.getContext('2d', { willReadFrequently:true });
+      ctx.drawImage(img, 0, 0);
+      var d = ctx.getImageData(0, 0, w, h).data;
 
-     What makes two shapes look equally important is not matching width
-     or matching height, it is matching AREA. So each logo is scaled to
-     cover roughly the same number of pixels, whatever its proportions,
-     and only then clamped to the space available.
+      var minX = w, minY = h, maxX = -1, maxY = -1;
+      /* 12, not 0: anti-aliased edges and faint drop shadows carry a
+         little alpha, and treating those as ink would trim nothing. */
+      for (var y = 0; y < h; y++){
+        var row = y * w * 4;
+        for (var x = 0; x < w; x++){
+          if (d[row + x * 4 + 3] > 12){
+            if (x < minX) minX = x;
+            if (x > maxX) maxX = x;
+            if (y < minY) minY = y;
+            if (y > maxY) maxY = y;
+          }
+        }
+      }
+      if (maxX < 0) return null;                 // fully transparent
 
-     Not solvable here: logos with a lot of transparent padding baked in
-     will still read small, because trimming to the ink would mean
-     reading pixels, and Steam's CDN sends no CORS headers — the canvas
-     would be tainted and getImageData would throw. */
-  var TARGET_AREA = 300 * 64;   // a 300x64 wordmark, as the reference
-  /* MAX_H is the binding constraint for a squarer lockup like Arkham
-     City, which cannot reach the target area without it. 92 is what the
-     detail column can spare once the stat strip, the achievement list
-     and the CTA have taken theirs. */
-  var MAX_W = 380, MAX_H = 92, MIN_H = 30;
+      var tw = maxX - minX + 1, th = maxY - minY + 1;
+      if (tw >= w - 2 && th >= h - 2) return null;   // already tight
+
+      var out = document.createElement('canvas');
+      out.width = tw; out.height = th;
+      out.getContext('2d').drawImage(c, minX, minY, tw, th, 0, 0, tw, th);
+      return { url: out.toDataURL('image/png'), w: tw, h: th };
+    } catch (e) {
+      return null;                                // tainted; use as-is
+    }
+  }
 
   function size(w, h){
     if (!w || !h) return { w:260, h:64 };
     var k = Math.sqrt(TARGET_AREA / (w * h));
     var dw = w * k, dh = h * k;
-
-    // Then fit it to the space, keeping the ratio.
     if (dw > MAX_W){ dh *= MAX_W / dw; dw = MAX_W; }
     if (dh > MAX_H){ dw *= MAX_H / dh; dh = MAX_H; }
     if (dh < MIN_H){
@@ -58725,23 +58757,32 @@ async function reactComment(ev, id, btn){
     var text = (nameEl.getAttribute('title') || nameEl.textContent || '').trim();
     var urls = logoUrls(id), i = 0;
 
+    function giveUp(){
+      /* A designed title, not a leftover. */
+      nameEl.classList.add('gl-text');
+    }
+
     (function next(){
-      if (i >= urls.length) return;          // no logo: the text stays
+      if (i >= urls.length){ giveUp(); return; }
       var url = urls[i++];
       var probe = new Image();
+      probe.crossOrigin = 'anonymous';   // required to read the pixels
       probe.onload = function(){
-        /* A one-pixel sentinel is not a wordmark. Steam answers some
-           missing assets with a placeholder rather than a 404. */
         if (probe.naturalWidth < 40 || probe.naturalHeight < 12){ next(); return; }
-        var box = size(probe.naturalWidth, probe.naturalHeight);
+        var cut = trim(probe);
+        var src = cut ? cut.url : url;
+        var box = size(cut ? cut.w : probe.naturalWidth,
+                       cut ? cut.h : probe.naturalHeight);
+
         var img = document.createElement('img');
         img.className = 'gl-logo';
-        img.src = url;
+        img.src = src;
         img.alt = text;
         img.style.setProperty('--gl-w', box.w + 'px');
         img.style.setProperty('--gl-h', box.h + 'px');
         nameEl.setAttribute('title', text);
         nameEl.textContent = '';
+        nameEl.classList.remove('gl-text');
         nameEl.classList.add('gl-has');
         nameEl.appendChild(img);
       };
