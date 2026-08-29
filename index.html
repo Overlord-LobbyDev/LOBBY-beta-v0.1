@@ -55485,6 +55485,11 @@ body.double-dock[data-feed-position="right"].feed-open:not(.rail-hidden) #settin
     function giveUp(){
       var img = card.querySelector('.game-card-hero');
       if (!img) return;
+      /* The chain's guesses all 404'd, but the URL the SERVER supplied may
+         be perfectly good — for an app on a hashed path it is the ONLY
+         good one, and no guess can ever match it. Replacing a loaded
+         image with a placeholder because a guess failed is backwards. */
+      if (img.complete && img.naturalWidth > 0) return;
       var box = document.createElement('div');
       box.className = 'game-card-placeholder';
       box.textContent = '🎮';

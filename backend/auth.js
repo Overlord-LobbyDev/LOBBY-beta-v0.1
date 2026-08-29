@@ -2856,6 +2856,61 @@ app.delete("/steam/unlink", requireAuth, async (req, res) => {
   res.json({ success: true });
 });
 
+// ── Store art ──────────────────────────────────────────────────────
+// Steam moved store art to content-hashed paths:
+//
+//   .../store_item_assets/steam/apps/<appid>/<hash>/header.jpg
+//
+// The hash is a content digest, so it CANNOT be built from the appid.
+// Older apps still answer on the legacy unhashed path, which is why most
+// games worked; anything published or re-published recently 404s on every
+// guessable URL. appdetails is the only thing that knows the hash, and
+// each asset carries its own -- the header hash does not resolve
+// library_600x900 -- so nothing can be derived from anything else.
+//
+// Cached: appdetails is rate limited (about 200 calls per 5 minutes per
+// IP) and this runs once per game per request. Store art changes about
+// never, so the window is long.
+const _steamArtCache = new Map();
+const STEAM_ART_TTL = 6 * 60 * 60 * 1000;
+
+async function steamArt(appid) {
+  const hit = _steamArtCache.get(appid);
+  if (hit && Date.now() - hit.at < STEAM_ART_TTL) return hit.art;
+
+  // The legacy paths, which still resolve for most of the back catalogue.
+  const legacy = {
+    header_img:  `https://cdn.cloudflare.steamstatic.com/steam/apps/${appid}/header.jpg`,
+    capsule_img: `https://cdn.cloudflare.steamstatic.com/steam/apps/${appid}/library_600x900.jpg`,
+  };
+  let art = legacy;
+
+  try {
+    const r = await fetch(
+      `https://store.steampowered.com/api/appdetails?appids=${appid}&filters=basic`
+    );
+    if (r.ok) {
+      const j = await r.json();
+      const d = j && j[appid] && j[appid].data;
+      if (d && d.header_image) {
+        art = {
+          // Authoritative, and for a hashed app the only URL that works.
+          header_img: d.header_image,
+          // library_600x900 is not exposed by appdetails and carries its
+          // own hash, so the legacy guess is kept: it resolves for older
+          // apps, and the client falls back to the header when it does not.
+          capsule_img: legacy.capsule_img,
+        };
+      }
+    }
+  } catch (e) {
+    console.error("[steam-art]", appid, e.message);
+  }
+
+  _steamArtCache.set(appid, { art, at: Date.now() });
+  return art;
+}
+
 // GET /steam/recent — get recently played games + achievements for the logged-in user
 app.get("/steam/recent", requireAuth, async (req, res) => {
   const userRow = await pool.query("SELECT steam_id FROM users WHERE id = $1", [req.userId]);
@@ -2900,11 +2955,13 @@ app.get("/steam/recent", requireAuth, async (req, res) => {
       const hoursRecent = g.playtime_2weeks  ? (g.playtime_2weeks  / 60).toFixed(1) : null;
       const hoursTotal  = g.playtime_forever ? (g.playtime_forever / 60).toFixed(1) : "0";
 
+      const art = await steamArt(g.appid);
+
       return {
         appid:       g.appid,
         name:        g.name,
-        header_img:  `https://cdn.cloudflare.steamstatic.com/steam/apps/${g.appid}/header.jpg`,
-        capsule_img: `https://cdn.cloudflare.steamstatic.com/steam/apps/${g.appid}/library_600x900.jpg`,
+        header_img:  art.header_img,
+        capsule_img: art.capsule_img,
         hours_recent: hoursRecent,
         hours_total:  hoursTotal,
         achievements,
@@ -2963,11 +3020,13 @@ app.get("/steam/recent/:userId", requireAuth, async (req, res) => {
       const hoursRecent = g.playtime_2weeks  ? (g.playtime_2weeks  / 60).toFixed(1) : null;
       const hoursTotal  = g.playtime_forever ? (g.playtime_forever / 60).toFixed(1) : "0";
 
+      const art = await steamArt(g.appid);
+
       return {
         appid:       g.appid,
         name:        g.name,
-        header_img:  `https://cdn.cloudflare.steamstatic.com/steam/apps/${g.appid}/header.jpg`,
-        capsule_img: `https://cdn.cloudflare.steamstatic.com/steam/apps/${g.appid}/library_600x900.jpg`,
+        header_img:  art.header_img,
+        capsule_img: art.capsule_img,
         hours_recent: hoursRecent,
         hours_total:  hoursTotal,
         achievements,
