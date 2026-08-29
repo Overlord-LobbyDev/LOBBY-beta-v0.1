@@ -59081,5 +59081,231 @@ async function reactComment(ev, id, btn){
   else start();
 })();
 </script>
+
+<!-- ══════════════════════════════════════════════════════════════════
+     HUB DESIGN LANGUAGE — Discover, Tournaments, Leaderboards,
+     Queue, Speedrun
+
+     Same language as the home page, own structure per page — the type,
+     the depth treatment, the slates and the card behaviour are shared;
+     the layouts are not, because a browse grid and a bracket are not a
+     carousel and should not pretend to be.
+
+     WHAT WAS SHARED ALREADY, AND WRONG. All five hero titles were Bebas
+     Neue, the condensed face the home page has just moved off precisely
+     because it was the only thing on the page from its own world. They
+     also all set their accent word with background-clip:text over a
+     gradient, which CANNOT carry the bevel — the element background
+     paints before text-shadow, so the bevel would land inside the
+     letters and read as dirt. The accent word therefore takes a solid
+     colour and keeps the depth instead.
+
+     WHAT IS KEPT. Each hub already had its own accent — cyan on
+     Discover, indigo on Tournaments, orange on Speedrun, purple on
+     Queue, gold on Leaderboards. That is real identity and it survives:
+     it is lifted into --hub-accent and every shared rule below reads
+     from it, so the pages share a language without becoming the same
+     page.
+     ══════════════════════════════════════════════════════════════════ -->
+<style>
+/* ── Per-hub identity ─────────────────────────────────────────── */
+#discoverOverlay          { --hub-accent:#58d9ff; }
+#globalTournamentsOverlay { --hub-accent:var(--accent); }
+#speedrunOverlay          { --hub-accent:#ff7a2f; }
+#queueOverlay             { --hub-accent:#a863ff; }
+#leaderboardOverlay       { --hub-accent:#ffd33d; }
+.lobby-overlay            { --hub-accent:var(--accent); }   /* floor */
+
+/* ── Page titles ──────────────────────────────────────────────── */
+.lobby-overlay .discover-hero-title,
+.lobby-overlay .gt-hero-title,
+.lobby-overlay .q-hero-title,
+.lobby-overlay .sr-hero-title,
+.lobby-overlay .lb-title,
+.lobby-overlay .store-hero-title{
+  font-family:'Archivo', var(--font), sans-serif !important;
+  font-weight:900 !important;
+  /* Bebas has no lowercase glyphs, so these titles only LOOKED
+     uppercase. Any other face renders the markup as written, so the
+     caps have to be asked for. */
+  text-transform:uppercase !important;
+  /* Archivo 900 carries far more ink per letter than a condensed face,
+     so it reads larger at a smaller size and needs much less tracking. */
+  font-size:clamp(28px, 3.8vw, 52px) !important;
+  letter-spacing:2px !important;
+  line-height:1.03 !important;
+  color:#fff !important;
+  -webkit-text-fill-color:#fff !important;
+  background:none !important;
+  position:relative !important;
+  isolation:isolate;
+  /* Cut, not printed: light above, shadow below, one soft lift, and an
+     ambient glow in this hub's own colour. No wide blur, so no dark box. */
+  text-shadow:
+    0 -1px 0 rgba(255,255,255,.30),
+    0 1px 0 rgba(0,0,0,.55),
+    0 3px 8px rgba(0,0,0,.45),
+    0 0 46px color-mix(in srgb, var(--hub-accent) 34%, transparent) !important;
+}
+
+/* The layer behind — an outline, scaled just past the word. */
+.lobby-overlay .discover-hero-title::before,
+.lobby-overlay .gt-hero-title::before,
+.lobby-overlay .q-hero-title::before,
+.lobby-overlay .sr-hero-title::before,
+.lobby-overlay .lb-title::before{
+  content:attr(data-text);
+  position:absolute; left:0; right:0; top:0;
+  z-index:-1; pointer-events:none;
+  color:transparent; -webkit-text-fill-color:transparent;
+  background:none; text-shadow:none;
+  -webkit-text-stroke:1px rgba(255,255,255,.10);
+  transform:translateY(1px) scale(1.045);
+  transform-origin:left center;
+}
+.lobby-overlay [data-text=""]::before{ content:none; }
+
+/* Accent word: solid, so it can carry the same bevel. A gradient fill
+   cannot — see the note above. */
+.lobby-overlay .discover-hero-accent,
+.lobby-overlay .gt-hero-accent,
+.lobby-overlay .q-hero-accent,
+.lobby-overlay .sr-hero-accent,
+.lobby-overlay .lb-title-accent{
+  background:none !important;
+  -webkit-background-clip:border-box !important;
+  background-clip:border-box !important;
+  color:var(--hub-accent) !important;
+  -webkit-text-fill-color:var(--hub-accent) !important;
+  text-shadow:
+    0 -1px 0 color-mix(in srgb, var(--hub-accent) 30%, #fff),
+    0 1px 0 rgba(0,0,0,.5),
+    0 0 34px color-mix(in srgb, var(--hub-accent) 55%, transparent) !important;
+}
+
+/* Scrolled state — the overlay shrinks its header. Keeps the ratio. */
+.lobby-overlay.is-shrunk .discover-hero-title,
+.lobby-overlay.is-shrunk .gt-hero-title,
+.lobby-overlay.is-shrunk .q-hero-title,
+.lobby-overlay.is-shrunk .sr-hero-title,
+.lobby-overlay.is-shrunk .lb-title,
+.lobby-overlay.is-shrunk .store-hero-title{
+  font-size:clamp(20px, 2.2vw, 30px) !important;
+  letter-spacing:1.4px !important;
+}
+
+/* ── Eyebrow pills ────────────────────────────────────────────── */
+.lobby-overlay .discover-hero-eyebrow,
+.lobby-overlay .gt-hero-eyebrow,
+.lobby-overlay .q-hero-eyebrow,
+.lobby-overlay .sr-hero-eyebrow,
+.lobby-overlay .lb-eyebrow{
+  font-family:'JetBrains Mono', ui-monospace, monospace !important;
+  font-size:10px !important; font-weight:700 !important;
+  letter-spacing:2.2px !important;
+  padding:5px 12px !important; border-radius:99px !important;
+  color:var(--hub-accent) !important;
+  background:color-mix(in srgb, var(--hub-accent) 12%, transparent) !important;
+  border:1px solid color-mix(in srgb, var(--hub-accent) 34%, transparent) !important;
+}
+
+/* ── Section heads ────────────────────────────────────────────── */
+.lobby-overlay .gt-section-title,
+.lobby-overlay .sr-section-title,
+.lobby-overlay .lb-section-title,
+.lobby-overlay .q-step-label{
+  font-family:'Archivo', var(--font), sans-serif !important;
+  font-weight:900 !important; text-transform:uppercase !important;
+  font-size:15px !important; letter-spacing:1.6px !important;
+  color:#fff !important;
+  text-shadow:0 1px 2px rgba(0,0,0,.5) !important;
+}
+/* A short accent rule before the words, the section marker the home page
+   uses — placed inline here because these heads are left-aligned rows
+   rather than centred slates. */
+.lobby-overlay .gt-section-head,
+.lobby-overlay .sr-section-head,
+.lobby-overlay .lb-section-head{
+  position:relative;
+  padding-left:14px;
+}
+.lobby-overlay .gt-section-head::before,
+.lobby-overlay .sr-section-head::before,
+.lobby-overlay .lb-section-head::before{
+  content:''; position:absolute; left:0; top:50%;
+  width:4px; height:18px; margin-top:-9px; border-radius:99px;
+  background:linear-gradient(180deg,
+    color-mix(in srgb, var(--hub-accent) 95%, white),
+    color-mix(in srgb, var(--hub-accent) 55%, transparent));
+  box-shadow:0 0 12px color-mix(in srgb, var(--hub-accent) 55%, transparent);
+}
+
+/* ── Search fields ────────────────────────────────────────────── */
+.lobby-overlay .discover-search-input,
+.lobby-overlay .gt-search-input,
+.lobby-overlay .q-game-search{
+  font-family:var(--font) !important;
+}
+.lobby-overlay .discover-search-wrap:focus-within,
+.lobby-overlay .gt-search-wrap:focus-within{
+  border-color:color-mix(in srgb, var(--hub-accent) 55%, transparent) !important;
+  box-shadow:0 0 0 3px color-mix(in srgb, var(--hub-accent) 14%, transparent) !important;
+}
+
+/* ── Tabs and chips ───────────────────────────────────────────── */
+.lobby-overlay .discover-tab.active,
+.lobby-overlay .gt-tab.active{
+  background:color-mix(in srgb, var(--hub-accent) 18%, transparent) !important;
+  border-color:color-mix(in srgb, var(--hub-accent) 50%, transparent) !important;
+  color:#fff !important;
+}
+
+@media (prefers-reduced-motion: reduce){
+  .lobby-overlay .discover-hero-title::before,
+  .lobby-overlay .gt-hero-title::before,
+  .lobby-overlay .q-hero-title::before,
+  .lobby-overlay .sr-hero-title::before,
+  .lobby-overlay .lb-title::before{ transform:none; }
+}
+</style>
+<script>
+(function () {
+  'use strict';
+
+  /* The ghost layer is drawn with content:attr(data-text), so each title
+     needs its own words as an attribute. The home page has its own
+     stamper; this covers the hub titles, which are static markup and so
+     only need doing once — but it re-runs on mutation because the
+     overlays rebuild their headers.
+
+     Titles here contain a nested accent span (DISCOVER <span>LOBBIES
+     </span>), and textContent flattens that to the full phrase, which is
+     exactly what the outline behind should read. */
+  var SEL = [
+    '.discover-hero-title', '.gt-hero-title', '.q-hero-title',
+    '.sr-hero-title', '.lb-title'
+  ].join(',');
+
+  function stamp(){
+    document.querySelectorAll(SEL).forEach(function (t) {
+      var txt = (t.textContent || '').replace(/\s+/g, ' ').trim();
+      if (txt && t.getAttribute('data-text') !== txt) t.setAttribute('data-text', txt);
+    });
+  }
+
+  function start(){
+    stamp();
+    var queued = false;
+    new MutationObserver(function () {
+      if (queued) return;
+      queued = true;
+      requestAnimationFrame(function () { queued = false; stamp(); });
+    }).observe(document.body, { childList:true, subtree:true, characterData:true });
+  }
+
+  if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', start);
+  else start();
+})();
+</script>
 </body>
 </html>
