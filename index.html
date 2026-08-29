@@ -19675,7 +19675,18 @@ window.renderChannelHero = renderChannelHero;
 // currentView. Click events are handled by delegation on .chat-ribbon.
 function renderChannelRibbon(activeId) {
   const channels = Array.isArray(window.cachedServerChannels) ? window.cachedServerChannels : [];
-  if (!channels.length) return '';
+  /* Deliberately NO `if (!channels.length) return ''`.
+     Returning empty here is what let the old chat layout reappear: the
+     modern styling is gated on `.chat-main:has(.chat-ribbon)`, and the
+     legacy .chat-header is rendered whenever the ribbon comes back
+     empty. So in the window between opening a channel and the channel
+     list arriving — a lobby switch, a channel opened from the rail or
+     the Coliseum, a cold load — the whole chat fell back to the old
+     look and stayed there, because nothing re-rendered it afterwards.
+
+     With no channels the strip simply has no tabs; the crest, activity
+     and actions still render, .chat-ribbon still exists, and the chat
+     keeps the current design. The tabs fill in on the next render. */
   const members = Array.isArray(window.cachedServerMembers) ? window.cachedServerMembers : [];
   const canManage = (typeof myServerRole !== 'undefined') && (myServerRole === 'owner' || myServerRole === 'moderator');
   const escAttr = s => String(s == null ? '' : s).replace(/&/g,'&amp;').replace(/"/g,'&quot;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
@@ -52340,10 +52351,23 @@ body.feed-anim-out #socialFeed{
 
     /* Already reading a channel of THIS lobby: leave it alone. This also
        makes the hook safe on the re-renders triggered by pinning,
-       searching and collapsing sections. */
+       searching and collapsing sections.
+
+       One exception — if the ribbon rendered before the channel list
+       arrived it has no tabs, and nothing else would ever refresh it.
+       Re-opening the same channel rebuilds the strip with its tabs. */
     var v = view();
     if (v && v.type === 'channel' &&
-        channels.some(function(c){ return String(c.id) === String(v.id); })) return;
+        channels.some(function(c){ return String(c.id) === String(v.id); })){
+      var ribbon = document.getElementById('chatRibbon');
+      // :not(.add) — the "+" button is a .cr-tab too and renders even
+      // when there are no channels, so it would mask an empty strip.
+      if (ribbon && !ribbon.querySelector('.cr-tab:not(.add)') && typeof window.openChannel === 'function'){
+        var cur = channels.find(function(c){ return String(c.id) === String(v.id); });
+        if (cur) window.openChannel(cur.id, cur.name, cur.type || 'text');
+      }
+      return;
+    }
 
     var pick = remembered(server.id, channels) || firstReadable(channels);
     if (!pick) return;                       // voice-only lobby — nothing to open
