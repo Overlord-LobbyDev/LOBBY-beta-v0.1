@@ -22336,7 +22336,23 @@ async function joinVoiceChannel(channelId, channelName) {
   const alreadyIn = vcChannelMembers[channelId].find(m => m.userId === me.id);
   if (!alreadyIn) vcChannelMembers[channelId].push({ userId:me.id, username:me.username, avatarUrl:me.avatarUrl||null, muted:!vcStream });
 
-  showVcPanel(channelName);
+  /* Joining voice no longer takes over the page. Discord's model: you
+     drop into a room and carry on reading whatever you were reading —
+     the connection is a persistent state, not a destination. Taking over
+     the page meant every join threw away where you were, and you had to
+     navigate back to the channel you were in the middle of.
+
+     Everything needed to make this work already existed: showHotbarCall()
+     below puts the live widget in the top bar with mic / expand /
+     disconnect, and its expand button calls showVcPanel(). Clicking a
+     voice lounge you are ALREADY in also opens it (see the top of this
+     function), so the full stage is two obvious clicks away.
+
+     If the voice page happens to be open, keep it in sync rather than
+     leaving it showing the old room. */
+  var vcp = document.getElementById('vcPanel');
+  if (vcp && !vcp.classList.contains('hidden')) showVcPanel(channelName);
+
   refreshChannelListVc();
   LobbySound.play("vcJoin");
   showToast(`Joined 🔊 ${channelName}`, "success");
