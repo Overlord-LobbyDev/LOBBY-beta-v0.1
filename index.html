@@ -50997,24 +50997,53 @@ body.rail-dm #lirDM{ display:flex; flex-direction:column; height:100%; min-heigh
   transform:translateX(3px);
 }
 .ldm-row.online{ border-left-color:var(--green); }
-.ldm-row.unread{ border-left-color:var(--accent); }
+.ldm-row.unread{ border-left-color:var(--accent); background:rgba(255,255,255,.05); }
+/* Conversations get room for two lines; friends you have not messaged
+   stay compact, so the list reads as "chats, then everyone else". */
+.ldm-row.chat{ padding:10px 10px; }
 .ldm-av{
-  width:30px; height:30px; border-radius:50%; flex:none; overflow:hidden;
+  width:34px; height:34px; border-radius:50%; flex:none; overflow:hidden;
   background:linear-gradient(135deg,var(--accent),var(--accent-h));
   display:grid; place-items:center; font-size:11px; font-weight:800; color:#fff;
   position:relative;
 }
-.ldm-av img{ width:100%; height:100%; object-fit:cover; }
-.ldm-meta{ flex:1; min-width:0; }
+.ldm-av img{ width:100%; height:100%; object-fit:cover; display:block; }
+.ldm-av{ overflow:visible; }
+.ldm-av img, .ldm-av > *{ border-radius:50%; }
+/* Two stacked rows: name + time, then preview + badge. The name and the
+   status used to be bare inline spans in one box, so margin-top did
+   nothing and they rendered run together as "3reiignOffline". */
+.ldm-meta{ flex:1; min-width:0; display:flex; flex-direction:column; gap:3px; }
+.ldm-line{ display:flex; align-items:baseline; gap:8px; min-width:0; }
 .ldm-name{
-  font-family:var(--font); font-size:12.5px; font-weight:800; color:#fff;
-  overflow:hidden; text-overflow:ellipsis; white-space:nowrap;
+  font-family:'Archivo', var(--font), sans-serif;
+  font-size:13px; font-weight:700; color:#fff; letter-spacing:-.1px;
+  overflow:hidden; text-overflow:ellipsis; white-space:nowrap; flex:1; min-width:0;
+}
+.ldm-time{
+  flex:none; font-family:'JetBrains Mono', ui-monospace, monospace;
+  font-size:9px; color:var(--text-3); letter-spacing:.3px;
 }
 .ldm-sub{
-  font-family:var(--font); font-size:9.5px; font-weight:700; color:var(--text-3);
-  margin-top:2px;
+  font-family:var(--font); font-size:11px; font-weight:500; color:var(--text-3);
+  overflow:hidden; text-overflow:ellipsis; white-space:nowrap; flex:1; min-width:0;
 }
-.ldm-sub.online{ color:var(--green); }
+.ldm-sub.online{ color:var(--green); font-weight:700; }
+/* An unread conversation is the one thing here that should pull the eye. */
+.ldm-row.unread .ldm-name{ color:#fff; }
+.ldm-row.unread .ldm-sub{ color:var(--text-1); font-weight:700; }
+/* Presence on the avatar, not spelled out on every row. */
+.ldm-av.on::after{
+  content:''; position:absolute; right:-1px; bottom:-1px;
+  width:9px; height:9px; border-radius:50%;
+  background:var(--green); border:2px solid var(--bg-1);
+}
+.ldm-group{
+  font-family:'Archivo', var(--font), sans-serif;
+  font-size:9px; font-weight:800; letter-spacing:1.6px; text-transform:uppercase;
+  color:var(--text-3); margin:14px 4px 7px; padding-top:12px;
+  border-top:1px solid rgba(255,255,255,.06);
+}
 .ldm-badge{
   flex:none; min-width:17px; height:17px; padding:0 5px; border-radius:99px;
   background:var(--accent); color:var(--bg-0);
@@ -51247,6 +51276,36 @@ body.dock-sidebar:not(.dock-feed)  #phFeedToggleBtn .ph-fb-dot {
       friends = (Array.isArray(d) ? d : []).filter(function(f){ return f.status === 'accepted'; });
       renderList();
     });
+    loadConvos();
+  }
+
+  /* /dm/conversations returns one row per person you have actually talked
+     to — other_id, from_user_id, content, created_at, username,
+     avatar_url — already ordered newest first. That is what turns this
+     from a friend list into a messages list. */
+  var convos = [], convosAt = 0;
+  function loadConvos(force){
+    var now = Date.now();
+    if (!force && now - convosAt < 15000) return;   // the rail re-renders often
+    convosAt = now;
+    call('/dm/conversations').then(function(d){
+      convos = Array.isArray(d) ? d : [];
+      if (openWith == null) renderList();
+    });
+  }
+
+  /* "14:02" today, "Tue" this week, "12 Mar" beyond — the form that tells
+     you how stale a conversation is at a glance. */
+  function stamp(iso){
+    if (!iso) return '';
+    var d = new Date(iso);
+    if (isNaN(d)) return '';
+    var now = new Date();
+    var sameDay = d.toDateString() === now.toDateString();
+    if (sameDay) return d.toLocaleTimeString('en-GB', { hour:'2-digit', minute:'2-digit' });
+    var days = Math.floor((now - d) / 86400000);
+    if (days < 7) return d.toLocaleDateString('en-GB', { weekday:'short' });
+    return d.toLocaleDateString('en-GB', { day:'numeric', month:'short' });
   }
 
   function loadThread(uid){
@@ -51269,19 +51328,58 @@ body.dock-sidebar:not(.dock-feed)  #phFeedToggleBtn .ph-fb-dot {
     if (openWith != null) return;
     var on = onlineIds(), un = unread();
     var q = query.trim().toLowerCase();
-    var list = friends.filter(function(f){
-      return !q || String(f.username || '').toLowerCase().indexOf(q) >= 0;
-    });
-    // Unread first, then online, then alphabetical — same priority idea as
-    // the recents strip.
-    list.sort(function(a, b){
-      var ua = un[a.other_id] || 0, ub = un[b.other_id] || 0;
-      if (!!ua !== !!ub) return ub - ua;
+    var meId = (window.me && window.me.id) || null;
+
+    function match(name){ return !q || String(name || '').toLowerCase().indexOf(q) >= 0; }
+
+    /* Conversations first, newest first — the endpoint already orders
+       them, so recency is preserved rather than re-derived. Everyone else
+       falls into "All friends" below, which is how you start a new one. */
+    var chats = convos.filter(function(c){ return match(c.username); });
+    var talkedTo = {};
+    convos.forEach(function(c){ talkedTo[String(c.other_id)] = true; });
+    var rest = friends.filter(function(f){
+      return match(f.username) && !talkedTo[String(f.other_id)];
+    }).sort(function(a, b){
       var oa = on.has && on.has(a.other_id) ? 1 : 0;
       var ob = on.has && on.has(b.other_id) ? 1 : 0;
-      if (oa !== ob) return ob - oa;
+      if (oa !== ob) return ob - oa;              // online first
       return String(a.username||'').localeCompare(String(b.username||''));
     });
+
+    function row(uid, name, avatarUrl, sub, time, isChat){
+      var isOn = on.has && on.has(uid);
+      var n = un[uid] || 0;
+      return '<button class="ldm-row' + (n ? ' unread' : '') + (isChat ? ' chat' : '') +
+             '" data-ldm="open" data-uid="' + esc(uid) +
+             '" data-name="' + esc(name) + '" data-av="' + esc(avatarUrl || '') + '">' +
+        '<span class="ldm-av' + (isOn ? ' on' : '') + '">' +
+          (avatarUrl ? '<img src="' + esc(avatarUrl) + '" alt="" onerror="this.remove()">'
+                     : esc(String(name || '?').charAt(0).toUpperCase())) +
+        '</span>' +
+        '<span class="ldm-meta">' +
+          '<span class="ldm-line">' +
+            '<span class="ldm-name">' + esc(name) + '</span>' +
+            (time ? '<span class="ldm-time">' + esc(time) + '</span>' : '') +
+          '</span>' +
+          '<span class="ldm-line">' +
+            '<span class="ldm-sub' + (isOn && !isChat ? ' online' : '') + '">' + esc(sub) + '</span>' +
+            (n ? '<span class="ldm-badge">' + (n > 9 ? '9+' : n) + '</span>' : '') +
+          '</span>' +
+        '</span></button>';
+    }
+
+    var chatRows = chats.map(function(c){
+      var mine = meId != null && String(c.from_user_id) === String(meId);
+      var body = String(c.content || '').replace(/\s+/g, ' ').trim() || 'Sent an attachment';
+      return row(c.other_id, c.username, c.avatar_url,
+                 (mine ? 'You: ' : '') + body, stamp(c.created_at), true);
+    }).join('');
+
+    var restRows = rest.map(function(f){
+      var isOn = on.has && on.has(f.other_id);
+      return row(f.other_id, f.username, f.avatar_url, isOn ? 'Online' : 'Offline', '', false);
+    }).join('');
 
     el.innerHTML =
       '<div class="ldm-head">' +
@@ -51290,25 +51388,18 @@ body.dock-sidebar:not(.dock-feed)  #phFeedToggleBtn .ph-fb-dot {
       '</div>' +
       '<div class="ldm-search">' +
         '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg>' +
-        '<input id="ldmSearch" type="text" placeholder="Search friends" autocomplete="off" value="' + esc(query) + '">' +
+        '<input id="ldmSearch" type="text" placeholder="Search or start a chat" autocomplete="off" value="' + esc(query) + '">' +
       '</div>' +
       '<div class="ldm-list">' +
-        (list.length ? list.map(function(f){
-          var isOn = on.has && on.has(f.other_id);
-          var n = un[f.other_id] || 0;
-          var av = f.avatar_url
-            ? '<img src="' + esc(f.avatar_url) + '" alt="">'
-            : esc(String(f.username || '?').charAt(0).toUpperCase());
-          return '<button class="ldm-row' + (n ? ' unread' : (isOn ? ' online' : '')) +
-                 '" data-ldm="open" data-uid="' + esc(f.other_id) +
-                 '" data-name="' + esc(f.username) + '" data-av="' + esc(f.avatar_url || '') + '">' +
-            '<span class="ldm-av">' + av + '</span>' +
-            '<span class="ldm-meta"><span class="ldm-name">' + esc(f.username) + '</span>' +
-              '<span class="ldm-sub' + (isOn ? ' online' : '') + '">' +
-              (isOn ? '● Online' : 'Offline') + '</span></span>' +
-            (n ? '<span class="ldm-badge">' + (n > 9 ? '9+' : n) + '</span>' : '') +
-          '</button>';
-        }).join('') : '<div class="ldm-empty">No friends yet.<br>Add someone to start a conversation.</div>') +
+        (chatRows || restRows
+          ? (chatRows || '') +
+            /* Only labelled once there are conversations above it —
+               with none, this IS the list and a header would be noise. */
+            (restRows
+              ? (chatRows ? '<div class="ldm-group">All friends</div>' : '') + restRows
+              : '')
+          : (q ? '<div class="ldm-empty">Nobody matches “' + esc(query) + '”.</div>'
+               : '<div class="ldm-empty">No friends yet.<br>Add someone to start a conversation.</div>')) +
       '</div>';
 
     var s = $('ldmSearch');
