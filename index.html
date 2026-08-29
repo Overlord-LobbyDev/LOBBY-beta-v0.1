@@ -55041,8 +55041,12 @@ body.double-dock[data-feed-position="right"].feed-open:not(.rail-hidden) #settin
 
 /* ── Art column ─────────────────────────────────────────────────── */
 #homeRecents .game-card-hero{
-  width:46% !important; height:100% !important;
-  object-fit:cover !important; flex:0 0 46% !important;
+  /* 38%, not 46%: at 46% the column was 414x392 -- almost square, so
+     portrait art cropped a third of its height away. Narrower is much
+     closer to the 2:3 of library_600x900, so far less is lost. */
+  width:38% !important; height:100% !important;
+  object-fit:cover !important; object-position:center !important;
+  flex:0 0 38% !important;
   border-radius:0 !important;
   /* Positioned so it paints ABOVE the ambient ::before. A positioned
      pseudo with z-index:0 otherwise covers in-flow content, and the
@@ -55050,7 +55054,7 @@ body.double-dock[data-feed-position="right"].feed-open:not(.rail-hidden) #settin
   position:relative; z-index:1;
 }
 #homeRecents .game-card-placeholder{
-  width:46% !important; height:100% !important; flex:0 0 46%;
+  width:38% !important; height:100% !important; flex:0 0 38%;
   font-size:56px !important;
   position:relative; z-index:1;
 }
@@ -55079,7 +55083,7 @@ body.double-dock[data-feed-position="right"].feed-open:not(.rail-hidden) #settin
 /* Art bleeds into the detail column rather than stopping at a hard
    seam — the join is the thing that made the split look pasted. */
 #homeRecents .game-card::after{
-  content:''; position:absolute; top:0; bottom:0; left:46%;
+  content:''; position:absolute; top:0; bottom:0; left:38%;
   width:110px; pointer-events:none; z-index:1;
   background:linear-gradient(90deg, rgba(11,13,19,0), rgba(11,13,19,.92) 70%, #0b0d13);
 }
@@ -55229,16 +55233,30 @@ body.double-dock[data-feed-position="right"].feed-open:not(.rail-hidden) #settin
      of 404s in the console was, and why some cards fell back to the
      controller placeholder. Try the known locations in turn and take the
      first that loads, instead of giving up after one. */
+  /* Ordered by how well each asset survives THIS box, not by which is
+     most common. The art column is roughly square, so:
+
+       library_600x900  600x900 portrait — closest ratio, crops least,
+                        and it is the art Steam designs as the game's
+                        identity
+       capsule_616x353  616x353 — wider, but big enough not to soften
+       library_hero     3840x1240 — enormous, so always sharp, but 3.1:1
+                        means a very tight centre crop
+       header           460x215 — the old first choice, and the reason
+                        cards looked blurry: it has to scale up ~1.8x
+
+     capsule_231x87 is deliberately absent. At 231px wide it would be
+     smeared across a 340px column; a placeholder is honest, a smeared
+     thumbnail just looks broken. */
   function artUrls(appid){
     var A = 'https://cdn.cloudflare.steamstatic.com/steam/apps/' + appid + '/';
     var B = 'https://cdn.akamai.steamstatic.com/steam/apps/' + appid + '/';
     var C = 'https://shared.cloudflare.steamstatic.com/store_item_assets/steam/apps/' + appid + '/';
     return [
-      A + 'header.jpg',            C + 'header.jpg',            B + 'header.jpg',
-      A + 'capsule_616x353.jpg',   C + 'capsule_616x353.jpg',
-      A + 'library_hero.jpg',      C + 'library_hero.jpg',
-      A + 'library_600x900.jpg',   C + 'library_600x900.jpg',
-      A + 'capsule_231x87.jpg'
+      A + 'library_600x900.jpg',  C + 'library_600x900.jpg',  B + 'library_600x900.jpg',
+      A + 'capsule_616x353.jpg',  C + 'capsule_616x353.jpg',
+      A + 'library_hero.jpg',     C + 'library_hero.jpg',
+      A + 'header.jpg',           C + 'header.jpg',           B + 'header.jpg'
     ];
   }
 
@@ -55269,11 +55287,15 @@ body.double-dock[data-feed-position="right"].feed-open:not(.rail-hidden) #settin
       }
     }
 
-    // Already loaded fine — just feed the tint.
-    if (hero && hero.complete && hero.naturalWidth > 0){
-      card.style.setProperty('--rc-art', 'url("' + hero.src + '")');
-      return;
+    /* Tint immediately from whatever is already there, so the card has
+       colour while the better art is being probed. */
+    if (hero && hero.getAttribute('src')){
+      card.style.setProperty('--rc-art', 'url("' + hero.getAttribute('src') + '")');
     }
+    /* Deliberately NOT short-circuiting on "the current image loaded".
+       What loads by default is header.jpg at 460x215, which is exactly
+       the blurry case — the chain is run so a sharper asset can replace
+       it, and the existing image simply stays if nothing better exists. */
     if (!appid) return;
 
     var list = artUrls(appid), i = 0;
