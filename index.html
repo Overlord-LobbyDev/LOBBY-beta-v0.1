@@ -58628,8 +58628,11 @@ async function reactComment(ev, id, btn){
      ══════════════════════════════════════════════════════════════════ -->
 <style>
 .gl-logo{
-  display:block; width:auto; height:auto;
-  max-width:100%; max-height:76px;
+  /* Sized by the controller from the asset's real proportions, so the
+     two custom properties are the whole geometry. */
+  display:block;
+  width:var(--gl-w, auto); height:var(--gl-h, auto);
+  max-width:100%;
   object-fit:contain; object-position:left center;
   /* Logos are drawn for a store page, so most are light with
      transparency. A little shadow keeps a pale one from dissolving into
@@ -58642,10 +58645,13 @@ async function reactComment(ev, id, btn){
   font-size:0 !important; line-height:0 !important;
   letter-spacing:0 !important; text-shadow:none !important;
   min-height:0 !important; padding:0 !important;
-  margin:0 0 14px !important;
+  margin:0 0 10px !important;
 }
+/* Scaled from the computed size rather than re-capped, so a back card's
+   logo keeps the proportions the front card gave it. */
 #homeContent [data-home-slot="hero"] .game-card:not(.rc-active) .gl-logo{
-  max-height:40px;
+  width:calc(var(--gl-w, 200px) * .5);
+  height:calc(var(--gl-h, 40px) * .5);
 }
 </style>
 <script>
@@ -58670,6 +58676,44 @@ async function reactComment(ev, id, btn){
     ];
   }
 
+  /* THE SIZING PROBLEM. Logos have wildly different proportions —
+     TEKKEN 8's wordmark is about 3.5:1, Batman Arkham City's is nearer
+     4:3 — so capping width and height independently makes them look
+     nothing like each other. A wide logo hits max-width and reads
+     enormous; a squarer one hits max-height and reads tiny, even though
+     both are technically 'at their limit'.
+
+     What makes two shapes look equally important is not matching width
+     or matching height, it is matching AREA. So each logo is scaled to
+     cover roughly the same number of pixels, whatever its proportions,
+     and only then clamped to the space available.
+
+     Not solvable here: logos with a lot of transparent padding baked in
+     will still read small, because trimming to the ink would mean
+     reading pixels, and Steam's CDN sends no CORS headers — the canvas
+     would be tainted and getImageData would throw. */
+  var TARGET_AREA = 300 * 64;   // a 300x64 wordmark, as the reference
+  /* MAX_H is the binding constraint for a squarer lockup like Arkham
+     City, which cannot reach the target area without it. 92 is what the
+     detail column can spare once the stat strip, the achievement list
+     and the CTA have taken theirs. */
+  var MAX_W = 380, MAX_H = 92, MIN_H = 30;
+
+  function size(w, h){
+    if (!w || !h) return { w:260, h:64 };
+    var k = Math.sqrt(TARGET_AREA / (w * h));
+    var dw = w * k, dh = h * k;
+
+    // Then fit it to the space, keeping the ratio.
+    if (dw > MAX_W){ dh *= MAX_W / dw; dw = MAX_W; }
+    if (dh > MAX_H){ dw *= MAX_H / dh; dh = MAX_H; }
+    if (dh < MIN_H){
+      var up = MIN_H / dh;
+      if (dw * up <= MAX_W){ dw *= up; dh = MIN_H; }
+    }
+    return { w:Math.round(dw), h:Math.round(dh) };
+  }
+
   function fit(card){
     if (card.__logo) return;
     var nameEl = card.querySelector('.game-card-name');
@@ -58689,10 +58733,13 @@ async function reactComment(ev, id, btn){
         /* A one-pixel sentinel is not a wordmark. Steam answers some
            missing assets with a placeholder rather than a 404. */
         if (probe.naturalWidth < 40 || probe.naturalHeight < 12){ next(); return; }
+        var box = size(probe.naturalWidth, probe.naturalHeight);
         var img = document.createElement('img');
         img.className = 'gl-logo';
         img.src = url;
         img.alt = text;
+        img.style.setProperty('--gl-w', box.w + 'px');
+        img.style.setProperty('--gl-h', box.h + 'px');
         nameEl.setAttribute('title', text);
         nameEl.textContent = '';
         nameEl.classList.add('gl-has');
