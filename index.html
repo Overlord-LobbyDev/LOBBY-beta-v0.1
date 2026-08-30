@@ -64501,75 +64501,91 @@ async function reactComment(ev, id, btn){
   max-width:none !important;
 }
 
-#qMarquee{
-  position:relative; overflow:hidden;
-  height:clamp(460px, 64vh, 660px);
-  /* Centred, as in the mockup. Bottom-aligned pushed the copy onto the
-     darkest part of the gradient and left a band of dead air above it. */
-  display:flex; align-items:center;
-  margin:0;
-  border-bottom:1px solid rgba(255,255,255,.07);
-}
+#qMarquee{ position:relative; height:660px; overflow:hidden; margin:0; }
+@media (max-height:900px){ #qMarquee{ height:560px; } }
 #qArt{
   position:absolute !important; inset:0 !important; z-index:0 !important;
-  background-size:cover; background-position:center 26%;
+  background-size:cover; background-position:center 30%;
   opacity:0; transition:opacity .6s ease;
 }
 #qArt.on{ opacity:1; }
-/* Reads to transparent well before the right edge, so the key art holds
-   that half of the frame. That is what fills the space — not a panel. */
+/* Verbatim from the reference. The horizontal ramp reaches transparent
+   at 78% so the key art holds the right of the frame, and the vertical
+   one starts at 40% — there is no darkening at the TOP, which is what
+   I had wrongly added. */
 #qArt::after{
   content:''; position:absolute; inset:0;
   background:
-    linear-gradient(90deg, rgba(7,8,13,.96) 0%, rgba(7,8,13,.72) 42%,
-                    transparent 78%),
-    linear-gradient(180deg, rgba(7,8,13,.35) 0%, transparent 34%,
-                    rgba(7,8,13,.92) 100%);
+    linear-gradient(90deg, rgba(6,8,13,.96) 0%, rgba(6,8,13,.72) 42%, transparent 78%),
+    linear-gradient(180deg, transparent 40%, rgba(6,8,13,.92) 100%);
 }
 /* NOT "> *" — that outranks #qArt on specificity and drags the art
    layer back into flow with no height, which is exactly how the
    cinematic band went missing. */
 #qMq{
-  position:relative; z-index:1;
-  width:100%; padding:0 clamp(32px, 4vw, 76px);
-  margin:0;
+  position:relative; z-index:2; height:100%;
+  display:flex; flex-direction:column; justify-content:center;
+  padding:0 64px; max-width:760px;
 }
-#qMqMain{ max-width:600px; }
+#qMqMain{ display:contents; }
+@media (max-width:900px){ #qMq{ padding:0 28px; } }
 #queueOverlay .q-hero-title,
 #queueOverlay .q-hero-sub,
 #queueOverlay .q-camera-notice,
 #queueOverlay .q-hero-eyebrow{ display:none !important; }
 #qMqKick{
   font-family:'JetBrains Mono', ui-monospace, monospace;
-  font-size:10px; font-weight:700; letter-spacing:2.6px; text-transform:uppercase;
+  font-size:10px; font-weight:700; letter-spacing:2.4px; text-transform:uppercase;
   color:color-mix(in srgb, var(--hub-accent) 70%, white);
-  margin-bottom:14px;
+  margin-bottom:16px;
 }
 #qMqName{
   font-family:'Archivo', var(--font), sans-serif;
-  font-size:clamp(34px, 4.2vw, 58px); font-weight:900;
+  font-size:clamp(38px, 4.6vw, 62px); font-weight:900;
   text-transform:uppercase; letter-spacing:.5px; line-height:.98;
-  color:#fff; margin:0 0 14px;
-  text-shadow:0 4px 42px rgba(0,0,0,.92);
+  color:#fff; margin:0 0 16px;
+  text-shadow:0 4px 40px rgba(0,0,0,.9);
 }
 #qMqDesc{
-  font-size:15px; line-height:1.58; color:rgba(255,255,255,.74);
-  max-width:48ch; margin:0 0 24px;
+  font-size:15px; line-height:1.6; color:rgba(255,255,255,.76);
+  max-width:46ch; margin:0 0 26px;
 }
-#qMqStats{ display:flex; align-items:flex-end; margin:0 0 28px; }
-.qmq{ padding-right:24px; margin-right:24px; border-right:1px solid rgba(255,255,255,.15); }
-.qmq:last-child{ border-right:0; margin-right:0; padding-right:0; }
+#qMqStats{ display:flex; gap:0; margin:0 0 30px; }
+.qmq{ padding-right:26px; margin-right:26px; border-right:1px solid rgba(255,255,255,.14); }
+.qmq:last-child{ border:0; margin-right:0; padding-right:0; }
 .qmq b{
   display:block; font-family:'JetBrains Mono', ui-monospace, monospace;
-  font-size:23px; font-weight:800; color:#fff; line-height:1;
+  font-size:24px; font-weight:800; color:#fff; line-height:1;
   font-variant-numeric:tabular-nums;
 }
 .qmq span{
   display:block; margin-top:7px;
   font-family:'JetBrains Mono', ui-monospace, monospace;
-  font-size:9px; font-weight:700; letter-spacing:1.7px; text-transform:uppercase;
+  font-size:9px; font-weight:700; letter-spacing:1.6px; text-transform:uppercase;
   color:var(--text-3);
 }
+
+/* ── The filmstrip ─────────────────────────────────────────────────
+   The largest thing the reference has that this did not. It is a quick
+   switch inside the band; the deck below is the full browse, and having
+   both is the reference's own arrangement. */
+#qStrip{
+  position:absolute; left:0; right:0; bottom:0; z-index:3;
+  display:flex; gap:12px; padding:16px 64px 20px;
+  overflow-x:auto; overflow-y:hidden;
+  background:linear-gradient(180deg, transparent, rgba(6,8,13,.86));
+  scrollbar-width:none;
+}
+#qStrip::-webkit-scrollbar{ display:none; }
+.qmini{
+  flex:0 0 84px; height:118px; border-radius:10px; overflow:hidden; cursor:pointer;
+  border:1px solid rgba(255,255,255,.1); opacity:.55;
+  background-size:cover; background-position:center; background-color:#161a26;
+  transition:opacity .3s, transform .3s, border-color .3s;
+}
+.qmini:hover{ opacity:.85; }
+.qmini.on{ opacity:1; border-color:var(--hub-accent); transform:translateY(-6px); }
+@media (max-width:900px){ #qStrip{ padding:16px 28px 20px; } }
 #qMqBtns{ display:flex; align-items:center; gap:11px; flex-wrap:wrap; }
 
 /* How it works, and the rules, as one quiet line UNDER the band rather
@@ -65011,11 +65027,39 @@ async function reactComment(ev, id, btn){
     if (!m){
       m = document.createElement('section');
       m.id = 'qMarquee';
-      m.innerHTML = '<div id="qArt" aria-hidden="true"></div><div id="qMq"></div>';
+      m.innerHTML = '<div id="qArt" aria-hidden="true"></div>' +
+                    '<div id="qMq"></div>' +
+                    '<div id="qStrip"></div>';
       stage.insertBefore(m, stage.firstChild);
     }
     return !!document.getElementById('qMq');
   }
+
+  /* Covers along the foot of the band, exactly as the reference has
+     them. Same source as the deck, so the two always agree. */
+  function paintStrip(){
+    var strip = document.getElementById('qStrip');
+    if (!strip) return;
+    var src = deckSource(), s = S();
+    var sel = s ? s.game : '';
+    strip.innerHTML = src.map(function (g){
+      return '<div class="qmini' + (g.id === sel ? ' on' : '') + '" ' +
+        'title="' + esc(g.name) + '" onclick="window.qPickFromStrip(' + jsStr(g.id) + ')" ' +
+        'style="' + (g.cover ? 'background-image:' + url(g.cover) : '') + '"></div>';
+    }).join('');
+    var on = strip.querySelector('.qmini.on');
+    if (on && on.scrollIntoView) on.scrollIntoView({ block:'nearest', inline:'nearest' });
+  }
+
+  /* Picking from the strip moves the deck too, so the two never
+     disagree about what is selected. */
+  window.qPickFromStrip = function (id){
+    var src = deckSource();
+    var at = src.findIndex(function (g){ return g.id === id; });
+    if (at < 0) return;
+    idx = at;
+    commit();
+  };
 
   function paintMarquee(){
     if (!ensureMarquee()) return;
@@ -65059,6 +65103,7 @@ async function reactComment(ev, id, btn){
       '</div>' +
       '</div>';
 
+    paintStrip();
     paintHow();
 
     var btn = document.getElementById('qFind');
