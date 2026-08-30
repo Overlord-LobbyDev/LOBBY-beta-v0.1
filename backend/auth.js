@@ -3655,6 +3655,46 @@ app.get("/me/speedrun/pb", requireAuth, async (req, res) => {
 
 // The tiers the client offers, in order. Distance between them is what
 // "skill window" means.
+// ── Playlists ────────────────────────────────────────────────────
+//
+// Matching was on exact game AND exact party size. With 87 games in the
+// picker and sizes 2-10 that is 783 buckets two strangers have to land
+// in simultaneously, which at this scale means never. The tier window
+// widens with age; game and size never did, so the widening could not
+// save it.
+//
+// A playlist is a bucket people share on purpose: a pool of games and
+// one party size. Six of them instead of 783. Everyone queueing for
+// fighters is in ONE pool, so two people arriving five minutes apart
+// can still meet.
+//
+// Stored in queue_sessions.game as "pl:<id>", which needs no schema
+// change -- that column is text and already holds an arbitrary game id.
+// Exact-game queueing still works exactly as before for anyone who
+// wants one specific title and will wait for it.
+const Q_PLAYLISTS = [
+  { id: "fighters", name: "Fighters", sub: "One on one, any rank", players: 2,
+    games: ["tekken8","sf6","mk1","gg-strive","kof15","dbfz","naruto-storm","smash","melee"] },
+  { id: "duos", name: "Shooters · Duos", sub: "Two up, any rank", players: 2,
+    games: ["cs2","valorant","apex","cod-mw3","cod-bo6","fortnite","finals","r6siege","pubg"] },
+  { id: "squad", name: "Shooters · Squad", sub: "Four stack", players: 4,
+    games: ["apex","cod-mw3","cod-bo6","fortnite","finals","r6siege","pubg","battlefield2042","overwatch2","marvel-rivals"] },
+  { id: "arena", name: "MOBA & Arena", sub: "Lanes and drafts", players: 2,
+    games: ["lol","dota2","smite2","predecessor","tft","wildrift"] },
+  { id: "coop", name: "Co-op & Chill", sub: "No rank, no pressure", players: 3,
+    games: ["minecraft","palworld","lethal-company","deeprock","phasmophobia","valheim","enshrouded","terraria"] },
+  // Deliberately last and deliberately unfiltered. It is the pool that
+  // can always match, which is what makes an empty night survivable.
+  { id: "any", name: "Anything goes", sub: "Any game, any rank", players: 2, games: null },
+];
+function _qPlaylist(id) {
+  return Q_PLAYLISTS.find(p => p.id === String(id || "").toLowerCase()) || null;
+}
+function _qPlaylistIdOf(game) {
+  const g = String(game || "");
+  return g.startsWith("pl:") ? g.slice(3) : null;
+}
+
 const Q_TIERS = ["bronze","silver","gold","plat","diamond","master","pro"];
 const Q_SESSION_MAX_MS = 3 * 60 * 60 * 1000;   // the UI promises 3 hours
 
@@ -3716,10 +3756,16 @@ async function _qExpireIfStale(sess) {
 }
 
 function _qPayload(sess, members) {
+  const plId = _qPlaylistIdOf(sess.game);
+  const pl = plId ? _qPlaylist(plId) : null;
   return {
     queueId: sess.id,
     state: sess.state,
     game: sess.game,
+    // Null for an exact-game session. The client needs to know which
+    // it is: a playlist match agrees its title afterwards, an exact
+    // one already has it.
+    playlist: pl ? { id: pl.id, name: pl.name, sub: pl.sub, games: pl.games } : null,
     players: sess.players,
     skill: sess.skill,
     members,
@@ -3735,9 +3781,18 @@ function _qPayload(sess, members) {
 
 // POST /queue/intent — join a compatible session, or open one.
 app.post("/queue/intent", requireAuth, async (req, res) => {
-  const { game, players, skill, proof } = req.body || {};
-  if (!game) return res.status(400).json({ error: "game is required" });
-  const size = Math.max(2, Math.min(10, parseInt(players, 10) || 2));
+  const { playlist, game: rawGame, players, skill, proof } = req.body || {};
+
+  // A playlist fixes both halves of the bucket, which is the whole
+  // point of it: its id becomes the game, its size becomes the size,
+  // and everyone who picked it is therefore matchable with everyone
+  // else who picked it.
+  const pl = playlist ? _qPlaylist(playlist) : null;
+  if (playlist && !pl) return res.status(400).json({ error: "No such playlist" });
+
+  const game = pl ? ("pl:" + pl.id) : rawGame;
+  if (!game) return res.status(400).json({ error: "game or playlist is required" });
+  const size = pl ? pl.players : Math.max(2, Math.min(10, parseInt(players, 10) || 2));
   const tier = String(skill || "plat").toLowerCase();
 
   try {
@@ -3814,6 +3869,69 @@ app.post("/queue/intent", requireAuth, async (req, res) => {
   } catch (e) {
     console.error("[queue/intent]", e.message);
     res.status(500).json({ error: "Could not join the queue" });
+  }
+});
+
+// GET /queue/pulse -- who is waiting, right now.
+//
+// The old page could not answer the first question anyone has about
+// matchmaking: is anyone here? Nothing rendered a population and no
+// endpoint could have supplied one. This is that number.
+//
+// Honest about zero. An empty pool returns 0 and the page says so and
+// offers something else, rather than showing a spinner that implies
+// a search is closing in on something.
+//
+// Unauthenticated on purpose: it is an aggregate count with no names in
+// it, and the queue button wants to show a badge before anyone signs in.
+app.get("/queue/pulse", async (req, res) => {
+  try {
+    const r = await pool.query(`
+      SELECT s.game, s.players,
+             COUNT(m.user_id)::int      AS waiting,
+             COUNT(DISTINCT s.id)::int  AS sessions
+      FROM queue_sessions s
+      JOIN queue_members m
+        ON m.session_id = s.id AND m.left_at IS NULL
+      WHERE s.state = 'searching'
+        -- Sessions expire on read rather than by a sweeper, so a stale
+        -- one can still be marked searching. Excluded by age here, or
+        -- the pulse would count people who left hours ago.
+        AND s.created_at > NOW() - INTERVAL '3 hours'
+      GROUP BY s.game, s.players
+    `);
+
+    const playlists = {};
+    const games = {};
+    let total = 0;
+    for (const row of r.rows) {
+      const plId = _qPlaylistIdOf(row.game);
+      total += row.waiting;
+      if (plId) {
+        const cur = playlists[plId] || { waiting: 0, sessions: 0 };
+        cur.waiting += row.waiting; cur.sessions += row.sessions;
+        playlists[plId] = cur;
+      } else {
+        const cur = games[row.game] || { waiting: 0, sessions: 0 };
+        cur.waiting += row.waiting; cur.sessions += row.sessions;
+        games[row.game] = cur;
+      }
+    }
+
+    res.json({
+      total,
+      playlists,
+      games,
+      // Sent with the counts so the client never has to keep its own copy
+      // of the pool definitions in sync with this file.
+      definitions: Q_PLAYLISTS.map(p => ({
+        id: p.id, name: p.name, sub: p.sub, players: p.players,
+        games: p.games, gameCount: p.games ? p.games.length : null,
+      })),
+    });
+  } catch (e) {
+    console.error("[queue/pulse]", e.message);
+    res.json({ total: 0, playlists: {}, games: {}, definitions: [] });
   }
 });
 
