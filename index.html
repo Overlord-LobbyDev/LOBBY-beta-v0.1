@@ -62589,187 +62589,160 @@ async function reactComment(ev, id, btn){
 
 
 <!-- ══════════════════════════════════════════════════════════════════
-     THE TROPHY AND THE PLAY BUTTON
+     THE TROPHY AND THE PLAY BUTTON — second pass
 
-     Both were placeholders that shipped. The trophy was the 🏆 emoji,
-     which means it was rendered by the operating system: Segoe UI Emoji
-     on this machine, Apple Color Emoji on another, Noto on a third. It
-     sat in a stat cell built from Archivo and JetBrains Mono at exact
-     weights and could not be styled, scaled or coloured with them --
-     the one element on a considered card drawn by something else. It is
-     now a drawn mark that takes the card's own gold.
+     The first attempt made both of them louder and neither of them
+     Lobby's. Two specific mistakes, and they have the same root:
 
-     The Play button was a green rectangle. It is the most important
-     control on the front page -- the whole point of a card that says
-     you played this for 56 hours -- and it looked like a form submit.
-     It now has weight: a deeper green with a lit top edge and a shadow
-     that matches the light source, the glyph in its own disc, and a
-     sheen that crosses it on hover.
+     THE TROPHY WAS DRAWN IN THE WRONG STYLE. Every icon in this app is
+     a thin outline — fill:none, stroke:currentColor, stroke-width:2,
+     round caps. 164 of them. The trophy was a filled shape with a
+     four-stop gold gradient, an inner highlight and stacked drop
+     shadows: rendered well, and from a completely different icon set.
+     That is what made it read as generic. It is an outline now, at the
+     same weight as everything else on the card, coloured by the gold
+     the cell already uses — so it reads as this app's mark for
+     "finished" rather than as an illustration of a trophy.
 
-     ONE GRADIENT, DEFINED ONCE. SVG gradients are referenced by id, and
-     ten cards each carrying their own <defs> would be ten duplicate ids
-     -- valid enough that browsers resolve to the first, until the first
-     card is the one that scrolls out and gets removed, and every other
-     trophy turns black. A single hidden svg holds the definition and
-     every trophy points at it.
+     THE PLAY BUTTON WAS A FOREIGN COLOUR AT THE WRONG SIZE. Lobby's
+     primary action is the accent, everywhere, and nothing else on the
+     front page is green. A saturated lime slab with its own glow did
+     not read as important, it read as pasted in from another product —
+     and at 13px uppercase with a disc around the glyph it was bigger
+     than the card's own title deserved to compete with. It is now the
+     same shape and size as the button beside it, filled with the
+     accent, which is exactly how this app has always said "this is the
+     one to press".
+
+     Emphasis still comes from the pair: Play is filled, Steam is a
+     tint. That is a stronger signal than hue was, because it is the
+     signal the rest of the app already uses.
      ══════════════════════════════════════════════════════════════════ -->
 <style>
 /* ── The trophy ────────────────────────────────────────────────── */
 .rc-trophy{
   display:inline-flex; align-items:center; justify-content:center;
   line-height:1;
-  /* Lit from above like everything else on the card: a dark seat below
-     the mark, then a warm bloom around it. */
-  filter:drop-shadow(0 1px 0 rgba(0,0,0,.55))
-         drop-shadow(0 0 10px rgba(255,190,60,.55));
+  color:#ffcf5a;
+  /* One soft bloom, not a stack. The gold is already carrying the
+     meaning; the glow only stops it sitting flat on the panel. */
+  filter:drop-shadow(0 0 7px rgba(255,190,60,.45));
 }
-.rc-trophy svg{ display:block; width:100%; height:100%; overflow:visible; }
+.rc-trophy svg{ display:block; width:100%; height:100%; }
 #homeContent [data-home-slot="hero"] .rc-stat .rc-trophy{
   margin-left:auto !important;
   align-self:center;
-  width:30px !important; height:30px !important;
-  font-size:0 !important;   /* nothing left to size — it is a drawing now */
+  width:19px !important; height:19px !important;
+  font-size:0 !important;
 }
-/* The cell it lives in gets a matching lift rather than the mark
-   floating on a flat panel. */
+/* The cell keeps a trace of warmth so the mark is not floating on grey,
+   well below the level the gold figures sit at. */
 #homeContent [data-home-slot="hero"] .rc-stat.rc-stat-100{
   position:relative; overflow:hidden;
 }
 #homeContent [data-home-slot="hero"] .rc-stat.rc-stat-100::after{
   content:''; position:absolute; inset:0; pointer-events:none;
-  background:radial-gradient(70% 120% at 100% 50%,
-    rgba(255,200,80,.16) 0%, transparent 70%);
+  background:radial-gradient(80% 130% at 100% 50%,
+    rgba(255,200,80,.09) 0%, transparent 72%);
 }
 
 /* ── Play ──────────────────────────────────────────────────────── */
+/* Deliberately the same geometry as .rc-cta beside it. The difference
+   between them is fill versus tint, which is the contrast this app uses
+   for primary versus secondary everywhere else. */
 .rc-play{
-  position:relative; overflow:hidden;
-  padding:11px 20px 11px 14px !important;
-  border-radius:12px !important;
-  gap:10px !important;
-  font-size:13px !important; letter-spacing:.9px !important;
-  text-transform:uppercase;
-  color:#04240f !important;
-  background:linear-gradient(180deg,#4ade80 0%,#22c55e 52%,#15a34a 100%) !important;
-  box-shadow:
-    /* lit top edge, seated bottom edge, then the glow */
-    inset 0 1px 0 rgba(255,255,255,.62),
-    inset 0 -1px 0 rgba(0,0,0,.22),
-    0 2px 4px rgba(0,0,0,.35),
-    0 10px 24px rgba(34,197,94,.34) !important;
+  display:inline-flex; align-items:center; gap:7px;
+  padding:9px 16px; border-radius:10px; cursor:pointer;
+  font-family:'Archivo', var(--font), sans-serif;
+  font-size:11.5px; font-weight:800; letter-spacing:.6px;
+  color:#fff;
+  background:linear-gradient(180deg,
+    color-mix(in srgb, var(--accent) 88%, white) 0%,
+    var(--accent) 100%);
+  border:1px solid color-mix(in srgb, var(--accent) 72%, transparent);
+  box-shadow:inset 0 1px 0 rgba(255,255,255,.26),
+             0 4px 14px color-mix(in srgb, var(--accent) 26%, transparent);
+  transition:filter .18s ease, box-shadow .18s ease;
 }
 .rc-play:hover{
-  filter:brightness(1.06);
-  box-shadow:
-    inset 0 1px 0 rgba(255,255,255,.7),
-    inset 0 -1px 0 rgba(0,0,0,.22),
-    0 3px 6px rgba(0,0,0,.35),
-    0 14px 32px rgba(34,197,94,.46) !important;
+  filter:brightness(1.08);
+  box-shadow:inset 0 1px 0 rgba(255,255,255,.3),
+             0 6px 20px color-mix(in srgb, var(--accent) 38%, transparent);
 }
-/* The glyph gets its own disc, so the button reads as a control with a
-   part rather than a word with a triangle stuck to it. */
-.rc-play-disc{
-  display:inline-flex; align-items:center; justify-content:center;
-  width:23px; height:23px; border-radius:50%;
-  background:rgba(255,255,255,.34);
-  box-shadow:inset 0 1px 0 rgba(255,255,255,.5);
-  flex:0 0 auto;
-}
-.rc-play-disc svg{ width:10px !important; height:10px !important; margin-left:1.5px; }
-/* A sheen that crosses once on hover. */
-.rc-play::after{
-  content:''; position:absolute; top:0; bottom:0; left:-60%; width:45%;
-  background:linear-gradient(100deg, transparent, rgba(255,255,255,.42), transparent);
-  transform:skewX(-18deg);
-  transition:left .55s cubic-bezier(.22,1,.36,1);
-  pointer-events:none;
-}
-.rc-play:hover::after{ left:130%; }
+.rc-play:active{ filter:brightness(.96); }
+.rc-play svg{ width:10px; height:10px; flex:0 0 auto; }
 
-/* Steam sits beside it as the quieter option and matches its height. */
+/* Steam is the quiet half of the pair. */
 #homeContent [data-home-slot="hero"] .rc-actions .rc-cta{
-  padding:11px 17px !important;
-  border-radius:12px !important;
-  font-size:12px !important;
+  padding:9px 15px !important;
+  border-radius:10px !important;
+  font-size:11.5px !important; font-weight:700 !important;
+  background:rgba(255,255,255,.05) !important;
+  border:1px solid rgba(255,255,255,.12) !important;
+  color:rgba(255,255,255,.78) !important;
+}
+#homeContent [data-home-slot="hero"] .rc-actions .rc-cta:hover{
+  background:rgba(255,255,255,.1) !important;
+  color:#fff !important;
 }
 
-/* ── The disc on a grid card ───────────────────────────────────── */
+/* ── The grid card's launch control ────────────────────────────── */
 .rc-play-mini{
-  width:38px !important; height:38px !important;
-  border:0 !important;
-  background:linear-gradient(180deg,#4ade80 0%,#22c55e 52%,#15a34a 100%) !important;
-  color:#04240f !important;
-  box-shadow:
-    inset 0 1px 0 rgba(255,255,255,.6),
-    0 2px 4px rgba(0,0,0,.4),
-    0 8px 20px rgba(34,197,94,.4) !important;
+  width:30px !important; height:30px !important;
+  border:1px solid color-mix(in srgb, var(--accent) 62%, transparent) !important;
+  background:color-mix(in srgb, var(--accent) 82%, rgba(10,12,18,.6)) !important;
+  color:#fff !important;
+  box-shadow:0 4px 12px rgba(0,0,0,.45),
+             inset 0 1px 0 rgba(255,255,255,.22) !important;
+  backdrop-filter:blur(6px);
 }
-.rc-play-mini:hover{ filter:brightness(1.08); transform:scale(1.06) !important; }
+.rc-play-mini svg{ width:11px !important; height:11px !important; margin-left:1px; }
+.rc-play-mini:hover{ filter:brightness(1.1); transform:scale(1.06) !important; }
 
 @media (prefers-reduced-motion: reduce){
-  .rc-play::after{ transition:none; }
+  .rc-play, .rc-play-mini{ transition:none; }
 }
 </style>
 <script>
 (function () {
   'use strict';
 
-  /* The gradient every trophy points at, defined once. */
-  function defs(){
-    if (document.getElementById('lobbyGoldDefs')) return;
-    var wrap = document.createElement('div');
-    wrap.id = 'lobbyGoldDefs';
-    wrap.setAttribute('aria-hidden', 'true');
-    wrap.style.cssText = 'position:absolute;width:0;height:0;overflow:hidden';
-    wrap.innerHTML =
-      '<svg xmlns="http://www.w3.org/2000/svg"><defs>' +
-        '<linearGradient id="lobbyGold" x1="0" y1="0" x2="0" y2="1">' +
-          '<stop offset="0%" stop-color="#fff1b8"/>' +
-          '<stop offset="38%" stop-color="#ffd35c"/>' +
-          '<stop offset="72%" stop-color="#e8a520"/>' +
-          '<stop offset="100%" stop-color="#b3760c"/>' +
-        '</linearGradient>' +
-      '</defs></svg>';
-    document.body.appendChild(wrap);
-  }
-
+  /* fill:none, stroke:currentColor, stroke-width:2, round caps — the
+     same construction as the other 164 icons in this file, so it sits
+     in the set rather than beside it. */
   var TROPHY =
-    '<svg viewBox="0 0 24 24" fill="none" aria-hidden="true">' +
-      /* handles, behind the cup */
-      '<path d="M7.2 5.2H4.3v1.6a4 4 0 0 0 3.6 4" stroke="url(#lobbyGold)" ' +
-        'stroke-width="1.7" stroke-linecap="round"/>' +
-      '<path d="M16.8 5.2h2.9v1.6a4 4 0 0 1-3.6 4" stroke="url(#lobbyGold)" ' +
-        'stroke-width="1.7" stroke-linecap="round"/>' +
-      /* cup */
-      '<path d="M6.8 3.4h10.4v5.4a5.2 5.2 0 0 1-10.4 0V3.4Z" fill="url(#lobbyGold)"/>' +
-      /* the light on the left of the cup, which is what stops it reading flat */
-      '<path d="M8.5 4.6v4.2a3.5 3.5 0 0 0 1.5 2.9c-1.9-.5-3.2-2-3.2-3.9V4.6h1.7Z" ' +
-        'fill="#fff" fill-opacity=".34"/>' +
-      /* stem and base */
-      '<path d="M12 14v2.9" stroke="url(#lobbyGold)" stroke-width="1.9" stroke-linecap="round"/>' +
-      '<path d="M8.1 20.6h7.8l-.7-2.3a1.1 1.1 0 0 0-1.1-.8h-4.2a1.1 1.1 0 0 0-1.1.8l-.7 2.3Z" ' +
-        'fill="url(#lobbyGold)"/>' +
+    '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" ' +
+      'stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">' +
+      '<path d="M7 4h10v5a5 5 0 0 1-10 0V4Z"/>' +
+      '<path d="M7 6H4.5v1a3.5 3.5 0 0 0 3 3.4"/>' +
+      '<path d="M17 6h2.5v1a3.5 3.5 0 0 1-3 3.4"/>' +
+      '<path d="M12 14v3"/>' +
+      '<path d="M8.5 20h7"/>' +
+      '<path d="M10 17h4l.8 3h-5.6l.8-3Z"/>' +
     '</svg>';
 
-  var PLAY_DISC =
-    '<span class="rc-play-disc"><svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">' +
+  var PLAY =
+    '<svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">' +
       '<path d="M8 5.14v13.72a1 1 0 0 0 1.52.86l11.14-6.86a1 1 0 0 0 0-1.72L9.52 4.28A1 1 0 0 0 8 5.14z"/>' +
-    '</svg></span>';
+    '</svg>';
 
   function sweep(){
     /* The deck controller writes the emoji when it builds the stat row,
-       so this replaces it wherever it turns up rather than only once. */
+       so this replaces it wherever it appears rather than once at boot.
+       __gold2 rather than __gold: the previous pass marked elements with
+       the old flag, and a session that has already run it would
+       otherwise keep the filled trophy until reload. */
     document.querySelectorAll('.rc-trophy').forEach(function (el){
-      if (el.__gold) return;
-      el.__gold = true;
+      if (el.__gold2) return;
+      el.__gold2 = true;
       el.innerHTML = TROPHY;
       el.setAttribute('title', 'Every achievement unlocked');
       el.setAttribute('aria-label', 'Every achievement unlocked');
     });
     document.querySelectorAll('.rc-play').forEach(function (el){
-      if (el.__disc) return;
-      el.__disc = true;
-      el.innerHTML = PLAY_DISC + 'Play';
+      if (el.__disc2) return;
+      el.__disc2 = true;
+      el.innerHTML = PLAY + 'Play';
     });
   }
 
@@ -62780,7 +62753,6 @@ async function reactComment(ev, id, btn){
   }
 
   function start(){
-    defs();
     sweep();
     var host = document.getElementById('homeContent');
     if (!host) { setTimeout(start, 250); return; }
