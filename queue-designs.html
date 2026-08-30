@@ -1,0 +1,596 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Queue — three directions</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo:wght@500;700;800;900&family=JetBrains+Mono:wght@400;700;800&display=swap">
+<style>
+:root{
+  --bg-0:#07080d;
+  --bg-1:#0b0d14;
+  --bg-2:#12151f;
+  --accent:#a863ff;
+  --text-1:#f2f3f7;
+  --text-2:#a8adc0;
+  --text-3:#6b7086;
+  --line:rgba(255,255,255,.08);
+  --font:'Archivo',system-ui,sans-serif;
+}
+*{ box-sizing:border-box; }
+html,body{ margin:0; background:var(--bg-0); }
+body{
+  font-family:var(--font);
+  color:var(--text-2);
+  -webkit-font-smoothing:antialiased;
+}
+.mono{ font-family:'JetBrains Mono',ui-monospace,monospace; }
+
+/* ── Document chrome ─────────────────────────────────────────── */
+.doc{ max-width:1120px; margin:0 auto; padding:78px 32px 40px; }
+.eyebrow{
+  font-family:'JetBrains Mono',monospace;
+  font-size:10px; font-weight:700; letter-spacing:2.6px; text-transform:uppercase;
+  color:var(--accent); margin-bottom:18px;
+}
+h1{
+  font-size:clamp(34px,5.4vw,60px); font-weight:900; text-transform:uppercase;
+  letter-spacing:1.5px; line-height:1; color:var(--text-1); margin:0 0 20px;
+}
+.lede{ font-size:18px; line-height:1.6; max-width:62ch; margin:0 0 12px; }
+.lede b{ color:var(--text-1); font-weight:700; }
+
+.sec-head{ max-width:1120px; margin:0 auto; padding:96px 32px 26px; }
+.sec-n{
+  font-family:'JetBrains Mono',monospace;
+  font-size:11px; font-weight:800; letter-spacing:2.2px; text-transform:uppercase;
+  color:var(--accent); margin-bottom:14px;
+}
+h2{
+  font-size:clamp(26px,3.4vw,38px); font-weight:900; text-transform:uppercase;
+  letter-spacing:1.4px; color:var(--text-1); margin:0 0 14px; line-height:1.05;
+}
+.why{ font-size:16px; line-height:1.62; max-width:60ch; margin:0; }
+.why b{ color:var(--text-1); font-weight:700; }
+
+/* ── Mock frame ──────────────────────────────────────────────── */
+.frame{
+  position:relative; overflow:hidden;
+  margin:0 auto; max-width:1560px;
+  border:1px solid var(--line);
+  border-radius:18px;
+  background:var(--bg-1);
+  box-shadow:0 40px 100px -30px rgba(0,0,0,.9);
+}
+.frame-bar{
+  display:flex; align-items:center; gap:8px;
+  padding:11px 16px; border-bottom:1px solid var(--line);
+  background:rgba(255,255,255,.02);
+}
+.frame-bar i{ width:9px; height:9px; border-radius:50%; background:rgba(255,255,255,.14); }
+.frame-bar span{
+  margin-left:10px; font-family:'JetBrains Mono',monospace;
+  font-size:10px; letter-spacing:1.6px; text-transform:uppercase; color:var(--text-3);
+}
+.stage{ position:relative; min-height:660px; overflow:hidden; }
+
+/* Ambient wash — the thing Home actually does. */
+.wash{
+  position:absolute; inset:0 0 auto 0; height:78%;
+  background-size:cover; background-position:center 22%;
+  filter:blur(72px) saturate(1.7) brightness(.8);
+  opacity:.5; z-index:0;
+  -webkit-mask-image:linear-gradient(180deg,#000 0%,rgba(0,0,0,.6) 46%,transparent 92%);
+          mask-image:linear-gradient(180deg,#000 0%,rgba(0,0,0,.6) 46%,transparent 92%);
+  transition:background-image .6s ease;
+}
+.stage > *:not(.wash){ position:relative; z-index:1; }
+
+/* ── Shared bits ─────────────────────────────────────────────── */
+.kicker{
+  display:inline-flex; align-items:center; gap:10px;
+  font-family:'JetBrains Mono',monospace;
+  font-size:10px; font-weight:700; letter-spacing:2.2px; text-transform:uppercase;
+  color:var(--text-3);
+  padding:5px 13px; border-radius:99px;
+  background:rgba(255,255,255,.035); border:1px solid rgba(255,255,255,.07);
+}
+.kicker b{ color:#fff; font-weight:800; }
+.kicker .i{ color:color-mix(in srgb,var(--accent) 90%,white); font-weight:800; }
+.kicker .sep{ color:rgba(255,255,255,.18); }
+.title{
+  font-size:25px; font-weight:900; letter-spacing:2.2px; text-transform:uppercase;
+  color:#fff; line-height:1.06;
+  text-shadow:0 -1px 0 rgba(255,255,255,.3),0 1px 0 rgba(0,0,0,.55),
+              0 3px 7px rgba(0,0,0,.42),0 0 42px color-mix(in srgb,var(--accent) 34%,transparent);
+}
+.bar{
+  width:64px; height:3px; border-radius:99px; margin:11px auto;
+  background:linear-gradient(90deg,transparent,
+    color-mix(in srgb,var(--accent) 95%,white) 35%,
+    color-mix(in srgb,var(--accent) 95%,white) 65%,transparent);
+}
+.sub{ font-size:12.5px; color:var(--text-3); }
+.centred{ text-align:center; }
+.cta{
+  display:inline-flex; align-items:center; justify-content:center; gap:11px;
+  padding:15px 34px; border-radius:12px; border:0; cursor:pointer;
+  font-family:var(--font); font-size:13.5px; font-weight:900;
+  letter-spacing:1.6px; text-transform:uppercase; color:#0d0320;
+  background:linear-gradient(180deg,color-mix(in srgb,var(--accent) 94%,white),var(--accent));
+  box-shadow:0 14px 34px -8px color-mix(in srgb,var(--accent) 55%,transparent),
+             inset 0 1px 0 rgba(255,255,255,.45);
+}
+.ghost{
+  display:inline-flex; align-items:center; gap:8px;
+  padding:13px 20px; border-radius:12px; cursor:pointer;
+  font-size:12px; font-weight:700; letter-spacing:.6px; color:rgba(255,255,255,.78);
+  background:rgba(255,255,255,.05); border:1px solid rgba(255,255,255,.12);
+}
+.chip{
+  display:inline-flex; align-items:center; gap:6px;
+  padding:5px 11px; border-radius:7px;
+  font-family:'JetBrains Mono',monospace;
+  font-size:9.5px; font-weight:700; letter-spacing:1.1px; text-transform:uppercase;
+  color:var(--text-2); background:rgba(255,255,255,.055);
+  border:1px solid rgba(255,255,255,.08);
+}
+.dot{ width:7px;height:7px;border-radius:50%;background:#3ddc84;box-shadow:0 0 10px rgba(61,220,132,.85); }
+
+/* ══════════════════════════════════════════════════════════════
+   A — THE DECK
+   ══════════════════════════════════════════════════════════════ */
+.deck-wrap{ padding:38px 0 30px; }
+.deck{
+  position:relative; height:392px; margin:26px 0 0;
+}
+.dcard{
+  position:absolute; top:0; left:50%;
+  width:250px; height:375px; margin-left:-125px;
+  border-radius:16px; overflow:hidden; cursor:pointer;
+  background:#12151f; border:1px solid rgba(255,255,255,.09);
+  box-shadow:0 26px 60px -18px rgba(0,0,0,.85);
+  transform-origin:center center;
+  transition:transform .5s cubic-bezier(.22,1,.36,1),
+             filter .42s ease, box-shadow .42s ease, border-color .42s ease;
+  will-change:transform;
+}
+.dcard img{ width:100%; height:100%; object-fit:cover; display:block; }
+.dcard .cap{
+  position:absolute; left:0; right:0; bottom:0; padding:16px 16px 14px;
+  background:linear-gradient(180deg,transparent,rgba(6,8,13,.96));
+}
+.dcard .nm{ font-size:15px; font-weight:800; color:#fff; line-height:1.2; }
+.dcard .hr{
+  font-family:'JetBrains Mono',monospace; font-size:9.5px; font-weight:700;
+  letter-spacing:1.2px; text-transform:uppercase; color:rgba(255,255,255,.6); margin-top:5px;
+}
+.dcard.on{
+  border-color:rgba(255,255,255,.34);
+  box-shadow:0 0 0 1px color-mix(in srgb,var(--accent) 55%,transparent),
+             0 40px 90px -20px rgba(0,0,0,.95),
+             0 0 60px color-mix(in srgb,var(--accent) 22%,transparent);
+}
+.deck-nav{
+  position:absolute; top:50%; transform:translateY(-50%); z-index:40;
+  width:42px; height:42px; border-radius:50%;
+  display:flex; align-items:center; justify-content:center;
+  border:1px solid rgba(255,255,255,.14); background:rgba(10,13,18,.7);
+  backdrop-filter:blur(12px); color:#fff; cursor:pointer; font-size:18px;
+}
+.deck-nav.p{ left:40px; } .deck-nav.n{ right:40px; }
+.dots{ display:flex; justify-content:center; gap:7px; margin-top:22px; }
+.dots i{ width:7px;height:7px;border-radius:99px;background:rgba(255,255,255,.2);transition:width .3s,background .3s; }
+.dots i.on{ width:26px;background:var(--accent);box-shadow:0 0 12px color-mix(in srgb,var(--accent) 60%,transparent); }
+
+.setbar{
+  display:flex; align-items:center; justify-content:center; gap:10px; flex-wrap:wrap;
+  margin:30px auto 0; padding:14px 18px; max-width:900px;
+  border-radius:16px;
+  background:linear-gradient(160deg,rgba(255,255,255,.045),rgba(255,255,255,.015));
+  border:1px solid rgba(255,255,255,.08);
+}
+.seg{ display:flex; gap:4px; padding:4px; border-radius:11px; background:rgba(0,0,0,.35); }
+.seg b{
+  padding:8px 13px; border-radius:8px; cursor:pointer;
+  font-family:'JetBrains Mono',monospace; font-size:10px; font-weight:700;
+  letter-spacing:1.1px; text-transform:uppercase; color:var(--text-3);
+}
+.seg b.on{ background:var(--accent); color:#0d0320; }
+.vr{ width:1px; height:22px; background:rgba(255,255,255,.1); }
+
+/* ══════════════════════════════════════════════════════════════
+   B — THE MARQUEE
+   ══════════════════════════════════════════════════════════════ */
+.marq{ position:relative; height:660px; }
+.marq-art{
+  position:absolute; inset:0;
+  background-size:cover; background-position:center 30%;
+}
+.marq-art::after{
+  content:''; position:absolute; inset:0;
+  background:
+    linear-gradient(90deg,rgba(6,8,13,.96) 0%,rgba(6,8,13,.72) 42%,transparent 78%),
+    linear-gradient(180deg,transparent 40%,rgba(6,8,13,.92) 100%);
+}
+.marq-in{
+  position:relative; z-index:2; height:100%;
+  display:flex; flex-direction:column; justify-content:center;
+  padding:0 64px; max-width:760px;
+}
+.marq-eyebrow{
+  font-family:'JetBrains Mono',monospace; font-size:10px; font-weight:700;
+  letter-spacing:2.4px; text-transform:uppercase; color:color-mix(in srgb,var(--accent) 70%,white);
+  margin-bottom:16px;
+}
+.marq-t{
+  font-size:clamp(38px,4.6vw,62px); font-weight:900; text-transform:uppercase;
+  letter-spacing:.5px; line-height:.98; color:#fff; margin:0 0 16px;
+  text-shadow:0 4px 40px rgba(0,0,0,.9);
+}
+.marq-s{ font-size:15px; line-height:1.6; max-width:46ch; margin:0 0 26px; color:rgba(255,255,255,.76); }
+.marq-stats{ display:flex; gap:0; margin:0 0 30px; }
+.marq-stat{ padding-right:26px; margin-right:26px; border-right:1px solid rgba(255,255,255,.14); }
+.marq-stat:last-child{ border:0; }
+.marq-stat b{
+  display:block; font-family:'JetBrains Mono',monospace;
+  font-size:24px; font-weight:800; color:#fff; line-height:1;
+}
+.marq-stat span{
+  display:block; margin-top:7px; font-family:'JetBrains Mono',monospace;
+  font-size:9px; font-weight:700; letter-spacing:1.6px; text-transform:uppercase; color:var(--text-3);
+}
+.marq-strip{
+  position:absolute; left:0; right:0; bottom:0; z-index:3;
+  display:flex; gap:12px; padding:16px 64px 20px;
+  overflow:hidden;
+  background:linear-gradient(180deg,transparent,rgba(6,8,13,.86));
+}
+.marq-mini{
+  flex:0 0 84px; height:118px; border-radius:10px; overflow:hidden; cursor:pointer;
+  border:1px solid rgba(255,255,255,.1); opacity:.55;
+  transition:opacity .3s, transform .3s, border-color .3s;
+}
+.marq-mini img{ width:100%; height:100%; object-fit:cover; display:block; }
+.marq-mini.on{ opacity:1; border-color:var(--accent); transform:translateY(-6px); }
+
+/* ══════════════════════════════════════════════════════════════
+   C — THE TABLE
+   ══════════════════════════════════════════════════════════════ */
+.table-stage{ display:grid; grid-template-columns:300px 1fr; min-height:660px; }
+.table-side{
+  padding:34px 26px; border-right:1px solid var(--line);
+  background:rgba(255,255,255,.014);
+}
+.table-main{ position:relative; display:flex; flex-direction:column; align-items:center; justify-content:center; padding:40px; }
+.seats{ position:relative; width:430px; height:430px; }
+.seat{
+  position:absolute; width:92px; height:92px; margin:-46px 0 0 -46px;
+  border-radius:50%;
+  display:flex; align-items:center; justify-content:center;
+  border:1.5px dashed rgba(255,255,255,.18);
+  color:var(--text-3);
+  font-family:'JetBrains Mono',monospace; font-size:9px;
+  letter-spacing:1.2px; text-transform:uppercase;
+}
+.seat.filled{
+  border:2px solid rgba(255,255,255,.24); border-style:solid;
+  background:linear-gradient(135deg,#3a4a6b,#1a2030);
+  box-shadow:0 12px 30px rgba(0,0,0,.6);
+  overflow:hidden;
+}
+.seat.filled img{ width:100%;height:100%;object-fit:cover; }
+.seat.you{ border-color:var(--accent); box-shadow:0 0 0 2px color-mix(in srgb,var(--accent) 45%,transparent),0 12px 30px rgba(0,0,0,.6); }
+.table-core{
+  position:absolute; left:50%; top:50%; transform:translate(-50%,-50%);
+  width:196px; height:196px; border-radius:50%;
+  display:flex; flex-direction:column; align-items:center; justify-content:center;
+  background:radial-gradient(circle at 50% 35%,rgba(168,99,255,.22),rgba(10,12,20,.9) 70%);
+  border:1px solid rgba(255,255,255,.1);
+}
+.table-core b{ font-family:'JetBrains Mono',monospace; font-size:30px; font-weight:800; color:#fff; }
+.table-core span{
+  font-family:'JetBrains Mono',monospace; font-size:9px; font-weight:700;
+  letter-spacing:1.8px; text-transform:uppercase; color:var(--text-3); margin-top:8px;
+}
+.ring{
+  position:absolute; inset:0; border-radius:50%;
+  border:1px solid rgba(255,255,255,.06);
+}
+.ring.pulse{
+  border-color:color-mix(in srgb,var(--accent) 30%,transparent);
+  animation:ringPulse 2.6s ease-out infinite;
+}
+@keyframes ringPulse{
+  0%{ transform:scale(.82); opacity:.9; }
+  100%{ transform:scale(1.06); opacity:0; }
+}
+.sidegame{
+  border-radius:14px; overflow:hidden; margin-bottom:20px;
+  border:1px solid rgba(255,255,255,.1);
+}
+.sidegame img{ width:100%; display:block; }
+.slabel{
+  font-family:'JetBrains Mono',monospace; font-size:9px; font-weight:700;
+  letter-spacing:1.8px; text-transform:uppercase; color:var(--text-3);
+  margin:22px 0 9px;
+}
+
+.note{
+  max-width:1120px; margin:26px auto 0; padding:0 32px;
+  font-size:14.5px; line-height:1.62; color:var(--text-3);
+}
+.note b{ color:var(--text-2); }
+footer{ max-width:1120px; margin:0 auto; padding:80px 32px 120px; }
+
+@media (max-width:900px){
+  .table-stage{ grid-template-columns:1fr; }
+  .table-side{ border-right:0; border-bottom:1px solid var(--line); }
+  .marq-in{ padding:0 28px; }
+  .deck-nav{ display:none; }
+}
+@media (prefers-reduced-motion:reduce){
+  *{ animation:none!important; transition:none!important; }
+}
+</style>
+</head>
+<body>
+
+<div class="doc">
+  <div class="eyebrow">Lobby · Queue</div>
+  <h1>Three ways to make<br>Queue a moment</h1>
+  <p class="lede">
+    The glass version was decoration — aurora, frost and grain doing work the
+    content should be doing. <b>Home isn't beautiful because of effects. It has none.</b>
+    It's beautiful because one piece of game art is enormous, everything else recedes,
+    and the whole page takes its colour from whatever you're looking at.
+  </p>
+  <p class="lede">
+    All three below steal exactly that. Click the cards — they're live.
+  </p>
+</div>
+
+<!-- ═══ A ═══════════════════════════════════════════════════════ -->
+<div class="sec-head">
+  <div class="sec-n">Direction A</div>
+  <h2>The Deck</h2>
+  <p class="why">
+    Queue's picker <b>becomes Home's deck</b> — the same geometry, the same
+    recede-and-dim, the same wash. You already love this interaction; the argument is
+    that the game you're about to queue for deserves it more than a game you played
+    last week. Setup collapses to one bar underneath, because once the deck is the
+    hero nothing else should compete.
+  </p>
+</div>
+<div class="frame">
+  <div class="frame-bar"><i></i><i></i><i></i><span>Queue · The Deck</span></div>
+  <div class="stage">
+    <div class="wash" id="washA"></div>
+    <div class="deck-wrap">
+      <div class="centred">
+        <div class="title">Choose your game</div>
+        <div class="bar"></div>
+        <div class="kicker"><span class="i">01</span><span class="sep">/</span>
+          <span>Your Steam library</span><span class="sep">·</span><b>11</b> games</div>
+        <div class="sub" style="margin-top:9px">The games you actually play. Search for anything else.</div>
+      </div>
+      <div class="deck" id="deckA">
+        <button class="deck-nav p" onclick="stepA(-1)">‹</button>
+        <button class="deck-nav n" onclick="stepA(1)">›</button>
+      </div>
+      <div class="dots" id="dotsA"></div>
+      <div class="setbar">
+        <span class="chip">Players</span>
+        <div class="seg"><b>1v1</b><b class="on">2</b><b>3</b><b>4</b><b>5+</b></div>
+        <div class="vr"></div>
+        <span class="chip">Rank</span>
+        <div class="seg"><b>Any</b><b class="on">±1 tier</b><b>Exact</b></div>
+        <div class="vr"></div>
+        <button class="cta">Find players</button>
+      </div>
+    </div>
+  </div>
+</div>
+<p class="note">
+  <b>Why it wows:</b> it's the app's best interaction, pointed at the thing it's best
+  suited to. <b>Cost:</b> the deck controller already exists — this is largely reuse.
+</p>
+
+<!-- ═══ B ═══════════════════════════════════════════════════════ -->
+<div class="sec-head">
+  <div class="sec-n">Direction B</div>
+  <h2>The Marquee</h2>
+  <p class="why">
+    Full-bleed <b>library hero art</b> — the wide cinematic key art Steam ships, which
+    Lobby already fetches and currently only uses as a blurred wash. The game fills the
+    screen like a launcher's play screen; your setup and the live numbers sit on top of
+    it. The library becomes a filmstrip along the bottom.
+  </p>
+</div>
+<div class="frame">
+  <div class="frame-bar"><i></i><i></i><i></i><span>Queue · The Marquee</span></div>
+  <div class="stage">
+    <div class="marq">
+      <div class="marq-art" id="marqArt"></div>
+      <div class="marq-in">
+        <div class="marq-eyebrow">◆ Queueing for</div>
+        <h3 class="marq-t" id="marqName">Tekken 8</h3>
+        <p class="marq-s">
+          Two players, within one rank of you. The window widens the longer you wait —
+          any rank at all after three minutes.
+        </p>
+        <div class="marq-stats">
+          <div class="marq-stat"><b id="marqHrs">1786h</b><span>Your playtime</span></div>
+          <div class="marq-stat"><b>4</b><span>Waiting now</span></div>
+          <div class="marq-stat"><b>~40s</b><span>Typical wait</span></div>
+        </div>
+        <div style="display:flex;gap:11px;align-items:center">
+          <button class="cta">Find players</button>
+          <button class="ghost">Change game</button>
+        </div>
+      </div>
+      <div class="marq-strip" id="marqStrip"></div>
+    </div>
+  </div>
+</div>
+<p class="note">
+  <b>Why it wows:</b> nothing else in Lobby is full-bleed. It would be the most
+  cinematic screen in the app by a distance. <b>Cost:</b> needs hero art per title —
+  already resolved server-side, just unused at this size.
+</p>
+
+<!-- ═══ C ═══════════════════════════════════════════════════════ -->
+<div class="sec-head">
+  <div class="sec-n">Direction C</div>
+  <h2>The Table</h2>
+  <p class="why">
+    The one that's actually about <b>meeting strangers</b> rather than about picking a
+    game. Empty seats around a table, filling in real time as people arrive. The wait
+    stops being a spinner and becomes a thing you watch happen — and it's the only
+    direction here that has an obvious <b>NEXT</b> once you're seated.
+  </p>
+</div>
+<div class="frame">
+  <div class="frame-bar"><i></i><i></i><i></i><span>Queue · The Table · searching</span></div>
+  <div class="stage">
+    <div class="wash" id="washC"></div>
+    <div class="table-stage">
+      <aside class="table-side">
+        <div class="slabel" style="margin-top:0">Queueing for</div>
+        <div class="sidegame"><img id="sideArt" alt=""></div>
+        <div class="slabel">Matching window</div>
+        <div style="font-size:14px;color:#fff;font-weight:600">Gold – Diamond</div>
+        <div style="height:5px;border-radius:99px;background:rgba(255,255,255,.08);margin-top:11px;overflow:hidden">
+          <i style="display:block;height:100%;width:62%;border-radius:99px;background:linear-gradient(90deg,color-mix(in srgb,var(--accent) 70%,white),var(--accent))"></i>
+        </div>
+        <div class="mono" style="font-size:10px;letter-spacing:1.2px;text-transform:uppercase;color:var(--text-3);margin-top:10px">
+          Widens to any rank in 74s
+        </div>
+        <div class="slabel">Fast lane</div>
+        <div style="display:flex;flex-direction:column;gap:8px">
+          <div class="chip" style="justify-content:space-between;padding:11px 13px"><span>Fighters</span><span style="color:#3ddc84">6 waiting</span></div>
+          <div class="chip" style="justify-content:space-between;padding:11px 13px"><span>Anything goes</span><span style="color:#3ddc84">11 waiting</span></div>
+        </div>
+      </aside>
+      <div class="table-main">
+        <div class="seats" id="seats">
+          <div class="table-core">
+            <div class="ring pulse"></div>
+            <b id="seatCount">2/4</b>
+            <span>Forming</span>
+          </div>
+        </div>
+        <div style="display:flex;gap:11px;margin-top:34px">
+          <button class="ghost">Leave</button>
+          <button class="cta" style="padding:15px 30px">Next ▸</button>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+<p class="note">
+  <b>Why it wows:</b> it's the only one that looks like a social product rather than a
+  storefront, and it makes the <b>skip</b> mechanic obvious. <b>Cost:</b> most new
+  build — but the roster and fill endpoints already exist behind it.
+</p>
+
+<footer>
+  <p class="why" style="max-width:64ch">
+    <b>My call: A for the choosing, C for the waiting.</b> They're not competitors —
+    A is the screen before you press the button and C is the screen after. B is the most
+    striking single image but it's a storefront, and Queue isn't selling you a game.
+  </p>
+</footer>
+
+<script>
+const GAMES = [
+  { id:1778820, name:'Tekken 8',                hrs:'1786h' },
+  { id:3787240, name:'MARVEL Tōkon',            hrs:'85h'   },
+  { id:730,     name:'Counter-Strike 2',        hrs:'2824h' },
+  { id:1174180, name:'Red Dead Redemption 2',   hrs:'63h'   },
+  { id:976730,  name:'Halo: MCC',               hrs:'1h'    },
+  { id:2322010, name:'God of War Ragnarök',     hrs:'35h'   },
+  { id:3240220, name:'Grand Theft Auto V',      hrs:'4h'    },
+];
+const cap  = g => `https://cdn.cloudflare.steamstatic.com/steam/apps/${g.id}/library_600x900.jpg`;
+const hero = g => `https://cdn.cloudflare.steamstatic.com/steam/apps/${g.id}/library_hero.jpg`;
+
+/* ── A: the deck ─────────────────────────────────────────────── */
+let idxA = 0;
+const deckA = document.getElementById('deckA');
+GAMES.forEach((g,i) => {
+  const c = document.createElement('div');
+  c.className = 'dcard';
+  c.innerHTML = `<img src="${cap(g)}" alt="" loading="lazy">
+    <div class="cap"><div class="nm">${g.name}</div><div class="hr">${g.hrs} total</div></div>`;
+  c.onclick = () => { idxA = i; applyA(); };
+  deckA.appendChild(c);
+});
+function applyA(){
+  const cards = deckA.querySelectorAll('.dcard');
+  const n = cards.length;
+  cards.forEach((c,i) => {
+    let off = i - idxA;
+    if (off >  n/2) off -= n;
+    if (off < -n/2) off += n;
+    const a = Math.abs(off);
+    let x=0, s=1, b=1, sat=1, o=1, z=30;
+    if (a === 1){ x = off*220; s=.84; b=.62; sat=.7;  z=20; }
+    else if (a === 2){ x = (off/a)*390; s=.7; b=.44; sat=.5; z=10; }
+    else if (a > 2){ x = (off>0?600:-600); s=.62; o=0; z=1; }
+    c.style.transform = `translateX(${x}px) scale(${s})`;
+    c.style.filter = `brightness(${b}) saturate(${sat})`;
+    c.style.opacity = o;
+    c.style.zIndex = z;
+    c.classList.toggle('on', off === 0);
+  });
+  document.getElementById('washA').style.backgroundImage = `url('${hero(GAMES[idxA])}')`;
+  const dots = document.getElementById('dotsA');
+  dots.innerHTML = GAMES.map((_,i)=>`<i class="${i===idxA?'on':''}"></i>`).join('');
+}
+function stepA(d){ idxA = (idxA + d + GAMES.length) % GAMES.length; applyA(); }
+applyA();
+
+/* ── B: the marquee ──────────────────────────────────────────── */
+let idxB = 0;
+const strip = document.getElementById('marqStrip');
+GAMES.forEach((g,i) => {
+  const m = document.createElement('div');
+  m.className = 'marq-mini';
+  m.innerHTML = `<img src="${cap(g)}" alt="" loading="lazy">`;
+  m.onclick = () => { idxB = i; applyB(); };
+  strip.appendChild(m);
+});
+function applyB(){
+  const g = GAMES[idxB];
+  document.getElementById('marqArt').style.backgroundImage = `url('${hero(g)}')`;
+  document.getElementById('marqName').textContent = g.name;
+  document.getElementById('marqHrs').textContent = g.hrs;
+  strip.querySelectorAll('.marq-mini').forEach((m,i)=>m.classList.toggle('on', i===idxB));
+}
+applyB();
+
+/* ── C: the table ────────────────────────────────────────────── */
+const seats = document.getElementById('seats');
+const PEOPLE = [
+  'https://i.pravatar.cc/160?img=12',
+  'https://i.pravatar.cc/160?img=32',
+  null, null,
+];
+const R = 168;
+PEOPLE.forEach((p,i) => {
+  const ang = (-90 + i*(360/PEOPLE.length)) * Math.PI/180;
+  const el = document.createElement('div');
+  el.className = 'seat' + (p ? ' filled' : '') + (i===0 ? ' you' : '');
+  el.style.left = (215 + Math.cos(ang)*R) + 'px';
+  el.style.top  = (215 + Math.sin(ang)*R) + 'px';
+  el.innerHTML = p ? `<img src="${p}" alt="">` : 'Open';
+  seats.appendChild(el);
+});
+document.getElementById('sideArt').src = cap(GAMES[0]);
+document.getElementById('washC').style.backgroundImage = `url('${hero(GAMES[0])}')`;
+</script>
+</body>
+</html>
