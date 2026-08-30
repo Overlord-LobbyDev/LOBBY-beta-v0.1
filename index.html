@@ -65747,6 +65747,10 @@ async function reactComment(ev, id, btn){
   'use strict';
 
   var SKINS = [
+    /* The house skin first: geometry from Broadcast, material from
+       Glass, light from Arcade. The other three stay as the components
+       it was drawn from, which is what makes it comparable. */
+    { id:'fuse',    label:'Lobby'     },
     { id:'',        label:'Standard'  },
     { id:'glass',   label:'Glass'     },
     { id:'cast',    label:'Broadcast' },
@@ -65755,7 +65759,13 @@ async function reactComment(ev, id, btn){
   var KEY = 'lobby_queue_skin_v1';
 
   function current(){
-    try { return localStorage.getItem(KEY) || ''; } catch (e){ return ''; }
+    /* Default to the house skin, but never overwrite a choice already
+       made -- silently restyling someone's pick is worse than shipping
+       an option they have to find. */
+    try {
+      var v = localStorage.getItem(KEY);
+      return v === null ? 'fuse' : v;
+    } catch (e){ return 'fuse'; }
   }
 
   function apply(id){
@@ -65809,6 +65819,197 @@ async function reactComment(ev, id, btn){
   else start();
 })();
 </script>
+
+
+<!-- ══════════════════════════════════════════════════════════════════
+     QUEUE — THE HOUSE SKIN
+
+     A mix of the three, but not a stack of them. Layering every effect
+     from all three would give a frosted neon angled scanlined mess, so
+     each contributes the ONE thing it is actually best at and stands
+     down everywhere else.
+
+       GEOMETRY comes from Broadcast.  Cut corners, a 5px radius, an
+       accent slab down the left of every panel, headings skewed and
+       italic. This is the identity: "everything is a rounded rectangle"
+       is the loudest generated-design tell there is, and nothing here
+       is one.
+
+       MATERIAL comes from Glass.  Backdrop blur over a ground that is
+       genuinely coloured, a lit top edge, translucency. This is what
+       Arcade lacks — flat black has no depth — and what stops the hard
+       geometry reading as cheap.
+
+       LIGHT comes from Arcade.  Neon, but only on two things: the
+       accent edge and the numerals. Glow on everything is what makes
+       Arcade exhausting; glow on the figures is what makes a scoreboard
+       read as live.
+
+     THE SCANLINES MOVED INSIDE THE GLASS. Over the whole page they
+     fight the blur and dirty the artwork. As a texture layer on the
+     panels themselves they read as a display behind frosted acrylic,
+     which is the one detail here that belongs to no other product.
+
+     Drawn as a background layer rather than a pseudo-element, because
+     several of these panels already use ::before for the art wash or
+     the sequence chevron.
+     ══════════════════════════════════════════════════════════════════ -->
+<style>
+#queueOverlay.q-skin-fuse{
+  background:
+    radial-gradient(880px 620px at 10% -10%, rgba(168,99,255,.3) 0%, transparent 60%),
+    radial-gradient(700px 500px at 92% 4%, rgba(58,190,255,.17) 0%, transparent 58%),
+    radial-gradient(820px 560px at 68% 110%, rgba(255,72,160,.13) 0%, transparent 60%),
+    linear-gradient(168deg, #0b0916 0%, #07080f 100%) !important;
+}
+
+/* ── Panels: glass material, broadcast geometry ─────────────────── */
+#queueOverlay.q-skin-fuse .q-step-card,
+#queueOverlay.q-skin-fuse .qhow-row,
+#queueOverlay.q-skin-fuse .qhow-rules,
+#queueOverlay.q-skin-fuse #qPicked,
+#queueOverlay.q-skin-fuse #qPulse,
+#queueOverlay.q-skin-fuse .qp,
+#queueOverlay.q-skin-fuse .ql-search,
+#queueOverlay.q-skin-fuse .q-card{
+  /* The scanline is the element's own layer, sitting over the blurred
+     backdrop — a display seen through frosted acrylic. */
+  background:
+    repeating-linear-gradient(180deg,
+      rgba(255,255,255,.028) 0px, rgba(255,255,255,.028) 1px,
+      transparent 1px, transparent 3px),
+    rgba(255,255,255,.052) !important;
+  backdrop-filter:blur(24px) saturate(1.65);
+  -webkit-backdrop-filter:blur(24px) saturate(1.65);
+  border:1px solid rgba(255,255,255,.13) !important;
+  border-left:2px solid color-mix(in srgb, var(--hub-accent) 85%, transparent) !important;
+  border-radius:5px !important;
+  box-shadow:
+    inset 0 1px 0 rgba(255,255,255,.3),
+    inset 0 -1px 0 rgba(255,255,255,.05),
+    0 16px 44px rgba(0,0,0,.44),
+    -1px 0 18px color-mix(in srgb, var(--hub-accent) 26%, transparent) !important;
+}
+#queueOverlay.q-skin-fuse .q-step-card::before{ display:none !important; }
+
+/* The corner cut, on the two panels big enough to carry it. clip-path
+   removes the outer glow, so these keep their edge and inner light. */
+#queueOverlay.q-skin-fuse .qhow-row,
+#queueOverlay.q-skin-fuse #qPicked{
+  clip-path:polygon(0 0, 100% 0, 100% calc(100% - 18px), calc(100% - 18px) 100%, 0 100%);
+}
+#queueOverlay.q-skin-fuse .qhow + .qhow{ border-left:1px solid rgba(255,255,255,.11); }
+#queueOverlay.q-skin-fuse .qhow + .qhow::before{
+  background:rgba(24,20,44,.9);
+  border-top-color:rgba(255,255,255,.14);
+  border-right-color:rgba(255,255,255,.14);
+}
+
+/* ── Type: broadcast cut, arcade light ──────────────────────────── */
+#queueOverlay.q-skin-fuse .qh{ align-items:flex-start; text-align:left; }
+#queueOverlay.q-skin-fuse .qh-t,
+#queueOverlay.q-skin-fuse .q-step-label{
+  display:inline-block;
+  font-style:italic;
+  transform:skewX(-7deg);
+  letter-spacing:1.4px !important;
+  color:#fff !important;
+  text-shadow:
+    0 1px 0 rgba(0,0,0,.6),
+    0 0 18px color-mix(in srgb, var(--hub-accent) 55%, transparent),
+    0 0 46px color-mix(in srgb, var(--hub-accent) 30%, transparent) !important;
+}
+#queueOverlay.q-skin-fuse .qh-bar{
+  width:118px; height:2px; margin-top:10px; border-radius:0;
+  background:linear-gradient(90deg,
+    color-mix(in srgb, var(--hub-accent) 96%, white), transparent) !important;
+  box-shadow:0 0 12px color-mix(in srgb, var(--hub-accent) 70%, transparent);
+}
+#queueOverlay.q-skin-fuse .qh-k,
+#queueOverlay.q-skin-fuse .qrule{
+  border-radius:3px !important;
+  background:rgba(0,0,0,.34) !important;
+  border-color:rgba(255,255,255,.13) !important;
+  backdrop-filter:blur(10px);
+}
+
+/* Numerals glow. Nothing else does — that is the whole discipline. */
+#queueOverlay.q-skin-fuse #qPulse .n,
+#queueOverlay.q-skin-fuse .qp-c,
+#queueOverlay.q-skin-fuse .ql-hrs,
+#queueOverlay.q-skin-fuse .qh-k b,
+#queueOverlay.q-skin-fuse .qh-k .i,
+#queueOverlay.q-skin-fuse .q-step-val{
+  color:color-mix(in srgb, var(--hub-accent) 46%, white) !important;
+  text-shadow:0 0 14px color-mix(in srgb, var(--hub-accent) 75%, transparent);
+}
+#queueOverlay.q-skin-fuse #qPulse .n{ font-size:24px !important; letter-spacing:1px; }
+#queueOverlay.q-skin-fuse .qhow-n{
+  font-size:24px !important; top:10px !important;
+  color:color-mix(in srgb, var(--hub-accent) 20%, transparent) !important;
+}
+
+/* ── Parts ──────────────────────────────────────────────────────── */
+#queueOverlay.q-skin-fuse .qhow-ico{
+  border-radius:4px !important;
+  background:rgba(255,255,255,.1) !important;
+  border-color:color-mix(in srgb, var(--hub-accent) 46%, transparent) !important;
+  color:color-mix(in srgb, var(--hub-accent) 42%, white) !important;
+  box-shadow:inset 0 1px 0 rgba(255,255,255,.32),
+             0 0 18px color-mix(in srgb, var(--hub-accent) 26%, transparent);
+}
+#queueOverlay.q-skin-fuse .ql-card{
+  border-radius:5px !important;
+  border:1px solid rgba(255,255,255,.15) !important;
+  border-bottom:3px solid transparent !important;
+  box-shadow:inset 0 1px 0 rgba(255,255,255,.22), 0 14px 36px rgba(0,0,0,.5) !important;
+}
+#queueOverlay.q-skin-fuse .ql-card.on{
+  border-color:rgba(255,255,255,.24) !important;
+  border-bottom-color:var(--hub-accent) !important;
+  box-shadow:
+    inset 0 1px 0 rgba(255,255,255,.3),
+    0 0 0 1px color-mix(in srgb, var(--hub-accent) 60%, transparent),
+    0 0 34px color-mix(in srgb, var(--hub-accent) 34%, transparent) !important;
+}
+#queueOverlay.q-skin-fuse .q-skill-tile{
+  border-radius:4px !important;
+  background:rgba(255,255,255,.055) !important;
+  border-color:rgba(255,255,255,.13) !important;
+  backdrop-filter:blur(12px);
+  box-shadow:inset 0 1px 0 rgba(255,255,255,.2) !important;
+}
+#queueOverlay.q-skin-fuse .q-skill-tile.is-selected{
+  background:color-mix(in srgb, var(--qst-color) 16%, rgba(255,255,255,.05)) !important;
+  border-color:var(--qst-color) !important;
+  box-shadow:inset 0 1px 0 rgba(255,255,255,.26),
+             0 0 24px color-mix(in srgb, var(--qst-color) 34%, transparent) !important;
+}
+
+/* The commit: cut on both ends, glass fill, lit edge. */
+#queueOverlay.q-skin-fuse #qGo{
+  border-radius:3px !important;
+  clip-path:polygon(15px 0, 100% 0, calc(100% - 15px) 100%, 0 100%);
+  letter-spacing:2.4px !important;
+  color:#fff !important;
+  background:
+    linear-gradient(180deg,
+      color-mix(in srgb, var(--hub-accent) 72%, transparent),
+      color-mix(in srgb, var(--hub-accent) 42%, transparent)) !important;
+  border:0 !important;
+  box-shadow:inset 0 1px 0 rgba(255,255,255,.4) !important;
+  text-shadow:0 1px 2px rgba(0,0,0,.5);
+}
+#queueOverlay.q-skin-fuse #qGo:hover{ filter:brightness(1.14); }
+#queueOverlay.q-skin-fuse #qGo:disabled{ filter:grayscale(.6) brightness(.7); }
+
+#queueOverlay.q-skin-fuse .qskin.on{ border-radius:3px !important; }
+
+@media (prefers-reduced-motion: reduce){
+  #queueOverlay.q-skin-fuse .ql-card{ transition:none !important; }
+}
+</style>
+<!-- The switcher owns its own list; this skin is registered there. -->
 
 </body>
 </html>
