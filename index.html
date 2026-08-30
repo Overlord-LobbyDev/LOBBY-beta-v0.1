@@ -65449,369 +65449,301 @@ async function reactComment(ev, id, btn){
 </script>
 
 
+
+
+
+
+<!-- The switcher owns its own list; this skin is registered there. -->
+
+
 <!-- ══════════════════════════════════════════════════════════════════
-     QUEUE — FOUR SKINS, PICKED LIVE
+     QUEUE — GLASS, AND A FAST LANE ON THE RIGHT
 
-     "It still looks AI" is a fair read and worth naming precisely: the
-     page is dark panels, one radius on everything, hairline borders, a
-     violet accent, mono uppercase micro-labels, centred headings, even
-     spacing. None of that is bad. All of it is the DEFAULT dark-product
-     look, which is exactly why it reads as generated — nothing about it
-     is specific to matchmaking, or to games, or to Lobby.
+     Two changes, and the second one is the real one.
 
-     Describing alternatives is useless when the links to mockups will
-     not open, so the alternatives ship instead. A control at the top of
-     the page swaps between four complete treatments, live, on the real
-     data. Pick one and it sticks.
+     THE COLUMNS SWAP THEIR JOBS. Setup goes back into the main column
+     where there is room to lay it out, and the rail becomes the fast
+     lane: who is here, and six pools you can drop into without filling
+     anything in. That is the right split for what this page actually is
+     — Omegle for gamers — where the whole appeal is arriving somewhere
+     with a stranger in one action. The configured path stays for people
+     who want a specific game; the rail is for people who want to be in
+     a call in four seconds.
 
-       STANDARD   what is there now, as the control
-       GLASS      frosted panels floating over the page's own colour
-       BROADCAST  an esports lower-third: angled cuts, no radius
-       ARCADE     a cabinet: neon, scanlines, segment numerals
+     ONE SKIN, DONE PROPERLY. The switcher and the other four treatments
+     are gone. What makes glass read as expensive rather than as a CSS
+     effect is not the blur — everyone has the blur — it is what is
+     BEHIND it and what is ON it:
 
-     Each one changes MATERIAL, not layout. Nothing moves, so the
-     comparison is honest and any of them can be thrown away without
-     touching the structure underneath.
+       a ground that moves.  Three aurora fields drifting on a slow
+       cycle, so the frost has something to refract and the page is
+       never quite the same twice. Stopped entirely under
+       prefers-reduced-motion.
 
-     THE ANGLED AND THE SQUARE ONES ARE THE POINT. "Everything is a
-     rounded rectangle" is the single loudest generated-design tell, and
-     two of these break it outright rather than restyling within it.
+       grain.  A single tile of turbulence at 3.5%, over everything.
+       This is the one detail that separates real glass from plastic,
+       because nothing in the physical world is perfectly smooth.
+
+       specular light.  Each panel gets a bright hairline along its top
+       edge and a soft radial sheen in its upper-left, as if lit from
+       one place. That is what gives a surface a normal and a direction
+       rather than being a flat translucent rectangle.
+
+       layered depth.  Three levels of translucency, not one: the page,
+       the panels, and the controls on them. A single alpha for
+       everything is what makes glass UIs look like sheets of tinted
+       plastic stacked at random.
      ══════════════════════════════════════════════════════════════════ -->
 <style>
-/* ═══ The switcher ════════════════════════════════════════════════ */
-#qSkins{
-  display:flex; align-items:center; gap:7px; flex-wrap:wrap;
-  margin:0 0 20px; padding:0 2px;
+/* ═══ The ground ══════════════════════════════════════════════════ */
+#queueOverlay{
+  background:linear-gradient(168deg, #0a0812 0%, #06070d 100%) !important;
+  isolation:isolate;
 }
-#qSkins .l{
-  font-family:'JetBrains Mono', ui-monospace, monospace;
-  font-size:9.5px; font-weight:700; letter-spacing:2px; text-transform:uppercase;
-  color:var(--text-3); margin-right:5px;
+#qAurora{
+  position:absolute; inset:-20%; z-index:0; pointer-events:none;
+  filter:blur(90px) saturate(1.5);
+  opacity:.85;
 }
-.qskin{
-  padding:7px 14px; border-radius:99px; cursor:pointer;
-  font-family:'Archivo', var(--font), sans-serif;
-  font-size:11px; font-weight:800; letter-spacing:1.1px; text-transform:uppercase;
-  color:var(--text-3);
-  background:rgba(255,255,255,.035);
-  border:1px solid rgba(255,255,255,.08);
-  transition:color .16s ease, background .16s ease, border-color .16s ease;
+#qAurora i{
+  position:absolute; display:block; border-radius:50%;
+  mix-blend-mode:screen;
 }
-.qskin:hover{ color:#fff; border-color:rgba(255,255,255,.2); }
-.qskin.on{
-  color:#0b0416;
-  background:linear-gradient(180deg,
-    color-mix(in srgb, var(--hub-accent) 94%, white), var(--hub-accent));
-  border-color:transparent;
+#qAurora .a{
+  width:46%; height:56%; left:2%; top:-6%;
+  background:radial-gradient(circle at 50% 50%, rgba(168,99,255,.55), transparent 68%);
+  animation:qAurA 34s ease-in-out infinite alternate;
 }
+#qAurora .b{
+  width:40%; height:50%; right:4%; top:4%;
+  background:radial-gradient(circle at 50% 50%, rgba(52,180,255,.42), transparent 68%);
+  animation:qAurB 44s ease-in-out infinite alternate;
+}
+#qAurora .c{
+  width:52%; height:52%; left:32%; bottom:-14%;
+  background:radial-gradient(circle at 50% 50%, rgba(255,70,160,.32), transparent 68%);
+  animation:qAurC 52s ease-in-out infinite alternate;
+}
+@keyframes qAurA{ to{ transform:translate3d(9%, 7%, 0) scale(1.18); } }
+@keyframes qAurB{ to{ transform:translate3d(-11%, 10%, 0) scale(1.24); } }
+@keyframes qAurC{ to{ transform:translate3d(7%, -9%, 0) scale(1.14); } }
 
-/* ══════════════════════════════════════════════════════════════════
-   GLASS — frosted panels over the page's own colour
+/* Grain. One tile of turbulence over the lot — the single detail that
+   separates glass from plastic, because nothing real is perfectly
+   smooth. */
+#queueOverlay::after{
+  content:''; position:absolute; inset:0; z-index:60; pointer-events:none;
+  opacity:.035;
+  background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='140' height='140'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.85' numOctaves='3'/%3E%3C/filter%3E%3Crect width='140' height='140' filter='url(%23n)'/%3E%3C/svg%3E");
+}
+#queueOverlay > .q-hero,
+#queueOverlay > .q-body{ position:relative; z-index:1; }
 
-   Everything becomes a sheet of glass with a lit top edge, floating on
-   a ground that is actually coloured rather than near-black. The tell it
-   breaks is flatness: panels currently sit ON the background, and here
-   they sit ABOVE it with the background visible through them.
-   ══════════════════════════════════════════════════════════════════ */
-#queueOverlay.q-skin-glass{
-  background:
-    radial-gradient(900px 640px at 12% -8%, rgba(168,99,255,.34) 0%, transparent 62%),
-    radial-gradient(760px 520px at 88% 8%, rgba(64,190,255,.2) 0%, transparent 60%),
-    radial-gradient(900px 620px at 70% 108%, rgba(255,90,180,.16) 0%, transparent 62%),
-    linear-gradient(165deg, #0d0a18 0%, #0a0c14 100%) !important;
-}
-#queueOverlay.q-skin-glass .q-step-card,
-#queueOverlay.q-skin-glass .qhow-row,
-#queueOverlay.q-skin-glass .qhow-rules,
-#queueOverlay.q-skin-glass #qPicked,
-#queueOverlay.q-skin-glass #qPulse,
-#queueOverlay.q-skin-glass .qp,
-#queueOverlay.q-skin-glass .ql-search,
-#queueOverlay.q-skin-glass .q-card{
-  background:rgba(255,255,255,.055) !important;
-  backdrop-filter:blur(26px) saturate(1.7);
-  -webkit-backdrop-filter:blur(26px) saturate(1.7);
-  border:1px solid rgba(255,255,255,.16) !important;
-  border-radius:20px !important;
-  box-shadow:
-    inset 0 1px 0 rgba(255,255,255,.34),
-    inset 0 -1px 0 rgba(255,255,255,.06),
-    0 18px 50px rgba(0,0,0,.42) !important;
-}
-#queueOverlay.q-skin-glass .q-step-card::before,
-#queueOverlay.q-skin-glass .qhow + .qhow::before{ display:none !important; }
-#queueOverlay.q-skin-glass .qhow + .qhow{ border-left-color:rgba(255,255,255,.12); }
-#queueOverlay.q-skin-glass .ql-card{
-  border-radius:20px !important;
-  border:1px solid rgba(255,255,255,.18) !important;
-  box-shadow:inset 0 1px 0 rgba(255,255,255,.3), 0 16px 40px rgba(0,0,0,.5) !important;
-}
-#queueOverlay.q-skin-glass .qhow-ico{
-  border-radius:14px !important;
-  background:rgba(255,255,255,.12) !important;
-  border-color:rgba(255,255,255,.24) !important;
-  box-shadow:inset 0 1px 0 rgba(255,255,255,.4);
-}
-#queueOverlay.q-skin-glass .qrule,
-#queueOverlay.q-skin-glass .q-skill-tile{
-  background:rgba(255,255,255,.07) !important;
-  border-color:rgba(255,255,255,.16) !important;
-  backdrop-filter:blur(14px);
-  box-shadow:inset 0 1px 0 rgba(255,255,255,.24) !important;
-}
-#queueOverlay.q-skin-glass .q-skill-tile{ border-radius:16px !important; }
-#queueOverlay.q-skin-glass #qGo{
-  border-radius:18px !important;
-  background:rgba(255,255,255,.16) !important;
-  backdrop-filter:blur(20px) saturate(1.5);
-  border:1px solid rgba(255,255,255,.3) !important;
-  color:#fff !important;
-  box-shadow:inset 0 1px 0 rgba(255,255,255,.45), 0 14px 38px rgba(0,0,0,.4) !important;
-}
-#queueOverlay.q-skin-glass .qh-t{ text-shadow:0 2px 18px rgba(0,0,0,.5); }
-
-/* ══════════════════════════════════════════════════════════════════
-   BROADCAST — an esports lower-third
-
-   Angled cuts, near-zero radius, a solid accent slab down the left of
-   every heading, and numerals that behave like a scoreboard. This is
-   the one that breaks "everything is a rounded rectangle" hardest,
-   because nothing in it is one.
-   ══════════════════════════════════════════════════════════════════ */
-#queueOverlay.q-skin-cast .q-step-card,
-#queueOverlay.q-skin-cast .qhow-row,
-#queueOverlay.q-skin-cast .qhow-rules,
-#queueOverlay.q-skin-cast #qPicked,
-#queueOverlay.q-skin-cast #qPulse,
-#queueOverlay.q-skin-cast .qp,
-#queueOverlay.q-skin-cast .ql-search,
-#queueOverlay.q-skin-cast .q-card,
-#queueOverlay.q-skin-cast .ql-card,
-#queueOverlay.q-skin-cast .q-skill-tile{
-  border-radius:3px !important;
-}
-#queueOverlay.q-skin-cast .q-step-card,
-#queueOverlay.q-skin-cast .qhow-row,
-#queueOverlay.q-skin-cast #qPicked,
-#queueOverlay.q-skin-cast #qPulse,
-#queueOverlay.q-skin-cast .qp{
+/* ═══ The glass recipe ════════════════════════════════════════════ */
+/* Level two: panels. */
+#queueOverlay .q-step-card,
+#queueOverlay .qhow-row,
+#queueOverlay .qhow-rules,
+#queueOverlay #qPicked,
+#queueOverlay #qPulse,
+#queueOverlay .qp,
+#queueOverlay .ql-search,
+#queueOverlay .q-card{
   position:relative;
-  background:linear-gradient(100deg, rgba(255,255,255,.055), rgba(255,255,255,.012)) !important;
-  border:0 !important;
-  border-left:3px solid var(--hub-accent) !important;
-  box-shadow:0 1px 0 rgba(255,255,255,.06) inset, 0 12px 30px rgba(0,0,0,.4) !important;
-}
-#queueOverlay.q-skin-cast .q-step-card::before{ display:none !important; }
-/* The corner cut is what makes it read as broadcast rather than as a
-   card with a coloured edge. */
-#queueOverlay.q-skin-cast #qPicked,
-#queueOverlay.q-skin-cast .qhow-row{
-  clip-path:polygon(0 0, 100% 0, 100% calc(100% - 16px), calc(100% - 16px) 100%, 0 100%);
-}
-#queueOverlay.q-skin-cast .qh-t,
-#queueOverlay.q-skin-cast .q-step-label{
-  font-style:italic;
-  letter-spacing:1.2px !important;
-  transform:skewX(-6deg);
-  display:inline-block;
-}
-#queueOverlay.q-skin-cast .qh{ align-items:flex-start; text-align:left; }
-#queueOverlay.q-skin-cast .qh-bar{
-  width:100%; height:2px; margin-top:9px;
-  background:linear-gradient(90deg, var(--hub-accent), transparent 60%) !important;
-}
-#queueOverlay.q-skin-cast .qh-k{
-  border-radius:2px !important;
-  background:var(--hub-accent) !important;
-  border:0 !important;
-  color:#0b0416 !important;
-}
-#queueOverlay.q-skin-cast .qh-k b,
-#queueOverlay.q-skin-cast .qh-k .i,
-#queueOverlay.q-skin-cast .qh-k .sep{ color:#0b0416 !important; }
-#queueOverlay.q-skin-cast .qhow-ico{
-  border-radius:2px !important;
-  background:var(--hub-accent) !important;
-  color:#0b0416 !important; border:0 !important;
-}
-#queueOverlay.q-skin-cast .qhow-n{
-  font-size:26px !important; font-weight:800 !important;
-  color:rgba(255,255,255,.09) !important; top:8px !important;
-}
-#queueOverlay.q-skin-cast .qrule{
-  border-radius:2px !important; letter-spacing:1.6px !important;
-}
-#queueOverlay.q-skin-cast #qPulse .n{ font-size:26px !important; }
-#queueOverlay.q-skin-cast #qGo{
-  border-radius:2px !important;
-  clip-path:polygon(14px 0, 100% 0, calc(100% - 14px) 100%, 0 100%);
-  letter-spacing:2.4px !important;
-}
-#queueOverlay.q-skin-cast .ql-card{
-  border-radius:3px !important;
-  border-bottom:3px solid transparent !important;
-}
-#queueOverlay.q-skin-cast .ql-card.on{ border-bottom-color:var(--hub-accent) !important; }
-#queueOverlay.q-skin-cast .ql-hrs{ letter-spacing:1.6px !important; }
-
-/* ══════════════════════════════════════════════════════════════════
-   ARCADE — a cabinet
-
-   Neon on near-black, doubled outlines, scanlines over the whole page,
-   and numerals that glow like a segment display. The most committed of
-   the four and the least like anything else in the app, which is either
-   the point or the problem depending on your taste.
-   ══════════════════════════════════════════════════════════════════ */
-#queueOverlay.q-skin-arcade{
-  background:linear-gradient(170deg, #07060f 0%, #05070c 100%) !important;
-}
-#queueOverlay.q-skin-arcade::after{
-  content:''; position:absolute; inset:0; z-index:50; pointer-events:none;
-  background:repeating-linear-gradient(180deg,
-    rgba(255,255,255,.035) 0px, rgba(255,255,255,.035) 1px, transparent 1px, transparent 3px);
-  mix-blend-mode:overlay;
-}
-#queueOverlay.q-skin-arcade .q-step-card,
-#queueOverlay.q-skin-arcade .qhow-row,
-#queueOverlay.q-skin-arcade .qhow-rules,
-#queueOverlay.q-skin-arcade #qPicked,
-#queueOverlay.q-skin-arcade #qPulse,
-#queueOverlay.q-skin-arcade .qp,
-#queueOverlay.q-skin-arcade .ql-search,
-#queueOverlay.q-skin-arcade .q-card{
-  background:rgba(10,8,20,.72) !important;
-  border:1px solid color-mix(in srgb, var(--hub-accent) 46%, transparent) !important;
-  border-radius:6px !important;
+  background:rgba(255,255,255,.052) !important;
+  backdrop-filter:blur(30px) saturate(1.9);
+  -webkit-backdrop-filter:blur(30px) saturate(1.9);
+  border:1px solid rgba(255,255,255,.115) !important;
+  border-radius:22px !important;
   box-shadow:
-    0 0 0 1px rgba(0,0,0,.9),
-    inset 0 0 26px color-mix(in srgb, var(--hub-accent) 9%, transparent),
-    0 0 26px color-mix(in srgb, var(--hub-accent) 15%, transparent) !important;
+    /* the lit top edge, and a seated bottom one */
+    inset 0 1px 0 rgba(255,255,255,.34),
+    inset 0 -1px 0 rgba(255,255,255,.05),
+    /* a soft floor shadow, wide and weak */
+    0 24px 60px -18px rgba(0,0,0,.6),
+    0 2px 10px rgba(0,0,0,.28) !important;
 }
-#queueOverlay.q-skin-arcade .q-step-card::before{ display:none !important; }
-#queueOverlay.q-skin-arcade .qh-t,
-#queueOverlay.q-skin-arcade .q-step-label{
+/* Specular sheen: one light source, upper-left, on every surface. */
+#queueOverlay .q-step-card::after,
+#queueOverlay .qhow-row::after,
+#queueOverlay #qPulse::after,
+#queueOverlay .qp::after,
+#queueOverlay .q-card::after{
+  content:''; position:absolute; inset:0; z-index:0; pointer-events:none;
+  border-radius:inherit;
+  background:radial-gradient(120% 90% at 4% -8%,
+    rgba(255,255,255,.14) 0%, rgba(255,255,255,.04) 32%, transparent 62%);
+}
+#queueOverlay .q-step-card > *,
+#queueOverlay .qhow-row > *,
+#queueOverlay #qPulse > *,
+#queueOverlay .qp > *{ position:relative; z-index:1; }
+#queueOverlay .q-step-card::before{ display:none !important; }
+
+/* Level three: controls sitting ON the panels sit slightly brighter. */
+#queueOverlay .qrule,
+#queueOverlay .q-skill-tile,
+#queueOverlay .qh-k,
+#queueOverlay .q-input,
+#queueOverlay .q-stepper,
+#queueOverlay .qb-game,
+#queueOverlay .qhow-ico{
+  background:rgba(255,255,255,.085) !important;
+  border:1px solid rgba(255,255,255,.14) !important;
+  box-shadow:inset 0 1px 0 rgba(255,255,255,.24) !important;
+  backdrop-filter:blur(12px);
+}
+#queueOverlay .qrule, #queueOverlay .qh-k{ border-radius:99px !important; }
+#queueOverlay .q-skill-tile{ border-radius:16px !important; }
+#queueOverlay .qhow-ico{
+  border-radius:15px !important;
   color:#fff !important;
-  text-shadow:
-    0 0 6px color-mix(in srgb, var(--hub-accent) 90%, white),
-    0 0 22px color-mix(in srgb, var(--hub-accent) 70%, transparent),
-    0 0 48px color-mix(in srgb, var(--hub-accent) 45%, transparent) !important;
 }
-#queueOverlay.q-skin-arcade .qh-k,
-#queueOverlay.q-skin-arcade .qrule{
-  border-radius:3px !important;
-  background:rgba(0,0,0,.5) !important;
-  border-color:color-mix(in srgb, var(--hub-accent) 40%, transparent) !important;
+#queueOverlay .q-skill-tile.is-selected{
+  background:color-mix(in srgb, var(--qst-color) 22%, rgba(255,255,255,.08)) !important;
+  border-color:color-mix(in srgb, var(--qst-color) 70%, transparent) !important;
+  box-shadow:inset 0 1px 0 rgba(255,255,255,.3),
+             0 0 28px color-mix(in srgb, var(--qst-color) 30%, transparent) !important;
 }
-#queueOverlay.q-skin-arcade #qPulse .n,
-#queueOverlay.q-skin-arcade .qp-c,
-#queueOverlay.q-skin-arcade .ql-hrs{
-  color:color-mix(in srgb, var(--hub-accent) 60%, white) !important;
-  text-shadow:0 0 12px color-mix(in srgb, var(--hub-accent) 80%, transparent);
+
+/* Game cards are glass with the art behind them, not on a card. */
+#queueOverlay .ql-card{
+  border-radius:20px !important;
+  border:1px solid rgba(255,255,255,.16) !important;
+  box-shadow:
+    inset 0 1px 0 rgba(255,255,255,.3),
+    0 22px 52px -16px rgba(0,0,0,.68) !important;
 }
-#queueOverlay.q-skin-arcade #qPulse .n{ font-size:24px !important; letter-spacing:2px; }
-#queueOverlay.q-skin-arcade .qhow-ico{
-  border-radius:5px !important;
-  background:rgba(0,0,0,.55) !important;
-  border-color:color-mix(in srgb, var(--hub-accent) 60%, transparent) !important;
-  box-shadow:inset 0 0 16px color-mix(in srgb, var(--hub-accent) 22%, transparent),
-             0 0 16px color-mix(in srgb, var(--hub-accent) 26%, transparent);
+#queueOverlay .ql-card.on{
+  border-color:rgba(255,255,255,.4) !important;
+  box-shadow:
+    inset 0 1px 0 rgba(255,255,255,.42),
+    0 0 0 1px color-mix(in srgb, var(--hub-accent) 70%, transparent),
+    0 0 44px color-mix(in srgb, var(--hub-accent) 34%, transparent),
+    0 22px 52px -16px rgba(0,0,0,.7) !important;
 }
-#queueOverlay.q-skin-arcade .ql-card{
-  border-radius:6px !important;
-  border-color:rgba(255,255,255,.14) !important;
+#queueOverlay .ql-tick{ box-shadow:0 4px 14px rgba(0,0,0,.6), inset 0 1px 0 rgba(255,255,255,.45); }
+
+/* Headings sit on the glass, so they need their own light rather than
+   a hard shadow that would look printed on it. */
+#queueOverlay .qh-t{
+  text-shadow:0 1px 0 rgba(0,0,0,.4), 0 2px 30px rgba(0,0,0,.55),
+              0 0 60px color-mix(in srgb, var(--hub-accent) 28%, transparent) !important;
 }
-#queueOverlay.q-skin-arcade .ql-card.on{
-  border-color:var(--hub-accent) !important;
-  box-shadow:0 0 0 1px var(--hub-accent),
-             0 0 34px color-mix(in srgb, var(--hub-accent) 55%, transparent) !important;
+
+/* The commit: the one solid object on the page, so it reads as the
+   thing you press. */
+#queueOverlay #qGo{
+  border-radius:18px !important;
+  background:linear-gradient(180deg,
+    color-mix(in srgb, var(--hub-accent) 94%, white),
+    color-mix(in srgb, var(--hub-accent) 88%, #2a0b52)) !important;
+  border:1px solid rgba(255,255,255,.28) !important;
+  color:#0d0320 !important;
+  box-shadow:
+    inset 0 1px 0 rgba(255,255,255,.55),
+    0 16px 42px -10px color-mix(in srgb, var(--hub-accent) 52%, transparent),
+    0 2px 8px rgba(0,0,0,.4) !important;
 }
-#queueOverlay.q-skin-arcade .q-skill-tile{
-  border-radius:5px !important; background:rgba(0,0,0,.45) !important;
+#queueOverlay #qGo:disabled{
+  background:rgba(255,255,255,.07) !important;
+  color:rgba(255,255,255,.4) !important;
+  border-color:rgba(255,255,255,.1) !important;
+  box-shadow:inset 0 1px 0 rgba(255,255,255,.16) !important;
 }
-#queueOverlay.q-skin-arcade #qGo{
-  border-radius:5px !important;
-  background:rgba(10,8,20,.8) !important;
-  border:1px solid var(--hub-accent) !important;
-  color:color-mix(in srgb, var(--hub-accent) 40%, white) !important;
-  text-shadow:0 0 12px color-mix(in srgb, var(--hub-accent) 85%, transparent);
-  box-shadow:inset 0 0 24px color-mix(in srgb, var(--hub-accent) 18%, transparent),
-             0 0 30px color-mix(in srgb, var(--hub-accent) 30%, transparent) !important;
+
+/* ═══ The fast lane ═══════════════════════════════════════════════ */
+#qSide{ gap:14px !important; }
+#qLaneTitle{
+  display:flex; align-items:baseline; gap:10px; padding:2px 4px 0;
 }
+#qLaneTitle .t{
+  font-family:'Archivo', var(--font), sans-serif;
+  font-size:15px; font-weight:900; letter-spacing:1.6px; text-transform:uppercase;
+  color:#fff;
+  text-shadow:0 2px 24px rgba(0,0,0,.6),
+              0 0 44px color-mix(in srgb, var(--hub-accent) 32%, transparent);
+}
+#qLaneTitle .s{ font-size:11.5px; color:var(--text-3); }
+
+/* Pools become the rail's main content, so they get room to breathe. */
+#qSide #qPools{ margin:0 !important; padding:0 !important; border-top:0 !important; }
+#qSide #qPools .qh{ display:none !important; }
+#qSide .qp-row{ grid-template-columns:1fr !important; gap:10px !important; }
+#qSide .qp{ padding:15px 17px !important; border-radius:18px !important; }
+#qSide .qp-n{ font-size:14px !important; }
+#qSide .qp:hover{
+  border-color:rgba(255,255,255,.3) !important;
+  background:rgba(255,255,255,.1) !important;
+  transform:translateX(2px);
+}
+#qSide .qp{ transition:background .18s ease, border-color .18s ease, transform .18s ease; }
 
 @media (prefers-reduced-motion: reduce){
-  #queueOverlay.q-skin-arcade::after{ display:none; }
+  #qAurora .a, #qAurora .b, #qAurora .c{ animation:none !important; }
+  #qSide .qp{ transition:none; }
 }
 </style>
 <script>
 (function () {
   'use strict';
 
-  var SKINS = [
-    /* The house skin first: geometry from Broadcast, material from
-       Glass, light from Arcade. The other three stay as the components
-       it was drawn from, which is what makes it comparable. */
-    { id:'fuse',    label:'Lobby'     },
-    { id:'',        label:'Standard'  },
-    { id:'glass',   label:'Glass'     },
-    { id:'cast',    label:'Broadcast' },
-    { id:'arcade',  label:'Arcade'    },
-  ];
-  var KEY = 'lobby_queue_skin_v1';
-
-  function current(){
-    /* Default to the house skin, but never overwrite a choice already
-       made -- silently restyling someone's pick is worse than shipping
-       an option they have to find. */
-    try {
-      var v = localStorage.getItem(KEY);
-      return v === null ? 'fuse' : v;
-    } catch (e){ return 'fuse'; }
-  }
-
-  function apply(id){
+  function build(){
     var ov = document.getElementById('queueOverlay');
     if (!ov) return;
-    SKINS.forEach(function (s){ if (s.id) ov.classList.remove('q-skin-' + s.id); });
-    if (id) ov.classList.add('q-skin-' + id);
-    try { localStorage.setItem(KEY, id); } catch (e){}
-    render();
-  }
-  window.qSetSkin = apply;
 
-  function render(){
-    var host = document.getElementById('qSkins');
-    if (!host) return;
-    var cur = current();
-    host.innerHTML = '<span class="l">Look</span>' + SKINS.map(function (s){
-      return '<button type="button" class="qskin' + (s.id === cur ? ' on' : '') + '" ' +
-        'onclick="window.qSetSkin(\'' + s.id + '\')">' + s.label + '</button>';
-    }).join('');
-  }
-
-  function mount(){
-    var setup = document.getElementById('qViewSetup');
-    if (!setup) return;
-    if (!document.getElementById('qSkins')){
-      var el = document.createElement('div');
-      el.id = 'qSkins';
-      var how = document.getElementById('qHow');
-      if (how && how.parentNode) how.parentNode.insertBefore(el, how);
-      else setup.insertBefore(el, setup.firstChild);
+    if (!document.getElementById('qAurora')){
+      var a = document.createElement('div');
+      a.id = 'qAurora';
+      a.setAttribute('aria-hidden', 'true');
+      a.innerHTML = '<i class="a"></i><i class="b"></i><i class="c"></i>';
+      ov.insertBefore(a, ov.firstChild);
     }
-    apply(current());
+
+    /* The columns swap jobs: configuring goes back to the wide column,
+       and the rail becomes the one-click path. */
+    var main = document.getElementById('qMain');
+    var side = document.getElementById('qSide');
+    var pools = document.getElementById('qPools');
+    var go = document.getElementById('qGoWrap');
+    if (!main || !side || !pools) return;
+
+    if (!side.contains(pools)){
+      /* Setup and the commit belong with the choosing. */
+      Array.prototype.slice.call(side.children).forEach(function (el){
+        if (el.classList && el.classList.contains('q-step-card')) main.appendChild(el);
+      });
+      if (go) main.appendChild(go);
+
+      var title = document.getElementById('qLaneTitle');
+      if (!title){
+        title = document.createElement('div');
+        title.id = 'qLaneTitle';
+        title.innerHTML = '<span class="t">Fast lane</span>' +
+          '<span class="s">Skip the setup — drop straight in</span>';
+      }
+      side.appendChild(title);
+      side.appendChild(pools);
+    }
+
+    /* The rail no longer holds a form, so it does not need to scroll
+       against the viewport or hide its own heading. */
+    side.style.maxHeight = 'none';
+    side.style.overflowY = 'visible';
+    var st = document.getElementById('qSideTitle');
+    if (st) st.style.display = 'none';
   }
 
   function start(){
     var orig = window.openQueuePanel;
     if (typeof orig !== 'function'){ setTimeout(start, 300); return; }
-    if (orig.__skins) return;
+    if (orig.__glass) return;
     var wrapped = function (){
       var out = orig.apply(this, arguments);
-      /* After v4's tidy(), which inserts #qHow. */
-      setTimeout(mount, 10);
+      setTimeout(build, 20);
       return out;
     };
-    wrapped.__skins = true;
+    wrapped.__glass = true;
     window.openQueuePanel = wrapped;
   }
 
@@ -65819,197 +65751,6 @@ async function reactComment(ev, id, btn){
   else start();
 })();
 </script>
-
-
-<!-- ══════════════════════════════════════════════════════════════════
-     QUEUE — THE HOUSE SKIN
-
-     A mix of the three, but not a stack of them. Layering every effect
-     from all three would give a frosted neon angled scanlined mess, so
-     each contributes the ONE thing it is actually best at and stands
-     down everywhere else.
-
-       GEOMETRY comes from Broadcast.  Cut corners, a 5px radius, an
-       accent slab down the left of every panel, headings skewed and
-       italic. This is the identity: "everything is a rounded rectangle"
-       is the loudest generated-design tell there is, and nothing here
-       is one.
-
-       MATERIAL comes from Glass.  Backdrop blur over a ground that is
-       genuinely coloured, a lit top edge, translucency. This is what
-       Arcade lacks — flat black has no depth — and what stops the hard
-       geometry reading as cheap.
-
-       LIGHT comes from Arcade.  Neon, but only on two things: the
-       accent edge and the numerals. Glow on everything is what makes
-       Arcade exhausting; glow on the figures is what makes a scoreboard
-       read as live.
-
-     THE SCANLINES MOVED INSIDE THE GLASS. Over the whole page they
-     fight the blur and dirty the artwork. As a texture layer on the
-     panels themselves they read as a display behind frosted acrylic,
-     which is the one detail here that belongs to no other product.
-
-     Drawn as a background layer rather than a pseudo-element, because
-     several of these panels already use ::before for the art wash or
-     the sequence chevron.
-     ══════════════════════════════════════════════════════════════════ -->
-<style>
-#queueOverlay.q-skin-fuse{
-  background:
-    radial-gradient(880px 620px at 10% -10%, rgba(168,99,255,.3) 0%, transparent 60%),
-    radial-gradient(700px 500px at 92% 4%, rgba(58,190,255,.17) 0%, transparent 58%),
-    radial-gradient(820px 560px at 68% 110%, rgba(255,72,160,.13) 0%, transparent 60%),
-    linear-gradient(168deg, #0b0916 0%, #07080f 100%) !important;
-}
-
-/* ── Panels: glass material, broadcast geometry ─────────────────── */
-#queueOverlay.q-skin-fuse .q-step-card,
-#queueOverlay.q-skin-fuse .qhow-row,
-#queueOverlay.q-skin-fuse .qhow-rules,
-#queueOverlay.q-skin-fuse #qPicked,
-#queueOverlay.q-skin-fuse #qPulse,
-#queueOverlay.q-skin-fuse .qp,
-#queueOverlay.q-skin-fuse .ql-search,
-#queueOverlay.q-skin-fuse .q-card{
-  /* The scanline is the element's own layer, sitting over the blurred
-     backdrop — a display seen through frosted acrylic. */
-  background:
-    repeating-linear-gradient(180deg,
-      rgba(255,255,255,.028) 0px, rgba(255,255,255,.028) 1px,
-      transparent 1px, transparent 3px),
-    rgba(255,255,255,.052) !important;
-  backdrop-filter:blur(24px) saturate(1.65);
-  -webkit-backdrop-filter:blur(24px) saturate(1.65);
-  border:1px solid rgba(255,255,255,.13) !important;
-  border-left:2px solid color-mix(in srgb, var(--hub-accent) 85%, transparent) !important;
-  border-radius:5px !important;
-  box-shadow:
-    inset 0 1px 0 rgba(255,255,255,.3),
-    inset 0 -1px 0 rgba(255,255,255,.05),
-    0 16px 44px rgba(0,0,0,.44),
-    -1px 0 18px color-mix(in srgb, var(--hub-accent) 26%, transparent) !important;
-}
-#queueOverlay.q-skin-fuse .q-step-card::before{ display:none !important; }
-
-/* The corner cut, on the two panels big enough to carry it. clip-path
-   removes the outer glow, so these keep their edge and inner light. */
-#queueOverlay.q-skin-fuse .qhow-row,
-#queueOverlay.q-skin-fuse #qPicked{
-  clip-path:polygon(0 0, 100% 0, 100% calc(100% - 18px), calc(100% - 18px) 100%, 0 100%);
-}
-#queueOverlay.q-skin-fuse .qhow + .qhow{ border-left:1px solid rgba(255,255,255,.11); }
-#queueOverlay.q-skin-fuse .qhow + .qhow::before{
-  background:rgba(24,20,44,.9);
-  border-top-color:rgba(255,255,255,.14);
-  border-right-color:rgba(255,255,255,.14);
-}
-
-/* ── Type: broadcast cut, arcade light ──────────────────────────── */
-#queueOverlay.q-skin-fuse .qh{ align-items:flex-start; text-align:left; }
-#queueOverlay.q-skin-fuse .qh-t,
-#queueOverlay.q-skin-fuse .q-step-label{
-  display:inline-block;
-  font-style:italic;
-  transform:skewX(-7deg);
-  letter-spacing:1.4px !important;
-  color:#fff !important;
-  text-shadow:
-    0 1px 0 rgba(0,0,0,.6),
-    0 0 18px color-mix(in srgb, var(--hub-accent) 55%, transparent),
-    0 0 46px color-mix(in srgb, var(--hub-accent) 30%, transparent) !important;
-}
-#queueOverlay.q-skin-fuse .qh-bar{
-  width:118px; height:2px; margin-top:10px; border-radius:0;
-  background:linear-gradient(90deg,
-    color-mix(in srgb, var(--hub-accent) 96%, white), transparent) !important;
-  box-shadow:0 0 12px color-mix(in srgb, var(--hub-accent) 70%, transparent);
-}
-#queueOverlay.q-skin-fuse .qh-k,
-#queueOverlay.q-skin-fuse .qrule{
-  border-radius:3px !important;
-  background:rgba(0,0,0,.34) !important;
-  border-color:rgba(255,255,255,.13) !important;
-  backdrop-filter:blur(10px);
-}
-
-/* Numerals glow. Nothing else does — that is the whole discipline. */
-#queueOverlay.q-skin-fuse #qPulse .n,
-#queueOverlay.q-skin-fuse .qp-c,
-#queueOverlay.q-skin-fuse .ql-hrs,
-#queueOverlay.q-skin-fuse .qh-k b,
-#queueOverlay.q-skin-fuse .qh-k .i,
-#queueOverlay.q-skin-fuse .q-step-val{
-  color:color-mix(in srgb, var(--hub-accent) 46%, white) !important;
-  text-shadow:0 0 14px color-mix(in srgb, var(--hub-accent) 75%, transparent);
-}
-#queueOverlay.q-skin-fuse #qPulse .n{ font-size:24px !important; letter-spacing:1px; }
-#queueOverlay.q-skin-fuse .qhow-n{
-  font-size:24px !important; top:10px !important;
-  color:color-mix(in srgb, var(--hub-accent) 20%, transparent) !important;
-}
-
-/* ── Parts ──────────────────────────────────────────────────────── */
-#queueOverlay.q-skin-fuse .qhow-ico{
-  border-radius:4px !important;
-  background:rgba(255,255,255,.1) !important;
-  border-color:color-mix(in srgb, var(--hub-accent) 46%, transparent) !important;
-  color:color-mix(in srgb, var(--hub-accent) 42%, white) !important;
-  box-shadow:inset 0 1px 0 rgba(255,255,255,.32),
-             0 0 18px color-mix(in srgb, var(--hub-accent) 26%, transparent);
-}
-#queueOverlay.q-skin-fuse .ql-card{
-  border-radius:5px !important;
-  border:1px solid rgba(255,255,255,.15) !important;
-  border-bottom:3px solid transparent !important;
-  box-shadow:inset 0 1px 0 rgba(255,255,255,.22), 0 14px 36px rgba(0,0,0,.5) !important;
-}
-#queueOverlay.q-skin-fuse .ql-card.on{
-  border-color:rgba(255,255,255,.24) !important;
-  border-bottom-color:var(--hub-accent) !important;
-  box-shadow:
-    inset 0 1px 0 rgba(255,255,255,.3),
-    0 0 0 1px color-mix(in srgb, var(--hub-accent) 60%, transparent),
-    0 0 34px color-mix(in srgb, var(--hub-accent) 34%, transparent) !important;
-}
-#queueOverlay.q-skin-fuse .q-skill-tile{
-  border-radius:4px !important;
-  background:rgba(255,255,255,.055) !important;
-  border-color:rgba(255,255,255,.13) !important;
-  backdrop-filter:blur(12px);
-  box-shadow:inset 0 1px 0 rgba(255,255,255,.2) !important;
-}
-#queueOverlay.q-skin-fuse .q-skill-tile.is-selected{
-  background:color-mix(in srgb, var(--qst-color) 16%, rgba(255,255,255,.05)) !important;
-  border-color:var(--qst-color) !important;
-  box-shadow:inset 0 1px 0 rgba(255,255,255,.26),
-             0 0 24px color-mix(in srgb, var(--qst-color) 34%, transparent) !important;
-}
-
-/* The commit: cut on both ends, glass fill, lit edge. */
-#queueOverlay.q-skin-fuse #qGo{
-  border-radius:3px !important;
-  clip-path:polygon(15px 0, 100% 0, calc(100% - 15px) 100%, 0 100%);
-  letter-spacing:2.4px !important;
-  color:#fff !important;
-  background:
-    linear-gradient(180deg,
-      color-mix(in srgb, var(--hub-accent) 72%, transparent),
-      color-mix(in srgb, var(--hub-accent) 42%, transparent)) !important;
-  border:0 !important;
-  box-shadow:inset 0 1px 0 rgba(255,255,255,.4) !important;
-  text-shadow:0 1px 2px rgba(0,0,0,.5);
-}
-#queueOverlay.q-skin-fuse #qGo:hover{ filter:brightness(1.14); }
-#queueOverlay.q-skin-fuse #qGo:disabled{ filter:grayscale(.6) brightness(.7); }
-
-#queueOverlay.q-skin-fuse .qskin.on{ border-radius:3px !important; }
-
-@media (prefers-reduced-motion: reduce){
-  #queueOverlay.q-skin-fuse .ql-card{ transition:none !important; }
-}
-</style>
-<!-- The switcher owns its own list; this skin is registered there. -->
 
 </body>
 </html>
