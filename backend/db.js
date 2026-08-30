@@ -681,6 +681,20 @@ async function initDb() {
       );
     `);
 
+    // Filters added after the table shipped. Idempotent, so an existing
+    // database picks them up on the next boot.
+    //
+    // NULL means "no preference" throughout, which is what makes the
+    // matching rule symmetrical: two sides agree when either has no
+    // preference or both want the same thing. A default of 'casual'
+    // would silently exclude everyone who never touched the control.
+    await pool.query(`
+      ALTER TABLE queue_sessions ADD COLUMN IF NOT EXISTS mic       BOOLEAN DEFAULT NULL;
+      ALTER TABLE queue_sessions ADD COLUMN IF NOT EXISTS playstyle TEXT    DEFAULT NULL;
+      ALTER TABLE queue_sessions ADD COLUMN IF NOT EXISTS mode      TEXT    DEFAULT NULL;
+      ALTER TABLE queue_sessions ADD COLUMN IF NOT EXISTS width     TEXT    DEFAULT NULL;
+    `);
+
     await pool.query(`
       CREATE TABLE IF NOT EXISTS queue_members (
         id         SERIAL PRIMARY KEY,

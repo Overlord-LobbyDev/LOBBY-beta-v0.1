@@ -3878,6 +3878,29 @@ function _qWindowFor(ageMs) {
   return Q_TIERS.length;   // past three minutes, take anyone
 }
 
+// The tier window a side is willing to accept, given how long it has
+// waited and what it asked for.
+//
+//   strict  never widens -- exact tier or nothing
+//   ±1      floors at one tier and still widens with age
+//   any     everyone, immediately
+//   (unset) the original age-only curve
+function _qWindowWith(ageMs, width) {
+  if (width === "strict") return 0;
+  if (width === "any")    return Q_TIERS.length;
+  if (width === "one")    return Math.max(_qWindowFor(ageMs), 1);
+  return _qWindowFor(ageMs);
+}
+
+// Two sides agree on a preference when either does not have one. NULL is
+// "no preference", so it matches anything -- which is what keeps a
+// filter from quietly excluding every player who left it alone.
+function _qPrefOk(a, b) {
+  if (a === null || a === undefined || a === "") return true;
+  if (b === null || b === undefined || b === "") return true;
+  return String(a) === String(b);
+}
+
 async function _qRoster(sessionId) {
   const r = await pool.query(`
     SELECT m.user_id, m.skill, m.proof, m.joined_at,
@@ -3945,7 +3968,15 @@ function _qPayload(sess, members) {
 
 // POST /queue/intent — join a compatible session, or open one.
 app.post("/queue/intent", requireAuth, async (req, res) => {
-  const { playlist, game: rawGame, players, skill, proof } = req.body || {};
+  const { playlist, game: rawGame, players, skill, proof,
+          mic, playstyle, mode, width, host } = req.body || {};
+
+  // Normalised here so a junk value can never reach the filter and
+  // quietly match nothing. Anything unrecognised becomes "no preference".
+  const wMic   = (mic === true || mic === false) ? mic : null;
+  const wPlay  = ["casual", "comp"].includes(playstyle) ? playstyle : null;
+  const wMode  = ["pvp", "pve"].includes(mode) ? mode : null;
+  const wWidth = ["strict", "one", "any"].includes(width) ? width : null;
 
   // A playlist fixes both halves of the bucket, which is the whole
   // point of it: its id becomes the game, its size becomes the size,
@@ -3988,14 +4019,23 @@ app.post("/queue/intent", requireAuth, async (req, res) => {
       ORDER BY s.created_at ASC
     `, [game, size, req.userId]);
 
+
     const mine = _qTierIdx(tier);
-    const fit = open.rows.find(row => {
+    // Hosting means "open my own table and wait", so no candidate is
+    // considered at all -- the point is that people come to you.
+    const fit = host ? null : open.rows.find(row => {
       if ((row.filled || 0) >= row.players) return false;
       // Both sides must accept: the waiting session has widened by age,
       // and the arriving player has not waited at all. Using the widest
       // of the two is what lets a long-waiting group take anyone.
-      const win = Math.max(_qWindowFor(Number(row.age_ms) || 0), 0);
-      return Math.abs(_qTierIdx(row.skill) - mine) <= win;
+      const win = Math.max(
+        _qWindowWith(Number(row.age_ms) || 0, row.width),
+        _qWindowWith(0, wWidth)
+      );
+      if (Math.abs(_qTierIdx(row.skill) - mine) > win) return false;
+      return _qPrefOk(wMic,  row.mic)
+          && _qPrefOk(wPlay, row.playstyle)
+          && _qPrefOk(wMode, row.mode);
     });
 
     let sessionId;
@@ -4009,9 +4049,9 @@ app.post("/queue/intent", requireAuth, async (req, res) => {
       `, [sessionId, req.userId, tier, proof || null]);
     } else {
       const created = await pool.query(`
-        INSERT INTO queue_sessions (game, players, skill, owner_id)
-        VALUES ($1,$2,$3,$4) RETURNING *
-      `, [game, size, tier, req.userId]);
+        INSERT INTO queue_sessions (game, players, skill, owner_id, mic, playstyle, mode, width)
+        VALUES ($1,$2,$3,$4,$5,$6,$7,$8) RETURNING *
+      `, [game, size, tier, req.userId, wMic, wPlay, wMode, wWidth]);
       sessionId = created.rows[0].id;
       await pool.query(
         "INSERT INTO queue_members (session_id, user_id, skill, proof) VALUES ($1,$2,$3,$4)",
@@ -4033,6 +4073,102 @@ app.post("/queue/intent", requireAuth, async (req, res) => {
   } catch (e) {
     console.error("[queue/intent]", e.message);
     res.status(500).json({ error: "Could not join the queue" });
+  }
+});
+
+// GET /queue/open -- the tables you could walk up to.
+//
+// /queue/intent picks one FOR you. This is the other half: the same
+// searching sessions, but listed, so you can see who is already in one
+// and how long they have been waiting before committing. Rank is
+// reported rather than enforced -- the list shows you what is there and
+// the join is what checks whether you fit.
+app.get("/queue/open", requireAuth, async (req, res) => {
+  try {
+    const r = await pool.query(`
+      SELECT s.id, s.game, s.players, s.skill, s.mic, s.playstyle, s.mode, s.width,
+             s.created_at,
+             EXTRACT(EPOCH FROM (NOW() - s.created_at)) * 1000 AS age_ms,
+             (SELECT COUNT(*)::int FROM queue_members m
+               WHERE m.session_id = s.id AND m.left_at IS NULL) AS filled,
+             u.username AS owner_name, u.avatar_url AS owner_avatar
+      FROM queue_sessions s
+      LEFT JOIN users u ON u.id = s.owner_id
+      WHERE s.state = 'searching'
+        AND NOT EXISTS (SELECT 1 FROM queue_members k
+                         WHERE k.session_id = s.id AND k.user_id = $1 AND k.kicked)
+        AND NOT EXISTS (SELECT 1 FROM queue_members me
+                         WHERE me.session_id = s.id AND me.user_id = $1 AND me.left_at IS NULL)
+      ORDER BY s.created_at ASC
+      LIMIT 60
+    `, [req.userId]);
+
+    res.json(r.rows
+      .filter(x => (x.filled || 0) < x.players)
+      .map(x => ({
+        id: x.id, game: x.game, players: x.players, filled: x.filled || 0,
+        skill: x.skill, mic: x.mic, playstyle: x.playstyle, mode: x.mode,
+        width: x.width, ageMs: Math.round(Number(x.age_ms) || 0),
+        owner: x.owner_name || null, ownerAvatar: x.owner_avatar || null,
+      })));
+  } catch (e) {
+    console.error("[queue/open]", e.message);
+    res.status(500).json({ error: "Could not list tables" });
+  }
+});
+
+// POST /queue/:id/join -- take a seat at one specific table.
+//
+// The rank window still applies: choosing a table from a list does not
+// let you sit at one that would not have matched you, or the list would
+// be a way around the thing it is showing you.
+app.post("/queue/:id/join", requireAuth, async (req, res) => {
+  const id = parseInt(req.params.id, 10);
+  if (!id) return res.status(400).json({ error: "Bad table id" });
+  const tier = String((req.body || {}).skill || "plat").toLowerCase();
+  const proof = (req.body || {}).proof || null;
+
+  try {
+    const r = await pool.query(`
+      SELECT s.*,
+        (SELECT COUNT(*)::int FROM queue_members m
+          WHERE m.session_id = s.id AND m.left_at IS NULL) AS filled,
+        EXTRACT(EPOCH FROM (NOW() - s.created_at)) * 1000 AS age_ms
+      FROM queue_sessions s WHERE s.id = $1
+    `, [id]);
+    const sess = r.rows[0];
+    if (!sess) return res.status(404).json({ error: "No such table" });
+    if (sess.state !== "searching") return res.status(409).json({ error: "That table has already filled" });
+    if ((sess.filled || 0) >= sess.players) return res.status(409).json({ error: "That table is full" });
+
+    const kicked = await pool.query(
+      "SELECT 1 FROM queue_members WHERE session_id=$1 AND user_id=$2 AND kicked", [id, req.userId]);
+    if (kicked.rows.length) return res.status(403).json({ error: "You cannot rejoin that table" });
+
+    const win = _qWindowWith(Number(sess.age_ms) || 0, sess.width);
+    if (Math.abs(_qTierIdx(sess.skill) - _qTierIdx(tier)) > win) {
+      return res.status(409).json({ error: "That table is outside your rank range for now" });
+    }
+
+    await pool.query(`
+      INSERT INTO queue_members (session_id, user_id, skill, proof)
+      VALUES ($1,$2,$3,$4)
+      ON CONFLICT (session_id, user_id)
+      DO UPDATE SET left_at = NULL, skill = EXCLUDED.skill, proof = EXCLUDED.proof
+    `, [id, req.userId, tier, proof]);
+
+    await pool.query(`
+      UPDATE queue_sessions s SET state = 'matched', matched_at = NOW()
+      WHERE s.id = $1 AND s.state = 'searching'
+        AND (SELECT COUNT(*) FROM queue_members m
+              WHERE m.session_id = s.id AND m.left_at IS NULL) >= s.players
+    `, [id]);
+
+    const out = await _qSession(id);
+    res.json(_qPayload(out, await _qRoster(id)));
+  } catch (e) {
+    console.error("[queue/join]", e.message);
+    res.status(500).json({ error: "Could not join that table" });
   }
 });
 

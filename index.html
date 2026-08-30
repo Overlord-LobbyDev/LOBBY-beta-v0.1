@@ -29188,6 +29188,13 @@ let _qState = {
   players: 2,
   skill: 'plat',
   proof: '',
+  // Filters. null is "no preference" everywhere, matching the server's
+  // rule that two sides agree when either has not asked for anything.
+  mic: null,         // true = mic required
+  playstyle: null,   // 'casual' | 'comp'
+  mode: null,        // 'pvp' | 'pve' — only offered for games that are both
+  width: 'one',      // 'strict' | 'one' | 'any' — the rank window you accept
+  host: false,       // true = open your own table instead of joining one
   playlist: null,    // set by the pool board; null means an exact game
   friends: [],       // selected friend user ids
   queueId: null,
@@ -29325,7 +29332,9 @@ const Q_SKILL_TIERS = [
   { id:'bronze',  name:'Bronze',   emoji:'🥉', color:'#c97a3a' },
   { id:'silver',  name:'Silver',   emoji:'🥈', color:'#c0c8d2' },
   { id:'gold',    name:'Gold',     emoji:'🥇', color:'#ffcc33' },
-  { id:'plat',    name:'Platinum', emoji:'💠', color:'#58d9ff' },
+  /* Not a second gem: 💠 next to 💎 is two blue diamonds a tile apart,
+     and at this size they read as the same badge. */
+  { id:'plat',    name:'Platinum', emoji:'🛡️', color:'#58d9ff' },
   { id:'diamond', name:'Diamond',  emoji:'💎', color:'#a8e5ff' },
   { id:'master',  name:'Master',   emoji:'👑', color:'#c598ff' },
   { id:'pro',     name:'Pro',      emoji:'⚡', color:'#ff5d8a' },
@@ -29475,6 +29484,14 @@ window.qBeginSearch = async function() {
         skill:   _qState.skill,
         proof:   _qState.proof,
         friends: _qState.friends.slice(),
+        // Filters. Each is null when you have expressed no preference,
+        // which the server reads as "matches anything" — a default of
+        // its own would quietly exclude everyone who left it alone.
+        mic:       _qState.mic,
+        playstyle: _qState.playstyle,
+        mode:      _qState.mode,
+        width:     _qState.width,
+        host:      _qState.host === true,
       }),
     }).catch(() => null);
     if (r && r.queueId) _qState.queueId = r.queueId;
@@ -64986,13 +65003,24 @@ async function reactComment(ev, id, btn){
 }
 .qsrc.on b{ opacity:.65; }
 
-#qDeck{ position:relative; height:calc(392px * var(--qk)); margin:26px 0 0; --qwash:none; }
+#qDeck{
+  position:relative; height:calc(392px * var(--qk)); margin:26px 0 0; --qwash:none;
+  /* clip, not hidden: hidden on one axis forces the other to auto and
+     would cut the wash's upward reach. clip leaves overflow-y visible
+     and creates no scroll container. Cards parked off-stage sit at
+     +/-600px * --qk and would otherwise widen the page on a narrow
+     window even at zero opacity. */
+  overflow-x:clip; overflow-y:visible;
+}
 /* The reference stands its deck on a blurred copy of the selected hero
    (.wash), which is where that soft colour behind the cards comes from.
    Ours hangs off the deck itself and reaches up behind the heading, so
    it needs no extra element and no layout of its own. */
 #qDeck::before{
-  content:''; position:absolute; inset:-260px -14% 40px; z-index:0;
+  /* No horizontal bleed: at -14% of a 2400px deck this reached 316px
+     past each edge of the window and put a scrollbar on the page. It
+     still reaches UP, which is the part that matters. */
+  content:''; position:absolute; inset:-260px 0 40px; z-index:0;
   background-image:var(--qwash);
   background-size:cover; background-position:center 22%;
   /* The reference's own .5/brightness(.8) assumes a dark hero. Half the
@@ -65002,8 +65030,19 @@ async function reactComment(ev, id, btn){
      a bright hero. */
   filter:blur(80px) saturate(1.6) brightness(.5);
   opacity:.34; pointer-events:none;
-  -webkit-mask-image:linear-gradient(180deg, #000 0%, rgba(0,0,0,.6) 46%, transparent 92%);
-          mask-image:linear-gradient(180deg, #000 0%, rgba(0,0,0,.6) 46%, transparent 92%);
+  /* Two masks, intersected. Without the horizontal one the wash simply
+     stops at the deck's box, and on a monitor wider than the 2400 cap
+     that hard edge is visible as a vertical seam down each side of the
+     page. Fading it out means it has no edge to see -- and unlike the
+     old -14% bleed, a fade cannot widen the page. */
+  -webkit-mask-image:
+    linear-gradient(180deg, #000 0%, rgba(0,0,0,.6) 46%, transparent 92%),
+    linear-gradient(90deg, transparent 0%, #000 15%, #000 85%, transparent 100%);
+  -webkit-mask-composite:source-in;
+          mask-image:
+    linear-gradient(180deg, #000 0%, rgba(0,0,0,.6) 46%, transparent 92%),
+    linear-gradient(90deg, transparent 0%, #000 15%, #000 85%, transparent 100%);
+          mask-composite:intersect;
   transition:background-image .6s ease;
 }
 /* The reference frames the whole mock at 1560px and hangs the nav
@@ -65022,6 +65061,8 @@ async function reactComment(ev, id, btn){
 #qStage > #qDeck,
 #qStage > #qDots,
 #qStage > #qBar,
+#qStage > #qMorePanel,
+#qStage > #qFindList,
 #qStage > #qPools{
   max-width:2400px; margin-left:auto; margin-right:auto;
   padding-left:clamp(28px, 3.4vw, 72px);
@@ -65030,7 +65071,11 @@ async function reactComment(ev, id, btn){
 #qStage > .qsec{ padding-top:56px; }
 /* The one thing that should NOT stretch: a row of controls 2000px wide
    puts the rank tiles a screen away from the stepper. */
-#qStage > #qBar{ max-width:calc(900px * var(--qk)); margin-left:auto; margin-right:auto; }
+/* 1200, not the reference's 900: the bar carried two controls when that
+   number was chosen and now carries five. Still capped -- a row of
+   controls the full width of the frame puts the last one a screen away
+   from the first. */
+#qStage > #qBar{ max-width:calc(1200px * var(--qk)); margin-left:auto; margin-right:auto; }
 #qTrack{ position:relative; height:100%; z-index:1; }
 .qc{
   position:absolute; top:0; left:50%;
@@ -65052,11 +65097,22 @@ async function reactComment(ev, id, btn){
 .qc-fb{
   position:absolute; inset:0; z-index:2;
   display:flex; align-items:center; justify-content:center;
+  padding:0 12%; box-sizing:border-box; text-align:center;
   font-family:'Archivo', var(--font), sans-serif;
-  font-size:calc(64px * var(--qk)); font-weight:900;
-  color:rgba(255,255,255,.82); letter-spacing:2px;
-  text-shadow:0 4px 24px rgba(0,0,0,.75);
+  font-size:calc(21px * var(--qk)); font-weight:900; line-height:1.24;
+  text-transform:uppercase; letter-spacing:.6px;
+  color:rgba(255,255,255,.92);
+  text-shadow:0 4px 24px rgba(0,0,0,.85);
+  overflow:hidden;
 }
+/* The filmstrip tile is 76px across -- a title cannot be read there, so
+   it keeps the single character. */
+.qmini-fb{
+  position:absolute; inset:0; display:flex; align-items:center; justify-content:center;
+  font-family:'Archivo', var(--font), sans-serif;
+  font-size:26px; font-weight:900; color:rgba(255,255,255,.6);
+}
+.qmini{ position:relative; }
 /* Cards contain their art over a blurred copy of it. This is the half
    of Home's treatment I had left out: "the gaps fell back to the card's
    own grey, which is why a letterboxed header looked broken rather than
@@ -65165,7 +65221,112 @@ async function reactComment(ev, id, btn){
   background:none; border:0; cursor:pointer; padding:8px 6px;
 }
 #qMore:hover{ color:#fff; }
-#queueOverlay.q-more .q-body-setup > .q-step-card:not(.q-picker){ display:block !important; }
+/* The extra options live in #qMorePanel under the bar now, so nothing
+   is revealed in place at the foot of the page any more. */
+
+/* ── More options ────────────────────────────────────────────────── */
+#qMorePanel{
+  max-height:0; overflow:hidden; opacity:0; margin-top:0;
+  transition:max-height .34s cubic-bezier(.22,1,.36,1),
+             opacity .24s ease, margin-top .34s cubic-bezier(.22,1,.36,1);
+}
+#qMorePanel.on{ max-height:1200px; opacity:1; margin-top:14px; }
+#qMorePanel .q-extra{
+  display:block !important;
+  max-width:calc(900px * var(--qk)); margin:0 auto;
+  padding:20px 24px 22px; border-radius:16px;
+  background:linear-gradient(160deg, rgba(255,255,255,.045), rgba(255,255,255,.015));
+  border:1px solid rgba(255,255,255,.08);
+}
+/* It is no longer step 3 of anything -- it is the drawer behind a
+   button, so the numbered badge would be describing a flow that this
+   design does not have. */
+#qMorePanel .q-step-num{ display:none !important; }
+#qMorePanel .q-step-head{ margin-bottom:16px; }
+#qMorePanel .q-form-grid{ display:grid; gap:14px; }
+#qMoreRow{
+  display:flex; align-items:center; justify-content:center;
+  gap:26px; flex-wrap:wrap; margin:0 auto 18px;
+  max-width:calc(900px * var(--qk));
+}
+.qmr{ display:flex; align-items:center; gap:11px; }
+.qmr[hidden]{ display:none !important; }
+
+/* ── Segmented controls ──────────────────────────────────────────
+   One look for host/find, match width, voice, playstyle and mode, so
+   five different questions read as the same kind of control. */
+.qseg{
+  display:inline-flex; gap:3px; padding:3px; border-radius:11px;
+  background:rgba(0,0,0,.35);
+}
+.qseg-b{
+  padding:7px 13px; border:0; border-radius:8px; cursor:pointer;
+  background:transparent; color:var(--text-3);
+  font-family:'JetBrains Mono', ui-monospace, monospace;
+  font-size:10px; font-weight:700; letter-spacing:1.1px; text-transform:uppercase;
+  transition:background .18s, color .18s;
+}
+.qseg-b:hover:not(.on){ color:#fff; background:rgba(255,255,255,.06); }
+.qseg-b.on{
+  color:#0d0320;
+  background:linear-gradient(180deg,
+    color-mix(in srgb, var(--hub-accent) 94%, white), var(--hub-accent));
+}
+
+/* ── Open tables ─────────────────────────────────────────────────── */
+#qFindList{ display:none; margin-top:18px; }
+#qFindList.on{ display:block; }
+.qft-head{
+  font-family:'JetBrains Mono', ui-monospace, monospace;
+  font-size:10px; font-weight:700; letter-spacing:2px; text-transform:uppercase;
+  color:var(--text-3); text-align:center; margin-bottom:11px;
+}
+.qft-head b{ color:#fff; }
+.qft-empty{
+  text-align:center; font-size:12.5px; color:var(--text-3);
+  padding:18px; border-radius:14px;
+  border:1px dashed rgba(255,255,255,.09);
+  max-width:calc(900px * var(--qk)); margin:0 auto;
+}
+.qft{
+  display:flex; align-items:center; gap:14px; width:100%;
+  max-width:calc(900px * var(--qk)); margin:0 auto 7px;
+  padding:12px 16px; border-radius:13px; cursor:pointer; text-align:left;
+  background:linear-gradient(160deg, rgba(255,255,255,.045), rgba(255,255,255,.015));
+  border:1px solid rgba(255,255,255,.08);
+  color:var(--text-2);
+  transition:border-color .18s, transform .18s, background .18s;
+}
+.qft:hover{
+  transform:translateY(-1px);
+  border-color:color-mix(in srgb, var(--hub-accent) 42%, transparent);
+  background:linear-gradient(160deg, rgba(255,255,255,.07), rgba(255,255,255,.025));
+}
+.qft-n{
+  flex:1; min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;
+  font-family:'Archivo', var(--font), sans-serif;
+  font-size:13.5px; font-weight:800; color:#fff;
+}
+.qft-m, .qft-t, .qft-a{
+  font-family:'JetBrains Mono', ui-monospace, monospace;
+  font-size:10.5px; font-weight:700; letter-spacing:1.1px; flex:0 0 auto;
+}
+.qft-m{ color:#fff; }
+.qft-a{ color:var(--text-3); }
+.qft-c{
+  flex:0 0 auto; padding:3px 8px; border-radius:99px;
+  font-family:'JetBrains Mono', ui-monospace, monospace;
+  font-size:9px; font-weight:700; letter-spacing:1.1px; text-transform:uppercase;
+  color:var(--text-3); border:1px solid rgba(255,255,255,.1);
+}
+.qft-j{
+  flex:0 0 auto; padding:7px 15px; border-radius:9px;
+  font-family:'JetBrains Mono', ui-monospace, monospace;
+  font-size:10px; font-weight:800; letter-spacing:1.2px; text-transform:uppercase;
+  color:#0d0320;
+  background:linear-gradient(180deg,
+    color-mix(in srgb, var(--hub-accent) 94%, white), var(--hub-accent));
+}
 
 /* ═══ 3 · POOLS ═══════════════════════════════════════════════════ */
 #qPools{ margin:56px 0 0; }
@@ -65388,11 +65549,19 @@ async function reactComment(ev, id, btn){
     var r = await window.api('/queue/pulse').catch(function(){ return null; });
     if (r && typeof r.total === 'number') pulse = r;
     paintPools();
+    /* Open tables go stale the same way the pulse does, so they refresh
+       on the same 10s beat rather than a second timer of their own. */
+    loadFind();
   }
+  /* Every shelf, not just recents and the catalogue. A game picked from
+     the library or from a search lives in `owned` / `found`, and looking
+     it up here used to fail -- which left the band with no name, no
+     playtime and no hero, because all three come off this record. */
   function entry(id){
-    return lib.find(function (g){ return g.id === id; })
-        || catalogue().find(function (g){ return g.id === id; })
-        || null;
+    function pick(list){
+      return (list || []).find(function (g){ return g.id === id; });
+    }
+    return pick(lib) || pick(owned) || pick(found) || pick(catalogue()) || null;
   }
 
   /* Steam serves library_hero.jpg for most titles but not all, and a
@@ -65466,7 +65635,7 @@ async function reactComment(ev, id, btn){
         'style="' + (g.cover ? 'background-image:' + url(g.cover) : '') + '"></div>';
     }).join('');
     Array.prototype.forEach.call(strip.children, function (m, i){
-      upgradeArt(m, src[i].id, 'mini');
+      upgradeArt(m, src[i].id, 'mini', src[i].name);
     });
     var on = strip.querySelector('.qmini.on');
     if (on && on.scrollIntoView) on.scrollIntoView({ block:'nearest', inline:'nearest' });
@@ -65530,7 +65699,11 @@ async function reactComment(ev, id, btn){
     var isPool = sel.indexOf('pl:') === 0;
     var e = entry(sel);
     var g = GAMES().find(function (x){ return x.id === sel; });
-    var hero = e ? e.hero : (g ? (g.heroHi || g.header || g.cover) : '');
+    /* Same fix as the band: fall back to the appid's own hero when the
+       record carries no URL, which is every library and search row. */
+    var app = appIdFor(sel);
+    var hero = (e ? e.hero : (g ? (g.heroHi || g.header || g.cover) : ''))
+            || (app ? steamHosts(app).A + 'library_hero.jpg' : '');
     dk.style.setProperty('--qwash', (hero && !isPool) ? url(hero) : 'none');
   }
 
@@ -65546,13 +65719,23 @@ async function reactComment(ev, id, btn){
     var e = entry(sel);
     var g = GAMES().find(function (x){ return x.id === sel; });
     var hero = e ? e.hero : (g ? (g.heroHi || g.header || g.cover) : '');
-
-    if (hero && !isPool) setArt(art, hero, e, g, sel);
-    else art.classList.remove('on');
-
     var name = isPool ? 'A pool' : (e ? e.name : (g ? g.name : ''));
     var ready = !!sel;
+    /* Resolved BEFORE the art block, not after it. var hoists the
+       declaration and not the assignment, so reading it above this line
+       yields undefined -- which silently made the guard below false for
+       every game and left the band blank. */
     var app = (ready && !isPool) ? appIdFor(sel) : '';
+
+    /* NOT "if (hero)". setArt builds its whole chain from the APPID --
+       the seed URL is only one more candidate in it. Gating on that seed
+       meant any row without a hero of its own never even asked, and
+       every /steam/owned and /steam/search row is exactly that: an
+       appid and a name. Steam has a header for practically everything,
+       so if there is an appid there is art to find. */
+    if (!isPool && (app || hero)) setArt(art, hero, e, g, sel);
+    else art.classList.remove('on');
+
     /* PvP or PvE for the third stat. Empty until /steam/modes exists,
        and the stat is simply left out then -- capacity is not something
        Steam publishes, and repeating the queue size here would only say
@@ -65587,6 +65770,12 @@ async function reactComment(ev, id, btn){
         (ready ? '<button class="qghost" onclick="window.qScrollDeck()">Change game</button>' : '') +
       '</div>' +
       '</div>';
+
+    /* The Mode filter is only a question for games that are actually
+       both -- offering PvP/PvE on Tekken is noise, and LobbyModes
+       already knows which is which. */
+    var modeRow = document.getElementById('qModeRow');
+    if (modeRow) modeRow.hidden = mPvx !== 'PvP · PvE';
 
     paintTitleLogo(app, name);
     paintStrip();
@@ -65797,6 +65986,17 @@ async function reactComment(ev, id, btn){
   /* No art worth showing. A gradient with the game's initial on it is a
      designed state; the 231x87 capsule smeared over 361px is not. Same
      call Home's .game-card-placeholder makes. */
+  /* Nothing in the chain fitted. Neither box may be left blank -- that
+     reads as a loading failure rather than as a title without art. */
+  function noArt(el, id, box, name){
+    if (box === 'card'){ designedFallback(el, id, name); return; }
+    if (el.querySelector('.qmini-fb')) return;
+    var d = document.createElement('div');
+    d.className = 'qmini-fb';
+    d.textContent = String(name || '?').charAt(0).toUpperCase();
+    el.appendChild(d);
+  }
+
   function designedFallback(el, id, name){
     var app = appIdFor(id);
     var g = GAMES().find(function (x){ return x.id === id; })
@@ -65806,11 +66006,13 @@ async function reactComment(ev, id, btn){
        against a #12151f card is invisible, which is why these two read
        as "no image at all" rather than as a fallback. */
     el.style.background = (g && g.fallback) || 'linear-gradient(160deg,#2a3040,#12151f)';
+    /* The NAME, not an initial. A card showing "H" tells you nothing --
+       the title is the whole point of the tile, and there is room for
+       it. The mini has room for one character and gets that instead. */
     if (!el.querySelector('.qc-fb')){
       var d = document.createElement('div');
       d.className = 'qc-fb';
-      d.textContent = String((g && (g.initial || g.short)) || name || '?')
-                        .charAt(0).toUpperCase();
+      d.textContent = String(name || (g && g.name) || '?');
       el.appendChild(d);
     }
 
@@ -65880,6 +66082,13 @@ async function reactComment(ev, id, btn){
      TOKON" mid-word. */
   function applyArt(el, rec){
     el.style.backgroundImage = url(rec.url);
+    /* The card was built with a fallback initial because its row
+       carried no cover -- every library row does, since art is resolved
+       from the appid afterwards. Now that there IS art, the letter has
+       to go: it sits above the background and was printing an M over
+       MARVEL Tokon and a C over Call of Duty. */
+    var fb = el.querySelector('.qc-fb');
+    if (fb) fb.parentNode.removeChild(fb);
     /* Cards ALWAYS contain over a blurred copy of the same art -- no
        ratio test, because there is a choice here that cannot be wrong.
        For a true 2:3 asset contain and cover are identical: it fills the
@@ -65901,16 +66110,14 @@ async function reactComment(ev, id, btn){
     if (!el || !app) return;
     var key = app + '|' + box, hit = artCache[key];
     if (hit){ applyArt(el, hit); return; }
-    if (hit === false){
-      /* Nothing fits this box. The mini keeps its capsule -- at 84px it
-         is barely upscaled and still recognisable. The card does not. */
-      if (box === 'card') designedFallback(el, id, name);
-      return;
-    }
+    if (hit === false){ noArt(el, id, box, name); return; }
     if (artWaiters[key]){ artWaiters[key].push(el); return; }
     artWaiters[key] = [el];
-    var chain = portraitUrls(app);
-    if (box === 'card') chain = chain.concat(capsuleUrls(app));
+    /* The wide capsule is a last resort for BOTH boxes now. A 616x353
+       cropped into a 76px tile is a centre slice, but a centre slice of
+       the key art beats the empty tiles the library and search shelves
+       were showing for anything without portrait art. */
+    var chain = portraitUrls(app).concat(capsuleUrls(app));
     var need = boxPixels(el, box);
     var i = 0;
     (function tryNext(){
@@ -65918,7 +66125,7 @@ async function reactComment(ev, id, btn){
         artCache[key] = false;
         var waiting = artWaiters[key] || [];
         delete artWaiters[key];
-        if (box === 'card') waiting.forEach(function (n){ designedFallback(n, id, name); });
+        waiting.forEach(function (n){ noArt(n, id, box, name); });
         return;
       }
       var c = chain[i++];
@@ -65956,7 +66163,7 @@ async function reactComment(ev, id, btn){
      worth. Calling that "your library" was wrong: the library is
      everything you OWN, which is a separate endpoint, and neither of
      them reaches a game you have not bought. */
-  var deckSrc = 'recent';                 // 'recent' | 'owned' | 'find'
+  var deckSrc = 'recent';                 // 'recent' | 'owned'  (search overrides)
   var owned = null;                       // lazy, from /steam/owned
   var ownedLoading = false, ownedError = false;
   var found = [];                         // results for the current query
@@ -66000,8 +66207,15 @@ async function reactComment(ev, id, btn){
   }
 
   async function loadOwned(){
-    if (owned || ownedLoading) return;
+    if (ownedLoading) return;
+    /* NOT `if (owned)`: a failed call leaves owned as [], which is
+       TRUTHY, so the guard latched and no later click ever retried --
+       the failure outlived the thing that caused it. Only a successful
+       load is final; an error is always worth asking again. */
+    if (owned && !ownedError) return;
     ownedLoading = true;
+    ownedError = false;
+    owned = null;                 // so the heading reads "Loading…" again
     var r = await window.api('/steam/owned').catch(function (){ return null; });
     ownedLoading = false;
     /* Distinguish "the request failed" from "you own nothing" -- they
@@ -66013,16 +66227,17 @@ async function reactComment(ev, id, btn){
   }
 
   window.qSetSource = function (which){
-    if (which === deckSrc) return;
+    var q = deckQuery.trim();
+    /* Picking a shelf while a search is up means "leave the search",
+       so this is not a no-op just because the shelf is unchanged. */
+    if (which === deckSrc && !q) return;
     if (which === 'recent' && !lib.length) return;
     deckSrc = which;
-    if (which !== 'find'){ deckQuery = ''; found = []; }
+    deckQuery = ''; found = [];
+    var el = document.getElementById('qDeckQ');
+    if (el) el.value = '';
     if (which === 'owned') loadOwned();
     rebuildDeck();
-    if (which === 'find'){
-      var el = document.getElementById('qDeckQ');
-      if (el) el.focus();
-    }
     var d = document.getElementById('qDeck');
     if (d && d.scrollIntoView) d.scrollIntoView({ behavior:'smooth', block:'center' });
   };
@@ -66039,8 +66254,11 @@ async function reactComment(ev, id, btn){
     return out;
   }
 
+  /* A query overrides whichever shelf is selected rather than being a
+     shelf of its own -- searching is something you do TO the picker, and
+     clearing it puts you back where you were. */
   function deckSource(){
-    if (deckSrc === 'find') return found;
+    if (deckQuery.trim()) return found;
     if (deckSrc === 'owned') return owned || [];
     return lib.length ? lib : catalogue();
   }
@@ -66097,14 +66315,13 @@ async function reactComment(ev, id, btn){
   function paintDeckHead(src){
     var head = document.getElementById('qDeckHead');
     if (!head) return;
-    var q = deckQuery.trim(), find = deckSrc === 'find';
+    var q = deckQuery.trim(), find = !!q;
     var kick, sub;
 
     if (find){
       kick = 'Find any game';
-      sub  = !q ? 'Type a name. This searches all of Steam, not just what you own.'
-           : src.length ? 'Matching “' + esc(q) + '” across Steam.'
-           : 'Nothing matches “' + esc(q) + '” yet.';
+      sub  = src.length ? 'Matching “' + esc(q) + '” across all of Steam.'
+                        : 'Nothing matches “' + esc(q) + '” yet.';
     } else if (deckSrc === 'owned'){
       kick = 'Your Steam library';
       sub  = owned === null ? 'Loading your library…'
@@ -66141,11 +66358,13 @@ async function reactComment(ev, id, btn){
       '<div id="qSrc" role="tablist">' +
         '<button class="qsrc" data-src="recent" onclick="window.qSetSource(\'recent\')"></button>' +
         '<button class="qsrc" data-src="owned"  onclick="window.qSetSource(\'owned\')"></button>' +
-        '<button class="qsrc" data-src="find"   onclick="window.qSetSource(\'find\')"></button>' +
       '</div>' +
+      /* No third tab: the search box IS "find any game". A tab that only
+         put the caret in the field beside it was a step to reach the
+         thing rather than the thing. */
       '<div id="qSearch">' + I.find +
         '<input id="qDeckQ" type="text" autocomplete="off" spellcheck="false" ' +
-          'placeholder="Search all of Steam…" oninput="window.qDeckSearch(this.value)">' +
+          'placeholder="Find any game on Steam…" oninput="window.qDeckSearch(this.value)">' +
         '<button id="qSearchX" type="button" aria-label="Clear search" ' +
           'onclick="window.qClearSearch()">×</button>' +
       '</div>';
@@ -66155,23 +66374,21 @@ async function reactComment(ev, id, btn){
   function paintDeckTabs(){
     ensureDeckTools();
     var nRec = recentCount(), nOwn = ownedCount();
+    var searching = !!deckQuery.trim();
     function set(which, text, n, off, why){
       var b = document.querySelector('#qSrc [data-src="' + which + '"]');
       if (!b) return;
-      b.className = 'qsrc' + (deckSrc === which ? ' on' : '');
+      /* Neither tab is lit while a search is up: the deck is showing
+         matches from everywhere, so claiming a shelf would be a lie.
+         Clearing the query lights the one you were on again. */
+      b.className = 'qsrc' + (deckSrc === which && !searching ? ' on' : '');
       b.disabled = !!off;
       if (why) b.title = why;
       b.innerHTML = text + (n ? '<b>' + n + '</b>' : '');
     }
     set('recent', 'Your recents', nRec, !nRec, 'Connect Steam to see what you have played');
-    set('owned',  'Your library', nOwn, false,
-        owned === null ? 'Your full Steam library' : '');
-    set('find',   'Find any game', 0, false, 'Search all of Steam');
+    set('owned',  'Your library', nOwn, false, 'Your full Steam library');
 
-    /* The search box belongs to the Find shelf and only appears with
-       it -- shown on the other two it would imply it filters them. */
-    var box = document.getElementById('qSearch');
-    if (box) box.hidden = deckSrc !== 'find';
     var x = document.getElementById('qSearchX');
     if (x) x.hidden = !deckQuery.trim();
   }
@@ -66248,7 +66465,7 @@ async function reactComment(ev, id, btn){
              of flashing a cropped one. */
           '<div class="qc-art' + (g.cover ? ' qc-amb' : '') + '" style="' +
             (g.cover ? 'background-image:' + url(g.cover) + ';--qc-amb:' + url(g.cover) : '') + '">' +
-            (g.cover ? '' : '<div class="qc-fb">' + esc(g.name.charAt(0).toUpperCase()) + '</div>') + '</div>' +
+            (g.cover ? '' : '<div class="qc-fb">' + esc(g.name) + '</div>') + '</div>' +
           '<div class="qc-cap"><div class="qc-nm">' + esc(g.name) + '</div>' +
             '<div class="qc-hr">' + (g.hrsRecent ? g.hrsRecent + 'h this fortnight' : g.hrsTotal + 'h total') + '</div>' +
           '</div></div>';
@@ -66322,21 +66539,234 @@ async function reactComment(ev, id, btn){
     var skills  = document.getElementById('qSkillGrid');
     if (!stepper || !skills) return;
     bar.__built = true;
+    /* One builder for every segmented control in the bar and the panel.
+       Four hand-rolled sets would drift apart the first time one of
+       them needed a tweak. */
+    function seg(key, opts, onPick){
+      var wrap = document.createElement('div');
+      wrap.className = 'qseg';
+      wrap.setAttribute('data-key', key);
+      opts.forEach(function (o){
+        var b = document.createElement('button');
+        b.type = 'button';
+        b.className = 'qseg-b';
+        b.setAttribute('data-val', String(o.v));
+        b.textContent = o.t;
+        if (o.title) b.title = o.title;
+        b.onclick = function (){
+          onPick(o.v);
+          paintSeg(wrap, key);
+        };
+        wrap.appendChild(b);
+      });
+      paintSeg(wrap, key);
+      return wrap;
+    }
+
     var l1 = document.createElement('span'); l1.className = 'qbl'; l1.textContent = 'Players';
     var l2 = document.createElement('span'); l2.className = 'qbl'; l2.textContent = 'Rank';
     var v1 = document.createElement('span'); v1.className = 'qvr';
     var v2 = document.createElement('span'); v2.className = 'qvr';
+    /* More options opens a panel attached to the BAR. It used to reveal
+       the legacy step cards where they sat -- at the foot of the page,
+       below the pools, which is nowhere near the control that opened
+       them. Step 2 is deliberately not among them: the bar already IS
+       its two controls, and appendChild MOVED the stepper and the tier
+       grid up here rather than copying them, so revealing that card
+       showed two labelled boxes with nothing in them. */
+    var panel = document.getElementById('qMorePanel');
+    if (!panel){
+      panel = document.createElement('div');
+      panel.id = 'qMorePanel';
+      /* Found by its CONTENT, not its position. #qViewSetup and
+         .q-body-setup are the same element -- "#qViewSetup
+         .q-body-setup > .q-step-card" asked for a descendant of itself
+         and matched nothing, which is why this opened empty. */
+      /* The two filters that do not earn a place in the bar: playstyle
+         is a preference rather than a constraint, and mode only means
+         anything for the minority of games that are both. */
+      var row = document.createElement('div');
+      row.id = 'qMoreRow';
+      function labelled(text, node, id){
+        var w = document.createElement('div');
+        w.className = 'qmr';
+        if (id) w.id = id;
+        var l = document.createElement('span');
+        l.className = 'qbl'; l.textContent = text;
+        w.appendChild(l); w.appendChild(node);
+        return w;
+      }
+      row.appendChild(labelled('Playstyle', seg('playstyle', [
+        { v:null,     t:'Any' },
+        { v:'casual', t:'Casual', title:'Here for the game, not the ladder' },
+        { v:'comp',   t:'Comp',   title:'Playing to win' }
+      ], function (v){ var st = S(); if (st) st.playstyle = v; })));
+
+      row.appendChild(labelled('Mode', seg('mode', [
+        { v:null,  t:'Any' },
+        { v:'pvp', t:'PvP' },
+        { v:'pve', t:'PvE' }
+      ], function (v){ var st = S(); if (st) st.mode = v; }), 'qModeRow'));
+      panel.appendChild(row);
+
+      var proof = document.getElementById('qFormProof');
+      var extra = proof && proof.closest ? proof.closest('.q-step-card') : null;
+      if (extra){ extra.classList.add('q-extra'); panel.appendChild(extra); }
+      bar.parentNode.insertBefore(panel, bar.nextSibling);
+    }
+
     var more = document.createElement('button');
     more.id = 'qMore'; more.type = 'button'; more.textContent = 'More options';
+    more.setAttribute('aria-expanded', 'false');
     more.onclick = function (){
-      var ov = document.getElementById('queueOverlay');
-      var open = ov.classList.toggle('q-more');
+      var open = panel.classList.toggle('on');
       more.textContent = open ? 'Fewer options' : 'More options';
+      more.setAttribute('aria-expanded', open ? 'true' : 'false');
+      if (open) panel.scrollIntoView({ behavior:'smooth', block:'nearest' });
     };
+    var s = S() || {};
+
+    /* Host or Find, first in the bar, because it changes what every
+       control after it means: hosting sets the table's terms, finding
+       states what you will accept from someone else's. */
+    var hostSeg = seg('host', [
+      { v:false, t:'Find', title:'Join a table that is already filling' },
+      { v:true,  t:'Host', title:'Open your own table and wait for people' }
+    ], function (v){ var st = S(); if (st) st.host = v; paintFindList(); });
+
+    /* The bar has always SAID "within one rank" without letting you
+       change it. Strict never widens; One floors at a tier and still
+       opens up with age; Any takes the room. */
+    var widthSeg = seg('width', [
+      { v:'strict', t:'Exact', title:'Only your own tier' },
+      { v:'one',    t:'±1',    title:'One tier either way, widening as you wait' },
+      { v:'any',    t:'Any',   title:'Any rank at all' }
+    ], function (v){ var st = S(); if (st) st.width = v; });
+
+    /* Tri-state, not a checkbox: "any" is a real answer and the most
+       common one, and a checkbox could not say it. */
+    var micSeg = seg('mic', [
+      { v:null,  t:'Any',  title:'Mic optional' },
+      { v:true,  t:'Mic',  title:'Everyone must have a microphone' }
+    ], function (v){ var st = S(); if (st) st.mic = v; });
+
+    var l3 = document.createElement('span'); l3.className = 'qbl'; l3.textContent = 'Match';
+    var l4 = document.createElement('span'); l4.className = 'qbl'; l4.textContent = 'Voice';
+    var v3 = document.createElement('span'); v3.className = 'qvr';
+    var v4 = document.createElement('span'); v4.className = 'qvr';
+
+    bar.appendChild(hostSeg);
+    bar.appendChild(document.createElement('span')).className = 'qvr';
     bar.appendChild(l1); bar.appendChild(stepper);
     bar.appendChild(v1); bar.appendChild(l2); bar.appendChild(skills);
+    bar.appendChild(v3); bar.appendChild(l3); bar.appendChild(widthSeg);
+    bar.appendChild(v4); bar.appendChild(l4); bar.appendChild(micSeg);
     bar.appendChild(v2); bar.appendChild(more);
   }
+
+  /* Repaints a segmented control from state, so every one of them shows
+     what is actually set rather than what was last clicked. */
+  function paintSeg(wrap, key){
+    var st = S() || {}, cur = st[key];
+    Array.prototype.forEach.call(wrap.children, function (b){
+      var raw = b.getAttribute('data-val');
+      var val = raw === 'true' ? true : raw === 'false' ? false
+              : raw === 'null' ? null : raw;
+      b.classList.toggle('on', val === cur);
+    });
+  }
+
+  /* ── 2b · Open tables ────────────────────────────────────────────
+     The other half of matchmaking. /queue/intent picks a table FOR you;
+     this lists the same open sessions so you can see who is already in
+     one, and how long they have been sat there, before committing. */
+  var findRows = [], findTimer = null;
+
+  function ensureFindList(){
+    var stage = document.getElementById('qStage');
+    var bar = document.getElementById('qBar');
+    if (!stage || !bar) return null;
+    var el = document.getElementById('qFindList');
+    if (!el){
+      el = document.createElement('div');
+      el.id = 'qFindList';
+      var panel = document.getElementById('qMorePanel');
+      stage.insertBefore(el, (panel || bar).nextSibling);
+    }
+    return el;
+  }
+
+  function ago(ms){
+    var s = Math.round((ms || 0) / 1000);
+    if (s < 60) return s + 's';
+    var m = Math.floor(s / 60);
+    return m < 60 ? m + 'm' : Math.floor(m / 60) + 'h';
+  }
+
+  function paintFindList(){
+    var el = ensureFindList();
+    if (!el) return;
+    var st = S() || {};
+    /* Hosting means people come to you, so a list of other people's
+       tables is not the question you are asking. */
+    if (st.host){ el.classList.remove('on'); el.innerHTML = ''; return; }
+    el.classList.add('on');
+
+    if (!findRows.length){
+      el.innerHTML = '<div class="qft-empty">No open tables right now. ' +
+        'Start searching and one opens for you.</div>';
+      return;
+    }
+    el.innerHTML =
+      '<div class="qft-head"><b>' + findRows.length + '</b> open ' +
+        (findRows.length === 1 ? 'table' : 'tables') + '</div>' +
+      findRows.map(function (r){
+        var e = entry(r.game);
+        var nm = e ? e.name : String(r.game || '').replace(/^steam:/, 'App ');
+        var tier = String(r.skill || '').toUpperCase();
+        return '<button class="qft" onclick="window.qJoinTable(' + r.id + ',' +
+            jsStr(r.game) + ',' + (r.players | 0) + ')">' +
+          '<span class="qft-n">' + esc(nm) + '</span>' +
+          '<span class="qft-m">' + r.filled + '/' + r.players + '</span>' +
+          '<span class="qft-t">' + esc(tier) + '</span>' +
+          (r.mic ? '<span class="qft-c">Mic</span>' : '') +
+          (r.playstyle ? '<span class="qft-c">' + (r.playstyle === 'comp' ? 'Comp' : 'Casual') + '</span>' : '') +
+          (r.mode ? '<span class="qft-c">' + esc(r.mode.toUpperCase()) + '</span>' : '') +
+          '<span class="qft-a">' + ago(r.ageMs) + '</span>' +
+          '<span class="qft-j">Join</span>' +
+        '</button>';
+      }).join('');
+  }
+
+  async function loadFind(){
+    var st = S();
+    if (!st || st.host) return;
+    var r = await window.api('/queue/open').catch(function (){ return null; });
+    findRows = Array.isArray(r) ? r : [];
+    paintFindList();
+  }
+
+  window.qJoinTable = async function (id, game, players){
+    var st = S(); if (!st) return;
+    var r = await window.api('/queue/' + id + '/join', {
+      method:'POST', headers:{ 'Content-Type':'application/json' },
+      body: JSON.stringify({ skill: st.skill || 'plat', proof: st.proof || '' })
+    }).catch(function (){ return null; });
+
+    if (!r || r.error){
+      if (typeof showToast === 'function'){
+        showToast((r && r.error) || 'Could not join that table.', 'warn');
+      }
+      loadFind();                       // it probably filled while you read it
+      return;
+    }
+    st.game = game; st.players = players; st.playlist = null;
+    st.queueId = r.queueId || r.id || st.queueId;
+    /* Reuse the real transition rather than a second copy of it. */
+    if (typeof _qShowView === 'function') _qShowView('searching');
+    st.searchStarted = Date.now();
+    if (typeof _qTickSearch === 'function') _qTickSearch();
+  };
 
   /* ── 3 · Pools ───────────────────────────────────────────────── */
   function paintPools(){
