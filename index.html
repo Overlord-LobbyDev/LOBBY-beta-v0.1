@@ -64432,446 +64432,6 @@ async function reactComment(ev, id, btn){
 </style>
 
 
-<!-- ══════════════════════════════════════════════════════════════════
-     QUEUE — THE PULSE BOARD
-
-     The page was three stacked steps and a screen and a half of scroll
-     before anything could be pressed, and every one of those decisions
-     was made BEFORE the player got to find out whether anyone was there.
-     The answer, almost always, was nobody: exact game × exact party size
-     is 783 buckets, and queue_sessions holds one row in its entire
-     history with state 'cancelled'. Somebody tried it once and waited
-     until they gave up.
-
-     So the order is inverted. The first thing on the page is the
-     population — how many people are queueing, in which pools, right
-     now — and joining one is a single click. The 87-game picker survives
-     as "pick exactly", folded away, for the player who wants one title
-     and will wait for it.
-
-     HONEST ABOUT ZERO. When nothing is running the board says so in
-     words and offers the things that do work: the pool that always
-     matches, an open lobby, a friend. A spinner implying a search is
-     closing in on something, when nothing is there, is the specific lie
-     this page used to tell.
-
-     BUILT BY EXTENSION. qBeginSearch, _qShowView, the roster and the
-     three-hour timer are untouched — the playlist path just sets
-     _qState and calls the same function. Nothing here reimplements the
-     flow that already works.
-     ══════════════════════════════════════════════════════════════════ -->
-<style>
-/* ── The board ─────────────────────────────────────────────────── */
-#qBoard{ margin:0 0 26px; }
-
-.qb-pulse{
-  display:flex; align-items:center; gap:14px; flex-wrap:wrap;
-  padding:15px 20px; margin-bottom:20px;
-  border-radius:14px;
-  background:linear-gradient(160deg, rgba(168,99,255,.1), rgba(255,255,255,.014));
-  border:1px solid color-mix(in srgb, var(--hub-accent) 26%, transparent);
-}
-.qb-pulse-n{
-  font-family:'Archivo', var(--font), sans-serif;
-  font-size:30px; font-weight:900; line-height:1; color:#fff;
-  font-variant-numeric:tabular-nums;
-}
-.qb-pulse-l{
-  font-family:'JetBrains Mono', ui-monospace, monospace;
-  font-size:10px; font-weight:700; letter-spacing:1.8px; text-transform:uppercase;
-  color:var(--text-3); margin-top:6px;
-}
-.qb-dot{
-  width:8px; height:8px; border-radius:50%; flex:0 0 auto;
-  background:#3ddc84; box-shadow:0 0 12px rgba(61,220,132,.8);
-  animation:qbPulse 2s ease-in-out infinite;
-}
-.qb-dot.cold{ background:rgba(255,255,255,.22); box-shadow:none; animation:none; }
-@keyframes qbPulse{ 50%{ opacity:.35; } }
-.qb-pulse-msg{ font-size:13.5px; color:var(--text-2); line-height:1.55; max-width:56ch; }
-.qb-pulse-msg b{ color:#fff; font-weight:700; }
-
-/* ── Playlists ─────────────────────────────────────────────────── */
-.qb-grid{
-  display:grid; gap:14px;
-  grid-template-columns:repeat(auto-fill, minmax(310px, 1fr));
-}
-.qb-card{
-  position:relative; overflow:hidden;
-  display:flex; flex-direction:column; gap:14px;
-  padding:20px 22px; border-radius:16px; cursor:pointer;
-  background:linear-gradient(160deg, rgba(255,255,255,.035), rgba(255,255,255,.012));
-  border:1px solid rgba(255,255,255,.08);
-  transition:transform .2s cubic-bezier(.22,1,.36,1),
-             border-color .2s ease, box-shadow .2s ease;
-}
-.qb-card::before{
-  content:''; position:absolute; top:0; left:22px; right:22px; height:1px;
-  background:linear-gradient(90deg, transparent,
-    color-mix(in srgb, var(--hub-accent) 42%, rgba(255,255,255,.14)) 25%,
-    color-mix(in srgb, var(--hub-accent) 42%, rgba(255,255,255,.14)) 75%, transparent);
-}
-.qb-card:hover{
-  transform:translateY(-4px);
-  border-color:color-mix(in srgb, var(--hub-accent) 52%, transparent);
-  box-shadow:0 18px 40px rgba(0,0,0,.5),
-             0 0 26px color-mix(in srgb, var(--hub-accent) 14%, transparent);
-}
-/* The pool that can always match. Marked, because on a quiet night it
-   is the correct answer and the player should be able to see that. */
-.qb-card.always{
-  border-color:color-mix(in srgb, var(--hub-accent) 34%, transparent);
-  background:linear-gradient(160deg, rgba(168,99,255,.1), rgba(255,255,255,.012));
-}
-.qb-card-top{ display:flex; align-items:flex-start; gap:14px; }
-.qb-name{
-  font-family:'Archivo', var(--font), sans-serif;
-  font-size:19px; font-weight:900; letter-spacing:.2px; color:#fff; line-height:1.15;
-}
-.qb-sub{ font-size:12.5px; color:var(--text-3); margin-top:5px; line-height:1.5; }
-.qb-size{
-  margin-left:auto; flex:0 0 auto;
-  font-family:'JetBrains Mono', ui-monospace, monospace;
-  font-size:10px; font-weight:800; letter-spacing:1.3px; text-transform:uppercase;
-  color:var(--text-2);
-  padding:5px 10px; border-radius:99px;
-  background:rgba(255,255,255,.05); border:1px solid rgba(255,255,255,.09);
-}
-.qb-foot{ display:flex; align-items:center; gap:12px; margin-top:auto; }
-.qb-count{
-  display:inline-flex; align-items:center; gap:8px;
-  font-family:'JetBrains Mono', ui-monospace, monospace;
-  font-size:10.5px; font-weight:700; letter-spacing:1.2px; text-transform:uppercase;
-  color:#3ddc84;
-}
-.qb-count.cold{ color:var(--text-3); }
-.qb-join{
-  margin-left:auto;
-  display:inline-flex; align-items:center; gap:7px;
-  padding:9px 16px; border-radius:10px; cursor:pointer;
-  font-family:'Archivo', var(--font), sans-serif;
-  font-size:11.5px; font-weight:800; letter-spacing:.6px; color:#fff;
-  background:color-mix(in srgb, var(--hub-accent) 26%, transparent);
-  border:1px solid color-mix(in srgb, var(--hub-accent) 58%, transparent);
-  transition:background .18s ease, border-color .18s ease;
-}
-.qb-card:hover .qb-join{
-  background:color-mix(in srgb, var(--hub-accent) 42%, transparent);
-  border-color:color-mix(in srgb, var(--hub-accent) 78%, transparent);
-}
-.qb-games{ display:flex; gap:5px; flex-wrap:wrap; }
-.qb-game{
-  font-family:'JetBrains Mono', ui-monospace, monospace;
-  font-size:9px; font-weight:700; letter-spacing:.9px; text-transform:uppercase;
-  color:var(--text-3);
-  padding:3px 8px; border-radius:5px;
-  background:rgba(255,255,255,.045); border:1px solid rgba(255,255,255,.07);
-}
-
-/* ── Section headings inside the board ─────────────────────────── */
-.qb-head{
-  display:flex; align-items:baseline; gap:12px;
-  margin:30px 0 14px;
-}
-.qb-head-t{
-  font-family:'Archivo', var(--font), sans-serif;
-  font-size:13px; font-weight:800; letter-spacing:2.2px; text-transform:uppercase;
-  color:var(--text-2);
-}
-.qb-head-s{ font-size:12px; color:var(--text-3); }
-.qb-head::after{ content:''; flex:1; height:1px; background:rgba(255,255,255,.07); }
-
-/* ── Pick exactly ──────────────────────────────────────────────── */
-#qExactToggle{
-  display:flex; align-items:center; gap:12px; width:100%;
-  padding:15px 20px; border-radius:14px; cursor:pointer; text-align:left;
-  background:rgba(255,255,255,.026);
-  border:1px solid rgba(255,255,255,.08);
-  color:var(--text-2);
-  font-family:'Archivo', var(--font), sans-serif;
-  transition:background .18s ease, border-color .18s ease;
-}
-#qExactToggle:hover{ background:rgba(255,255,255,.055); border-color:rgba(255,255,255,.16); }
-#qExactToggle .t{ font-size:14px; font-weight:800; color:#fff; letter-spacing:.2px; }
-#qExactToggle .s{ font-size:12px; color:var(--text-3); margin-top:3px; }
-#qExactToggle .chev{
-  margin-left:auto; transition:transform .22s cubic-bezier(.22,1,.36,1);
-  color:var(--text-3);
-}
-#qExactToggle[aria-expanded="true"] .chev{ transform:rotate(90deg); }
-#queueOverlay.q-exact-closed .q-body-setup > .q-step-card{ display:none !important; }
-
-/* ── The wait ──────────────────────────────────────────────────── */
-.qb-widen{
-  margin-top:20px; padding:16px 20px; border-radius:14px;
-  background:rgba(255,255,255,.03);
-  border:1px solid rgba(255,255,255,.08);
-  max-width:460px;
-}
-.qb-widen-l{
-  font-family:'JetBrains Mono', ui-monospace, monospace;
-  font-size:9.5px; font-weight:700; letter-spacing:1.8px; text-transform:uppercase;
-  color:var(--text-3); margin-bottom:10px;
-}
-.qb-widen-v{ font-size:14px; color:#fff; font-weight:600; }
-.qb-widen-bar{
-  height:5px; border-radius:99px; margin-top:12px;
-  background:rgba(255,255,255,.08); overflow:hidden;
-}
-.qb-widen-bar i{
-  display:block; height:100%; border-radius:99px;
-  background:linear-gradient(90deg,
-    color-mix(in srgb, var(--hub-accent) 70%, white), var(--hub-accent));
-  transition:width .9s linear;
-}
-.qb-widen-next{
-  font-family:'JetBrains Mono', ui-monospace, monospace;
-  font-size:10px; letter-spacing:1.2px; text-transform:uppercase;
-  color:var(--text-3); margin-top:10px;
-}
-
-@media (prefers-reduced-motion: reduce){
-  .qb-dot{ animation:none; }
-  .qb-card{ transition:none; }
-}
-</style>
-<script>
-(function () {
-  'use strict';
-
-  function esc(v){
-    return String(v == null ? '' : v)
-      .replace(/&/g,'&amp;').replace(/</g,'&lt;')
-      .replace(/>/g,'&gt;').replace(/"/g,'&quot;');
-  }
-  function jsStr(v){ return JSON.stringify(String(v == null ? '' : v)).replace(/"/g,'&quot;'); }
-
-  var pulse = { total:0, playlists:{}, games:{}, definitions:[] };
-  var pulseTimer = null;
-
-  function gameName(id){
-    try {
-      if (typeof GT_GAMES !== 'undefined'){
-        var g = GT_GAMES.find(function (x){ return x.id === id; });
-        if (g) return g.short || g.name;
-      }
-    } catch (e){}
-    return id;
-  }
-
-  /* ── The board ───────────────────────────────────────────────── */
-  function boardHtml(){
-    var defs = pulse.definitions || [];
-    var live = pulse.total > 0;
-
-    var header = '<div class="qb-pulse">' +
-      '<span class="qb-dot' + (live ? '' : ' cold') + '"></span>' +
-      '<div><div class="qb-pulse-n">' + pulse.total + '</div>' +
-        '<div class="qb-pulse-l">' + (pulse.total === 1 ? 'Player waiting' : 'Players waiting') + '</div></div>' +
-      '<div class="qb-pulse-msg">' + (live
-        ? 'Pick the pool they are in and you will be matched with them. Everyone in a pool is matchable with everyone else in it.'
-        : '<b>Nobody is queueing right now.</b> Join a pool anyway and you will be first in it — ' +
-          'or take a look at what is already running.') +
-      '</div></div>';
-
-    if (!defs.length){
-      return header + '<div class="qb-head"><span class="qb-head-t">Pools</span></div>' +
-        '<div class="qb-pulse-msg" style="padding:8px 2px">Could not reach the queue. ' +
-        'The exact-game form below still works.</div>';
-    }
-
-    var cards = defs.map(function (d){
-      var p = pulse.playlists[d.id] || { waiting:0 };
-      var n = p.waiting || 0;
-      var games = (d.games || []).slice(0, 5).map(function (g){
-        return '<span class="qb-game">' + esc(gameName(g)) + '</span>';
-      }).join('');
-      var more = (d.games && d.games.length > 5)
-        ? '<span class="qb-game">+' + (d.games.length - 5) + '</span>' : '';
-      if (!d.games) games = '<span class="qb-game">Any game</span>';
-
-      return '<div class="qb-card' + (d.id === 'any' ? ' always' : '') + '" ' +
-          'onclick="window.qJoinPlaylist(' + jsStr(d.id) + ')">' +
-        '<div class="qb-card-top">' +
-          '<div><div class="qb-name">' + esc(d.name) + '</div>' +
-          '<div class="qb-sub">' + esc(d.sub) + '</div></div>' +
-          '<span class="qb-size">' + d.players + ' players</span>' +
-        '</div>' +
-        '<div class="qb-games">' + games + more + '</div>' +
-        '<div class="qb-foot">' +
-          '<span class="qb-count' + (n ? '' : ' cold') + '">' +
-            (n ? '<span class="qb-dot"></span>' + n + ' waiting'
-               : '<span class="qb-dot cold"></span>Be first') + '</span>' +
-          '<span class="qb-join">Join' +
-            '<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" ' +
-            'stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round">' +
-            '<polyline points="9 18 15 12 9 6"/></svg></span>' +
-        '</div>' +
-      '</div>';
-    }).join('');
-
-    return header +
-      '<div class="qb-head"><span class="qb-head-t">Pools</span>' +
-        '<span class="qb-head-s">One click. Everyone in a pool can match with everyone else in it.</span></div>' +
-      '<div class="qb-grid">' + cards + '</div>';
-  }
-
-  function render(){
-    var host = document.getElementById('qBoard');
-    if (!host) return;
-    host.innerHTML = boardHtml();
-  }
-
-  async function load(){
-    try {
-      var r = await window.api('/queue/pulse');
-      if (r && typeof r.total === 'number') pulse = r;
-    } catch (e){}
-    render();
-  }
-
-  /* ── Joining ─────────────────────────────────────────────────── */
-  window.qJoinPlaylist = async function (id){
-    var def = (pulse.definitions || []).find(function (d){ return d.id === id; });
-    if (!def) return;
-
-    /* The existing flow is reused wholesale rather than reimplemented:
-       set the state qBeginSearch reads, then let it run. It handles the
-       view switch, the timers and the poll. */
-    try {
-      if (typeof _qState !== 'undefined'){
-        _qState.playlist = id;
-        _qState.players  = def.players;
-        /* qBeginSearch refuses to start without a game. The playlist IS
-           the bucket, so this stands in for one and the server ignores it
-           the moment a playlist is present. */
-        _qState.game = 'pl:' + id;
-      }
-    } catch (e){}
-
-    if (typeof window.qBeginSearch === 'function') await window.qBeginSearch();
-  };
-
-  /* ── The wait ────────────────────────────────────────────────── */
-  /* _qWindowFor opens the tier window at 30s, 90s and 180s. The page
-     never said so, which is what made an indefinite wait feel like a
-     failing one. Saying it turns the same three minutes into a countdown
-     with a guarantee on the end. */
-  var STEPS = [
-    { at:0,   label:'Exact rank only',        next:30  },
-    { at:30,  label:'One rank either way',    next:90  },
-    { at:90,  label:'Two ranks either way',   next:180 },
-    { at:180, label:'Any rank at all',        next:null },
-  ];
-
-  function widenHtml(sec){
-    var cur = STEPS[0];
-    for (var i = 0; i < STEPS.length; i++) if (sec >= STEPS[i].at) cur = STEPS[i];
-    var pct, next;
-    if (cur.next == null){
-      pct = 100;
-      next = 'Matching anyone who queues from here';
-    } else {
-      var span = cur.next - cur.at;
-      pct = Math.min(100, Math.round(((sec - cur.at) / span) * 100));
-      next = 'Widens again in ' + Math.max(0, cur.next - sec) + 's';
-    }
-    return '<div class="qb-widen-l">Matching window</div>' +
-      '<div class="qb-widen-v">' + esc(cur.label) + '</div>' +
-      '<div class="qb-widen-bar"><i style="width:' + pct + '%"></i></div>' +
-      '<div class="qb-widen-next">' + esc(next) + '</div>';
-  }
-
-  function tickWiden(){
-    var view = document.getElementById('qViewSearching');
-    if (!view || view.style.display === 'none') return;
-    var box = document.getElementById('qWiden');
-    if (!box){
-      box = document.createElement('div');
-      box.id = 'qWiden';
-      box.className = 'qb-widen';
-      var tip = document.getElementById('qSearchTip');
-      if (tip && tip.parentNode) tip.parentNode.insertBefore(box, tip.nextSibling);
-      else view.appendChild(box);
-    }
-    var started = 0;
-    try { if (typeof _qState !== 'undefined') started = _qState.searchStarted || 0; } catch (e){}
-    var sec = started ? Math.floor((Date.now() - started) / 1000) : 0;
-    box.innerHTML = widenHtml(sec);
-  }
-
-  /* ── Wire in ─────────────────────────────────────────────────── */
-  function mount(){
-    var setup = document.getElementById('qViewSetup');
-    if (!setup) return false;
-    if (!document.getElementById('qBoard')){
-      var board = document.createElement('div');
-      board.id = 'qBoard';
-      setup.insertBefore(board, setup.firstChild);
-
-      /* The 87-game form is not deleted — it is the right tool for the
-         player who wants one title and will wait. It just stops being
-         the first thing anyone meets. */
-      var toggle = document.createElement('button');
-      toggle.id = 'qExactToggle';
-      toggle.type = 'button';
-      toggle.setAttribute('aria-expanded', 'false');
-      toggle.innerHTML =
-        '<div><div class="t">Pick exactly</div>' +
-        '<div class="s">One specific game, your own party size and rank. Slower to fill.</div></div>' +
-        '<svg class="chev" width="16" height="16" viewBox="0 0 24 24" fill="none" ' +
-        'stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round">' +
-        '<polyline points="9 18 15 12 9 6"/></svg>';
-      toggle.addEventListener('click', function (){
-        var ov = document.getElementById('queueOverlay');
-        var open = ov.classList.toggle('q-exact-closed') === false;
-        toggle.setAttribute('aria-expanded', open ? 'true' : 'false');
-      });
-      var head = document.createElement('div');
-      head.className = 'qb-head';
-      head.innerHTML = '<span class="qb-head-t">Or be specific</span>';
-      board.parentNode.insertBefore(head, board.nextSibling);
-      board.parentNode.insertBefore(toggle, head.nextSibling);
-
-      var ov = document.getElementById('queueOverlay');
-      if (ov) ov.classList.add('q-exact-closed');
-    }
-    return true;
-  }
-
-  function start(){
-    if (typeof window.api !== 'function'){ setTimeout(start, 300); return; }
-
-    var origOpen = window.openQueuePanel;
-    if (typeof origOpen === 'function' && !origOpen.__boardWrapped){
-      var wrapped = function (){
-        var out = origOpen.apply(this, arguments);
-        if (mount()) { render(); load(); }
-        clearInterval(pulseTimer);
-        /* Ten seconds: fast enough that somebody arriving feels like it
-           happened, slow enough to be free. Cleared on close so a
-           backgrounded app is not polling forever. */
-        pulseTimer = setInterval(load, 10000);
-        return out;
-      };
-      wrapped.__boardWrapped = true;
-      window.openQueuePanel = wrapped;
-    }
-
-    var origClose = window.closeQueuePanel;
-    if (typeof origClose === 'function' && !origClose.__boardWrapped){
-      var wc = function (){ clearInterval(pulseTimer); pulseTimer = null; return origClose.apply(this, arguments); };
-      wc.__boardWrapped = true;
-      window.closeQueuePanel = wc;
-    }
-
-    setInterval(tickWiden, 1000);
-  }
-
-  if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', start);
-  else start();
-})();
-</script>
 
 
 <!-- ══════════════════════════════════════════════════════════════════
@@ -64906,7 +64466,37 @@ async function reactComment(ev, id, btn){
      ══════════════════════════════════════════════════════════════════ -->
 <style>
 /* ═══ Layout ══════════════════════════════════════════════════════ */
-#queueOverlay .q-body-setup{ max-width:1560px; margin:0 auto; }
+#queueOverlay .q-body-setup{
+  max-width:1780px; margin:0 auto;
+  padding-top:18px !important;   /* the first heading was clipping */
+}
+#qCols{
+  display:grid; grid-template-columns:minmax(0,1fr) 396px;
+  gap:30px; align-items:start;
+}
+#qSide{
+  position:sticky; top:14px;
+  display:flex; flex-direction:column; gap:16px;
+}
+/* The setup panels were built for full width. In a rail they need to
+   stack rather than sit in a row. */
+#qSide .q-step-card{ margin:0 !important; }
+#qSide .q-form-grid{ grid-template-columns:1fr !important; gap:14px !important; }
+#qSide .q-skill-grid{
+  display:grid !important;
+  grid-template-columns:repeat(4, minmax(0,1fr)) !important;
+  gap:8px !important;
+}
+#qSide .q-skill-tile{ padding:13px 6px !important; gap:7px !important; }
+#qSide .q-skill-pip{ width:22px !important; height:22px !important; }
+#qSide .q-skill-name{ font-size:10px !important; letter-spacing:.8px !important; }
+#qSide .q-friend-picker{ max-height:190px; overflow-y:auto; }
+#qSide .q-card-wide{ grid-column:auto !important; }
+@media (max-width:1360px){
+  #qCols{ grid-template-columns:1fr; }
+  #qSide{ position:static; }
+  #qSide .q-skill-grid{ grid-template-columns:repeat(7, minmax(0,1fr)) !important; }
+}
 
 /* Section headings borrow the front page's, so Queue reads as the same
    product rather than a settings screen wearing its colours. */
@@ -64946,8 +64536,8 @@ async function reactComment(ev, id, btn){
 
 /* ═══ Pulse strip ═════════════════════════════════════════════════ */
 #qPulse{
-  display:flex; align-items:center; gap:14px; flex-wrap:wrap;
-  padding:12px 18px; margin:0 0 30px; border-radius:12px;
+  display:flex; align-items:center; gap:11px; flex-wrap:wrap;
+  padding:12px 16px; margin:0; border-radius:12px;
   background:rgba(255,255,255,.028);
   border:1px solid rgba(255,255,255,.075);
   font-size:13px; color:var(--text-2);
@@ -65152,12 +64742,16 @@ async function reactComment(ev, id, btn){
 
 /* ═══ The commit ══════════════════════════════════════════════════ */
 #qGoWrap{
-  display:flex; flex-direction:column; align-items:center; gap:12px;
-  margin:34px 0 10px;
+  display:flex; flex-direction:column; align-items:stretch; gap:11px;
+  margin:0;
+  position:sticky; bottom:0;
+  padding:16px 0 4px;
+  background:linear-gradient(180deg, transparent, var(--bg-0) 34%);
 }
 #qGo{
-  display:inline-flex; align-items:center; gap:12px;
-  padding:16px 42px; border-radius:14px; border:0; cursor:pointer;
+  display:inline-flex; align-items:center; justify-content:center; gap:12px;
+  width:100%;
+  padding:17px 32px; border-radius:14px; border:0; cursor:pointer;
   font-family:'Archivo', var(--font), sans-serif;
   font-size:15px; font-weight:900; letter-spacing:1.6px; text-transform:uppercase;
   color:#0b0416;
@@ -65171,12 +64765,12 @@ async function reactComment(ev, id, btn){
 #qGo:disabled{ opacity:.4; cursor:not-allowed; transform:none; box-shadow:none; }
 #qGoNote{
   font-family:'JetBrains Mono', ui-monospace, monospace;
-  font-size:10px; font-weight:700; letter-spacing:1.6px; text-transform:uppercase;
-  color:var(--text-3);
+  font-size:10px; font-weight:700; letter-spacing:1.3px; text-transform:uppercase;
+  color:var(--text-3); text-align:center; line-height:1.5;
 }
 
 /* ═══ Pools, demoted ══════════════════════════════════════════════ */
-#qPools{ margin:44px 0 0; padding-top:30px; border-top:1px solid rgba(255,255,255,.07); }
+#qPools{ margin:40px 0 0; padding-top:28px; border-top:1px solid rgba(255,255,255,.07); }
 .qp-row{ display:grid; grid-template-columns:repeat(auto-fill, minmax(215px, 1fr)); gap:11px; }
 .qp{
   display:flex; align-items:center; gap:11px;
@@ -65261,19 +64855,20 @@ async function reactComment(ev, id, btn){
   async function loadLibrary(){
     var rec = await window.api('/steam/recent').catch(function (){ return null; });
     if (!Array.isArray(rec) || !rec.length) { lib = []; return; }
-    var ids = rec.map(function (g){ return g.appid; }).filter(Boolean);
-    try {
-      art = await window.api('/steam/art?appids=' + ids.slice(0, 50).join(',')) || {};
-    } catch (e){ art = {}; }
+    /* No second request. This response already carries capsule_img and
+       header_img -- it resolves them server-side through the same cache
+       /steam/art uses -- and its playtime fields are hours_total and
+       hours_recent, already divided and rounded. Reading
+       playtime_forever, which is not in this payload, is why every card
+       said 0H PLAYED. */
     lib = rec.map(function (g){
-      var a = art[String(g.appid)] || {};
       return {
         id: idForAppid(g.appid),
         appid: g.appid,
         name: g.name,
-        hours: Math.round((g.playtime_forever || 0) / 60),
-        recent: Math.round(((g.playtime_2weeks || 0) / 60) * 10) / 10,
-        art: a.capsule_img || a.header_img || '',
+        hours: Math.round(parseFloat(g.hours_total || 0)),
+        recent: parseFloat(g.hours_recent || 0) || 0,
+        art: g.capsule_img || g.header_img || '',
       };
     });
   }
@@ -65309,7 +64904,11 @@ async function reactComment(ev, id, btn){
         '<polyline points="20 6 9 17 4 12"/></svg></span>' +
       '<div class="ql-meta">' +
         '<div class="ql-name">' + esc(g.name) + '</div>' +
-        (g.hours != null ? '<div class="ql-hrs">' + g.hours + 'h played</div>' : '') +
+        (g.hours != null
+          ? '<div class="ql-hrs">' +
+              (g.recent ? g.recent + 'h this fortnight' : g.hours + 'h total') +
+            '</div>'
+          : '') +
       '</div>' +
     '</div>';
   }
@@ -65366,7 +64965,7 @@ async function reactComment(ev, id, btn){
     host.innerHTML = '<div id="qPicked" style="--qp-art:' + (a ? cssUrl(a) : 'none') + '">' +
       '<div class="art" style="' + (a ? 'background-image:' + cssUrl(a) : '') + '"></div>' +
       '<div><div class="nm">' + esc(nameFor(sel)) + '</div>' +
-      '<div class="sb">' + (l && l.hours ? l.hours + 'h played · ' : '') + 'Queueing for this' + '</div></div>' +
+      '<div class="sb">' + (l && l.hours ? l.hours + 'h total · ' : '') + 'Queueing for this' + '</div></div>' +
       '<button class="chg" onclick="window.qPickGame(\'\')">Change</button>' +
     '</div>';
   }
@@ -65410,6 +65009,26 @@ async function reactComment(ev, id, btn){
       var p = document.getElementById('qPicked');
       if (p) p.scrollIntoView({ behavior:'smooth', block:'nearest' });
     }
+  };
+
+  /* Lived in the pulse-board block that this replaced; the pool cards
+     still call it, so it moves here rather than dying with that block.
+     The existing search flow is reused wholesale -- set the state
+     qBeginSearch reads, then let it run. */
+  window.qJoinPlaylist = async function (id){
+    var def = (pulse.definitions || []).find(function (d){ return d.id === id; });
+    if (!def) return;
+    try {
+      if (typeof _qState !== 'undefined'){
+        _qState.playlist = id;
+        _qState.players  = def.players;
+        /* qBeginSearch refuses to start without a game. The pool IS the
+           bucket, so this stands in for one and the server ignores it
+           the moment a playlist is present. */
+        _qState.game = 'pl:' + id;
+      }
+    } catch (e){}
+    if (typeof window.qBeginSearch === 'function') await window.qBeginSearch();
   };
 
   function renderPulse(){
@@ -65508,25 +65127,35 @@ async function reactComment(ev, id, btn){
     if (ov && !ov.getAttribute('data-hub')) ov.setAttribute('data-hub', 'queue');
     if (ov) ov.classList.remove('q-exact-closed');
 
-    if (!document.getElementById('qLib')){
-      var pulseEl = document.createElement('div');
-      pulseEl.id = 'qPulse';
-      var libEl = document.createElement('div');
-      libEl.id = 'qLib';
-      setup.insertBefore(libEl, setup.firstChild);
-      setup.insertBefore(pulseEl, libEl);
+    if (!document.getElementById('qCols')){
+      var cols = document.createElement('div'); cols.id = 'qCols';
+      var main = document.createElement('div'); main.id = 'qMain';
+      var side = document.createElement('aside'); side.id = 'qSide';
+      cols.appendChild(main); cols.appendChild(side);
 
-      /* The commit button and the pools go after the existing step
-         cards, which keep every setup option exactly where it was. */
+      var libEl = document.createElement('div'); libEl.id = 'qLib';
+      var pools = document.createElement('div'); pools.id = 'qPools';
+      main.appendChild(libEl);
+      main.appendChild(pools);
+
+      /* The existing step cards are MOVED, not rebuilt. Every control in
+         them -- the stepper, the rank tiles, the proof field, the friend
+         and recent pickers -- keeps its ids, its handlers and its state,
+         so nothing about how the form works changes by putting it in a
+         rail. */
+      var pulseEl = document.createElement('div'); pulseEl.id = 'qPulse';
+      side.appendChild(pulseEl);
+      Array.prototype.slice.call(setup.children).forEach(function (el){
+        if (el.classList && el.classList.contains('q-step-card')) side.appendChild(el);
+      });
+
       var go = document.createElement('div');
       go.id = 'qGoWrap';
       go.innerHTML = '<button id="qGo" type="button" disabled></button>' +
                      '<div id="qGoNote"></div>';
-      setup.appendChild(go);
-      var pools = document.createElement('div');
-      pools.id = 'qPools';
-      setup.appendChild(pools);
+      side.appendChild(go);
 
+      setup.appendChild(cols);
       document.getElementById('qGo').addEventListener('click', function (){
         if (typeof window.qBeginSearch === 'function') window.qBeginSearch();
       });
