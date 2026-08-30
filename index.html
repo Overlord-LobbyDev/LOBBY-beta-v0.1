@@ -64434,377 +64434,461 @@ async function reactComment(ev, id, btn){
 
 
 
+
+
+
+
+
+
+
+
+
+
+<!-- The switcher owns its own list; this skin is registered there. -->
+
+
+
+
+
+
+
+
 <!-- ══════════════════════════════════════════════════════════════════
-     QUEUE — YOUR LIBRARY FIRST
+     QUEUE — THE MOCKUP, BUILT
 
-     The last pass led with pools. That was solving my problem, not the
-     product's: pools exist because 783 buckets never fill, but "Fighters"
-     is a category, and nobody sits down wanting to play a category. They
-     want to play Tekken. So the specific game comes first and the pools
-     drop to the bottom as the thing you do when nobody is about.
+     Four previous attempts at this screen were each appended on top of
+     the last: a library rail, then two columns, then a how-it-works
+     strip, then glass and aurora and grain, then a marquee. Six visual
+     systems arguing on one page, which is why it stopped looking like
+     anything. They are all deleted; this is the single implementation.
 
-     THE PICKER IS THE PAGE, SO IT HAD TO EARN IT. It was 88 flat tiles
-     in two overflowing rows, 55 of them two letters on a gradient,
-     because it rendered the whole of GT_GAMES in alphabetical-ish order
-     regardless of whether you own any of it.
+     It is the mockup and nothing else:
 
-     It now opens on YOUR games — pulled from the same Steam recents the
-     front page uses, at 600x900 capsule art, sized to be looked at.
-     Those are the titles you would actually queue for, they all have
-     real artwork by definition, and the full 88 stay one keystroke away
-     behind search. A library you own beats a catalogue you don't.
+       MARQUEE   full-bleed hero art, the page's title bar. What you are
+                 queueing for, how long you have played it, and the
+                 button. No panel, no frost — the artwork IS the design.
 
-     THE SETUP IS ALL THERE AND ALL VISIBLE. Party size, rank, proof and
-     stack are three numbered sections in the front page's own heading
-     treatment, not a collapsed drawer. Nothing is hidden behind a
-     toggle any more.
+       DECK      scroll down and the picker is Home's deck. Stepping it
+                 is choosing; the marquee above changes as you step.
+                 Depth is dimming and desaturation, never opacity.
 
-     The rank tiles lose their emoji. 🥉🥈🥇💠💎👑⚡ are drawn by the
-     operating system and were the one set of marks on the page not in
-     Lobby's idiom — the same fault as the achievement trophy. They are
-     drawn pips now, in each tier's own colour.
+       TABLE     queueing seats you immediately. The room exists the
+                 moment you press the button and the chairs fill around
+                 you. There is no loading screen because there is
+                 nothing to load.
+
+     Everything the earlier passes added and this does not have — the
+     aurora, the grain, the frosted panels, the second column — was
+     decoration standing in for content. Home has none of it and looks
+     better, because the game art is doing the work.
      ══════════════════════════════════════════════════════════════════ -->
 <style>
-/* ═══ Layout ══════════════════════════════════════════════════════ */
-#queueOverlay .q-body-setup{
-  max-width:1780px; margin:0 auto;
-  padding-top:18px !important;   /* the first heading was clipping */
+/* ═══ 1 · MARQUEE ═════════════════════════════════════════════════ */
+#queueOverlay .q-hero{
+  position:relative; overflow:hidden;
+  min-height:420px;
+  display:flex !important; flex-direction:column; justify-content:flex-end;
+  padding:44px 56px 40px !important;
+  border-bottom:1px solid rgba(255,255,255,.07);
 }
-#qCols{
-  display:grid; grid-template-columns:minmax(0,1fr) 396px;
-  gap:30px; align-items:start;
+#qArt{
+  position:absolute; inset:0; z-index:0;
+  background-size:cover; background-position:center 26%;
+  opacity:0; transition:opacity .6s ease;
 }
-#qSide{
-  position:sticky; top:14px;
-  display:flex; flex-direction:column; gap:16px;
+#qArt.on{ opacity:1; }
+#qArt::after{
+  content:''; position:absolute; inset:0;
+  background:
+    linear-gradient(92deg, rgba(7,8,13,.97) 0%, rgba(7,8,13,.82) 38%,
+                    rgba(7,8,13,.24) 74%, transparent 100%),
+    linear-gradient(180deg, rgba(7,8,13,.55) 0%, transparent 30%, rgba(7,8,13,.95) 100%);
 }
-/* The setup panels were built for full width. In a rail they need to
-   stack rather than sit in a row. */
-#qSide .q-step-card{ margin:0 !important; }
-#qSide .q-form-grid{ grid-template-columns:1fr !important; gap:14px !important; }
-#qSide .q-skill-grid{
-  display:grid !important;
-  grid-template-columns:repeat(4, minmax(0,1fr)) !important;
-  gap:8px !important;
-}
-#qSide .q-skill-tile{ padding:13px 6px !important; gap:7px !important; }
-#qSide .q-skill-pip{ width:22px !important; height:22px !important; }
-#qSide .q-skill-name{ font-size:10px !important; letter-spacing:.8px !important; }
-#qSide .q-friend-picker{ max-height:190px; overflow-y:auto; }
-#qSide .q-card-wide{ grid-column:auto !important; }
-@media (max-width:1360px){
-  #qCols{ grid-template-columns:1fr; }
-  #qSide{ position:static; }
-  #qSide .q-skill-grid{ grid-template-columns:repeat(7, minmax(0,1fr)) !important; }
-}
+#queueOverlay .q-hero > *{ position:relative; z-index:1; }
+#queueOverlay .q-hero-title{ display:none !important; }
+#queueOverlay .q-hero-sub{ display:none !important; }
+#queueOverlay .q-camera-notice{ display:none !important; }
+#queueOverlay .q-hero-eyebrow{ margin-bottom:20px !important; }
 
-/* Section headings borrow the front page's, so Queue reads as the same
-   product rather than a settings screen wearing its colours. */
-#queueOverlay .qh{
-  display:flex; flex-direction:column; align-items:center;
-  text-align:center; position:relative;
-  margin:0 0 22px; padding:6px 0;
+#qMq{ max-width:720px; }
+#qMqKick{
+  font-family:'JetBrains Mono', ui-monospace, monospace;
+  font-size:10px; font-weight:700; letter-spacing:2.6px; text-transform:uppercase;
+  color:color-mix(in srgb, var(--hub-accent) 70%, white);
+  margin-bottom:14px;
 }
-#queueOverlay .qh-t{
+#qMqName{
   font-family:'Archivo', var(--font), sans-serif;
-  font-size:23px; font-weight:900; letter-spacing:2.2px; text-transform:uppercase;
-  line-height:1.06; color:#fff; position:relative; padding-bottom:2px;
-  text-shadow:
-    0 -1px 0 rgba(255,255,255,.28),
-    0 1px 0 rgba(0,0,0,.55),
-    0 3px 7px rgba(0,0,0,.42),
-    0 0 42px color-mix(in srgb, var(--hub-accent) 36%, transparent);
+  font-size:clamp(34px, 4.2vw, 58px); font-weight:900;
+  text-transform:uppercase; letter-spacing:.5px; line-height:.98;
+  color:#fff; margin:0 0 14px;
+  text-shadow:0 4px 42px rgba(0,0,0,.92);
 }
-#queueOverlay .qh-bar{
-  width:64px; height:3px; border-radius:99px; margin-top:11px;
+#qMqDesc{
+  font-size:15px; line-height:1.58; color:rgba(255,255,255,.74);
+  max-width:48ch; margin:0 0 24px;
+}
+#qMqStats{ display:flex; align-items:flex-end; margin:0 0 28px; }
+.qmq{ padding-right:24px; margin-right:24px; border-right:1px solid rgba(255,255,255,.15); }
+.qmq:last-child{ border-right:0; margin-right:0; padding-right:0; }
+.qmq b{
+  display:block; font-family:'JetBrains Mono', ui-monospace, monospace;
+  font-size:23px; font-weight:800; color:#fff; line-height:1;
+  font-variant-numeric:tabular-nums;
+}
+.qmq span{
+  display:block; margin-top:7px;
+  font-family:'JetBrains Mono', ui-monospace, monospace;
+  font-size:9px; font-weight:700; letter-spacing:1.7px; text-transform:uppercase;
+  color:var(--text-3);
+}
+#qMqBtns{ display:flex; align-items:center; gap:11px; flex-wrap:wrap; }
+#qFind{
+  display:inline-flex; align-items:center; justify-content:center; gap:11px;
+  padding:16px 34px; border-radius:12px; border:0; cursor:pointer;
+  font-family:'Archivo', var(--font), sans-serif;
+  font-size:13.5px; font-weight:900; letter-spacing:1.6px; text-transform:uppercase;
+  color:#0d0320;
+  background:linear-gradient(180deg,
+    color-mix(in srgb, var(--hub-accent) 94%, white), var(--hub-accent));
+  box-shadow:0 16px 38px -10px color-mix(in srgb, var(--hub-accent) 58%, transparent),
+             inset 0 1px 0 rgba(255,255,255,.45);
+  transition:transform .18s cubic-bezier(.22,1,.36,1), filter .18s ease;
+}
+#qFind:hover{ transform:translateY(-2px); filter:brightness(1.07); }
+#qFind:disabled{
+  background:rgba(255,255,255,.07); color:rgba(255,255,255,.4);
+  box-shadow:none; cursor:not-allowed; transform:none;
+}
+.qghost{
+  display:inline-flex; align-items:center; gap:8px;
+  padding:14px 20px; border-radius:12px; cursor:pointer;
+  font-family:'Archivo', var(--font), sans-serif;
+  font-size:12px; font-weight:700; letter-spacing:.6px;
+  color:rgba(255,255,255,.8);
+  background:rgba(255,255,255,.06); border:1px solid rgba(255,255,255,.13);
+  transition:background .18s ease, color .18s ease;
+}
+.qghost:hover{ background:rgba(255,255,255,.13); color:#fff; }
+
+/* The three steps, kept to one quiet line — the marquee is the hero. */
+#qHow{
+  display:flex; align-items:center; gap:0; flex-wrap:wrap;
+  margin-top:26px; padding-top:20px;
+  border-top:1px solid rgba(255,255,255,.09);
+}
+.qhw{ display:flex; align-items:center; gap:11px; padding-right:22px; }
+.qhw + .qhw{ padding-left:22px; border-left:1px solid rgba(255,255,255,.1); }
+.qhw i{
+  flex:0 0 auto; width:30px; height:30px; border-radius:9px;
+  display:flex; align-items:center; justify-content:center;
+  color:color-mix(in srgb, var(--hub-accent) 88%, white);
+  background:color-mix(in srgb, var(--hub-accent) 14%, transparent);
+  border:1px solid color-mix(in srgb, var(--hub-accent) 28%, transparent);
+}
+.qhw i svg{ width:15px; height:15px; }
+.qhw b{ display:block; font-size:12.5px; font-weight:800; color:#fff; letter-spacing:.2px; }
+.qhw span{ display:block; font-size:11.5px; color:var(--text-3); margin-top:2px; }
+#qRules{ display:flex; gap:7px; flex-wrap:wrap; margin-left:auto; }
+.qrule{
+  display:inline-flex; align-items:center; gap:6px;
+  padding:5px 10px; border-radius:99px;
+  font-family:'JetBrains Mono', ui-monospace, monospace;
+  font-size:9px; font-weight:700; letter-spacing:1.2px; text-transform:uppercase;
+  color:var(--text-3);
+  background:rgba(255,255,255,.04); border:1px solid rgba(255,255,255,.08);
+}
+.qrule svg{ width:11px; height:11px; }
+.qrule.no{ color:#ff9a9a; border-color:rgba(255,120,120,.26); }
+.qrule.yes{ color:#7fe0a3; border-color:rgba(90,220,140,.24); }
+
+/* ═══ 2 · DECK ════════════════════════════════════════════════════ */
+#queueOverlay .q-body-setup{
+  max-width:1500px; margin:0 auto; padding:46px 40px 60px !important;
+}
+/* The original picker card and action bar are what the deck replaces. */
+#queueOverlay .q-body-setup > .q-step-card,
+#queueOverlay .q-body-setup > .q-actions{ display:none !important; }
+
+.qsec{ text-align:center; margin:0 0 4px; }
+.qsec-t{
+  font-family:'Archivo', var(--font), sans-serif;
+  font-size:25px; font-weight:900; letter-spacing:2.2px; text-transform:uppercase;
+  color:#fff; line-height:1.06;
+  text-shadow:0 -1px 0 rgba(255,255,255,.3), 0 1px 0 rgba(0,0,0,.55),
+              0 3px 7px rgba(0,0,0,.42),
+              0 0 42px color-mix(in srgb, var(--hub-accent) 34%, transparent);
+}
+.qsec-bar{
+  width:64px; height:3px; border-radius:99px; margin:11px auto;
   background:linear-gradient(90deg, transparent,
     color-mix(in srgb, var(--hub-accent) 95%, white) 35%,
     color-mix(in srgb, var(--hub-accent) 95%, white) 65%, transparent);
 }
-#queueOverlay .qh-k{
-  display:inline-flex; align-items:center; gap:10px; margin-top:13px;
+.qsec-k{
+  display:inline-flex; align-items:center; gap:10px;
   font-family:'JetBrains Mono', ui-monospace, monospace;
   font-size:10px; font-weight:700; letter-spacing:2.2px; text-transform:uppercase;
   color:var(--text-3);
   padding:5px 13px; border-radius:99px;
   background:rgba(255,255,255,.035); border:1px solid rgba(255,255,255,.07);
 }
-#queueOverlay .qh-k b{ color:#fff; font-weight:800; font-variant-numeric:tabular-nums; }
-#queueOverlay .qh-k .i{ color:color-mix(in srgb, var(--hub-accent) 90%, white); font-weight:800; }
-#queueOverlay .qh-k .sep{ color:rgba(255,255,255,.18); }
-#queueOverlay .qh-s{ font-size:12.5px; color:var(--text-3); margin-top:7px; }
+.qsec-k b{ color:#fff; font-weight:800; }
+.qsec-k .i{ color:color-mix(in srgb, var(--hub-accent) 90%, white); font-weight:800; }
+.qsec-k .sep{ color:rgba(255,255,255,.18); }
+.qsec-s{ font-size:12.5px; color:var(--text-3); margin-top:9px; }
 
-/* ═══ Pulse strip ═════════════════════════════════════════════════ */
-#qPulse{
-  display:flex; align-items:center; gap:11px; flex-wrap:wrap;
-  padding:12px 16px; margin:0; border-radius:12px;
-  background:rgba(255,255,255,.028);
-  border:1px solid rgba(255,255,255,.075);
-  font-size:13px; color:var(--text-2);
+#qDeck{ position:relative; height:400px; margin:30px 0 0; }
+#qTrack{ position:relative; height:100%; }
+.qc{
+  position:absolute; top:0; left:50%;
+  width:252px; height:378px; margin-left:-126px;
+  border-radius:16px; overflow:hidden; cursor:pointer;
+  background:#12151f; border:1px solid rgba(255,255,255,.09);
+  box-shadow:0 26px 60px -18px rgba(0,0,0,.85);
+  transform-origin:center center;
+  transform:translateX(var(--x,0)) scale(var(--s,1));
+  filter:brightness(var(--b,1)) saturate(var(--sat,1));
+  opacity:var(--o,1);
+  transition:transform .5s cubic-bezier(.22,1,.36,1),
+             filter .42s ease, opacity .42s ease,
+             box-shadow .42s ease, border-color .42s ease;
+  will-change:transform; backface-visibility:hidden;
 }
-#qPulse .n{
-  font-family:'JetBrains Mono', ui-monospace, monospace;
-  font-size:15px; font-weight:800; color:#fff; font-variant-numeric:tabular-nums;
-}
-#qPulse .dot{
-  width:7px; height:7px; border-radius:50%;
-  background:#3ddc84; box-shadow:0 0 10px rgba(61,220,132,.8);
-  animation:qPulseDot 2s ease-in-out infinite;
-}
-#qPulse .dot.cold{ background:rgba(255,255,255,.2); box-shadow:none; animation:none; }
-@keyframes qPulseDot{ 50%{ opacity:.35; } }
-
-/* ═══ The library ═════════════════════════════════════════════════ */
-#qLib{ margin:0 0 40px; position:relative; }
-.ql-rail{
-  display:flex; gap:16px; overflow-x:auto; overflow-y:hidden;
-  padding:6px 4px 18px; scroll-behavior:smooth; scroll-snap-type:x proximity;
-  scrollbar-width:thin; scrollbar-color:rgba(255,255,255,.16) transparent;
-  -webkit-mask-image:linear-gradient(90deg, transparent 0, #000 24px, #000 calc(100% - 24px), transparent 100%);
-          mask-image:linear-gradient(90deg, transparent 0, #000 24px, #000 calc(100% - 24px), transparent 100%);
-}
-.ql-rail::-webkit-scrollbar{ height:6px; }
-.ql-rail::-webkit-scrollbar-track{ background:transparent; }
-.ql-rail::-webkit-scrollbar-thumb{ background:rgba(255,255,255,.14); border-radius:99px; }
-
-.ql-card{
-  position:relative; flex:0 0 176px; width:176px;
-  scroll-snap-align:start; cursor:pointer;
-  border-radius:14px; overflow:hidden;
-  background:#10131b;
-  border:1px solid rgba(255,255,255,.08);
-  box-shadow:0 10px 26px rgba(0,0,0,.45);
-  transition:transform .22s cubic-bezier(.22,1,.36,1),
-             border-color .22s ease, box-shadow .22s ease;
-}
-.ql-card:hover{
-  transform:translateY(-6px);
-  border-color:color-mix(in srgb, var(--hub-accent) 55%, transparent);
-  box-shadow:0 22px 46px rgba(0,0,0,.6),
-             0 0 28px color-mix(in srgb, var(--hub-accent) 18%, transparent);
-}
-.ql-card.on{
-  border-color:var(--hub-accent);
-  box-shadow:0 0 0 1px var(--hub-accent),
-             0 18px 44px rgba(0,0,0,.6),
-             0 0 34px color-mix(in srgb, var(--hub-accent) 32%, transparent);
-}
-.ql-art{
-  position:relative; width:100%; aspect-ratio:2/3;
-  background-size:cover; background-position:center; background-color:#161a26;
-}
-.ql-art::after{
-  content:''; position:absolute; inset:0;
-  background:linear-gradient(180deg, transparent 48%, rgba(8,10,15,.94) 100%);
-}
-.ql-fb{
+.qc-art{ position:absolute; inset:0; background-size:cover; background-position:center; background:#161a26; }
+.qc-fb{
   position:absolute; inset:0; display:flex; align-items:center; justify-content:center;
   font-family:'Archivo', var(--font), sans-serif;
-  font-size:34px; font-weight:900; color:rgba(255,255,255,.16);
+  font-size:44px; font-weight:900; color:rgba(255,255,255,.14);
 }
-.ql-meta{ position:absolute; left:0; right:0; bottom:0; padding:12px 13px; z-index:2; }
-.ql-name{
+.qc-cap{
+  position:absolute; left:0; right:0; bottom:0; padding:16px;
+  background:linear-gradient(180deg, transparent, rgba(6,8,13,.96));
+}
+.qc-nm{
   font-family:'Archivo', var(--font), sans-serif;
-  font-size:13.5px; font-weight:800; color:#fff; line-height:1.25;
-  text-shadow:0 1px 3px rgba(0,0,0,.8);
+  font-size:15px; font-weight:800; color:#fff; line-height:1.2;
   display:-webkit-box; -webkit-line-clamp:2; line-clamp:2;
   -webkit-box-orient:vertical; overflow:hidden;
 }
-.ql-hrs{
+.qc-hr{
   font-family:'JetBrains Mono', ui-monospace, monospace;
-  font-size:9.5px; font-weight:700; letter-spacing:1.1px; text-transform:uppercase;
+  font-size:9.5px; font-weight:700; letter-spacing:1.2px; text-transform:uppercase;
   color:rgba(255,255,255,.62); margin-top:5px;
 }
-.ql-tick{
-  position:absolute; top:10px; right:10px; z-index:3;
-  width:26px; height:26px; border-radius:50%;
-  display:flex; align-items:center; justify-content:center;
-  background:var(--hub-accent); color:#0b0416;
-  box-shadow:0 4px 12px rgba(0,0,0,.5);
-  opacity:0; transform:scale(.7);
-  transition:opacity .18s ease, transform .18s cubic-bezier(.22,1,.36,1);
+.qc.on{
+  cursor:default; border-color:rgba(255,255,255,.34);
+  box-shadow:0 0 0 1px color-mix(in srgb, var(--hub-accent) 55%, transparent),
+             0 40px 90px -20px rgba(0,0,0,.95),
+             0 0 60px color-mix(in srgb, var(--hub-accent) 22%, transparent);
 }
-.ql-card.on .ql-tick{ opacity:1; transform:scale(1); }
-
-.ql-arrow{
-  position:absolute; top:calc(50% - 26px); transform:translateY(-50%);
-  width:40px; height:40px; border-radius:50%; z-index:6;
+.qnav{
+  position:absolute; top:50%; transform:translateY(-50%); z-index:40;
+  width:44px; height:44px; border-radius:50%;
   display:flex; align-items:center; justify-content:center;
   border:1px solid rgba(255,255,255,.14);
-  background:rgba(10,13,18,.84); backdrop-filter:blur(12px);
-  color:#fff; cursor:pointer; font-size:18px; line-height:1;
-  opacity:0; transition:opacity .2s ease, background .2s ease, transform .2s ease;
+  background:rgba(10,13,18,.7); backdrop-filter:blur(12px);
+  color:#fff; cursor:pointer; font-size:19px; line-height:1;
+  transition:background .2s, transform .2s, color .2s;
 }
-#qLib:hover .ql-arrow{ opacity:1; }
-.ql-arrow:hover{ background:var(--hub-accent); color:#0b0416; transform:translateY(-50%) scale(1.08); }
-.ql-arrow.prev{ left:-8px; }  .ql-arrow.next{ right:-8px; }
+.qnav:hover{ background:var(--hub-accent); color:#0d0320; transform:translateY(-50%) scale(1.08); }
+.qnav.p{ left:30px; } .qnav.n{ right:30px; }
+#qDots{ display:flex; justify-content:center; gap:7px; margin-top:20px; }
+#qDots i{
+  width:7px; height:7px; border-radius:99px; cursor:pointer;
+  background:rgba(255,255,255,.2); transition:width .28s, background .28s;
+}
+#qDots i.on{
+  width:26px; background:var(--hub-accent);
+  box-shadow:0 0 12px color-mix(in srgb, var(--hub-accent) 60%, transparent);
+}
 
-/* Search + full library */
-.ql-search{
-  display:flex; align-items:center; gap:11px;
-  padding:12px 16px; border-radius:12px; margin:4px 0 0;
-  background:rgba(8,10,16,.55);
-  border:1px solid rgba(255,255,255,.09);
-  transition:border-color .18s ease, box-shadow .18s ease;
+/* The settings bar under the deck. */
+#qBar{
+  display:flex; align-items:center; justify-content:center; gap:12px; flex-wrap:wrap;
+  margin:30px auto 0; padding:14px 18px; max-width:940px;
+  border-radius:16px;
+  background:linear-gradient(160deg, rgba(255,255,255,.045), rgba(255,255,255,.015));
+  border:1px solid rgba(255,255,255,.08);
 }
-.ql-search:focus-within{
-  border-color:color-mix(in srgb, var(--hub-accent) 54%, transparent);
-  box-shadow:0 0 0 3px color-mix(in srgb, var(--hub-accent) 15%, transparent);
-}
-.ql-search svg{ color:var(--text-3); flex:0 0 auto; }
-.ql-search input{
-  flex:1; background:none; border:0; outline:none; color:#fff;
-  font-family:'Archivo', var(--font), sans-serif; font-size:13.5px;
-}
-.ql-search input::placeholder{ color:var(--text-3); }
-.ql-hint{
+.qbl{
   font-family:'JetBrains Mono', ui-monospace, monospace;
-  font-size:9.5px; font-weight:700; letter-spacing:1.3px; text-transform:uppercase;
-  color:var(--text-3); white-space:nowrap;
+  font-size:9.5px; font-weight:700; letter-spacing:1.8px; text-transform:uppercase;
+  color:var(--text-3);
 }
-#qLibResults{
-  display:grid; grid-template-columns:repeat(auto-fill, minmax(132px, 1fr));
-  gap:12px; margin-top:16px;
+#queueOverlay #qBar .q-stepper{
+  display:flex !important; align-items:center; gap:2px;
+  padding:3px !important; border-radius:11px !important;
+  background:rgba(0,0,0,.35) !important; border:0 !important;
 }
-#qLibResults:empty{ display:none; }
-#qLibResults .ql-card{ flex:none; width:auto; }
-#qLibResults .ql-name{ font-size:12px; }
-
-/* ═══ Selected banner ═════════════════════════════════════════════ */
-#qPicked{
-  position:relative; overflow:hidden;
-  display:flex; align-items:center; gap:20px;
-  padding:20px 24px; border-radius:16px; margin:0 0 8px;
-  border:1px solid color-mix(in srgb, var(--hub-accent) 42%, transparent);
-  background:#0e111a;
+#queueOverlay #qBar .q-step-btn{
+  width:30px !important; height:30px !important; border-radius:8px !important;
 }
-#qPicked::before{
-  content:''; position:absolute; inset:0; z-index:0;
-  background-image:var(--qp-art, none);
-  background-size:cover; background-position:center 30%;
-  filter:blur(38px) saturate(1.5); opacity:.4; transform:scale(1.3);
+#queueOverlay #qBar .q-step-val{ min-width:26px; text-align:center; font-size:14px !important; }
+#queueOverlay #qBar .q-skill-grid{
+  display:flex !important; gap:3px !important;
+  padding:3px; border-radius:11px; background:rgba(0,0,0,.35);
+  grid-template-columns:none !important;
 }
-#qPicked > *{ position:relative; z-index:1; }
-#qPicked .art{
-  width:58px; height:87px; border-radius:9px; flex:0 0 auto;
-  background-size:cover; background-position:center; background-color:#161a26;
-  box-shadow:0 8px 20px rgba(0,0,0,.6);
+#queueOverlay #qBar .q-skill-tile{
+  padding:7px 11px !important; border-radius:8px !important;
+  flex-direction:row !important; gap:6px !important;
+  background:transparent !important; border:0 !important; box-shadow:none !important;
 }
-#qPicked .nm{
+#queueOverlay #qBar .q-skill-tile.is-selected{
+  background:var(--qst-color) !important;
+}
+#queueOverlay #qBar .q-skill-tile.is-selected .q-skill-name{ color:#0d0320 !important; }
+#queueOverlay #qBar .q-skill-tile.is-selected .q-skill-pip{ color:#0d0320 !important; filter:none; }
+#queueOverlay #qBar .q-skill-pip{ width:14px !important; height:14px !important; }
+#queueOverlay #qBar .q-skill-name{ font-size:9.5px !important; letter-spacing:.9px !important; }
+.qvr{ width:1px; height:24px; background:rgba(255,255,255,.1); }
+#qMore{
   font-family:'Archivo', var(--font), sans-serif;
-  font-size:22px; font-weight:900; color:#fff; letter-spacing:.2px; line-height:1.15;
+  font-size:11.5px; font-weight:700; color:var(--text-3);
+  background:none; border:0; cursor:pointer; padding:8px 6px;
 }
-#qPicked .sb{
-  font-family:'JetBrains Mono', ui-monospace, monospace;
-  font-size:10px; font-weight:700; letter-spacing:1.6px; text-transform:uppercase;
-  color:var(--text-3); margin-top:7px;
-}
-#qPicked .chg{
-  margin-left:auto;
-  padding:9px 15px; border-radius:10px; cursor:pointer;
-  font-family:'Archivo', var(--font), sans-serif;
-  font-size:11.5px; font-weight:700; letter-spacing:.5px; color:var(--text-2);
-  background:rgba(255,255,255,.06); border:1px solid rgba(255,255,255,.12);
-}
-#qPicked .chg:hover{ background:rgba(255,255,255,.12); color:#fff; }
+#qMore:hover{ color:#fff; }
+#queueOverlay.q-more .q-body-setup > .q-step-card:not(:first-of-type){ display:block !important; }
 
-/* ═══ Rank tiles, drawn not typed ═════════════════════════════════ */
-#queueOverlay .q-skill-tile{
-  position:relative;
-  display:flex !important; flex-direction:column; align-items:center; justify-content:center;
-  gap:9px !important; padding:16px 10px !important;
-  border-radius:13px !important;
-  background:rgba(255,255,255,.028) !important;
-  border:1px solid rgba(255,255,255,.08) !important;
-  transition:border-color .18s ease, background .18s ease, transform .18s ease !important;
+/* ═══ 3 · POOLS ═══════════════════════════════════════════════════ */
+#qPools{ margin:56px 0 0; }
+#qPoolRow{
+  display:grid; grid-template-columns:repeat(auto-fill, minmax(212px, 1fr));
+  gap:12px; margin-top:26px;
 }
-#queueOverlay .q-skill-tile:hover{
-  transform:translateY(-2px);
-  border-color:color-mix(in srgb, var(--qst-color) 60%, transparent) !important;
-  background:rgba(255,255,255,.055) !important;
+.qpool{
+  display:flex; align-items:center; gap:12px;
+  padding:15px 17px; border-radius:14px; cursor:pointer;
+  background:linear-gradient(160deg, rgba(255,255,255,.04), rgba(255,255,255,.012));
+  border:1px solid rgba(255,255,255,.08);
+  transition:border-color .18s, background .18s, transform .18s;
 }
-#queueOverlay .q-skill-tile.is-selected{
-  border-color:var(--qst-color) !important;
-  background:color-mix(in srgb, var(--qst-color) 14%, transparent) !important;
-  box-shadow:0 0 0 1px var(--qst-color), 0 0 26px color-mix(in srgb, var(--qst-color) 26%, transparent);
-}
-#queueOverlay .q-skill-emoji{ font-size:0 !important; line-height:0 !important; }
-#queueOverlay .q-skill-pip{
-  display:block; width:26px; height:26px; color:var(--qst-color);
-  filter:drop-shadow(0 0 10px color-mix(in srgb, var(--qst-color) 55%, transparent));
-}
-#queueOverlay .q-skill-name{
-  font-family:'Archivo', var(--font), sans-serif !important;
-  font-size:12px !important; font-weight:800 !important;
-  letter-spacing:1.2px !important; text-transform:uppercase !important;
-  color:#fff !important;
-}
-
-/* ═══ The commit ══════════════════════════════════════════════════ */
-#qGoWrap{
-  display:flex; flex-direction:column; align-items:stretch; gap:11px;
-  margin:0;
-  position:sticky; bottom:0;
-  padding:16px 0 4px;
-  background:linear-gradient(180deg, transparent, var(--bg-0) 34%);
-}
-#qGo{
-  display:inline-flex; align-items:center; justify-content:center; gap:12px;
-  width:100%;
-  padding:17px 32px; border-radius:14px; border:0; cursor:pointer;
-  font-family:'Archivo', var(--font), sans-serif;
-  font-size:15px; font-weight:900; letter-spacing:1.6px; text-transform:uppercase;
-  color:#0b0416;
-  background:linear-gradient(180deg,
-    color-mix(in srgb, var(--hub-accent) 92%, white), var(--hub-accent));
-  box-shadow:0 14px 34px color-mix(in srgb, var(--hub-accent) 36%, transparent),
-             inset 0 1px 0 rgba(255,255,255,.45);
-  transition:transform .18s cubic-bezier(.22,1,.36,1), filter .18s ease;
-}
-#qGo:hover{ transform:translateY(-2px); filter:brightness(1.07); }
-#qGo:disabled{ opacity:.4; cursor:not-allowed; transform:none; box-shadow:none; }
-#qGoNote{
-  font-family:'JetBrains Mono', ui-monospace, monospace;
-  font-size:10px; font-weight:700; letter-spacing:1.3px; text-transform:uppercase;
-  color:var(--text-3); text-align:center; line-height:1.5;
-}
-
-/* ═══ Pools, demoted ══════════════════════════════════════════════ */
-#qPools{ margin:40px 0 0; padding-top:28px; border-top:1px solid rgba(255,255,255,.07); }
-.qp-row{ display:grid; grid-template-columns:repeat(auto-fill, minmax(215px, 1fr)); gap:11px; }
-.qp{
-  display:flex; align-items:center; gap:11px;
-  padding:13px 15px; border-radius:12px; cursor:pointer;
-  background:rgba(255,255,255,.025);
-  border:1px solid rgba(255,255,255,.075);
-  transition:border-color .18s ease, background .18s ease;
-}
-.qp:hover{
+.qpool:hover{
+  transform:translateY(-3px);
   border-color:color-mix(in srgb, var(--hub-accent) 50%, transparent);
   background:color-mix(in srgb, var(--hub-accent) 10%, transparent);
 }
-.qp-n{ font-family:'Archivo', var(--font), sans-serif; font-size:13px; font-weight:800; color:#fff; }
-.qp-s{
+.qpool-n{ font-family:'Archivo', var(--font), sans-serif; font-size:13.5px; font-weight:800; color:#fff; }
+.qpool-s{
   font-family:'JetBrains Mono', ui-monospace, monospace;
   font-size:9px; font-weight:700; letter-spacing:1.1px; text-transform:uppercase;
   color:var(--text-3); margin-top:4px;
 }
-.qp-c{
+.qpool-c{
   margin-left:auto; flex:0 0 auto;
   font-family:'JetBrains Mono', ui-monospace, monospace;
   font-size:10px; font-weight:800; color:#3ddc84;
 }
-.qp-c.cold{ color:var(--text-3); }
+.qpool-c.cold{ color:var(--text-3); }
 
-/* Superseded: :first-of-type matches by element TYPE, so this stopped
-   matching the moment anything was inserted before the card. The card is
-   now hidden by what it contains -- see .q-dup-picker below. */
-#queueOverlay.q-exact-closed .q-body-setup > .q-step-card{ display:block !important; }
-#qExactToggle{ display:none !important; }
+/* ═══ 4 · TABLE ═══════════════════════════════════════════════════ */
+#queueOverlay .q-search-orb,
+#queueOverlay #qSearchTitle,
+#queueOverlay #qSearchMeta,
+#queueOverlay #qSearchTip,
+#queueOverlay #qViewSearching > .q-actions{ display:none !important; }
+#queueOverlay #qViewSearching{
+  display:flex; flex-direction:column; align-items:center; justify-content:center;
+  padding:44px 32px !important;
+}
+#qTable{
+  display:grid; grid-template-columns:288px 1fr; gap:38px;
+  width:100%; max-width:1080px; align-items:center;
+}
+.qtl{
+  font-family:'JetBrains Mono', ui-monospace, monospace;
+  font-size:9px; font-weight:700; letter-spacing:1.9px; text-transform:uppercase;
+  color:var(--text-3); margin:22px 0 9px;
+}
+.qtl:first-child{ margin-top:0; }
+#qtArt{
+  width:100%; aspect-ratio:2/3; border-radius:14px;
+  background-size:cover; background-position:center; background-color:#161a26;
+  border:1px solid rgba(255,255,255,.1);
+  box-shadow:0 22px 50px -14px rgba(0,0,0,.82);
+}
+#qtWin{ font-size:14.5px; color:#fff; font-weight:600; }
+#qtTrack{ height:5px; border-radius:99px; margin-top:11px; background:rgba(255,255,255,.08); overflow:hidden; }
+#qtTrack i{
+  display:block; height:100%; border-radius:99px;
+  background:linear-gradient(90deg, color-mix(in srgb, var(--hub-accent) 70%, white), var(--hub-accent));
+  transition:width .9s linear;
+}
+#qtNext{
+  font-family:'JetBrains Mono', ui-monospace, monospace;
+  font-size:10px; font-weight:700; letter-spacing:1.2px; text-transform:uppercase;
+  color:var(--text-3); margin-top:10px;
+}
+#qSeatsWrap{ display:flex; flex-direction:column; align-items:center; }
+#qSeats{ position:relative; width:440px; height:440px; }
+.qseat{
+  position:absolute; width:94px; height:94px; margin:-47px 0 0 -47px;
+  border-radius:50%; overflow:hidden;
+  display:flex; align-items:center; justify-content:center;
+  font-family:'JetBrains Mono', ui-monospace, monospace;
+  font-size:9px; font-weight:700; letter-spacing:1.2px; text-transform:uppercase;
+  color:var(--text-3);
+  border:1.5px dashed rgba(255,255,255,.18);
+  transition:border-color .4s, box-shadow .4s, background .4s;
+}
+.qseat.filled{
+  border:2px solid rgba(255,255,255,.24);
+  background:linear-gradient(135deg,#3a4a6b,#1a2030);
+  box-shadow:0 14px 34px rgba(0,0,0,.62);
+  color:#fff; font-family:'Archivo', var(--font), sans-serif;
+  font-size:24px; font-weight:900; letter-spacing:0;
+  animation:qSeatIn .5s cubic-bezier(.22,1,.36,1);
+}
+.qseat.filled img{ width:100%; height:100%; object-fit:cover; }
+.qseat.you{
+  border-color:var(--hub-accent);
+  box-shadow:0 0 0 2px color-mix(in srgb, var(--hub-accent) 45%, transparent),
+             0 14px 34px rgba(0,0,0,.62);
+}
+@keyframes qSeatIn{ from{ transform:scale(.72); opacity:0; } }
+.qseat-n{
+  position:absolute; left:50%; transform:translateX(-50%); white-space:nowrap;
+  font-family:'JetBrains Mono', ui-monospace, monospace;
+  font-size:9.5px; font-weight:700; letter-spacing:1.2px; color:var(--text-2);
+}
+#qCore{
+  position:absolute; left:50%; top:50%; transform:translate(-50%,-50%);
+  width:200px; height:200px; border-radius:50%;
+  display:flex; flex-direction:column; align-items:center; justify-content:center;
+  background:radial-gradient(circle at 50% 34%,
+    color-mix(in srgb, var(--hub-accent) 24%, transparent), rgba(10,12,20,.92) 70%);
+  border:1px solid rgba(255,255,255,.1);
+}
+#qCore b{
+  font-family:'JetBrains Mono', ui-monospace, monospace;
+  font-size:32px; font-weight:800; color:#fff; line-height:1;
+  font-variant-numeric:tabular-nums;
+}
+#qCore span{
+  font-family:'JetBrains Mono', ui-monospace, monospace;
+  font-size:9px; font-weight:700; letter-spacing:1.9px; text-transform:uppercase;
+  color:var(--text-3); margin-top:9px;
+}
+.qring{
+  position:absolute; inset:0; border-radius:50%; pointer-events:none;
+  border:1px solid color-mix(in srgb, var(--hub-accent) 30%, transparent);
+  animation:qRing 2.8s ease-out infinite;
+}
+.qring.b{ animation-delay:1.4s; }
+@keyframes qRing{ 0%{ transform:scale(.8); opacity:.85; } 100%{ transform:scale(1.08); opacity:0; } }
+#qtActs{ display:flex; gap:11px; margin-top:32px; }
 
+@media (max-width:1080px){
+  #qTable{ grid-template-columns:1fr; }
+  #qSeats{ width:360px; height:360px; }
+  .qseat{ width:78px; height:78px; margin:-39px 0 0 -39px; }
+  #queueOverlay .q-hero{ min-height:340px; padding:32px 26px !important; }
+}
 @media (prefers-reduced-motion: reduce){
-  .ql-card, #qGo, .q-skill-tile{ transition:none !important; }
-  #qPulse .dot{ animation:none; }
+  .qring{ animation:none; opacity:.35; }
+  .qseat.filled{ animation:none; }
+  .qc, #qFind{ transition:none; }
 }
 </style>
 <script>
@@ -64817,1652 +64901,420 @@ async function reactComment(ev, id, btn){
       .replace(/>/g,'&gt;').replace(/"/g,'&quot;');
   }
   function jsStr(v){ return JSON.stringify(String(v == null ? '' : v)).replace(/"/g,'&quot;'); }
-  function cssUrl(u){
-    return u ? "url('" + String(u).replace(/\\/g,'%5C').replace(/'/g,'%27') + "')" : '';
-  }
+  function url(u){ return u ? "url('" + String(u).replace(/'/g,'%27') + "')" : ''; }
+  function S(){ try { if (typeof _qState !== 'undefined') return _qState; } catch(e){} return null; }
+  function GAMES(){ try { if (typeof GT_GAMES !== 'undefined') return GT_GAMES; } catch(e){} return []; }
 
-  var lib = [];          // the player's own titles, with art
-  var art = {};          // appid -> { capsule_img, header_img }
-  var pulse = { total:0, playlists:{}, definitions:[] };
-  var pulseTimer = null;
-  var booted = false;
-
-  function games(){
-    try { if (typeof GT_GAMES !== 'undefined') return GT_GAMES; } catch (e){}
-    return [];
-  }
-  /* Steam recents give an appid; the queue wants an id it can store. Use
-     the GT_GAMES entry when one exists so an exact-game session from the
-     library and one from the full picker land in the same bucket, and
-     fall back to the appid otherwise. */
-  function idForAppid(appid){
-    var g = games().find(function (x){ return String(x.steamAppId) === String(appid); });
-    return g ? g.id : ('steam:' + appid);
-  }
-  function nameFor(id){
-    var g = games().find(function (x){ return x.id === id; });
-    if (g) return g.name;
-    var l = lib.find(function (x){ return x.id === id; });
-    return l ? l.name : id;
-  }
-  function artFor(id){
-    var l = lib.find(function (x){ return x.id === id; });
-    if (l && l.art) return l.art;
-    var g = games().find(function (x){ return x.id === id; });
-    return g ? (g.cover || g.header || '') : '';
-  }
-
-  /* ── Data ────────────────────────────────────────────────────── */
-  async function loadLibrary(){
-    var rec = await window.api('/steam/recent').catch(function (){ return null; });
-    if (!Array.isArray(rec) || !rec.length) { lib = []; return; }
-    /* No second request. This response already carries capsule_img and
-       header_img -- it resolves them server-side through the same cache
-       /steam/art uses -- and its playtime fields are hours_total and
-       hours_recent, already divided and rounded. Reading
-       playtime_forever, which is not in this payload, is why every card
-       said 0H PLAYED. */
-    lib = rec.map(function (g){
-      return {
-        id: idForAppid(g.appid),
-        appid: g.appid,
-        name: g.name,
-        hours: Math.round(parseFloat(g.hours_total || 0)),
-        recent: parseFloat(g.hours_recent || 0) || 0,
-        art: g.capsule_img || g.header_img || '',
-      };
-    });
-  }
-
-  async function loadPulse(){
-    try {
-      var r = await window.api('/queue/pulse');
-      if (r && typeof r.total === 'number') pulse = r;
-    } catch (e){}
-    renderPulse();
-    renderPools();
-  }
-
-  /* ── Render ──────────────────────────────────────────────────── */
-  function head(idx, title, sub, kicker){
-    return '<div class="qh">' +
-      '<div class="qh-t">' + esc(title) + '</div>' +
-      '<span class="qh-bar"></span>' +
-      '<div class="qh-k"><span class="i">' + ('0' + idx).slice(-2) + '</span>' +
-        '<span class="sep">/</span>' + kicker + '</div>' +
-      '<div class="qh-s">' + esc(sub) + '</div>' +
-    '</div>';
-  }
-
-  function cardHtml(g, selected){
-    return '<div class="ql-card' + (selected ? ' on' : '') + '" ' +
-        'onclick="window.qPickGame(' + jsStr(g.id) + ')" title="' + esc(g.name) + '">' +
-      '<div class="ql-art" style="' + (g.art ? 'background-image:' + cssUrl(g.art) : '') + '">' +
-        (g.art ? '' : '<div class="ql-fb">' + esc(String(g.name || '?').charAt(0).toUpperCase()) + '</div>') +
-      '</div>' +
-      '<span class="ql-tick"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" ' +
-        'stroke="currentColor" stroke-width="3.2" stroke-linecap="round" stroke-linejoin="round">' +
-        '<polyline points="20 6 9 17 4 12"/></svg></span>' +
-      '<div class="ql-meta">' +
-        '<div class="ql-name">' + esc(g.name) + '</div>' +
-        (g.hours != null
-          ? '<div class="ql-hrs">' +
-              (g.recent ? g.recent + 'h this fortnight' : g.hours + 'h total') +
-            '</div>'
-          : '') +
-      '</div>' +
-    '</div>';
-  }
-
-  function renderLibrary(){
-    var host = document.getElementById('qLib');
-    if (!host) return;
-    var sel = '';
-    try { if (typeof _qState !== 'undefined') sel = _qState.game || ''; } catch (e){}
-
-    var kicker = lib.length
-      ? '<span>Your Steam library</span><span class="sep">·</span>' +
-        '<b>' + lib.length + '</b> games'
-      : '<span>Full catalogue</span><span class="sep">·</span><b>' + games().length + '</b> titles';
-
-    var rail = lib.length
-      ? '<div style="position:relative">' +
-          '<button class="ql-arrow prev" onclick="window.qLibScroll(-1)" aria-label="Scroll left">‹</button>' +
-          '<div class="ql-rail" id="qLibRail">' +
-            lib.map(function (g){ return cardHtml(g, g.id === sel); }).join('') +
-          '</div>' +
-          '<button class="ql-arrow next" onclick="window.qLibScroll(1)" aria-label="Scroll right">›</button>' +
-        '</div>'
-      : '';
-
-    host.innerHTML =
-      head(1, 'Choose your game',
-        lib.length ? 'The games you actually play, first. Search for anything else.'
-                   : 'Search the full library.',
-        kicker) +
-      '<div id="qPickedHost"></div>' +
-      rail +
-      '<div class="ql-search">' +
-        '<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" ' +
-          'stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round">' +
-          '<circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>' +
-        '<input id="qLibSearch" type="text" placeholder="Search every game…" ' +
-          'oninput="window.qLibSearch(this.value)" autocomplete="off">' +
-        '<span class="ql-hint">' + games().length + ' titles</span>' +
-      '</div>' +
-      '<div id="qLibResults"></div>';
-
-    renderPicked();
-  }
-
-  function renderPicked(){
-    var host = document.getElementById('qPickedHost');
-    if (!host) return;
-    var sel = '';
-    try { if (typeof _qState !== 'undefined') sel = _qState.game || ''; } catch (e){}
-    if (!sel || String(sel).indexOf('pl:') === 0){ host.innerHTML = ''; return; }
-    var a = artFor(sel);
-    var l = lib.find(function (x){ return x.id === sel; });
-    host.innerHTML = '<div id="qPicked" style="--qp-art:' + (a ? cssUrl(a) : 'none') + '">' +
-      '<div class="art" style="' + (a ? 'background-image:' + cssUrl(a) : '') + '"></div>' +
-      '<div><div class="nm">' + esc(nameFor(sel)) + '</div>' +
-      '<div class="sb">' + (l && l.hours ? l.hours + 'h total · ' : '') + 'Queueing for this' + '</div></div>' +
-      '<button class="chg" onclick="window.qPickGame(\'\')">Change</button>' +
-    '</div>';
-  }
-
-  window.qLibScroll = function (dir){
-    var r = document.getElementById('qLibRail');
-    if (r) r.scrollBy({ left: dir * Math.max(300, r.clientWidth * 0.8), behavior:'smooth' });
-  };
-
-  window.qLibSearch = function (q){
-    var host = document.getElementById('qLibResults');
-    if (!host) return;
-    q = String(q || '').trim().toLowerCase();
-    if (!q){ host.innerHTML = ''; return; }
-    var sel = '';
-    try { if (typeof _qState !== 'undefined') sel = _qState.game || ''; } catch (e){}
-    var hits = games().filter(function (g){
-      if (g.id === 'other') return false;
-      return (g.name || '').toLowerCase().indexOf(q) !== -1
-          || (g.id || '').toLowerCase().indexOf(q) !== -1
-          || (g.short || '').toLowerCase().indexOf(q) !== -1;
-    }).slice(0, 24);
-    host.innerHTML = hits.length
-      ? hits.map(function (g){
-          return cardHtml({ id:g.id, name:g.name, art:g.cover || g.header || '', hours:null }, g.id === sel);
-        }).join('')
-      : '<div style="grid-column:1/-1;padding:18px 2px;color:var(--text-3);font-size:13px">' +
-        'Nothing matches “' + esc(q) + '”.</div>';
-  };
-
-  window.qPickGame = function (id){
-    try {
-      if (typeof _qState !== 'undefined'){
-        _qState.game = id || '';
-        _qState.playlist = null;   /* a specific title is not a pool */
-      }
-    } catch (e){}
-    renderLibrary();
-    syncGo();
-    if (id){
-      var p = document.getElementById('qPicked');
-      if (p) p.scrollIntoView({ behavior:'smooth', block:'nearest' });
-    }
-  };
-
-  /* Lived in the pulse-board block that this replaced; the pool cards
-     still call it, so it moves here rather than dying with that block.
-     The existing search flow is reused wholesale -- set the state
-     qBeginSearch reads, then let it run. */
-  window.qJoinPlaylist = async function (id){
-    var def = (pulse.definitions || []).find(function (d){ return d.id === id; });
-    if (!def) return;
-    try {
-      if (typeof _qState !== 'undefined'){
-        _qState.playlist = id;
-        _qState.players  = def.players;
-        /* qBeginSearch refuses to start without a game. The pool IS the
-           bucket, so this stands in for one and the server ignores it
-           the moment a playlist is present. */
-        _qState.game = 'pl:' + id;
-      }
-    } catch (e){}
-    if (typeof window.qBeginSearch === 'function') await window.qBeginSearch();
-  };
-
-  function renderPulse(){
-    var el = document.getElementById('qPulse');
-    if (!el) return;
-    var live = pulse.total > 0;
-    el.innerHTML = '<span class="dot' + (live ? '' : ' cold') + '"></span>' +
-      '<span class="n">' + pulse.total + '</span>' +
-      '<span>' + (live
-        ? (pulse.total === 1 ? 'player is queueing right now.' : 'players are queueing right now.')
-        : 'players queueing right now — pick your game and you will be first in line.') +
-      '</span>';
-  }
-
-  function renderPools(){
-    var host = document.getElementById('qPools');
-    if (!host) return;
-    var defs = pulse.definitions || [];
-    if (!defs.length){ host.innerHTML = ''; return; }
-    host.innerHTML =
-      head(4, 'Or drop into a pool',
-        'Wider nets, so they fill faster. Your rank still applies.',
-        '<span>Shared pools</span><span class="sep">·</span><b>' + defs.length + '</b> open') +
-      '<div class="qp-row">' + defs.map(function (d){
-        var n = (pulse.playlists[d.id] || {}).waiting || 0;
-        return '<div class="qp" onclick="window.qJoinPlaylist(' + jsStr(d.id) + ')">' +
-          '<div><div class="qp-n">' + esc(d.name) + '</div>' +
-          '<div class="qp-s">' + d.players + ' players · ' +
-            (d.games ? d.games.length + ' games' : 'any game') + '</div></div>' +
-          '<span class="qp-c' + (n ? '' : ' cold') + '">' + (n ? n + ' waiting' : '—') + '</span>' +
-        '</div>';
-      }).join('') + '</div>';
-  }
-
-  /* ── The commit ──────────────────────────────────────────────── */
-  function syncGo(){
-    var btn = document.getElementById('qGo');
-    var note = document.getElementById('qGoNote');
-    if (!btn) return;
-    var sel = '', players = 2, skill = 'plat';
-    try {
-      if (typeof _qState !== 'undefined'){
-        sel = _qState.game || ''; players = _qState.players; skill = _qState.skill;
-      }
-    } catch (e){}
-    var ready = !!sel;
-    btn.disabled = !ready;
-    btn.innerHTML =
-      '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" ' +
-      'stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round">' +
-      '<circle cx="11" cy="11" r="7"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>' +
-      (ready ? 'Find players' : 'Pick a game');
-    if (note){
-      note.textContent = ready
-        ? nameFor(sel) + ' · ' + players + ' players · ' + String(skill).toUpperCase()
-        : 'Choose a title above, or drop into a pool below';
-    }
-  }
-  window.qSyncGo = syncGo;
-
-  /* ── Rank pips ───────────────────────────────────────────────── */
-  /* The tier marks were emoji, drawn by the OS. These are drawn here,
-     in the tier's own colour, at the app's stroke weight. */
-  var PIPS = {
-    bronze:'<path d="M12 3 4 8v8l8 5 8-5V8l-8-5Z"/>',
-    silver:'<path d="M12 3 4 8v8l8 5 8-5V8l-8-5Z"/><path d="M12 8v8"/>',
-    gold:'<path d="M12 3 4 8v8l8 5 8-5V8l-8-5Z"/><path d="M8.5 10.5 12 8l3.5 2.5"/><path d="M12 8v8"/>',
-    plat:'<path d="M12 2.5 21 12l-9 9.5L3 12l9-9.5Z"/>',
-    diamond:'<path d="M12 2.5 21 12l-9 9.5L3 12l9-9.5Z"/><path d="M7.5 12 12 7l4.5 5-4.5 5-4.5-5Z"/>',
-    master:'<path d="M4 18h16"/><path d="M4 18 3 7l5 3.5L12 4l4 6.5L21 7l-1 11"/>',
-    pro:'<path d="M13 2 4.5 13.5H11L10 22l8.5-11.5H12L13 2Z"/>',
-  };
-  function drawPips(){
-    document.querySelectorAll('#queueOverlay .q-skill-tile').forEach(function (t){
-      if (t.__pip) return;
-      var id = t.getAttribute('data-skill');
-      var d = PIPS[id];
-      if (!d) return;
-      var slot = t.querySelector('.q-skill-emoji');
-      if (!slot) return;
-      t.__pip = true;
-      slot.outerHTML = '<svg class="q-skill-pip" viewBox="0 0 24 24" fill="none" ' +
-        'stroke="currentColor" stroke-width="1.9" stroke-linecap="round" ' +
-        'stroke-linejoin="round" aria-hidden="true">' + d + '</svg>';
-    });
-  }
-
-  /* ── Mount ───────────────────────────────────────────────────── */
-  function mount(){
-    var setup = document.getElementById('qViewSetup');
-    if (!setup) return false;
-
-    var ov = document.getElementById('queueOverlay');
-    /* Borrows the hub heading styles that were generalised to [data-hub]
-       — no Hub instance, just the same typography. */
-    if (ov && !ov.getAttribute('data-hub')) ov.setAttribute('data-hub', 'queue');
-    if (ov) ov.classList.remove('q-exact-closed');
-
-    if (!document.getElementById('qCols')){
-      var cols = document.createElement('div'); cols.id = 'qCols';
-      var main = document.createElement('div'); main.id = 'qMain';
-      var side = document.createElement('aside'); side.id = 'qSide';
-      cols.appendChild(main); cols.appendChild(side);
-
-      var libEl = document.createElement('div'); libEl.id = 'qLib';
-      var pools = document.createElement('div'); pools.id = 'qPools';
-      main.appendChild(libEl);
-      main.appendChild(pools);
-
-      /* The existing step cards are MOVED, not rebuilt. Every control in
-         them -- the stepper, the rank tiles, the proof field, the friend
-         and recent pickers -- keeps its ids, its handlers and its state,
-         so nothing about how the form works changes by putting it in a
-         rail. */
-      var pulseEl = document.createElement('div'); pulseEl.id = 'qPulse';
-      side.appendChild(pulseEl);
-      Array.prototype.slice.call(setup.children).forEach(function (el){
-        if (el.classList && el.classList.contains('q-step-card')) side.appendChild(el);
-      });
-
-      var go = document.createElement('div');
-      go.id = 'qGoWrap';
-      go.innerHTML = '<button id="qGo" type="button" disabled></button>' +
-                     '<div id="qGoNote"></div>';
-      side.appendChild(go);
-
-      setup.appendChild(cols);
-      document.getElementById('qGo').addEventListener('click', function (){
-        if (typeof window.qBeginSearch === 'function') window.qBeginSearch();
-      });
-    }
-    return true;
-  }
-
-  function refresh(){
-    renderLibrary();
-    renderPulse();
-    renderPools();
-    drawPips();
-    syncGo();
-  }
-
-  function start(){
-    if (typeof window.api !== 'function'){ setTimeout(start, 300); return; }
-    if (booted) return;
-    booted = true;
-
-    var origOpen = window.openQueuePanel;
-    if (typeof origOpen === 'function' && !origOpen.__v2){
-      var wrapped = function (){
-        var out = origOpen.apply(this, arguments);
-        if (mount()){
-          refresh();
-          loadLibrary().then(refresh);
-          loadPulse();
-          clearInterval(pulseTimer);
-          pulseTimer = setInterval(loadPulse, 10000);
-        }
-        return out;
-      };
-      wrapped.__v2 = true;
-      window.openQueuePanel = wrapped;
-    }
-
-    var origClose = window.closeQueuePanel;
-    if (typeof origClose === 'function' && !origClose.__v2){
-      var wc = function (){ clearInterval(pulseTimer); pulseTimer = null; return origClose.apply(this, arguments); };
-      wc.__v2 = true;
-      window.closeQueuePanel = wc;
-    }
-
-    /* The steppers and rank tiles write straight into _qState, so the
-       summary under the button follows them. */
-    ['qStep','_qSelectSkill','_qSelectGame'].forEach(function (fn){
-      var orig = window[fn];
-      if (typeof orig !== 'function' || orig.__v2) return;
-      var w = function (){
-        var r = orig.apply(this, arguments);
-        drawPips(); renderPicked(); syncGo();
-        return r;
-      };
-      w.__v2 = true;
-      window[fn] = w;
-    });
-  }
-
-  if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', start);
-  else start();
-})();
-</script>
-
-
-<!-- ══════════════════════════════════════════════════════════════════
-     QUEUE — HOW IT WORKS, AND A RAIL THAT IS ONLY SETTINGS
-
-     Three faults from moving the form into a rail, all of them mine.
-
-     THE OLD GAME PICKER CAME WITH IT. Step one's card was supposed to be
-     hidden and was not: the rule used :first-of-type, which matches by
-     element TYPE, not by class -- so it stopped matching the moment
-     anything else was inserted before it. The rail ended up holding a
-     second, worse copy of the picker that the main column already does
-     properly. It is hidden by what it CONTAINS now, which cannot drift.
-
-     THE ORIGINAL ACTION BAR STAYED BEHIND. .q-actions is a sibling of
-     the step cards, not one of them, so it did not travel with them --
-     and because the two-column grid was appended after it, Cancel and
-     Start Searching ended up floating above the whole page. There is one
-     commit button now, at the foot of the rail.
-
-     NOBODY IS TOLD HOW THIS WORKS. Queue does something no other page
-     does -- it goes and finds strangers, puts them in a call, and holds
-     them for three hours -- and the page opened straight into a form. It
-     now opens on what is about to happen, in three steps, with the rules
-     stated up front rather than as a warning strip nobody reads: no
-     camera, screen share fine, three-hour cap, convert to a lobby to
-     keep the people.
-     ══════════════════════════════════════════════════════════════════ -->
-<style>
-/* ═══ How it works ════════════════════════════════════════════════ */
-#qHow{ margin:0 0 34px; }
-.qhow-row{
-  display:grid; grid-template-columns:repeat(3, minmax(0,1fr));
-  gap:0; border-radius:16px; overflow:hidden;
-  background:linear-gradient(160deg, rgba(255,255,255,.035), rgba(255,255,255,.012));
-  border:1px solid rgba(255,255,255,.08);
-}
-.qhow{
-  position:relative;
-  display:flex; align-items:flex-start; gap:15px;
-  padding:20px 24px;
-}
-.qhow + .qhow{ border-left:1px solid rgba(255,255,255,.07); }
-/* The chevron sits ON the seam, so the three read as a sequence rather
-   than as three unrelated boxes in a row. */
-.qhow + .qhow::before{
-  content:''; position:absolute; left:-7px; top:50%;
-  width:13px; height:13px; transform:translateY(-50%) rotate(45deg);
-  background:#12141d;
-  border-top:1px solid rgba(255,255,255,.07);
-  border-right:1px solid rgba(255,255,255,.07);
-}
-.qhow-ico{
-  flex:0 0 auto; width:42px; height:42px; border-radius:12px;
-  display:flex; align-items:center; justify-content:center;
-  color:color-mix(in srgb, var(--hub-accent) 90%, white);
-  background:color-mix(in srgb, var(--hub-accent) 13%, transparent);
-  border:1px solid color-mix(in srgb, var(--hub-accent) 30%, transparent);
-}
-.qhow-ico svg{ width:20px; height:20px; }
-.qhow-n{
-  position:absolute; top:14px; right:16px;
-  font-family:'JetBrains Mono', ui-monospace, monospace;
-  font-size:10px; font-weight:800; letter-spacing:1.4px;
-  color:rgba(255,255,255,.16);
-}
-.qhow-t{
-  font-family:'Archivo', var(--font), sans-serif;
-  font-size:14.5px; font-weight:800; color:#fff; letter-spacing:.2px;
-}
-.qhow-s{ font-size:12.5px; color:var(--text-3); margin-top:5px; line-height:1.5; }
-
-.qhow-rules{
-  display:flex; align-items:center; gap:9px; flex-wrap:wrap;
-  margin-top:10px; padding:11px 16px; border-radius:12px;
-  background:rgba(255,255,255,.022);
-  border:1px solid rgba(255,255,255,.07);
-}
-.qrule{
-  display:inline-flex; align-items:center; gap:7px;
-  font-family:'JetBrains Mono', ui-monospace, monospace;
-  font-size:9.5px; font-weight:700; letter-spacing:1.2px; text-transform:uppercase;
-  color:var(--text-3);
-  padding:5px 11px; border-radius:99px;
-  background:rgba(255,255,255,.035); border:1px solid rgba(255,255,255,.07);
-}
-.qrule svg{ width:12px; height:12px; flex:0 0 auto; }
-.qrule.no{ color:#ff9a9a; border-color:rgba(255,120,120,.28); background:rgba(255,90,90,.08); }
-.qrule.yes{ color:#7fe0a3; border-color:rgba(90,220,140,.26); background:rgba(70,220,130,.07); }
-
-@media (max-width:1100px){
-  .qhow-row{ grid-template-columns:1fr; }
-  .qhow + .qhow{ border-left:0; border-top:1px solid rgba(255,255,255,.07); }
-  .qhow + .qhow::before{ display:none; }
-}
-
-/* ═══ The rail is settings only ═══════════════════════════════════ */
-/* Hidden by what it contains, not by where it sits — the previous rule
-   keyed off :first-of-type and silently stopped matching. */
-#queueOverlay .q-step-card.q-dup-picker{ display:none !important; }
-/* One commit button. The original bar is a sibling of the step cards so
-   it never moved with them, and ended up above the entire page. */
-#queueOverlay .q-body-setup > .q-actions{ display:none !important; }
-/* Folded into the rules strip above, where it is read rather than
-   skipped. */
-#queueOverlay .q-camera-notice{ display:none !important; }
-
-#qSide{
-  max-height:calc(100vh - 190px);
-  overflow-y:auto; overflow-x:hidden;
-  padding-right:4px;
-  scrollbar-width:thin; scrollbar-color:rgba(255,255,255,.16) transparent;
-}
-#qSide::-webkit-scrollbar{ width:6px; }
-#qSide::-webkit-scrollbar-track{ background:transparent; }
-#qSide::-webkit-scrollbar-thumb{ background:rgba(255,255,255,.14); border-radius:99px; }
-
-/* A rail of settings does not need step numbers — the numbered sequence
-   is the strip at the top of the page now. */
-#qSide .q-step-num{ display:none !important; }
-#qSide .q-step-head{ gap:0 !important; }
-#qSide .q-step-label{ font-size:14px !important; letter-spacing:1.4px !important; }
-
-#qSideTitle{
-  display:flex; align-items:center; gap:10px;
-  padding:0 2px 2px;
-  font-family:'JetBrains Mono', ui-monospace, monospace;
-  font-size:10px; font-weight:700; letter-spacing:2.2px; text-transform:uppercase;
-  color:var(--text-3);
-}
-#qSideTitle::after{ content:''; flex:1; height:1px; background:rgba(255,255,255,.08); }
-</style>
-<script>
-(function () {
-  'use strict';
+  var lib = [], pulse = { total:0, playlists:{}, definitions:[] }, pulseTimer = null;
 
   var I = {
-    pick:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="14" rx="3"/><path d="M8 20h8"/><path d="M9 9.5h.01"/><path d="M15 9.5h.01"/><path d="M12 12.5h.01"/></svg>',
-    squad:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="9" cy="8" r="3.2"/><path d="M3 20v-1.5A4.5 4.5 0 0 1 7.5 14h3A4.5 4.5 0 0 1 15 18.5V20"/><circle cx="17" cy="9" r="2.4"/><path d="M17.5 13.4A4 4 0 0 1 21 17.3V19"/></svg>',
-    find:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="7"/><line x1="21" y1="21" x2="16.65" y2="16.65"/><path d="M11 8v3l2 1.4"/></svg>',
+    pick:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="14" rx="3"/><path d="M8 20h8"/><path d="M9 9.5h.01"/><path d="M15 9.5h.01"/></svg>',
+    squad:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="9" cy="8" r="3.2"/><path d="M3 20v-1.5A4.5 4.5 0 0 1 7.5 14h3A4.5 4.5 0 0 1 15 18.5V20"/><circle cx="17" cy="9" r="2.4"/></svg>',
+    find:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="7"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>',
     noCam:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M16 10.5 22 7v10l-6-3.5"/><rect x="2" y="6" width="14" height="12" rx="3"/><line x1="3" y1="3" x2="21" y2="21"/></svg>',
-    screen:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2.5" y="4" width="19" height="13" rx="2.5"/><path d="M8 21h8"/><path d="M12 17v4"/></svg>',
+    screen:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2.5" y="4" width="19" height="13" rx="2.5"/><path d="M8 21h8"/></svg>',
     clock:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3.2 1.9"/></svg>',
-    keep:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 21s-7-4.4-7-9.7A4.3 4.3 0 0 1 12 8a4.3 4.3 0 0 1 7 3.3C19 16.6 12 21 12 21Z"/></svg>',
   };
 
-  var STEPS = [
-    { ico:I.pick,  t:'Pick a game',
-      s:'Your Steam library first, or search all 88 titles. No game? Drop into a pool instead.' },
-    { ico:I.squad, t:'Set your squad',
-      s:'How many players and your rank. We match within one tier, then widen the longer you wait.' },
-    { ico:I.find,  t:'We find the players',
-      s:'You land in a voice call together. Nothing to accept — it opens when the group is full.' },
-  ];
-
-  var RULES = [
-    { k:'no',  ico:I.noCam,  t:'Camera off' },
-    { k:'yes', ico:I.screen, t:'Screen share allowed' },
-    { k:'',    ico:I.clock,  t:'3 hour cap' },
-    { k:'',    ico:I.keep,   t:'Convert to a lobby to keep them' },
-  ];
-
-  function howHtml(){
-    return '<div class="qhow-row">' + STEPS.map(function (s, i){
-      return '<div class="qhow">' +
-        '<span class="qhow-n">0' + (i + 1) + '</span>' +
-        '<span class="qhow-ico">' + s.ico + '</span>' +
-        '<div><div class="qhow-t">' + s.t + '</div>' +
-        '<div class="qhow-s">' + s.s + '</div></div>' +
-      '</div>';
-    }).join('') + '</div>' +
-    '<div class="qhow-rules">' + RULES.map(function (r){
-      return '<span class="qrule ' + r.k + '">' + r.ico + r.t + '</span>';
-    }).join('') + '</div>';
+  /* ── Data ────────────────────────────────────────────────────── */
+  function idFor(appid){
+    var g = GAMES().find(function (x){ return String(x.steamAppId) === String(appid); });
+    return g ? g.id : ('steam:' + appid);
   }
-
-  function tidy(){
-    var setup = document.getElementById('qViewSetup');
-    if (!setup) return;
-
-    /* The old picker card, found by what is inside it. Position-based
-       rules kept drifting as the layout moved around them. */
-    var grid = document.getElementById('qGameGrid');
-    if (grid){
-      var card = grid.closest('.q-step-card');
-      if (card) card.classList.add('q-dup-picker');
-    }
-
-    /* The how-it-works strip goes above the two columns. */
-    if (!document.getElementById('qHow')){
-      var how = document.createElement('div');
-      how.id = 'qHow';
-      how.innerHTML = howHtml();
-      var cols = document.getElementById('qCols');
-      if (cols && cols.parentNode) cols.parentNode.insertBefore(how, cols);
-      else setup.insertBefore(how, setup.firstChild);
-    }
-
-    /* The rail says what it is. Without this the settings read as more
-       of the page rather than as the panel belonging to the choice. */
-    var side = document.getElementById('qSide');
-    if (side && !document.getElementById('qSideTitle')){
-      var t = document.createElement('div');
-      t.id = 'qSideTitle';
-      t.textContent = 'Your setup';
-      side.insertBefore(t, side.firstChild);
-    }
-  }
-
-  function start(){
-    var orig = window.openQueuePanel;
-    if (typeof orig !== 'function'){ setTimeout(start, 300); return; }
-    if (orig.__v4) return;
-    var wrapped = function (){
-      var out = orig.apply(this, arguments);
-      /* After the v2/v3 mount has built the columns and moved the cards. */
-      setTimeout(tidy, 0);
-      return out;
-    };
-    wrapped.__v4 = true;
-    window.openQueuePanel = wrapped;
-  }
-
-  if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', start);
-  else start();
-})();
-</script>
-
-
-
-
-
-
-<!-- The switcher owns its own list; this skin is registered there. -->
-
-
-<!-- ══════════════════════════════════════════════════════════════════
-     QUEUE — GLASS, AND A FAST LANE ON THE RIGHT
-
-     Two changes, and the second one is the real one.
-
-     THE COLUMNS SWAP THEIR JOBS. Setup goes back into the main column
-     where there is room to lay it out, and the rail becomes the fast
-     lane: who is here, and six pools you can drop into without filling
-     anything in. That is the right split for what this page actually is
-     — Omegle for gamers — where the whole appeal is arriving somewhere
-     with a stranger in one action. The configured path stays for people
-     who want a specific game; the rail is for people who want to be in
-     a call in four seconds.
-
-     ONE SKIN, DONE PROPERLY. The switcher and the other four treatments
-     are gone. What makes glass read as expensive rather than as a CSS
-     effect is not the blur — everyone has the blur — it is what is
-     BEHIND it and what is ON it:
-
-       a ground that moves.  Three aurora fields drifting on a slow
-       cycle, so the frost has something to refract and the page is
-       never quite the same twice. Stopped entirely under
-       prefers-reduced-motion.
-
-       grain.  A single tile of turbulence at 3.5%, over everything.
-       This is the one detail that separates real glass from plastic,
-       because nothing in the physical world is perfectly smooth.
-
-       specular light.  Each panel gets a bright hairline along its top
-       edge and a soft radial sheen in its upper-left, as if lit from
-       one place. That is what gives a surface a normal and a direction
-       rather than being a flat translucent rectangle.
-
-       layered depth.  Three levels of translucency, not one: the page,
-       the panels, and the controls on them. A single alpha for
-       everything is what makes glass UIs look like sheets of tinted
-       plastic stacked at random.
-     ══════════════════════════════════════════════════════════════════ -->
-<style>
-/* ═══ The ground ══════════════════════════════════════════════════ */
-#queueOverlay{
-  background:linear-gradient(168deg, #0a0812 0%, #06070d 100%) !important;
-  isolation:isolate;
-}
-#qAurora{
-  position:absolute; inset:-20%; z-index:0; pointer-events:none;
-  filter:blur(90px) saturate(1.5);
-  opacity:.85;
-}
-#qAurora i{
-  position:absolute; display:block; border-radius:50%;
-  mix-blend-mode:screen;
-}
-#qAurora .a{
-  width:46%; height:56%; left:2%; top:-6%;
-  background:radial-gradient(circle at 50% 50%, rgba(168,99,255,.55), transparent 68%);
-  animation:qAurA 34s ease-in-out infinite alternate;
-}
-#qAurora .b{
-  width:40%; height:50%; right:4%; top:4%;
-  background:radial-gradient(circle at 50% 50%, rgba(52,180,255,.42), transparent 68%);
-  animation:qAurB 44s ease-in-out infinite alternate;
-}
-#qAurora .c{
-  width:52%; height:52%; left:32%; bottom:-14%;
-  background:radial-gradient(circle at 50% 50%, rgba(255,70,160,.32), transparent 68%);
-  animation:qAurC 52s ease-in-out infinite alternate;
-}
-@keyframes qAurA{ to{ transform:translate3d(9%, 7%, 0) scale(1.18); } }
-@keyframes qAurB{ to{ transform:translate3d(-11%, 10%, 0) scale(1.24); } }
-@keyframes qAurC{ to{ transform:translate3d(7%, -9%, 0) scale(1.14); } }
-
-/* Grain. One tile of turbulence over the lot — the single detail that
-   separates glass from plastic, because nothing real is perfectly
-   smooth. */
-#queueOverlay::after{
-  content:''; position:absolute; inset:0; z-index:60; pointer-events:none;
-  opacity:.035;
-  background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='140' height='140'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.85' numOctaves='3'/%3E%3C/filter%3E%3Crect width='140' height='140' filter='url(%23n)'/%3E%3C/svg%3E");
-}
-#queueOverlay > .q-hero,
-#queueOverlay > .q-body{ position:relative; z-index:1; }
-
-/* ═══ The glass recipe ════════════════════════════════════════════ */
-/* Level two: panels. */
-#queueOverlay .q-step-card,
-#queueOverlay .qhow-row,
-#queueOverlay .qhow-rules,
-#queueOverlay #qPicked,
-#queueOverlay #qPulse,
-#queueOverlay .qp,
-#queueOverlay .ql-search,
-#queueOverlay .q-card{
-  position:relative;
-  background:rgba(255,255,255,.052) !important;
-  backdrop-filter:blur(30px) saturate(1.9);
-  -webkit-backdrop-filter:blur(30px) saturate(1.9);
-  border:1px solid rgba(255,255,255,.115) !important;
-  border-radius:22px !important;
-  box-shadow:
-    /* the lit top edge, and a seated bottom one */
-    inset 0 1px 0 rgba(255,255,255,.34),
-    inset 0 -1px 0 rgba(255,255,255,.05),
-    /* a soft floor shadow, wide and weak */
-    0 24px 60px -18px rgba(0,0,0,.6),
-    0 2px 10px rgba(0,0,0,.28) !important;
-}
-/* Specular sheen: one light source, upper-left, on every surface. */
-#queueOverlay .q-step-card::after,
-#queueOverlay .qhow-row::after,
-#queueOverlay #qPulse::after,
-#queueOverlay .qp::after,
-#queueOverlay .q-card::after{
-  content:''; position:absolute; inset:0; z-index:0; pointer-events:none;
-  border-radius:inherit;
-  background:radial-gradient(120% 90% at 4% -8%,
-    rgba(255,255,255,.14) 0%, rgba(255,255,255,.04) 32%, transparent 62%);
-}
-#queueOverlay .q-step-card > *,
-#queueOverlay .qhow-row > *,
-#queueOverlay #qPulse > *,
-#queueOverlay .qp > *{ position:relative; z-index:1; }
-#queueOverlay .q-step-card::before{ display:none !important; }
-
-/* Level three: controls sitting ON the panels sit slightly brighter. */
-#queueOverlay .qrule,
-#queueOverlay .q-skill-tile,
-#queueOverlay .qh-k,
-#queueOverlay .q-input,
-#queueOverlay .q-stepper,
-#queueOverlay .qb-game,
-#queueOverlay .qhow-ico{
-  background:rgba(255,255,255,.085) !important;
-  border:1px solid rgba(255,255,255,.14) !important;
-  box-shadow:inset 0 1px 0 rgba(255,255,255,.24) !important;
-  backdrop-filter:blur(12px);
-}
-#queueOverlay .qrule, #queueOverlay .qh-k{ border-radius:99px !important; }
-#queueOverlay .q-skill-tile{ border-radius:16px !important; }
-#queueOverlay .qhow-ico{
-  border-radius:15px !important;
-  color:#fff !important;
-}
-#queueOverlay .q-skill-tile.is-selected{
-  background:color-mix(in srgb, var(--qst-color) 22%, rgba(255,255,255,.08)) !important;
-  border-color:color-mix(in srgb, var(--qst-color) 70%, transparent) !important;
-  box-shadow:inset 0 1px 0 rgba(255,255,255,.3),
-             0 0 28px color-mix(in srgb, var(--qst-color) 30%, transparent) !important;
-}
-
-/* Game cards are glass with the art behind them, not on a card. */
-#queueOverlay .ql-card{
-  border-radius:20px !important;
-  border:1px solid rgba(255,255,255,.16) !important;
-  box-shadow:
-    inset 0 1px 0 rgba(255,255,255,.3),
-    0 22px 52px -16px rgba(0,0,0,.68) !important;
-}
-#queueOverlay .ql-card.on{
-  border-color:rgba(255,255,255,.4) !important;
-  box-shadow:
-    inset 0 1px 0 rgba(255,255,255,.42),
-    0 0 0 1px color-mix(in srgb, var(--hub-accent) 70%, transparent),
-    0 0 44px color-mix(in srgb, var(--hub-accent) 34%, transparent),
-    0 22px 52px -16px rgba(0,0,0,.7) !important;
-}
-#queueOverlay .ql-tick{ box-shadow:0 4px 14px rgba(0,0,0,.6), inset 0 1px 0 rgba(255,255,255,.45); }
-
-/* Headings sit on the glass, so they need their own light rather than
-   a hard shadow that would look printed on it. */
-#queueOverlay .qh-t{
-  text-shadow:0 1px 0 rgba(0,0,0,.4), 0 2px 30px rgba(0,0,0,.55),
-              0 0 60px color-mix(in srgb, var(--hub-accent) 28%, transparent) !important;
-}
-
-/* The commit: the one solid object on the page, so it reads as the
-   thing you press. */
-#queueOverlay #qGo{
-  border-radius:18px !important;
-  background:linear-gradient(180deg,
-    color-mix(in srgb, var(--hub-accent) 94%, white),
-    color-mix(in srgb, var(--hub-accent) 88%, #2a0b52)) !important;
-  border:1px solid rgba(255,255,255,.28) !important;
-  color:#0d0320 !important;
-  box-shadow:
-    inset 0 1px 0 rgba(255,255,255,.55),
-    0 16px 42px -10px color-mix(in srgb, var(--hub-accent) 52%, transparent),
-    0 2px 8px rgba(0,0,0,.4) !important;
-}
-#queueOverlay #qGo:disabled{
-  background:rgba(255,255,255,.07) !important;
-  color:rgba(255,255,255,.4) !important;
-  border-color:rgba(255,255,255,.1) !important;
-  box-shadow:inset 0 1px 0 rgba(255,255,255,.16) !important;
-}
-
-/* ═══ The fast lane ═══════════════════════════════════════════════ */
-#qSide{ gap:14px !important; }
-#qLaneTitle{
-  display:flex; align-items:baseline; gap:10px; padding:2px 4px 0;
-}
-#qLaneTitle .t{
-  font-family:'Archivo', var(--font), sans-serif;
-  font-size:15px; font-weight:900; letter-spacing:1.6px; text-transform:uppercase;
-  color:#fff;
-  text-shadow:0 2px 24px rgba(0,0,0,.6),
-              0 0 44px color-mix(in srgb, var(--hub-accent) 32%, transparent);
-}
-#qLaneTitle .s{ font-size:11.5px; color:var(--text-3); }
-
-/* Pools become the rail's main content, so they get room to breathe. */
-#qSide #qPools{ margin:0 !important; padding:0 !important; border-top:0 !important; }
-#qSide #qPools .qh{ display:none !important; }
-#qSide .qp-row{ grid-template-columns:1fr !important; gap:10px !important; }
-#qSide .qp{ padding:15px 17px !important; border-radius:18px !important; }
-#qSide .qp-n{ font-size:14px !important; }
-#qSide .qp:hover{
-  border-color:rgba(255,255,255,.3) !important;
-  background:rgba(255,255,255,.1) !important;
-  transform:translateX(2px);
-}
-#qSide .qp{ transition:background .18s ease, border-color .18s ease, transform .18s ease; }
-
-@media (prefers-reduced-motion: reduce){
-  #qAurora .a, #qAurora .b, #qAurora .c{ animation:none !important; }
-  #qSide .qp{ transition:none; }
-}
-</style>
-<script>
-(function () {
-  'use strict';
-
-  function build(){
-    var ov = document.getElementById('queueOverlay');
-    if (!ov) return;
-
-    if (!document.getElementById('qAurora')){
-      var a = document.createElement('div');
-      a.id = 'qAurora';
-      a.setAttribute('aria-hidden', 'true');
-      a.innerHTML = '<i class="a"></i><i class="b"></i><i class="c"></i>';
-      ov.insertBefore(a, ov.firstChild);
-    }
-
-    /* The columns swap jobs: configuring goes back to the wide column,
-       and the rail becomes the one-click path. */
-    var main = document.getElementById('qMain');
-    var side = document.getElementById('qSide');
-    var pools = document.getElementById('qPools');
-    var go = document.getElementById('qGoWrap');
-    if (!main || !side || !pools) return;
-
-    if (!side.contains(pools)){
-      /* Setup and the commit belong with the choosing. */
-      Array.prototype.slice.call(side.children).forEach(function (el){
-        if (el.classList && el.classList.contains('q-step-card')) main.appendChild(el);
-      });
-      if (go) main.appendChild(go);
-
-      var title = document.getElementById('qLaneTitle');
-      if (!title){
-        title = document.createElement('div');
-        title.id = 'qLaneTitle';
-        title.innerHTML = '<span class="t">Fast lane</span>' +
-          '<span class="s">Skip the setup — drop straight in</span>';
-      }
-      side.appendChild(title);
-      side.appendChild(pools);
-    }
-
-    /* The rail no longer holds a form, so it does not need to scroll
-       against the viewport or hide its own heading. */
-    side.style.maxHeight = 'none';
-    side.style.overflowY = 'visible';
-    var st = document.getElementById('qSideTitle');
-    if (st) st.style.display = 'none';
-  }
-
-  function start(){
-    var orig = window.openQueuePanel;
-    if (typeof orig !== 'function'){ setTimeout(start, 300); return; }
-    if (orig.__glass) return;
-    var wrapped = function (){
-      var out = orig.apply(this, arguments);
-      setTimeout(build, 20);
-      return out;
-    };
-    wrapped.__glass = true;
-    window.openQueuePanel = wrapped;
-  }
-
-  if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', start);
-  else start();
-})();
-</script>
-
-
-<!-- ══════════════════════════════════════════════════════════════════
-     QUEUE — MARQUEE, DECK, TABLE
-
-     Three screens that are really one idea: the game you picked is
-     always the biggest thing you can see, and you are never looking at
-     a loading state.
-
-     THE MARQUEE is the page's title bar. Full-bleed library_hero art —
-     the wide cinematic key art Steam ships, which this app already
-     resolves server-side and until now only ever used as a blurred
-     smudge behind a card. Nothing else in Lobby is full-bleed, so this
-     is the most cinematic surface in the product by a distance, and it
-     costs one image that was already being fetched.
-
-     THE DECK is Home's deck, pointed at the thing it suits best. Same
-     geometry, same recede — dimming and desaturation, never opacity,
-     because a see-through card lets the one behind it read straight
-     through and the stack looks like it is melting. The game you are
-     about to spend an evening in deserves that treatment more than one
-     you played last week.
-
-     THE TABLE replaces the search screen, and this is the real change.
-     You were staring at a spinner while a request said "searching",
-     which is a progress bar for something that has no progress. Now
-     queueing SEATS YOU. The room exists from the moment you press the
-     button, you are in it, and the empty chairs fill as people arrive.
-     Nothing is loading, because there is nothing to load — you are
-     already where you were trying to get to.
-
-     AND IT ACTUALLY POLLS NOW. The search view ran a tip rotator and an
-     elapsed counter and never once asked the server what had happened.
-     /queue/:id/status existed and nothing called it, so a match could
-     complete and the page would sit there counting seconds at you.
-     ══════════════════════════════════════════════════════════════════ -->
-<style>
-/* ═══ MARQUEE ═════════════════════════════════════════════════════ */
-#queueOverlay .q-hero{
-  position:relative; overflow:hidden;
-  min-height:290px;
-  display:flex; flex-direction:column; justify-content:flex-end;
-  padding:36px 46px 30px !important;
-  border-bottom:1px solid rgba(255,255,255,.07);
-}
-#qMarqArt{
-  position:absolute; inset:0; z-index:0;
-  background-size:cover; background-position:center 28%;
-  transition:background-image .55s ease, opacity .55s ease;
-  opacity:0;
-}
-#qMarqArt.on{ opacity:1; }
-#qMarqArt::after{
-  content:''; position:absolute; inset:0;
-  background:
-    linear-gradient(92deg, rgba(7,8,13,.96) 0%, rgba(7,8,13,.78) 40%, rgba(7,8,13,.2) 76%, transparent 100%),
-    linear-gradient(180deg, rgba(7,8,13,.5) 0%, transparent 34%, rgba(7,8,13,.9) 100%);
-}
-#queueOverlay .q-hero > *:not(#qMarqArt){ position:relative; z-index:1; }
-#queueOverlay .q-hero-title{ margin:0 0 8px !important; }
-
-#qMarqMeta{
-  display:flex; align-items:center; gap:0; flex-wrap:wrap;
-  margin-top:18px;
-}
-.qmq-stat{
-  padding-right:22px; margin-right:22px;
-  border-right:1px solid rgba(255,255,255,.14);
-}
-.qmq-stat:last-child{ border-right:0; margin-right:0; padding-right:0; }
-.qmq-stat b{
-  display:block;
-  font-family:'JetBrains Mono', ui-monospace, monospace;
-  font-size:21px; font-weight:800; color:#fff; line-height:1;
-  font-variant-numeric:tabular-nums;
-}
-.qmq-stat span{
-  display:block; margin-top:6px;
-  font-family:'JetBrains Mono', ui-monospace, monospace;
-  font-size:9px; font-weight:700; letter-spacing:1.6px; text-transform:uppercase;
-  color:var(--text-3);
-}
-#qMarqNow{
-  font-family:'Archivo', var(--font), sans-serif;
-  font-size:15px; font-weight:800; color:#fff; letter-spacing:.3px;
-  margin-bottom:3px;
-}
-#qMarqNow small{
-  display:block; margin-bottom:6px;
-  font-family:'JetBrains Mono', ui-monospace, monospace;
-  font-size:9.5px; font-weight:700; letter-spacing:2px; text-transform:uppercase;
-  color:color-mix(in srgb, var(--hub-accent) 70%, white);
-}
-
-/* ═══ DECK ════════════════════════════════════════════════════════ */
-#qDeck{ position:relative; height:400px; margin:26px 0 0; }
-#qDeckTrack{ position:relative; height:100%; }
-.qd-card{
-  position:absolute; top:0; left:50%;
-  width:252px; height:378px; margin-left:-126px;
-  border-radius:16px; overflow:hidden; cursor:pointer;
-  background:#12151f;
-  border:1px solid rgba(255,255,255,.09);
-  box-shadow:0 26px 60px -18px rgba(0,0,0,.85);
-  transform-origin:center center;
-  transform:translateX(var(--qd-x,0)) scale(var(--qd-s,1));
-  filter:brightness(var(--qd-b,1)) saturate(var(--qd-sat,1));
-  opacity:var(--qd-o,1);
-  transition:transform .5s cubic-bezier(.22,1,.36,1),
-             filter .42s ease, opacity .42s ease,
-             box-shadow .42s ease, border-color .42s ease;
-  will-change:transform;
-  backface-visibility:hidden;
-}
-.qd-art{
-  position:absolute; inset:0;
-  background-size:cover; background-position:center; background-color:#161a26;
-}
-.qd-fb{
-  position:absolute; inset:0; display:flex; align-items:center; justify-content:center;
-  font-family:'Archivo', var(--font), sans-serif;
-  font-size:44px; font-weight:900; color:rgba(255,255,255,.14);
-}
-.qd-cap{
-  position:absolute; left:0; right:0; bottom:0; padding:16px 16px 14px;
-  background:linear-gradient(180deg, transparent, rgba(6,8,13,.96));
-}
-.qd-nm{
-  font-family:'Archivo', var(--font), sans-serif;
-  font-size:15px; font-weight:800; color:#fff; line-height:1.2;
-  display:-webkit-box; -webkit-line-clamp:2; line-clamp:2;
-  -webkit-box-orient:vertical; overflow:hidden;
-}
-.qd-hr{
-  font-family:'JetBrains Mono', ui-monospace, monospace;
-  font-size:9.5px; font-weight:700; letter-spacing:1.2px; text-transform:uppercase;
-  color:rgba(255,255,255,.62); margin-top:5px;
-}
-.qd-card.on{
-  cursor:default;
-  border-color:rgba(255,255,255,.34);
-  box-shadow:0 0 0 1px color-mix(in srgb, var(--hub-accent) 55%, transparent),
-             0 40px 90px -20px rgba(0,0,0,.95),
-             0 0 60px color-mix(in srgb, var(--hub-accent) 22%, transparent);
-}
-.qd-nav{
-  position:absolute; top:50%; transform:translateY(-50%); z-index:40;
-  width:44px; height:44px; border-radius:50%;
-  display:flex; align-items:center; justify-content:center;
-  border:1px solid rgba(255,255,255,.14);
-  background:rgba(10,13,18,.7); backdrop-filter:blur(12px);
-  color:#fff; cursor:pointer; font-size:19px; line-height:1;
-  transition:background .2s ease, transform .2s ease;
-}
-.qd-nav:hover{ background:var(--hub-accent); color:#0d0320; transform:translateY(-50%) scale(1.08); }
-.qd-nav.p{ left:26px; } .qd-nav.n{ right:26px; }
-#qDeckDots{ display:flex; justify-content:center; gap:7px; margin-top:20px; }
-#qDeckDots i{
-  width:7px; height:7px; border-radius:99px; cursor:pointer;
-  background:rgba(255,255,255,.2); transition:width .28s ease, background .28s ease;
-}
-#qDeckDots i.on{
-  width:26px; background:var(--hub-accent);
-  box-shadow:0 0 12px color-mix(in srgb, var(--hub-accent) 60%, transparent);
-}
-/* The old flat rail and the picked banner are what the deck replaces. */
-#queueOverlay .ql-rail, #queueOverlay #qPickedHost{ display:none !important; }
-
-/* ═══ TABLE ═══════════════════════════════════════════════════════ */
-#queueOverlay .q-search-orb,
-#queueOverlay #qSearchTitle,
-#queueOverlay #qSearchMeta,
-#queueOverlay #qViewSearching > .q-actions{ display:none !important; }
-#queueOverlay #qViewSearching{
-  display:flex; flex-direction:column; align-items:center; justify-content:center;
-  padding:40px 32px !important;
-}
-#qTable{
-  display:grid; grid-template-columns:296px 1fr; gap:34px;
-  width:100%; max-width:1120px; align-items:center;
-}
-#qTableSide{ display:flex; flex-direction:column; gap:0; }
-.qt-label{
-  font-family:'JetBrains Mono', ui-monospace, monospace;
-  font-size:9px; font-weight:700; letter-spacing:1.9px; text-transform:uppercase;
-  color:var(--text-3); margin:22px 0 9px;
-}
-.qt-label:first-child{ margin-top:0; }
-#qTableArt{
-  width:100%; border-radius:14px; overflow:hidden;
-  border:1px solid rgba(255,255,255,.1);
-  aspect-ratio:2/3; background-size:cover; background-position:center;
-  background-color:#161a26;
-  box-shadow:0 20px 46px -14px rgba(0,0,0,.8);
-}
-.qt-win{ font-size:14.5px; color:#fff; font-weight:600; }
-.qt-track{
-  height:5px; border-radius:99px; margin-top:11px;
-  background:rgba(255,255,255,.08); overflow:hidden;
-}
-.qt-track i{
-  display:block; height:100%; border-radius:99px;
-  background:linear-gradient(90deg,
-    color-mix(in srgb, var(--hub-accent) 70%, white), var(--hub-accent));
-  transition:width .9s linear;
-}
-.qt-next{
-  font-family:'JetBrains Mono', ui-monospace, monospace;
-  font-size:10px; font-weight:700; letter-spacing:1.2px; text-transform:uppercase;
-  color:var(--text-3); margin-top:10px;
-}
-
-#qSeatsWrap{ display:flex; flex-direction:column; align-items:center; }
-#qSeats{ position:relative; width:440px; height:440px; }
-.qt-seat{
-  position:absolute; width:94px; height:94px; margin:-47px 0 0 -47px;
-  border-radius:50%;
-  display:flex; align-items:center; justify-content:center;
-  overflow:hidden;
-  font-family:'JetBrains Mono', ui-monospace, monospace;
-  font-size:9px; font-weight:700; letter-spacing:1.2px; text-transform:uppercase;
-  color:var(--text-3);
-  border:1.5px dashed rgba(255,255,255,.18);
-  transition:border-color .4s ease, transform .5s cubic-bezier(.22,1,.36,1),
-             box-shadow .4s ease, background .4s ease;
-}
-.qt-seat.filled{
-  border:2px solid rgba(255,255,255,.24);
-  background:linear-gradient(135deg,#3a4a6b,#1a2030);
-  box-shadow:0 14px 34px rgba(0,0,0,.62);
-  color:#fff; font-family:'Archivo', var(--font), sans-serif;
-  font-size:24px; font-weight:900; letter-spacing:0;
-  animation:qSeatIn .5s cubic-bezier(.22,1,.36,1);
-}
-.qt-seat.filled img{ width:100%; height:100%; object-fit:cover; }
-.qt-seat.you{
-  border-color:var(--hub-accent);
-  box-shadow:0 0 0 2px color-mix(in srgb, var(--hub-accent) 45%, transparent),
-             0 14px 34px rgba(0,0,0,.62);
-}
-@keyframes qSeatIn{ from{ transform:scale(.72); opacity:0; } }
-.qt-name{
-  position:absolute; left:50%; transform:translateX(-50%);
-  top:100px; white-space:nowrap;
-  font-family:'JetBrains Mono', ui-monospace, monospace;
-  font-size:9.5px; font-weight:700; letter-spacing:1.2px;
-  color:var(--text-2);
-}
-#qTableCore{
-  position:absolute; left:50%; top:50%; transform:translate(-50%,-50%);
-  width:200px; height:200px; border-radius:50%;
-  display:flex; flex-direction:column; align-items:center; justify-content:center;
-  background:radial-gradient(circle at 50% 34%,
-    color-mix(in srgb, var(--hub-accent) 24%, transparent), rgba(10,12,20,.92) 70%);
-  border:1px solid rgba(255,255,255,.1);
-}
-#qTableCore b{
-  font-family:'JetBrains Mono', ui-monospace, monospace;
-  font-size:32px; font-weight:800; color:#fff; line-height:1;
-  font-variant-numeric:tabular-nums;
-}
-#qTableCore span{
-  font-family:'JetBrains Mono', ui-monospace, monospace;
-  font-size:9px; font-weight:700; letter-spacing:1.9px; text-transform:uppercase;
-  color:var(--text-3); margin-top:9px;
-}
-.qt-ring{
-  position:absolute; inset:0; border-radius:50%; pointer-events:none;
-  border:1px solid color-mix(in srgb, var(--hub-accent) 30%, transparent);
-  animation:qRing 2.8s ease-out infinite;
-}
-.qt-ring.b{ animation-delay:1.4s; }
-@keyframes qRing{
-  0%{ transform:scale(.8); opacity:.85; }
-  100%{ transform:scale(1.08); opacity:0; }
-}
-#qTableActions{ display:flex; gap:11px; margin-top:32px; }
-
-@media (max-width:1080px){
-  #qTable{ grid-template-columns:1fr; gap:24px; }
-  #qTableSide{ order:2; }
-  #qSeats{ width:360px; height:360px; }
-  .qt-seat{ width:78px; height:78px; margin:-39px 0 0 -39px; }
-}
-@media (prefers-reduced-motion: reduce){
-  .qt-ring{ animation:none; opacity:.35; }
-  .qt-seat.filled{ animation:none; }
-  .qd-card{ transition:none; }
-}
-</style>
-<script>
-(function () {
-  'use strict';
-
-  function esc(v){
-    return String(v == null ? '' : v)
-      .replace(/&/g,'&amp;').replace(/</g,'&lt;')
-      .replace(/>/g,'&gt;').replace(/"/g,'&quot;');
-  }
-  function cssUrl(u){
-    return u ? "url('" + String(u).replace(/\\/g,'%5C').replace(/'/g,'%27') + "')" : '';
-  }
-  function state(){
-    try { if (typeof _qState !== 'undefined') return _qState; } catch (e){}
-    return null;
-  }
-  function games(){
-    try { if (typeof GT_GAMES !== 'undefined') return GT_GAMES; } catch (e){}
-    return [];
-  }
-
-  /* The library that #qLib already loaded. Read back off the rail rather
-     than fetched again — same data, one request. */
-  function library(){
-    var out = [];
-    document.querySelectorAll('#qLib .ql-rail .ql-card').forEach(function (c){
-      var art = c.querySelector('.ql-art');
-      var bg = art ? art.style.backgroundImage : '';
-      out.push({
-        id: (c.getAttribute('onclick') || '').replace(/.*qPickGame\(['"]?([^'")]*)['"]?\).*/, '$1'),
-        name: (c.querySelector('.ql-name') || {}).textContent || '',
-        hrs:  (c.querySelector('.ql-hrs')  || {}).textContent || '',
-        art:  bg && bg !== 'none' ? bg.replace(/^url\(['"]?/, '').replace(/['"]?\)$/, '') : '',
-      });
+  async function loadLib(){
+    var r = await window.api('/steam/recent').catch(function(){ return null; });
+    if (!Array.isArray(r)) return;
+    lib = r.map(function (g){
+      var gg = GAMES().find(function (x){ return String(x.steamAppId) === String(g.appid); }) || {};
+      return {
+        id: idFor(g.appid),
+        name: g.name,
+        cover: g.capsule_img || gg.cover || '',
+        hero:  gg.heroHi || g.header_img || g.capsule_img || '',
+        hrsTotal: Math.round(parseFloat(g.hours_total || 0)),
+        hrsRecent: parseFloat(g.hours_recent || 0) || 0,
+      };
     });
-    return out;
   }
-  function heroFor(id){
-    var g = games().find(function (x){ return x.id === id; });
-    return g ? (g.heroHi || g.header || g.cover || '') : '';
+  async function loadPulse(){
+    var r = await window.api('/queue/pulse').catch(function(){ return null; });
+    if (r && typeof r.total === 'number') pulse = r;
+    paintPools();
   }
+  function entry(id){ return lib.find(function (g){ return g.id === id; }) || null; }
 
-  /* ── Marquee ─────────────────────────────────────────────────── */
-  function marquee(){
-    var hero = document.querySelector('#queueOverlay .q-hero');
-    if (!hero) return;
-    if (!document.getElementById('qMarqArt')){
-      var art = document.createElement('div');
-      art.id = 'qMarqArt';
-      art.setAttribute('aria-hidden', 'true');
-      hero.insertBefore(art, hero.firstChild);
-      var meta = document.createElement('div');
-      meta.id = 'qMarqMeta';
-      hero.appendChild(meta);
-    }
-    paintMarquee();
-  }
-
+  /* ── 1 · Marquee ─────────────────────────────────────────────── */
   function paintMarquee(){
-    var s = state();
-    var art = document.getElementById('qMarqArt');
-    var meta = document.getElementById('qMarqMeta');
-    if (!art || !meta || !s) return;
+    var s = S(); if (!s) return;
+    var art = document.getElementById('qArt');
+    var mq  = document.getElementById('qMq');
+    if (!art || !mq) return;
 
     var sel = s.game || '';
-    var lib = library();
-    var entry = lib.find(function (g){ return g.id === sel; });
-    var h = sel && sel.indexOf('pl:') !== 0 ? heroFor(sel) : '';
-    if (!h && entry) h = entry.art;
+    var isPool = sel.indexOf('pl:') === 0;
+    var e = entry(sel);
+    var g = GAMES().find(function (x){ return x.id === sel; });
+    var hero = e ? e.hero : (g ? (g.heroHi || g.header || g.cover) : '');
 
-    if (h){
-      art.style.backgroundImage = cssUrl(h);
-      art.classList.add('on');
-    } else {
-      art.classList.remove('on');
-    }
+    if (hero && !isPool){ art.style.backgroundImage = url(hero); art.classList.add('on'); }
+    else art.classList.remove('on');
 
-    if (!sel || sel.indexOf('pl:') === 0){
-      meta.innerHTML = '<div id="qMarqNow"><small>Nothing picked yet</small>' +
-        'Scroll down and choose a game</div>';
-      return;
-    }
+    var name = isPool ? 'A pool' : (e ? e.name : (g ? g.name : ''));
+    var ready = !!sel;
 
-    var name = entry ? entry.name : (games().find(function (x){ return x.id === sel; }) || {}).name || sel;
-    var hrs = entry && entry.hrs ? entry.hrs : '';
-    meta.innerHTML =
-      '<div class="qmq-stat" style="border-right:0;padding-right:26px;margin-right:26px;' +
-        'border-right:1px solid rgba(255,255,255,.14)">' +
-        '<div id="qMarqNow"><small>Queueing for</small>' + esc(name) + '</div></div>' +
-      (hrs ? '<div class="qmq-stat"><b>' + esc(hrs.replace(/\s.*$/, '')) + '</b>' +
-             '<span>' + esc(hrs.replace(/^\S+\s/, '')) + '</span></div>' : '') +
-      '<div class="qmq-stat"><b>' + (s.players || 2) + '</b><span>Players</span></div>' +
-      '<div class="qmq-stat"><b>' + String(s.skill || 'plat').toUpperCase() + '</b><span>Rank</span></div>';
+    mq.innerHTML =
+      '<div id="qMqKick">' + (ready ? '◆ Queueing for' : '◆ Find players · 1v1 or squad up') + '</div>' +
+      '<h1 id="qMqName">' + esc(ready ? name : 'Lobby Queue') + '</h1>' +
+      '<p id="qMqDesc">' + (ready
+        ? esc((s.players || 2) + ' players, within one rank of you. The window widens the longer you wait — any rank at all after three minutes.')
+        : 'Random teammates, your skill level, your game. Scroll down, pick a title, and we will put you in a call with people who want the same thing.') +
+      '</p>' +
+      '<div id="qMqStats">' +
+        (e && e.hrsTotal ? '<div class="qmq"><b>' + e.hrsTotal + 'h</b><span>Your playtime</span></div>' : '') +
+        '<div class="qmq"><b>' + pulse.total + '</b><span>Waiting now</span></div>' +
+        '<div class="qmq"><b>' + (s.players || 2) + '</b><span>Players</span></div>' +
+        '<div class="qmq"><b>' + String(s.skill || 'plat').toUpperCase() + '</b><span>Rank</span></div>' +
+      '</div>' +
+      '<div id="qMqBtns">' +
+        '<button id="qFind" type="button"' + (ready ? '' : ' disabled') + '>' + I.find +
+          (ready ? 'Find players' : 'Pick a game below') + '</button>' +
+        (ready ? '<button class="qghost" onclick="window.qScrollDeck()">Change game</button>' : '') +
+      '</div>' +
+      '<div id="qHow">' +
+        '<div class="qhw"><i>' + I.pick + '</i><div><b>Pick a game</b><span>Your library, or a pool</span></div></div>' +
+        '<div class="qhw"><i>' + I.squad + '</i><div><b>Set your squad</b><span>Size and rank</span></div></div>' +
+        '<div class="qhw"><i>' + I.find + '</i><div><b>Take a seat</b><span>The table fills around you</span></div></div>' +
+        '<div id="qRules">' +
+          '<span class="qrule no">' + I.noCam + 'Camera off</span>' +
+          '<span class="qrule yes">' + I.screen + 'Screen share ok</span>' +
+          '<span class="qrule">' + I.clock + '3h cap</span>' +
+        '</div>' +
+      '</div>';
+
+    var btn = document.getElementById('qFind');
+    if (btn) btn.onclick = function (){ if (window.qBeginSearch) window.qBeginSearch(); };
   }
+  window.qScrollDeck = function (){
+    var d = document.getElementById('qDeck');
+    if (d) d.scrollIntoView({ behavior:'smooth', block:'center' });
+  };
 
-  /* ── Deck ────────────────────────────────────────────────────── */
-  var deckIdx = 0;
-  var STEP = 224, STEP2 = 392;
+  /* ── 2 · Deck ────────────────────────────────────────────────── */
+  var idx = 0, STEP = 224, STEP2 = 392;
 
   function buildDeck(){
-    var lib = library();
-    var host = document.getElementById('qLib');
-    if (!host || !lib.length) return;
-
-    var deck = document.getElementById('qDeck');
-    if (!deck){
-      deck = document.createElement('div');
-      deck.id = 'qDeck';
-      deck.innerHTML =
-        '<button class="qd-nav p" onclick="window.qDeckStep(-1)" aria-label="Previous">‹</button>' +
-        '<div id="qDeckTrack"></div>' +
-        '<button class="qd-nav n" onclick="window.qDeckStep(1)" aria-label="Next">›</button>';
-      var dots = document.createElement('div');
-      dots.id = 'qDeckDots';
-      var rail = host.querySelector('.ql-rail');
-      var anchor = rail ? rail.parentNode : null;
-      if (anchor && anchor.parentNode){
-        anchor.parentNode.insertBefore(deck, anchor.nextSibling);
-        anchor.parentNode.insertBefore(dots, deck.nextSibling);
-      } else {
-        host.appendChild(deck); host.appendChild(dots);
-      }
+    var setup = document.getElementById('qViewSetup');
+    if (!setup || !lib.length) return;
+    if (!document.getElementById('qDeck')){
+      var wrap = document.createElement('div');
+      wrap.innerHTML =
+        '<div class="qsec">' +
+          '<div class="qsec-t">Choose your game</div>' +
+          '<div class="qsec-bar"></div>' +
+          '<div class="qsec-k"><span class="i">01</span><span class="sep">/</span>' +
+            '<span>Your Steam library</span><span class="sep">·</span>' +
+            '<b>' + lib.length + '</b> games</div>' +
+          '<div class="qsec-s">The games you actually play. Step the deck to choose.</div>' +
+        '</div>' +
+        '<div id="qDeck">' +
+          '<button class="qnav p" onclick="window.qStep2(-1)" aria-label="Previous">‹</button>' +
+          '<div id="qTrack"></div>' +
+          '<button class="qnav n" onclick="window.qStep2(1)" aria-label="Next">›</button>' +
+        '</div>' +
+        '<div id="qDots"></div>' +
+        '<div id="qBar"></div>' +
+        '<div id="qPools">' +
+          '<div class="qsec">' +
+            '<div class="qsec-t">Or drop into a pool</div>' +
+            '<div class="qsec-bar"></div>' +
+            '<div class="qsec-s">Wider nets, so they fill faster. Your rank still applies.</div>' +
+          '</div>' +
+          '<div id="qPoolRow"></div>' +
+        '</div>';
+      /* One container, prepended. Inserting the children one at a time
+         reverses them or lands them in the wrong place depending on
+         what is already in the view. */
+      var host = document.createElement('div');
+      host.id = 'qStage';
+      while (wrap.firstChild) host.appendChild(wrap.firstChild);
+      setup.insertBefore(host, setup.firstChild);
     }
 
-    var track = document.getElementById('qDeckTrack');
+    var track = document.getElementById('qTrack');
     var sig = lib.map(function (g){ return g.id; }).join('|');
     if (track.__sig !== sig){
       track.__sig = sig;
-      track.innerHTML = lib.map(function (g, i){
-        return '<div class="qd-card" data-i="' + i + '" data-id="' + esc(g.id) + '">' +
-          '<div class="qd-art" style="' + (g.art ? 'background-image:' + cssUrl(g.art) : '') + '">' +
-            (g.art ? '' : '<div class="qd-fb">' + esc(g.name.charAt(0).toUpperCase()) + '</div>') +
-          '</div>' +
-          '<div class="qd-cap"><div class="qd-nm">' + esc(g.name) + '</div>' +
-          (g.hrs ? '<div class="qd-hr">' + esc(g.hrs) + '</div>' : '') + '</div>' +
-        '</div>';
+      track.innerHTML = lib.map(function (g){
+        return '<div class="qc" data-id="' + esc(g.id) + '">' +
+          '<div class="qc-art" style="' + (g.cover ? 'background-image:' + url(g.cover) : '') + '">' +
+            (g.cover ? '' : '<div class="qc-fb">' + esc(g.name.charAt(0).toUpperCase()) + '</div>') + '</div>' +
+          '<div class="qc-cap"><div class="qc-nm">' + esc(g.name) + '</div>' +
+            '<div class="qc-hr">' + (g.hrsRecent ? g.hrsRecent + 'h this fortnight' : g.hrsTotal + 'h total') + '</div>' +
+          '</div></div>';
       }).join('');
-      /* Keep the deck on whatever is already selected, so returning to
-         the page does not silently move the choice. */
-      var s = state();
+      var s = S();
       var at = s ? lib.findIndex(function (g){ return g.id === s.game; }) : -1;
-      deckIdx = at >= 0 ? at : 0;
-    }
-    applyDeck();
+      idx = at >= 0 ? at : 0;
+      commit();
+    } else apply();
+    buildBar();
   }
 
-  function applyDeck(){
-    var track = document.getElementById('qDeckTrack');
+  function apply(){
+    var track = document.getElementById('qTrack');
     if (!track) return;
-    var cards = Array.prototype.slice.call(track.children);
-    var n = cards.length;
+    var cards = Array.prototype.slice.call(track.children), n = cards.length;
     if (!n) return;
-    deckIdx = ((deckIdx % n) + n) % n;
-
+    idx = ((idx % n) + n) % n;
     cards.forEach(function (c, i){
-      var off = i - deckIdx;
+      var off = i - idx;
       if (off >  n/2) off -= n;
       if (off < -n/2) off += n;
       var a = Math.abs(off), st = c.style;
       c.classList.toggle('on', off === 0);
-      if (a === 0){
-        st.setProperty('--qd-x','0px');  st.setProperty('--qd-s','1');
-        st.setProperty('--qd-b','1');    st.setProperty('--qd-sat','1');
-        st.setProperty('--qd-o','1');    st.zIndex = 30;
-      } else if (a === 1){
-        /* Depth by dimming, never opacity — a see-through card lets the
-           one behind it read straight through and the stack melts. */
-        st.setProperty('--qd-x',(off*STEP)+'px'); st.setProperty('--qd-s','.84');
-        st.setProperty('--qd-b','.62');  st.setProperty('--qd-sat','.7');
-        st.setProperty('--qd-o','1');    st.zIndex = 20;
-      } else if (a === 2){
-        st.setProperty('--qd-x',(off/a*STEP2)+'px'); st.setProperty('--qd-s','.7');
-        st.setProperty('--qd-b','.44');  st.setProperty('--qd-sat','.5');
-        st.setProperty('--qd-o','1');    st.zIndex = 10;
-      } else {
-        st.setProperty('--qd-x',(off>0 ? STEP2+220 : -(STEP2+220))+'px');
-        st.setProperty('--qd-s','.62');  st.setProperty('--qd-o','0');
-        st.zIndex = 1;
-      }
-      c.onclick = (off === 0) ? null : function (){ deckIdx = i; commitDeck(); };
+      if (a === 0){ st.setProperty('--x','0px'); st.setProperty('--s','1');
+                    st.setProperty('--b','1'); st.setProperty('--sat','1');
+                    st.setProperty('--o','1'); st.zIndex = 30; }
+      else if (a === 1){ st.setProperty('--x',(off*STEP)+'px'); st.setProperty('--s','.84');
+                    st.setProperty('--b','.62'); st.setProperty('--sat','.7');
+                    st.setProperty('--o','1'); st.zIndex = 20; }
+      else if (a === 2){ st.setProperty('--x',(off/a*STEP2)+'px'); st.setProperty('--s','.7');
+                    st.setProperty('--b','.44'); st.setProperty('--sat','.5');
+                    st.setProperty('--o','1'); st.zIndex = 10; }
+      else { st.setProperty('--x',(off>0 ? STEP2+220 : -(STEP2+220))+'px');
+             st.setProperty('--s','.62'); st.setProperty('--o','0'); st.zIndex = 1; }
+      c.onclick = (off === 0) ? null : function (){ idx = i; commit(); };
     });
-
-    var dots = document.getElementById('qDeckDots');
-    if (dots){
-      dots.innerHTML = cards.map(function (_, i){
-        return '<i class="' + (i === deckIdx ? 'on' : '') + '" onclick="window.qDeckGoto(' + i + ')"></i>';
-      }).join('');
-    }
+    var dots = document.getElementById('qDots');
+    if (dots) dots.innerHTML = cards.map(function (_, i){
+      return '<i class="' + (i === idx ? 'on' : '') + '" onclick="window.qGoto2(' + i + ')"></i>';
+    }).join('');
   }
 
-  /* Stepping the deck IS choosing — the front card is the selection, so
-     there is no separate confirm. */
-  function commitDeck(){
-    var track = document.getElementById('qDeckTrack');
-    if (!track) return;
-    var card = track.children[deckIdx];
+  /* Stepping the deck IS choosing — the front card is the selection. */
+  function commit(){
+    apply();
+    var track = document.getElementById('qTrack');
+    var card = track && track.children[idx];
     if (!card) return;
-    var id = card.getAttribute('data-id');
-    applyDeck();
-    if (id && typeof window.qPickGame === 'function') window.qPickGame(id);
+    var s = S();
+    if (s){ s.game = card.getAttribute('data-id'); s.playlist = null; }
     paintMarquee();
   }
-
-  window.qDeckStep = function (d){
-    var track = document.getElementById('qDeckTrack');
-    var n = track ? track.children.length : 0;
+  window.qStep2 = function (d){
+    var t = document.getElementById('qTrack');
+    var n = t ? t.children.length : 0;
     if (!n) return;
-    deckIdx = (deckIdx + d + n) % n;
-    commitDeck();
+    idx = (idx + d + n) % n; commit();
   };
-  window.qDeckGoto = function (i){ deckIdx = i; commitDeck(); };
+  window.qGoto2 = function (i){ idx = i; commit(); };
 
-  /* ── Table ───────────────────────────────────────────────────── */
-  var pollTimer = null, tickTimer = null;
+  /* The settings bar: the real controls, moved not rebuilt. */
+  function buildBar(){
+    var bar = document.getElementById('qBar');
+    if (!bar || bar.__built) return;
+    var stepper = document.querySelector('#qViewSetup .q-stepper');
+    var skills  = document.getElementById('qSkillGrid');
+    if (!stepper || !skills) return;
+    bar.__built = true;
+    var l1 = document.createElement('span'); l1.className = 'qbl'; l1.textContent = 'Players';
+    var l2 = document.createElement('span'); l2.className = 'qbl'; l2.textContent = 'Rank';
+    var v1 = document.createElement('span'); v1.className = 'qvr';
+    var v2 = document.createElement('span'); v2.className = 'qvr';
+    var more = document.createElement('button');
+    more.id = 'qMore'; more.type = 'button'; more.textContent = 'More options';
+    more.onclick = function (){
+      var ov = document.getElementById('queueOverlay');
+      var open = ov.classList.toggle('q-more');
+      more.textContent = open ? 'Fewer options' : 'More options';
+    };
+    bar.appendChild(l1); bar.appendChild(stepper);
+    bar.appendChild(v1); bar.appendChild(l2); bar.appendChild(skills);
+    bar.appendChild(v2); bar.appendChild(more);
+  }
 
+  /* ── 3 · Pools ───────────────────────────────────────────────── */
+  function paintPools(){
+    var row = document.getElementById('qPoolRow');
+    if (!row) return;
+    row.innerHTML = (pulse.definitions || []).map(function (d){
+      var n = (pulse.playlists[d.id] || {}).waiting || 0;
+      return '<div class="qpool" onclick="window.qJoinPlaylist(' + jsStr(d.id) + ')">' +
+        '<div><div class="qpool-n">' + esc(d.name) + '</div>' +
+        '<div class="qpool-s">' + d.players + ' players · ' +
+          (d.games ? d.games.length + ' games' : 'any game') + '</div></div>' +
+        '<span class="qpool-c' + (n ? '' : ' cold') + '">' + (n ? n + ' waiting' : '—') + '</span>' +
+      '</div>';
+    }).join('');
+  }
+
+  window.qJoinPlaylist = async function (id){
+    var d = (pulse.definitions || []).find(function (x){ return x.id === id; });
+    if (!d) return;
+    var s = S();
+    if (s){ s.playlist = id; s.players = d.players; s.game = 'pl:' + id; }
+    if (window.qBeginSearch) await window.qBeginSearch();
+  };
+
+  /* ── 4 · Table ───────────────────────────────────────────────── */
+  var pollT = null, tickT = null;
   var WIN = [
-    { at:0,   label:'Exact rank only',      next:30  },
-    { at:30,  label:'One rank either way',  next:90  },
-    { at:90,  label:'Two ranks either way', next:180 },
-    { at:180, label:'Any rank at all',      next:null },
+    { at:0, label:'Exact rank only', next:30 },
+    { at:30, label:'One rank either way', next:90 },
+    { at:90, label:'Two ranks either way', next:180 },
+    { at:180, label:'Any rank at all', next:null },
   ];
 
   function buildTable(){
-    var view = document.getElementById('qViewSearching');
-    if (!view || document.getElementById('qTable')) return;
+    var v = document.getElementById('qViewSearching');
+    if (!v || document.getElementById('qTable')) return;
     var t = document.createElement('div');
     t.id = 'qTable';
     t.innerHTML =
-      '<div id="qTableSide">' +
-        '<div class="qt-label">Queueing for</div>' +
-        '<div id="qTableArt"></div>' +
-        '<div class="qt-label">Matching window</div>' +
-        '<div class="qt-win" id="qtWin">Exact rank only</div>' +
-        '<div class="qt-track"><i id="qtBar" style="width:0%"></i></div>' +
-        '<div class="qt-next" id="qtNext">—</div>' +
-      '</div>' +
-      '<div id="qSeatsWrap">' +
-        '<div id="qSeats">' +
-          '<div id="qTableCore">' +
-            '<div class="qt-ring"></div><div class="qt-ring b"></div>' +
-            '<b id="qtCount">1/2</b><span id="qtState">Forming</span>' +
-          '</div>' +
-        '</div>' +
-        '<div id="qTableActions">' +
-          '<button class="q-cta-secondary" onclick="window.qBackToSetup()">Edit</button>' +
-          '<button class="q-cta-danger" onclick="window.qCancelSearch()">Leave table</button>' +
-        '</div>' +
-      '</div>';
-    view.appendChild(t);
+      '<div><div class="qtl">Queueing for</div><div id="qtArt"></div>' +
+        '<div class="qtl">Matching window</div><div id="qtWin">Exact rank only</div>' +
+        '<div id="qtTrack"><i style="width:0%"></i></div><div id="qtNext">—</div></div>' +
+      '<div id="qSeatsWrap"><div id="qSeats">' +
+        '<div id="qCore"><div class="qring"></div><div class="qring b"></div>' +
+        '<b id="qtCount">1/2</b><span id="qtState">Forming</span></div></div>' +
+        '<div id="qtActs">' +
+          '<button class="qghost" onclick="window.qBackToSetup()">Edit</button>' +
+          '<button class="qghost" onclick="window.qCancelSearch()">Leave table</button>' +
+        '</div></div>';
+    v.appendChild(t);
   }
 
-  function seatPositions(count){
-    var out = [], R = 172, C = 220;
-    for (var i = 0; i < count; i++){
-      var ang = (-90 + i * (360 / count)) * Math.PI / 180;
-      out.push({ x: C + Math.cos(ang) * R, y: C + Math.sin(ang) * R });
-    }
-    return out;
-  }
-
-  function renderSeats(members){
-    var host = document.getElementById('qSeats');
-    var s = state();
+  function seats(members){
+    var host = document.getElementById('qSeats'), s = S();
     if (!host || !s) return;
-    var size = Math.max(2, s.players || 2);
-    var pos = seatPositions(size);
-
-    /* Seat zero is you, and it is filled the instant the table exists —
-       that is the entire point. Everyone else appears as they arrive. */
+    var size = Math.max(2, s.players || 2), R = 172, C = 220;
     var me = null;
-    try { me = (typeof window.me === 'object' && window.me) ? window.me : null; } catch (e){}
-    var seats = [];
+    try { me = (typeof window.me === 'object' && window.me) ? window.me : null; } catch(e){}
+
+    var list = [];
     for (var i = 0; i < size; i++){
       var m = members[i] || null;
-      if (i === 0 && !m){
-        m = { username: (me && (me.display_name || me.username)) || 'You',
-              avatar_url: me && me.avatar_url, __me:true };
-      }
-      seats.push(m);
+      /* Seat zero is you and it is filled the instant the table exists.
+         That is the entire point: you are in the room, not waiting for
+         one to be built. */
+      if (i === 0 && !m) m = { username:(me && (me.display_name || me.username)) || 'You',
+                               avatar_url: me && me.avatar_url, __me:true };
+      list.push(m);
     }
 
-    host.querySelectorAll('.qt-seat, .qt-name').forEach(function (n){ n.remove(); });
-    seats.forEach(function (m, i){
+    host.querySelectorAll('.qseat, .qseat-n').forEach(function (n){ n.remove(); });
+    list.forEach(function (m, i){
+      var ang = (-90 + i * (360 / size)) * Math.PI / 180;
+      var x = C + Math.cos(ang) * R, y = C + Math.sin(ang) * R;
       var el = document.createElement('div');
-      el.className = 'qt-seat' + (m ? ' filled' : '') + (i === 0 ? ' you' : '');
-      el.style.left = pos[i].x + 'px';
-      el.style.top  = pos[i].y + 'px';
-      if (m){
-        el.innerHTML = m.avatar_url
-          ? '<img src="' + esc(m.avatar_url) + '" alt="">'
-          : esc(String(m.username || '?').trim().charAt(0).toUpperCase());
-      } else {
-        el.textContent = 'Open';
-      }
+      el.className = 'qseat' + (m ? ' filled' : '') + (i === 0 ? ' you' : '');
+      el.style.left = x + 'px'; el.style.top = y + 'px';
+      el.innerHTML = m
+        ? (m.avatar_url ? '<img src="' + esc(m.avatar_url) + '" alt="">'
+                        : esc(String(m.username || '?').charAt(0).toUpperCase()))
+        : 'Open';
       host.appendChild(el);
-
       var nm = document.createElement('div');
-      nm.className = 'qt-name';
-      nm.style.left = pos[i].x + 'px';
-      nm.style.top  = (pos[i].y + 52) + 'px';
+      nm.className = 'qseat-n';
+      nm.style.left = x + 'px'; nm.style.top = (y + 54) + 'px';
       nm.textContent = m ? (m.__me ? 'You' : (m.username || 'Player')) : '';
       host.appendChild(nm);
     });
 
-    var filled = seats.filter(Boolean).length;
-    var cnt = document.getElementById('qtCount');
-    var stt = document.getElementById('qtState');
-    if (cnt) cnt.textContent = filled + '/' + size;
-    if (stt) stt.textContent = filled >= size ? 'Ready' : 'Forming';
+    var filled = list.filter(Boolean).length;
+    var c = document.getElementById('qtCount'), st = document.getElementById('qtState');
+    if (c) c.textContent = filled + '/' + size;
+    if (st) st.textContent = filled >= size ? 'Ready' : 'Forming';
   }
 
   function tick(){
-    var s = state();
-    if (!s || !s.searchStarted) return;
-    var sec = Math.floor((Date.now() - s.searchStarted) / 1000);
-    var cur = WIN[0];
+    var s = S(); if (!s || !s.searchStarted) return;
+    var sec = Math.floor((Date.now() - s.searchStarted) / 1000), cur = WIN[0];
     for (var i = 0; i < WIN.length; i++) if (sec >= WIN[i].at) cur = WIN[i];
     var pct, next;
     if (cur.next == null){ pct = 100; next = 'Taking anyone who arrives'; }
-    else {
-      pct = Math.min(100, Math.round(((sec - cur.at) / (cur.next - cur.at)) * 100));
-      next = 'Widens again in ' + Math.max(0, cur.next - sec) + 's';
-    }
+    else { pct = Math.min(100, Math.round(((sec - cur.at) / (cur.next - cur.at)) * 100));
+           next = 'Widens again in ' + Math.max(0, cur.next - sec) + 's'; }
     var w = document.getElementById('qtWin');
-    var b = document.getElementById('qtBar');
+    var b = document.querySelector('#qtTrack i');
     var nx = document.getElementById('qtNext');
     if (w) w.textContent = cur.label;
     if (b) b.style.width = pct + '%';
     if (nx) nx.textContent = next;
   }
 
-  /* The search screen never asked the server anything. /queue/:id/status
-     existed and nothing called it, so a completed match would sit there
-     while the page counted seconds. */
   async function poll(){
-    var s = state();
-    if (!s || !s.queueId) return;
-    var r = await window.api('/queue/' + s.queueId + '/status').catch(function (){ return null; });
+    var s = S(); if (!s || !s.queueId) return;
+    var r = await window.api('/queue/' + s.queueId + '/status').catch(function(){ return null; });
     if (!r) return;
-    renderSeats(r.members || []);
+    seats(r.members || []);
     if (r.state === 'matched'){
-      clearInterval(pollTimer); pollTimer = null;
-      clearInterval(tickTimer); tickTimer = null;
-      /* _qOnMatched is what the websocket "queue-matched" push already
-         calls: it sets the roster, switches the view, names the game and
-         starts the three-hour timer. Reaching the same entry point from
-         the poll means a match looks identical whether the socket
-         delivered it or we noticed it ourselves. */
+      stop();
+      /* Same entry the websocket push uses, so a match looks identical
+         however it was noticed. */
       if (typeof window._qOnMatched === 'function') window._qOnMatched(r);
     }
   }
 
-  function enterTable(){
+  function enter(){
     buildTable();
-    var s = state();
-    var art = document.getElementById('qTableArt');
-    if (art && s){
-      var lib = library();
-      var e = lib.find(function (g){ return g.id === s.game; });
-      var a = e ? e.art : '';
-      art.style.backgroundImage = a ? cssUrl(a) : '';
-    }
-    renderSeats([]);
-    tick();
-    clearInterval(pollTimer); clearInterval(tickTimer);
-    pollTimer = setInterval(poll, 2500);
-    tickTimer = setInterval(tick, 1000);
+    var s = S(), e = s ? entry(s.game) : null;
+    var art = document.getElementById('qtArt');
+    if (art) art.style.backgroundImage = e && e.cover ? url(e.cover) : '';
+    seats([]); tick();
+    stop();
+    pollT = setInterval(poll, 2500);
+    tickT = setInterval(tick, 1000);
     poll();
   }
-
-  function stopTable(){
-    clearInterval(pollTimer); pollTimer = null;
-    clearInterval(tickTimer); tickTimer = null;
-  }
+  function stop(){ clearInterval(pollT); clearInterval(tickT); pollT = tickT = null; }
 
   /* ── Wire in ─────────────────────────────────────────────────── */
+  function refresh(){ buildDeck(); paintMarquee(); paintPools(); }
+
   function start(){
     if (typeof window.api !== 'function'){ setTimeout(start, 300); return; }
 
-    var origOpen = window.openQueuePanel;
-    if (typeof origOpen === 'function' && !origOpen.__mq){
+    var o = window.openQueuePanel;
+    if (typeof o === 'function' && !o.__f){
       var w = function (){
-        var out = origOpen.apply(this, arguments);
-        setTimeout(function (){ marquee(); buildDeck(); }, 40);
-        /* The library arrives a moment after open. */
-        setTimeout(function (){ buildDeck(); paintMarquee(); }, 700);
+        var out = o.apply(this, arguments);
+        setTimeout(function (){
+          paintMarquee();
+          loadLib().then(refresh);
+          loadPulse();
+          clearInterval(pulseTimer);
+          pulseTimer = setInterval(loadPulse, 10000);
+        }, 30);
         return out;
       };
-      w.__mq = true;
-      window.openQueuePanel = w;
+      w.__f = true; window.openQueuePanel = w;
     }
 
-    /* Selecting from search, the deck or a pool all repaint the top. */
-    ['qPickGame','qStep','_qSelectSkill'].forEach(function (fn){
+    var c = window.closeQueuePanel;
+    if (typeof c === 'function' && !c.__f){
+      var wc = function (){ clearInterval(pulseTimer); stop(); return c.apply(this, arguments); };
+      wc.__f = true; window.closeQueuePanel = wc;
+    }
+
+    var b = window.qBeginSearch;
+    if (typeof b === 'function' && !b.__f){
+      var wb = async function (){ var r = await b.apply(this, arguments); setTimeout(enter, 0); return r; };
+      wb.__f = true; window.qBeginSearch = wb;
+    }
+
+    ['qCancelSearch','qBackToSetup'].forEach(function (fn){
       var orig = window[fn];
-      if (typeof orig !== 'function' || orig.__mq) return;
-      var wrapped = function (){
-        var r = orig.apply(this, arguments);
-        paintMarquee();
-        return r;
-      };
-      wrapped.__mq = true;
-      window[fn] = wrapped;
+      if (typeof orig !== 'function' || orig.__f) return;
+      var wr = function (){ stop(); return orig.apply(this, arguments); };
+      wr.__f = true; window[fn] = wr;
     });
 
-    var origBegin = window.qBeginSearch;
-    if (typeof origBegin === 'function' && !origBegin.__mq){
-      var wb = async function (){
-        var r = await origBegin.apply(this, arguments);
-        setTimeout(enterTable, 0);
-        return r;
-      };
-      wb.__mq = true;
-      window.qBeginSearch = wb;
-    }
-
-    ['qCancelSearch','qBackToSetup','closeQueuePanel'].forEach(function (fn){
+    ['qStep','_qSelectSkill'].forEach(function (fn){
       var orig = window[fn];
-      if (typeof orig !== 'function' || orig.__mq) return;
-      var wrapped = function (){ stopTable(); return orig.apply(this, arguments); };
-      wrapped.__mq = true;
-      window[fn] = wrapped;
+      if (typeof orig !== 'function' || orig.__f) return;
+      var wr = function (){ var r = orig.apply(this, arguments); paintMarquee(); return r; };
+      wr.__f = true; window[fn] = wr;
     });
   }
 
