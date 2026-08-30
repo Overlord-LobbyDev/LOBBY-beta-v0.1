@@ -3064,6 +3064,170 @@ app.get("/steam/art", async (req, res) => {
   }
 });
 
+const _steamModesCache = new Map();
+const STEAM_MODES_TTL = 24 * 60 * 60 * 1000;   // categories change ~never
+
+// Steam publishes CATEGORIES, not a capacity. There is no player-count
+// field anywhere in appdetails, so maxPlayers is parsed out of the
+// description prose where a game happens to state it ("A 1-4 player
+// physics based fishing simulator") and left null otherwise rather than
+// guessed — most titles, CS2 included, never say.
+//
+// l=english matters: without it the categories come back in the store's
+// own language for that title and Tekken 8 answers in Japanese, which
+// no downstream string match would survive.
+const PLAYER_COUNT_RE = [
+  /\b(?:up to|supports?)\s+(\d{1,2})\s+players?\b/i,
+  /\b\d{1,2}\s*[-–]\s*(\d{1,2})\s+player/i,
+  /\b(\d{1,2})\s*[-–]?\s*player\s+(?:co-?op|multiplayer|online)/i,
+];
+
+function parseMaxPlayers(text) {
+  if (!text) return null;
+  const clean = String(text).replace(/<[^>]*>/g, " ");
+  for (const re of PLAYER_COUNT_RE) {
+    const m = clean.match(re);
+    if (m) {
+      const n = parseInt(m[1], 10);
+      if (n >= 2 && n <= 128) return n;
+    }
+  }
+  return null;
+}
+
+async function steamModes(appid) {
+  const hit = _steamModesCache.get(appid);
+  if (hit && Date.now() - hit.at < STEAM_MODES_TTL) return hit.modes;
+
+  let out = { modes: [], maxPlayers: null };
+  try {
+    const r = await fetch(
+      `https://store.steampowered.com/api/appdetails?appids=${appid}&l=english`
+    );
+    if (r.ok) {
+      const j = await r.json();
+      const d = j && j[appid] && j[appid].success && j[appid].data;
+      if (d) {
+        const cats = Array.isArray(d.categories) ? d.categories : [];
+        out.modes = cats
+          .map(c => c && c.description)
+          .filter(Boolean);
+        out.maxPlayers =
+          parseMaxPlayers(d.short_description) ||
+          parseMaxPlayers(d.about_the_game) ||
+          null;
+      }
+    }
+  } catch (e) {
+    console.error("[steam-modes]", appid, e.message);
+  }
+
+  _steamModesCache.set(appid, { modes: out, at: Date.now() });
+  return out;
+}
+
+// GET /steam/modes?appids=1,2,3 — what a game actually supports.
+//
+// Sibling of /steam/art and shaped the same way: public, batched, capped
+// at 50 so one call cannot fan out into hundreds of upstream lookups.
+// The client uses it for the queue's PvP/PvE signifier and for filtering
+// a library by how a game is actually played.
+//
+// It exists because neither appdetails nor SteamSpy sends an
+// Access-Control-Allow-Origin header, so the browser cannot ask either
+// of them directly — this is the only way the page can have this data.
+app.get("/steam/modes", async (req, res) => {
+  const raw = String(req.query.appids || "");
+  const ids = raw.split(",")
+    .map(x => x.trim())
+    .filter(x => /^\d+$/.test(x))
+    .slice(0, 50);
+  if (!ids.length) return res.json({});
+
+  try {
+    const pairs = await Promise.all(ids.map(async (id) => {
+      try { return [id, await steamModes(id)]; }
+      catch (e) { return [id, null]; }
+    }));
+    const out = {};
+    for (const [id, m] of pairs) if (m && m.modes.length) out[id] = m;
+    res.set("Cache-Control", "public, max-age=86400");
+    res.json(out);
+  } catch (err) {
+    console.error("[steam/modes]", err.message);
+    res.status(500).json({ error: "Could not resolve modes" });
+  }
+});
+
+const _ownedCache = new Map();
+const OWNED_TTL = 30 * 60 * 1000;
+
+// GET /steam/owned — the player's whole Steam library.
+//
+// /steam/recent is GetRecentlyPlayedGames: a fortnight's worth, a dozen
+// titles at most. Queueing for something you own but have not touched
+// lately is a different question and needs a different endpoint.
+//
+// Sorted by playtime and capped at 200: a library runs to hundreds of
+// rows, and the ones worth queueing for are the ones with hours on them.
+app.get("/steam/owned", requireAuth, async (req, res) => {
+  const userRow = await pool.query("SELECT steam_id FROM users WHERE id = $1", [req.userId]);
+  const steam_id = userRow.rows[0]?.steam_id;
+  if (!steam_id) return res.json([]);
+  if (!STEAM_KEY) return res.status(503).json({ error: "Steam API key not configured" });
+
+  const hit = _ownedCache.get(steam_id);
+  if (hit && Date.now() - hit.at < OWNED_TTL) return res.json(hit.games);
+
+  try {
+    const r = await fetch(
+      `https://api.steampowered.com/IPlayerService/GetOwnedGames/v1/?key=${STEAM_KEY}` +
+      `&steamid=${steam_id}&include_appinfo=1&include_played_free_games=1`
+    );
+    const j = await r.json();
+    const games = (j?.response?.games || [])
+      .sort((a, b) => (b.playtime_forever || 0) - (a.playtime_forever || 0))
+      .slice(0, 200)
+      .map(g => ({
+        appid: g.appid,
+        name: g.name,
+        hours_total:  Math.round((g.playtime_forever || 0) / 60),
+        hours_recent: +(((g.playtime_2weeks || 0) / 60).toFixed(1)),
+      }));
+    _ownedCache.set(steam_id, { games, at: Date.now() });
+    res.json(games);
+  } catch (err) {
+    console.error("[steam/owned]", err.message);
+    res.status(500).json({ error: "Could not load library" });
+  }
+});
+
+// GET /steam/search?q=… — find ANY game on Steam.
+//
+// Not the catalogue and not the player's library: the store's own index,
+// so a game nobody here owns yet is still reachable. Public, like
+// /steam/art — the picker renders before a token is necessarily to hand.
+app.get("/steam/search", async (req, res) => {
+  const q = String(req.query.q || "").trim().slice(0, 80);
+  if (q.length < 2) return res.json([]);
+  try {
+    const r = await fetch(
+      `https://store.steampowered.com/api/storesearch/?term=${encodeURIComponent(q)}&cc=us&l=english`
+    );
+    if (!r.ok) return res.json([]);
+    const j = await r.json();
+    const out = (j.items || [])
+      .filter(it => it && it.type === "app" && it.id)
+      .slice(0, 24)
+      .map(it => ({ appid: it.id, name: it.name }));
+    res.set("Cache-Control", "public, max-age=600");
+    res.json(out);
+  } catch (err) {
+    console.error("[steam/search]", err.message);
+    res.json([]);
+  }
+});
+
 // GET /steam/recent — get recently played games + achievements for the logged-in user
 app.get("/steam/recent", requireAuth, async (req, res) => {
   const userRow = await pool.query("SELECT steam_id FROM users WHERE id = $1", [req.userId]);

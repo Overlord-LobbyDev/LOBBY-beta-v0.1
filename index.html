@@ -58736,6 +58736,10 @@ async function reactComment(ev, id, btn){
     }
   }
 
+  /* Exported so the Queue band can put the same treatment on its title
+     rather than growing a second, worse copy of it. */
+  window.gameTitleLogo = { urls:logoUrls, trim:trim };
+
   function size(w, h){
     if (!w || !h) return { w:260, h:64 };
     var k = Math.sqrt(TARGET_AREA / (w * h));
@@ -59027,6 +59031,10 @@ async function reactComment(ev, id, btn){
       : [];
     if (ids.length) prime(ids);
     else patchCatalog();
+    /* Categories for the same catalogue, from the sibling module below.
+       Separate endpoint because it is a separate upstream lookup, and a
+       page that only needs art should not pay for it. */
+    try { if (window.LobbyModes) window.LobbyModes.prime(ids); } catch (e) {}
 
     /* Panels build their grids on open, so new images keep arriving.
        Debounced by a frame; sweep() only writes when a URL differs, so
@@ -59041,6 +59049,157 @@ async function reactComment(ev, id, btn){
 
   if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', start);
   else start();
+})();
+</script>
+
+<!-- ══════════════════════════════════════════════════════════════════
+     LOBBY MODES — what a game actually supports
+
+     Steam publishes CATEGORIES, not a player count: "Single-player",
+     "Multi-player", "PvP", "Online PvP", "Co-op", "Online Co-op",
+     "LAN PvP", "Cross-Platform Multiplayer". There is no capacity field
+     anywhere in the appdetails payload — checked against the full key
+     list, not assumed — so any "up to 10" has to come from elsewhere.
+     Some titles state it in prose ("A 1-4 player physics based fishing
+     simulator"), which the server can parse; most, CS2 included, do
+     not, and maxPlayers is null for those rather than guessed.
+
+     appdetails sends no Access-Control-Allow-Origin, so the browser
+     cannot call it — this needs the same server-side proxy treatment
+     /steam/art already gets:
+
+       GET  {base}/steam/modes?appids=730,4001890
+       →    { "730":     { modes:["Multi-player","Cross-Platform Multiplayer"],
+                           maxPlayers:null },
+              "4001890": { modes:["Single-player","Co-op"], maxPlayers:4 } }
+
+     Until that endpoint exists the fetch fails, the map stays empty and
+     every caller renders nothing extra — no errors, no placeholders.
+     ══════════════════════════════════════════════════════════════════ -->
+<script>
+(function () {
+  'use strict';
+
+  var SS_KEY = 'lobby_modes_v1';
+  var map = {};                 // appid -> { modes:[], maxPlayers:number|null }
+  var inflight = null;
+
+  try {
+    var saved = sessionStorage.getItem(SS_KEY);
+    if (saved) map = JSON.parse(saved) || {};
+  } catch (e) { map = {}; }
+
+  function save(){
+    try { sessionStorage.setItem(SS_KEY, JSON.stringify(map)); } catch (e) {}
+  }
+
+  function base(){
+    try { if (typeof FEED_AUTH_URL !== 'undefined' && FEED_AUTH_URL) return FEED_AUTH_URL; }
+    catch (e) {}
+    try { if (typeof AUTH_URL !== 'undefined' && AUTH_URL) return AUTH_URL; }
+    catch (e) {}
+    return '';
+  }
+
+  /* Ask for everything not already held, 50 at a time, as /steam/art
+     does — one call cannot fan out into hundreds of upstream lookups. */
+  function prime(ids){
+    var want = (ids || []).map(String)
+      .filter(function (x){ return /^\d+$/.test(x) && !map[x]; });
+    want = want.filter(function (x, i, a){ return a.indexOf(x) === i; });
+    if (!want.length) return Promise.resolve(map);
+
+    var chunks = [];
+    for (var i = 0; i < want.length; i += 50) chunks.push(want.slice(i, i + 50));
+
+    inflight = Promise.all(chunks.map(function (c){
+      return fetch(base() + '/steam/modes?appids=' + c.join(','))
+        .then(function (r){ return r.ok ? r.json() : {}; })
+        .catch(function (){ return {}; });
+    })).then(function (parts){
+      parts.forEach(function (p){
+        Object.keys(p || {}).forEach(function (k){ map[k] = p[k]; });
+      });
+      save();
+      return map;
+    });
+    return inflight;
+  }
+
+  function get(appid){ return map[String(appid)] || null; }
+
+  /* The one line worth showing out of a category list, ordered by how
+     much it tells you about queueing for the thing: how you play with
+     other people first, whether you can at all last. */
+  var RANK = ['Online PvP', 'Online Co-op', 'PvP', 'Co-op',
+              'Cross-Platform Multiplayer', 'Multi-player', 'Single-player'];
+
+  function label(appid){
+    var a = get(appid);
+    if (!a || !a.modes || !a.modes.length) return '';
+    for (var i = 0; i < RANK.length; i++){
+      if (a.modes.indexOf(RANK[i]) !== -1) return RANK[i];
+    }
+    return a.modes[0];
+  }
+
+  /* PvP or PvE — the distinction that decides whether you want to queue
+     at all. Steam spreads it over six categories (PvP / Online PvP /
+     LAN PvP against Co-op / Online Co-op / LAN Co-op) and plenty of
+     games are both, so this collapses them to the one word, or two. */
+  /* Overrides for titles whose Steam categories do not answer the
+     question. CS2 is the case: it carries "Multi-player" and
+     "Cross-Platform Multiplayer" and NEITHER a PvP nor a Co-op
+     category, so nothing can be derived from it. The server is asked
+     first and wins wherever it has an answer; this only fills the
+     silences. */
+  var PVX = {
+    730:     'PvP',        // Counter-Strike 2
+    1778820: 'PvP',        // Tekken 8
+    3787240: 'PvP',        // MARVEL Tokon: Fighting Souls
+    4783780: 'PvP',        // Call of Duty: Modern Warfare 4 - Beta
+    976730:  'PvP · PvE',  // Halo: The Master Chief Collection
+    3240220: 'PvP · PvE',  // Grand Theft Auto V Enhanced
+    1174180: 'PvP · PvE',  // Red Dead Redemption 2
+    4001890: 'PvE',        // How to Fish
+    2322010: 'Solo',       // God of War Ragnarok
+    3751950: 'Solo',       // Assassin's Creed Black Flag Resynced
+    200260:  'Solo'        // Batman: Arkham City GOTY
+  };
+
+  function pvx(appid){
+    var a = get(appid), own = PVX[String(appid)] || '';
+    if (!a || !a.modes || !a.modes.length) return own;
+
+    var pvp = false, pve = false, m = a.modes;
+    m.forEach(function (x){
+      if (/pvp/i.test(x)) pvp = true;
+      if (/co-?op/i.test(x)) pve = true;
+    });
+    if (pvp && pve) return 'PvP · PvE';
+    if (pvp) return 'PvP';
+    if (pve) return 'PvE';
+    /* Single-player and nothing else is genuinely solo. Single-player
+       ALONGSIDE Multi-player is not -- that is a campaign plus an
+       online mode, and the online mode is the part you are queueing
+       for. */
+    if (m.indexOf('Single-player') !== -1 && m.indexOf('Multi-player') === -1) return 'Solo';
+    /* Multi-player with neither a PvP nor a Co-op category: Steam has
+       not said which, so take the override if there is one and fall
+       back to the honest generic. */
+    if (own) return own;
+    if (m.indexOf('Multi-player') !== -1) return 'Multiplayer';
+    return '';
+  }
+
+  /* For filtering as much as for the chips: has(id, 'Co-op') is the
+     question a filter actually asks. */
+  function has(appid, mode){
+    var a = get(appid);
+    return !!(a && a.modes && a.modes.indexOf(mode) !== -1);
+  }
+
+  window.LobbyModes = { prime:prime, get:get, label:label, pvx:pvx, has:has, map:map };
 })();
 </script>
 
@@ -64501,8 +64660,17 @@ async function reactComment(ev, id, btn){
   max-width:none !important;
 }
 
-#qMarquee{ position:relative; height:660px; overflow:hidden; margin:0; }
-@media (max-height:900px){ #qMarquee{ height:560px; } }
+/* 594 is the reference's 660 less 10%, so the deck's heading sits
+   higher on first open. The filmstrip and the title below come down by
+   the same 10%, otherwise the shorter band just squeezes them. */
+#qMarquee{ position:relative; height:594px; overflow:hidden; margin:0; }
+@media (max-height:900px){ #qMarquee{ height:504px; } }
+
+/* NB: do not make this a flex container to control ordering. --qk is
+   derived from the deck's MEASURED width, so any change to how the
+   stage sizes its children rescales the whole deck -- which is what
+   shrank "Choose your game" when order:-1 was tried here. The strip's
+   position is settled in JS instead; see paintHow. */
 #qArt{
   position:absolute !important; inset:0 !important; z-index:0 !important;
   background-size:cover; background-position:center 30%;
@@ -64525,10 +64693,15 @@ async function reactComment(ev, id, btn){
 #qMq{
   position:relative; z-index:2; height:100%;
   display:flex; flex-direction:column; justify-content:center;
-  padding:0 64px; max-width:760px;
+  padding:0 64px 146px; max-width:760px;
 }
+/* The reference centres this in the full 660 and clears the 154px strip
+   by about 11px -- but only because "Tekken 8" is one line. Real titles
+   wrap ("MARVEL Tokon: Fighting Souls" is two) and the block grows down
+   into the strip. Reserving the strip's height means the column centres
+   in the space ABOVE it, so no title length can collide. */
 #qMqMain{ display:contents; }
-@media (max-width:900px){ #qMq{ padding:0 28px; } }
+@media (max-width:900px){ #qMq{ padding:0 28px 146px; } }
 #queueOverlay .q-hero-title,
 #queueOverlay .q-hero-sub,
 #queueOverlay .q-camera-notice,
@@ -64539,24 +64712,73 @@ async function reactComment(ev, id, btn){
   color:color-mix(in srgb, var(--hub-accent) 70%, white);
   margin-bottom:16px;
 }
+/* The title is the game's own logo artwork where Steam ships one, as
+   the Home cards are. Bebas Neue is the fallback for the titles that
+   have none -- the house display face, condensed, so a long name fits
+   far larger than Archivo managed. Weight 400 because that is Bebas's
+   only cut; the 900 was silently doing nothing. */
+#qMqName img{
+  display:block; width:auto; height:auto;
+  max-width:100%; max-height:clamp(88px, 12vh, 168px);
+  filter:drop-shadow(0 6px 26px rgba(0,0,0,.85));
+}
 #qMqName{
-  font-family:'Archivo', var(--font), sans-serif;
-  font-size:clamp(38px, 4.6vw, 62px); font-weight:900;
-  text-transform:uppercase; letter-spacing:.5px; line-height:.98;
+  font-family:'Bebas Neue', var(--font), sans-serif;
+  /* Back up to 88 now the rule sentence has moved to the top bar: that
+     freed ~74px of the band's content, which is more than a three-line
+     title needs at this size. */
+  font-size:clamp(46px, 5.2vw, 88px); font-weight:400;
+  text-transform:uppercase; letter-spacing:2px; line-height:.92;
   color:#fff; margin:0 0 16px;
   text-shadow:0 4px 40px rgba(0,0,0,.9);
+  /* Three lines' worth, always. Titles run one to three lines and logo
+     art varies in height, so without a fixed block the stats and the
+     buttons below re-centred on every deck step. Reserving the tallest
+     case holds them still; the title stays top-aligned inside it, so it
+     does not move either. 2.76 = 3 x the .92 line-height. */
+  min-height:2.76em;
 }
-#qMqDesc{
-  font-size:15px; line-height:1.6; color:rgba(255,255,255,.76);
-  max-width:46ch; margin:0 0 26px;
+/* The matchmaking rule, in the top bar beside the three steps. Same
+   divider treatment as .qhw so it reads as one more item in the row
+   rather than a caption stuck onto it. */
+#qHowSteps{ display:flex; align-items:center; min-width:0; }
+/* No divider rule here any more: a border on one side of a centred
+   group reads as a seam, not a separator. */
+#qHowRule{
+  display:flex; align-items:center; justify-content:center;
+  gap:7px; flex-wrap:wrap;
 }
+.qrule.mm{
+  color:color-mix(in srgb, var(--hub-accent) 78%, white);
+  border-color:color-mix(in srgb, var(--hub-accent) 30%, transparent);
+  background:color-mix(in srgb, var(--hub-accent) 11%, transparent);
+}
+/* Single-player is a signifier, not a refusal -- you can still put a
+   table up for one. Neutral rather than accent or red, so it reads as a
+   note about the game and not as something blocking the queue. */
+.qrule.solo{ color:var(--text-2); border-style:dashed; }
 #qMqStats{ display:flex; gap:0; margin:0 0 30px; }
 .qmq{ padding-right:26px; margin-right:26px; border-right:1px solid rgba(255,255,255,.14); }
 .qmq:last-child{ border:0; margin-right:0; padding-right:0; }
 .qmq b{
   display:block; font-family:'JetBrains Mono', ui-monospace, monospace;
-  font-size:24px; font-weight:800; color:#fff; line-height:1;
+  /* A fixed 24px box, not line-height:1. The mode value sets at 20px
+     and would otherwise occupy a shorter line than the figures beside
+     it, dropping its label 4px out of line with theirs. */
+  font-size:24px; font-weight:800; color:#fff; line-height:24px;
   font-variant-numeric:tabular-nums;
+}
+/* The others are figures, so they are mono and tabular. This one is a
+   word: Archivo sets it tighter and without mono's even advance, which
+   is what made "PvP · PvE" straggle. The separator drops back so the
+   two modes read as the content and the dot as punctuation. */
+.qmq b.txt{
+  font-family:'Archivo', var(--font), sans-serif;
+  font-size:20px; font-weight:800; letter-spacing:.2px; white-space:nowrap;
+}
+.qmq b.txt s{
+  text-decoration:none; color:rgba(255,255,255,.26);
+  margin:0 6px; font-weight:600;
 }
 .qmq span{
   display:block; margin-top:7px;
@@ -64578,7 +64800,7 @@ async function reactComment(ev, id, btn){
 }
 #qStrip::-webkit-scrollbar{ display:none; }
 .qmini{
-  flex:0 0 84px; height:118px; border-radius:10px; overflow:hidden; cursor:pointer;
+  flex:0 0 76px; height:106px; border-radius:10px; overflow:hidden; cursor:pointer;
   border:1px solid rgba(255,255,255,.1); opacity:.55;
   background-size:cover; background-position:center; background-color:#161a26;
   transition:opacity .3s, transform .3s, border-color .3s;
@@ -64591,23 +64813,41 @@ async function reactComment(ev, id, btn){
 /* How it works, and the rules, as one quiet line UNDER the band rather
    than three components arguing inside one image. */
 #qHow{
-  display:flex; align-items:center; gap:0; flex-wrap:wrap;
-  margin-top:56px; padding:20px clamp(32px, 4vw, 76px);
-  border-top:1px solid rgba(255,255,255,.07);
-  background:rgba(255,255,255,.014);
+  /* 1fr / auto / 1fr. The middle column carries the search chips and
+     the equal side columns are what put it on the centre of the BAR,
+     rather than centred in the gap the two ends leave -- which moves
+     every time a mode chip appears or a step label changes. */
+  display:grid; grid-template-columns:1fr auto 1fr;
+  align-items:center; gap:16px;
+  /* A bar across the top of the queue: the rules and the shape of the
+     thing, worth reading before you pick rather than after. Sized 5%
+     over the original throughout -- padding, both type sizes, the icon
+     tile and the rule chips -- so it scales as one piece instead of
+     just getting taller. */
+  margin:0 auto; max-width:none;
+  padding:11.6px clamp(32px, 4vw, 76px);
+  border-bottom:1px solid rgba(255,255,255,.07);
+  background:rgba(255,255,255,.02);
 }
+/* width:max-content and nowrap because a flex row will happily shrink a
+   button below its label: "Find players" was arriving on two lines. The
+   svg rule is the other half of that -- an inline <svg> with a viewBox
+   but no width/height falls back to its default replaced size and eats
+   the row, which is what crushed the label in the first place. */
 #qFind{
-  display:inline-flex; align-items:center; justify-content:center; gap:11px;
-  padding:16px 34px; border-radius:12px; border:0; cursor:pointer;
+  display:inline-flex; align-items:center; justify-content:center; gap:10px;
+  padding:15px 34px; border-radius:12px; border:0; cursor:pointer;
+  width:max-content; flex:0 0 auto; white-space:nowrap;
   font-family:'Archivo', var(--font), sans-serif;
   font-size:13.5px; font-weight:900; letter-spacing:1.6px; text-transform:uppercase;
   color:#0d0320;
   background:linear-gradient(180deg,
     color-mix(in srgb, var(--hub-accent) 94%, white), var(--hub-accent));
-  box-shadow:0 16px 38px -10px color-mix(in srgb, var(--hub-accent) 58%, transparent),
+  box-shadow:0 14px 34px -8px color-mix(in srgb, var(--hub-accent) 55%, transparent),
              inset 0 1px 0 rgba(255,255,255,.45);
   transition:transform .18s cubic-bezier(.22,1,.36,1), filter .18s ease;
 }
+#qFind svg, .qghost svg{ width:16px; height:16px; flex:0 0 auto; }
 #qFind:hover{ transform:translateY(-2px); filter:brightness(1.07); }
 #qFind:disabled{
   background:rgba(255,255,255,.07); color:rgba(255,255,255,.4);
@@ -64615,7 +64855,8 @@ async function reactComment(ev, id, btn){
 }
 .qghost{
   display:inline-flex; align-items:center; gap:8px;
-  padding:14px 20px; border-radius:12px; cursor:pointer;
+  padding:13px 20px; border-radius:12px; cursor:pointer;
+  width:max-content; flex:0 0 auto; white-space:nowrap;
   font-family:'Archivo', var(--font), sans-serif;
   font-size:12px; font-weight:700; letter-spacing:.6px;
   color:rgba(255,255,255,.8);
@@ -64625,28 +64866,30 @@ async function reactComment(ev, id, btn){
 .qghost:hover{ background:rgba(255,255,255,.13); color:#fff; }
 
 
-.qhw{ display:flex; align-items:center; gap:11px; padding-right:22px; }
-.qhw + .qhw{ padding-left:22px; border-left:1px solid rgba(255,255,255,.1); }
+.qhw{ display:flex; align-items:center; gap:11.6px; padding-right:23px; }
+.qhw + .qhw{ padding-left:23px; border-left:1px solid rgba(255,255,255,.1); }
 .qhw i{
-  flex:0 0 auto; width:30px; height:30px; border-radius:9px;
+  flex:0 0 auto; width:31.5px; height:31.5px; border-radius:9px;
   display:flex; align-items:center; justify-content:center;
   color:color-mix(in srgb, var(--hub-accent) 88%, white);
   background:color-mix(in srgb, var(--hub-accent) 14%, transparent);
   border:1px solid color-mix(in srgb, var(--hub-accent) 28%, transparent);
 }
-.qhw i svg{ width:15px; height:15px; }
-.qhw b{ display:block; font-size:12.5px; font-weight:800; color:#fff; letter-spacing:.2px; }
-.qhw span{ display:block; font-size:11.5px; color:var(--text-3); margin-top:2px; }
-#qRules{ display:flex; gap:7px; flex-wrap:wrap; margin-left:auto; }
+.qhw i svg{ width:15.75px; height:15.75px; }
+.qhw b{ display:block; font-size:13.1px; font-weight:800; color:#fff; letter-spacing:.2px; }
+.qhw span{ display:block; font-size:12.1px; color:var(--text-3); margin-top:2px; }
+/* justify-self, not margin-left:auto -- the grid gives it its own
+   column now, and auto margins would fight the track sizing. */
+#qRules{ display:flex; gap:7px; flex-wrap:wrap; justify-content:flex-end; justify-self:end; }
 .qrule{
   display:inline-flex; align-items:center; gap:6px;
-  padding:5px 10px; border-radius:99px;
+  padding:5.25px 10.5px; border-radius:99px;
   font-family:'JetBrains Mono', ui-monospace, monospace;
-  font-size:9px; font-weight:700; letter-spacing:1.2px; text-transform:uppercase;
+  font-size:9.45px; font-weight:700; letter-spacing:1.2px; text-transform:uppercase;
   color:var(--text-3);
   background:rgba(255,255,255,.04); border:1px solid rgba(255,255,255,.08);
 }
-.qrule svg{ width:11px; height:11px; }
+.qrule svg{ width:11.55px; height:11.55px; }
 .qrule.no{ color:#ff9a9a; border-color:rgba(255,120,120,.26); }
 .qrule.yes{ color:#7fe0a3; border-color:rgba(90,220,140,.24); }
 
@@ -64663,14 +64906,14 @@ async function reactComment(ev, id, btn){
 .qsec{ text-align:center; margin:0 0 4px; }
 .qsec-t{
   font-family:'Archivo', var(--font), sans-serif;
-  font-size:25px; font-weight:900; letter-spacing:2.2px; text-transform:uppercase;
+  font-size:calc(25px * var(--qk)); font-weight:900; letter-spacing:2.2px; text-transform:uppercase;
   color:#fff; line-height:1.06;
   text-shadow:0 -1px 0 rgba(255,255,255,.3), 0 1px 0 rgba(0,0,0,.55),
               0 3px 7px rgba(0,0,0,.42),
               0 0 42px color-mix(in srgb, var(--hub-accent) 34%, transparent);
 }
 .qsec-bar{
-  width:64px; height:3px; border-radius:99px; margin:11px auto;
+  width:calc(64px * var(--qk)); height:3px; border-radius:99px; margin:11px auto;
   background:linear-gradient(90deg, transparent,
     color-mix(in srgb, var(--hub-accent) 95%, white) 35%,
     color-mix(in srgb, var(--hub-accent) 95%, white) 65%, transparent);
@@ -64688,24 +64931,111 @@ async function reactComment(ev, id, btn){
 .qsec-k .sep{ color:rgba(255,255,255,.18); }
 .qsec-s{ font-size:12.5px; color:var(--text-3); margin-top:9px; }
 
-#qDeck{ position:relative; height:392px; margin:26px 0 0; }
+/* Which shelf the deck is showing. A segmented pair rather than a link,
+   so the state is readable at a glance and the alternative is visible
+   before you need it. */
+#qDeckTools{
+  display:flex; align-items:center; justify-content:center;
+  gap:12px; flex-wrap:wrap; margin-top:15px;
+}
+#qSrc{
+  display:inline-flex; gap:4px;
+  padding:4px; border-radius:12px;
+  background:rgba(0,0,0,.35); border:1px solid rgba(255,255,255,.07);
+}
+/* Search reaches every game, so it sits beside the shelf tabs rather
+   than inside either one. */
+#qSearch{
+  position:relative; display:inline-flex; align-items:center; gap:9px;
+  padding:0 12px 0 13px; height:40px; border-radius:12px;
+  background:rgba(0,0,0,.35); border:1px solid rgba(255,255,255,.07);
+  transition:border-color .2s, background .2s;
+}
+#qSearch:focus-within{
+  border-color:color-mix(in srgb, var(--hub-accent) 45%, transparent);
+  background:rgba(0,0,0,.5);
+}
+#qSearch svg{ width:14px; height:14px; flex:0 0 auto; color:var(--text-3); }
+#qDeckQ{
+  width:220px; border:0; outline:0; background:transparent; color:#fff;
+  font-family:'JetBrains Mono', ui-monospace, monospace;
+  font-size:11px; letter-spacing:.6px;
+}
+#qDeckQ::placeholder{ color:var(--text-3); letter-spacing:1.1px; text-transform:uppercase; font-size:10px; }
+#qSearchX{
+  border:0; background:transparent; cursor:pointer; padding:0 2px;
+  color:var(--text-3); font-size:17px; line-height:1;
+}
+#qSearchX:hover{ color:#fff; }
+.qsrc{
+  display:inline-flex; align-items:center; gap:7px;
+  padding:8px 16px; border-radius:9px; border:0; cursor:pointer;
+  background:transparent; color:var(--text-3);
+  font-family:'JetBrains Mono', ui-monospace, monospace;
+  font-size:10.5px; font-weight:700; letter-spacing:1.4px; text-transform:uppercase;
+  transition:background .2s, color .2s;
+}
+.qsrc b{ font-weight:800; opacity:.55; }
+.qsrc:hover:not(:disabled):not(.on){ color:#fff; background:rgba(255,255,255,.05); }
+.qsrc:disabled{ opacity:.4; cursor:not-allowed; }
+.qsrc.on{
+  color:#0d0320;
+  background:linear-gradient(180deg,
+    color-mix(in srgb, var(--hub-accent) 94%, white), var(--hub-accent));
+  box-shadow:0 6px 18px -6px color-mix(in srgb, var(--hub-accent) 55%, transparent);
+}
+.qsrc.on b{ opacity:.65; }
+
+#qDeck{ position:relative; height:calc(392px * var(--qk)); margin:26px 0 0; --qwash:none; }
+/* The reference stands its deck on a blurred copy of the selected hero
+   (.wash), which is where that soft colour behind the cards comes from.
+   Ours hangs off the deck itself and reaches up behind the heading, so
+   it needs no extra element and no layout of its own. */
+#qDeck::before{
+  content:''; position:absolute; inset:-260px -14% 40px; z-index:0;
+  background-image:var(--qwash);
+  background-size:cover; background-position:center 22%;
+  /* The reference's own .5/brightness(.8) assumes a dark hero. Half the
+     library is pale key art, and blurred at that strength it turns the
+     whole deck into a grey box -- the cards read as washed out rather
+     than lit. Dimmer and more saturated is the same idea that survives
+     a bright hero. */
+  filter:blur(80px) saturate(1.6) brightness(.5);
+  opacity:.34; pointer-events:none;
+  -webkit-mask-image:linear-gradient(180deg, #000 0%, rgba(0,0,0,.6) 46%, transparent 92%);
+          mask-image:linear-gradient(180deg, #000 0%, rgba(0,0,0,.6) 46%, transparent 92%);
+  transition:background-image .6s ease;
+}
+/* The reference frames the whole mock at 1560px and hangs the nav
+   arrows 40px inside THAT edge. Uncapped, the same 40px is 40px from a
+   2560 window, which is what stranded the arrows half a screen from the
+   cards. The band above stays full-bleed -- that is the marquee's whole
+   argument -- and only the deck block is framed.
+
+   The frame is 2400 rather than the reference's 1560 because --qk (set
+   in JS) scales the deck's geometry to whatever width it gets, so a
+   wide frame stays proportioned instead of leaving the cards marooned
+   in the middle of it. */
+#qStage{ --qk:1; }
 #qStage > .qsec,
+#qStage > #qDeckTools,
 #qStage > #qDeck,
 #qStage > #qDots,
 #qStage > #qBar,
 #qStage > #qPools{
-  max-width:none; margin-left:0; margin-right:0;
+  max-width:2400px; margin-left:auto; margin-right:auto;
   padding-left:clamp(28px, 3.4vw, 72px);
   padding-right:clamp(28px, 3.4vw, 72px);
 }
 #qStage > .qsec{ padding-top:56px; }
 /* The one thing that should NOT stretch: a row of controls 2000px wide
    puts the rank tiles a screen away from the stepper. */
-#qStage > #qBar{ max-width:900px; margin-left:auto; margin-right:auto; }
-#qTrack{ position:relative; height:100%; }
+#qStage > #qBar{ max-width:calc(900px * var(--qk)); margin-left:auto; margin-right:auto; }
+#qTrack{ position:relative; height:100%; z-index:1; }
 .qc{
   position:absolute; top:0; left:50%;
-  width:250px; height:375px; margin-left:-125px;
+  width:calc(250px * var(--qk)); height:calc(375px * var(--qk));
+  margin-left:calc(-125px * var(--qk));
   border-radius:16px; overflow:hidden; cursor:pointer;
   background:#12151f; border:1px solid rgba(255,255,255,.09);
   box-shadow:0 26px 60px -18px rgba(0,0,0,.85);
@@ -64720,23 +65050,45 @@ async function reactComment(ev, id, btn){
 }
 .qc-art{ position:absolute; inset:0; background-size:cover; background-position:center; background:#161a26; }
 .qc-fb{
-  position:absolute; inset:0; display:flex; align-items:center; justify-content:center;
+  position:absolute; inset:0; z-index:2;
+  display:flex; align-items:center; justify-content:center;
   font-family:'Archivo', var(--font), sans-serif;
-  font-size:44px; font-weight:900; color:rgba(255,255,255,.14);
+  font-size:calc(64px * var(--qk)); font-weight:900;
+  color:rgba(255,255,255,.82); letter-spacing:2px;
+  text-shadow:0 4px 24px rgba(0,0,0,.75);
+}
+/* Cards contain their art over a blurred copy of it. This is the half
+   of Home's treatment I had left out: "the gaps fell back to the card's
+   own grey, which is why a letterboxed header looked broken rather than
+   deliberate."
+
+   Contain unconditionally, with no ratio test: for a true 2:3 asset it
+   fills the box exactly and is indistinguishable from cover, so the
+   common path loses nothing, and every other ratio shows the whole
+   cover instead of a magnified middle with the logo sliced off. */
+.qc-art.qc-amb{
+  background-color:transparent;
+  background-size:contain; background-repeat:no-repeat; background-position:center;
+}
+.qc-art.qc-amb::before{
+  content:''; position:absolute; inset:-12%; z-index:-1;
+  background-image:var(--qc-amb, none);
+  background-size:cover; background-position:center;
+  filter:blur(16px) saturate(1.7) brightness(.7);
 }
 .qc-cap{
-  position:absolute; left:0; right:0; bottom:0; padding:16px;
+  position:absolute; left:0; right:0; bottom:0; padding:calc(16px * var(--qk));
   background:linear-gradient(180deg, transparent, rgba(6,8,13,.96));
 }
 .qc-nm{
   font-family:'Archivo', var(--font), sans-serif;
-  font-size:15px; font-weight:800; color:#fff; line-height:1.2;
+  font-size:calc(15px * var(--qk)); font-weight:800; color:#fff; line-height:1.2;
   display:-webkit-box; -webkit-line-clamp:2; line-clamp:2;
   -webkit-box-orient:vertical; overflow:hidden;
 }
 .qc-hr{
   font-family:'JetBrains Mono', ui-monospace, monospace;
-  font-size:9.5px; font-weight:700; letter-spacing:1.2px; text-transform:uppercase;
+  font-size:calc(9.5px * var(--qk)); font-weight:700; letter-spacing:1.2px; text-transform:uppercase;
   color:rgba(255,255,255,.62); margin-top:5px;
 }
 .qc.on{
@@ -64747,15 +65099,16 @@ async function reactComment(ev, id, btn){
 }
 .qnav{
   position:absolute; top:50%; transform:translateY(-50%); z-index:40;
-  width:44px; height:44px; border-radius:50%;
+  width:42px; height:42px; border-radius:50%;
   display:flex; align-items:center; justify-content:center;
   border:1px solid rgba(255,255,255,.14);
   background:rgba(10,13,18,.7); backdrop-filter:blur(12px);
-  color:#fff; cursor:pointer; font-size:19px; line-height:1;
+  color:#fff; cursor:pointer; font-size:18px; line-height:1;
   transition:background .2s, transform .2s, color .2s;
 }
 .qnav:hover{ background:var(--hub-accent); color:#0d0320; transform:translateY(-50%) scale(1.08); }
 .qnav.p{ left:40px; } .qnav.n{ right:40px; }
+@media (max-width:900px){ .qnav{ display:none; } }
 #qDots{ display:flex; justify-content:center; gap:7px; margin-top:22px; }
 #qDots i{
   width:7px; height:7px; border-radius:99px; cursor:pointer;
@@ -64998,6 +65351,38 @@ async function reactComment(ev, id, btn){
         hrsRecent: parseFloat(g.hours_recent || 0) || 0,
       };
     });
+
+    /* Steam moved store art behind a content hash, so a URL built from
+       an appid 404s for anything published recently -- which is most of
+       a real library. LobbyArt resolves them through Steam's own asset
+       index and its header names Queue as one of the pages that needs
+       it, but start() only primes GT_GAMES, and a library is mostly NOT
+       in GT_GAMES. So the queue primes its own appids: without this the
+       guessed portrait 404d and the card fell through to the same hero
+       the band above was already showing. */
+    var LA = window.LobbyArt;
+    if (LA && LA.prime){
+      var apps = r.map(function (g){ return g.appid; })
+                  .filter(function (a){ return /^\d+$/.test(String(a)); });
+      /* Categories for the library too. Not awaited: the chips are an
+         addition to the bar, and nothing should wait on them to paint. */
+      try { if (window.LobbyModes) window.LobbyModes.prime(apps).then(paintHow); } catch (e) {}
+      if (apps.length){
+        try {
+          await LA.prime(apps);
+          artCache = {};            // resolved URLs beat anything already probed
+          /* buildDeck only re-runs the art pass when the signature
+             changes, so clearing the cache alone left every card
+             showing whatever the first, unresolved pass painted --
+             which is why the deck stayed wrong while the filmstrip,
+             rebuilt on every paint, came good. Drop the signature so
+             the cards actually re-resolve. */
+          var t = document.getElementById('qTrack');
+          if (t) t.__sig = '';
+          if (document.getElementById('qStage')){ buildDeck(); paintMarquee(); }
+        } catch (e) {}
+      }
+    }
   }
   async function loadPulse(){
     var r = await window.api('/queue/pulse').catch(function(){ return null; });
@@ -65015,18 +65400,30 @@ async function reactComment(ev, id, btn){
      empty, indistinguishable from a layout fault. Probing it with an
      Image first means a missing wide asset falls back to the header,
      then to the capsule, rather than to nothing. */
-  function setArt(el, first, e, g){
-    var chain = [first,
-                 e && e.hero, e && e.cover,
-                 g && g.header, g && g.cover].filter(function (u, i, a){
-                   return !!u && a.indexOf(u) === i;
-                 });
+  /* Bumped on every call. A probe that resolves after the selection has
+     moved on must not paint: stepping the deck while one was in flight
+     is how the Halo band ended up showing Batman's key art. */
+  var artSeq = 0;
+
+  function setArt(el, first, e, g, id){
+    var seq = ++artSeq;
+    var app = appIdFor(id);
+    var chain = (app ? heroUrls(app) : [])
+      .concat([first, e && e.hero, e && e.cover, g && g.header, g && g.cover])
+      .filter(function (u, i, a){ return !!u && a.indexOf(u) === i; });
+    var need = boxPixels(el, 'band');
     var i = 0;
     (function tryNext(){
       if (i >= chain.length){ el.classList.remove('on'); return; }
+      if (seq !== artSeq) return;              // a newer selection owns the band
       var candidate = chain[i++];
       var probe = new Image();
       probe.onload = function (){
+        if (seq !== artSeq) return;
+        /* Looser than the deck's 1.5: the 1920-wide library_hero is a 2x
+           upscale on a 2560 band and still reads, because it is a big
+           image to begin with. A 460x215 header is 8x and does not. */
+        if (coverScale(need, probe) > 2.2){ tryNext(); return; }
         el.style.backgroundImage = url(candidate);
         el.classList.add('on');
       };
@@ -65068,6 +65465,9 @@ async function reactComment(ev, id, btn){
         'title="' + esc(g.name) + '" onclick="window.qPickFromStrip(' + jsStr(g.id) + ')" ' +
         'style="' + (g.cover ? 'background-image:' + url(g.cover) : '') + '"></div>';
     }).join('');
+    Array.prototype.forEach.call(strip.children, function (m, i){
+      upgradeArt(m, src[i].id, 'mini');
+    });
     var on = strip.querySelector('.qmini.on');
     if (on && on.scrollIntoView) on.scrollIntoView({ block:'nearest', inline:'nearest' });
   }
@@ -65082,6 +65482,58 @@ async function reactComment(ev, id, btn){
     commit();
   };
 
+  /* Resolved logo art, keyed by appid: a URL, or false for "Steam ships
+     none". Cached because paintMarquee rebuilds the band's innerHTML on
+     every state change -- without it the title would flash back to text
+     and re-probe the CDN on each one. */
+  var logoCache = {};
+
+  function titleHTML(app, name){
+    return (app && logoCache[app])
+      ? '<img src="' + esc(logoCache[app]) + '" alt="' + esc(name) + '">'
+      : esc(name);
+  }
+
+  function paintTitleLogo(app, name){
+    var api = window.gameTitleLogo;
+    if (!api || !app || logoCache[app] !== undefined) return;
+    var urls = api.urls(app), i = 0;
+    (function next(){
+      if (i >= urls.length){ logoCache[app] = false; return; }   // keep the text
+      var u = urls[i++];
+      var probe = new Image();
+      probe.crossOrigin = 'anonymous';          // required to read the pixels
+      probe.onerror = next;
+      probe.onload = function (){
+        if (probe.naturalWidth < 40 || probe.naturalHeight < 12){ next(); return; }
+        /* Trimmed to the lettering. Steam normalises the CANVAS, not the
+           artwork -- some sheets are mostly transparent with the
+           wordmark floating in the middle, and untrimmed those render
+           tiny. Same trim the Home cards use. */
+        var cut = api.trim(probe);
+        logoCache[app] = cut ? cut.url : u;
+        var host = document.getElementById('qMqName'), s = S();
+        if (host && s && appIdFor(s.game) === app) host.innerHTML = titleHTML(app, name);
+      };
+      probe.src = u;
+    })();
+  }
+
+  /* The deck stands on a blurred copy of whatever hero the band is
+     showing. Called from both painters because on a cold open either
+     one can be the last to run, and the deck may not exist yet when the
+     band first paints. */
+  function paintDeckWash(){
+    var dk = document.getElementById('qDeck');
+    if (!dk) return;
+    var s = S(), sel = s ? (s.game || '') : '';
+    var isPool = sel.indexOf('pl:') === 0;
+    var e = entry(sel);
+    var g = GAMES().find(function (x){ return x.id === sel; });
+    var hero = e ? e.hero : (g ? (g.heroHi || g.header || g.cover) : '');
+    dk.style.setProperty('--qwash', (hero && !isPool) ? url(hero) : 'none');
+  }
+
   function paintMarquee(){
     if (!ensureMarquee()) return;
     var s = S(); if (!s) return;
@@ -65095,44 +65547,59 @@ async function reactComment(ev, id, btn){
     var g = GAMES().find(function (x){ return x.id === sel; });
     var hero = e ? e.hero : (g ? (g.heroHi || g.header || g.cover) : '');
 
-    if (hero && !isPool) setArt(art, hero, e, g);
+    if (hero && !isPool) setArt(art, hero, e, g, sel);
     else art.classList.remove('on');
 
     var name = isPool ? 'A pool' : (e ? e.name : (g ? g.name : ''));
     var ready = !!sel;
+    var app = (ready && !isPool) ? appIdFor(sel) : '';
+    /* PvP or PvE for the third stat. Empty until /steam/modes exists,
+       and the stat is simply left out then -- capacity is not something
+       Steam publishes, and repeating the queue size here would only say
+       again what the top bar's "Looking for" chip already says. */
+    var mPvx = (window.LobbyModes && app) ? window.LobbyModes.pvx(app) : '';
 
     /* Five things, as in the mockup. The right of the frame is the key
        art doing its job, not a panel sitting on top of it. */
     mq.innerHTML =
       '<div id="qMqMain">' +
       '<div id="qMqKick">' + (ready ? '◆ Queueing for' : '◆ Find players · 1v1 or squad up') + '</div>' +
-      '<h1 id="qMqName">' + esc(ready ? name : 'Lobby Queue') + '</h1>' +
-      '<p id="qMqDesc">' + (ready
-        ? esc((s.players || 2) + ' players, within one rank of you. The window widens the longer you wait — any rank at all after three minutes.')
-        : 'Random teammates, your skill level, your game. Scroll down, pick a title, and we will put you in a call with people who want the same thing.') +
-      '</p>' +
+      '<h1 id="qMqName">' + titleHTML(app, ready ? name : 'Lobby Queue') + '</h1>' +
+      /* The matchmaking rule lives in the top bar now -- it is the same
+         sentence for every title, so it belongs with the other standing
+         rules rather than under each game's name. */
+      /* Three, as the reference has. Rank came out because it is a
+         setting, not a status, and it is already a control in the bar
+         under the deck -- the band is for what is true right now. The
+         reference's third stat is "Typical wait", which /queue/pulse
+         does not return; Players is the honest stand-in until it does. */
       '<div id="qMqStats">' +
         (e && e.hrsTotal ? '<div class="qmq"><b>' + e.hrsTotal + 'h</b><span>Your playtime</span></div>' : '') +
         '<div class="qmq"><b>' + pulse.total + '</b><span>Waiting now</span></div>' +
-        '<div class="qmq"><b>' + (s.players || 2) + '</b><span>Players</span></div>' +
-        '<div class="qmq"><b>' + String(s.skill || 'plat').toUpperCase() + '</b><span>Rank</span></div>' +
+        (mPvx ? '<div class="qmq"><b class="txt">' +
+           esc(mPvx).replace(' · ', '<s>·</s>') + '</b><span>Mode</span></div>' : '') +
       '</div>' +
       '<div id="qMqBtns">' +
-        '<button id="qFind" type="button"' + (ready ? '' : ' disabled') + '>' + I.find +
+        /* No icon: the reference's CTA is the label alone, and the
+           unsized magnifier was what squeezed it onto two lines. */
+        '<button id="qFind" type="button"' + (ready ? '' : ' disabled') + '>' +
           (ready ? 'Find players' : 'Pick a game below') + '</button>' +
         (ready ? '<button class="qghost" onclick="window.qScrollDeck()">Change game</button>' : '') +
       '</div>' +
       '</div>';
 
+    paintTitleLogo(app, name);
     paintStrip();
     paintHow();
+    paintDeckWash();
 
     var btn = document.getElementById('qFind');
     if (btn) btn.onclick = function (){ if (window.qBeginSearch) window.qBeginSearch(); };
   }
-  /* The reference has nothing between the band and the deck, so this
-     goes to the FOOT of the page: still there for anyone who wants it,
-     no longer standing where the deck's heading should be. */
+  /* A slim bar at the very top of the queue. It still keeps clear of
+     the band-to-deck transition, which is the one gap the reference
+     leaves empty; CSS order puts it there, so this can append wherever
+     it likes. */
   function paintHow(){
     var stage = document.getElementById('qStage');
     if (!stage) return;
@@ -65140,12 +65607,50 @@ async function reactComment(ev, id, btn){
     if (!how){
       how = document.createElement('div');
       how.id = 'qHow';
-      stage.appendChild(how);
     }
+    /* Pinned directly under the band, every paint. ensureMarquee
+       inserts the band at firstChild and buildDeck appends the deck, so
+       whichever ran last used to decide where this sat. Re-asserting
+       the position costs nothing when it is already right, and needs no
+       layout change to the stage -- making #qStage a flex container to
+       do the same job rescaled the whole deck, because --qk comes off
+       the deck's measured width. */
+    if (stage.firstChild !== how) stage.insertBefore(how, stage.firstChild);
+    var hs = S();
+    /* What the game itself supports, where the server has told us. Every
+       one of these is absent rather than guessed when /steam/modes has
+       no answer, so the bar degrades to what it showed before. */
+    var LM = window.LobbyModes;
+    var hApp = hs ? appIdFor(hs.game) : '';
+    var mode = (LM && hApp) ? LM.label(hApp) : '';
+    var info = (LM && hApp) ? LM.get(hApp) : null;
+    var cap  = info && info.maxPlayers;
+    var solo = mode === 'Single-player';
+
+    /* Three groups, not eight loose children: the bar is a grid of
+       1fr / auto / 1fr, so the chips in the middle sit on the centre of
+       the BAR rather than on the centre of whatever space the steps and
+       the rules happen to leave. Equal side columns is what makes that
+       true regardless of how wide either end runs. */
     how.innerHTML =
+      '<div id="qHowSteps">' +
       '<div class="qhw"><i>' + I.pick + '</i><div><b>Pick a game</b><span>Your library, or a pool</span></div></div>' +
       '<div class="qhw"><i>' + I.squad + '</i><div><b>Set your squad</b><span>Size and rank</span></div></div>' +
       '<div class="qhw"><i>' + I.find + '</i><div><b>Take a seat</b><span>The table fills around you</span></div></div>' +
+      '</div>' +
+      /* The same rule as three chips rather than a two-line paragraph.
+         The bar is a row of chips already; prose sat in it badly and
+         wrapped. Accent-tinted to separate what you are SEARCHING for
+         from the house rules on the right, which are red/green. */
+      '<div id="qHowRule">' +
+        /* "Minimum of N": it is the floor the queue searches for, not a
+           target and not the game's capacity. */
+        '<span class="qrule mm">Minimum of ' + esc(String((hs && hs.players) || 2)) + '</span>' +
+        (mode ? '<span class="qrule ' + (solo ? 'solo' : 'mm') + '">' + esc(mode) + '</span>' : '') +
+        (cap  ? '<span class="qrule mm">Up to ' + esc(String(cap)) + '</span>' : '') +
+        '<span class="qrule mm">Within 1 rank</span>' +
+        '<span class="qrule mm">Any rank after 3m</span>' +
+      '</div>' +
       '<div id="qRules">' +
         '<span class="qrule no">' + I.noCam + 'Camera off</span>' +
         '<span class="qrule yes">' + I.screen + 'Screen share ok</span>' +
@@ -65159,23 +65664,420 @@ async function reactComment(ev, id, btn){
   };
 
   /* ── 2 · Deck ────────────────────────────────────────────────── */
-  var idx = 0, STEP = 220, STEP2 = 390;
+  /* The reference's step geometry, and the frame width it was drawn
+     against. Everything below is these numbers times a scale factor, so
+     a 2560 window gets the reference's PROPORTIONS rather than its
+     pixels -- at 1560 the maths is the identity and the deck is the
+     reference exactly. */
+  var REF_W = 1560, BASE = { step:220, step2:390, far:600 };
+  var idx = 0, STEP = BASE.step, STEP2 = BASE.step2, FAR = BASE.far;
+
+  function deckScale(){
+    var dk = document.getElementById('qDeck');
+    var stage = document.getElementById('qStage');
+    if (!dk || !stage) return;
+    var cs = getComputedStyle(dk);
+    var w = dk.clientWidth - parseFloat(cs.paddingLeft || 0) - parseFloat(cs.paddingRight || 0);
+    if (!(w > 0)) return;
+    var k = Math.max(1, Math.min(1.6, w / REF_W));
+    stage.style.setProperty('--qk', String(k));
+    STEP  = BASE.step  * k;
+    STEP2 = BASE.step2 * k;
+    FAR   = BASE.far   * k;
+  }
+
+  var scaleTimer = null;
+  window.addEventListener('resize', function (){
+    clearTimeout(scaleTimer);
+    scaleTimer = setTimeout(function (){ deckScale(); apply(); }, 120);
+  });
+
+  /* Steam's capsule_img is 231x87 -- a landscape thumbnail. Cover-
+     cropping it into a 250x375 card is a ~4x upscale, and that is the
+     blur on the deck and the squashed covers in the filmstrip.
+     library_600x900.jpg is the portrait art the reference builds from.
+     It 404s for a handful of titles, so this UPGRADES rather than
+     replaces: the capsule is already painted, and a miss just leaves
+     the card as it was. */
+  /* GT_GAMES is keyed by SLUG -- _steamGame(1778820, 'tekken8', ...) --
+     and library rows come back as 'steam:<appid>'. Testing the id for
+     digits therefore matched nothing at all, which is why the _2x art
+     never once loaded. The appid lives on steamAppId; failing that it
+     can be read back out of any Steam URL the record already carries. */
+  function appIdFor(id){
+    var s = String(id == null ? '' : id);
+    if (/^\d+$/.test(s)) return s;
+    var m = s.match(/^steam:(\d+)$/);
+    if (m) return m[1];
+    var g = GAMES().find(function (x){ return x.id === id; });
+    if (g && g.steamAppId) return String(g.steamAppId);
+    var e = lib.find(function (x){ return x.id === id; });
+    var any = (g && (g.cover || g.header || g.heroHi)) || (e && (e.cover || e.hero)) || '';
+    var u = String(any).match(/\/apps\/(\d+)\//);
+    return u ? u[1] : '';
+  }
+
+  /* The band is a 3.1:1 cinematic box, so it wants the OPPOSITE end of
+     the catalogue from a 2:3 card -- Home's artUrls() is ordered for a
+     portrait column and would hand the band a 600x900 to crop to
+     ribbons. Same principle as that chain ("ordered by how well each
+     asset survives THIS box"), applied to this one: the 3840-wide _2x
+     hero first, since a 2560 band on a 1.5x display is 3840 real
+     pixels and the 1920 hero was being upscaled 2x. */
+  /* The three hosts Home's artUrls() probes: art missing from the
+     default CDN often exists under store_item_assets, which is what
+     rescues newer titles. */
+  function steamHosts(app){
+    return {
+      A: 'https://cdn.cloudflare.steamstatic.com/steam/apps/' + app + '/',
+      B: 'https://cdn.akamai.steamstatic.com/steam/apps/' + app + '/',
+      C: 'https://shared.cloudflare.steamstatic.com/store_item_assets/steam/apps/' + app + '/'
+    };
+  }
+
+  function heroUrls(app){
+    var a = resolvedArt(app), h = steamHosts(app);
+    /* library_hero has its own hash and is NOT in the /steam/art
+       payload, so the constructed ones lead here and the resolved
+       header_img is the backstop -- the same call patchCatalog makes. */
+    return [
+      h.A + 'library_hero_2x.jpg', h.C + 'library_hero_2x.jpg', h.B + 'library_hero_2x.jpg',
+      h.A + 'library_hero.jpg',    h.C + 'library_hero.jpg',    h.B + 'library_hero.jpg'
+    ].concat(a && a.header_img ? [a.header_img] : [])
+     .concat([h.A + 'capsule_616x353.jpg', h.C + 'capsule_616x353.jpg', h.A + 'header.jpg']);
+  }
+
+  /* Resolved art, keyed by appid and box: a URL, or false for "nothing
+     fits". paintStrip runs on every state change, so without this each
+     one refired a probe chain for all eleven minis and the deck's
+     twenty-four cards -- hundreds of concurrent requests at Steam,
+     which is its own way of ending up with a blank cover. */
+  var artCache = {};
+
+  /* Portrait boxes take PORTRAIT art or keep what they have. Home's
+     chain falls through to capsule_616x353 and library_hero because its
+     column is ~340px and roughly square, where a tight crop of a big
+     wide asset still reads. At 84px in the filmstrip the same crop is a
+     slice of sky, so falling through replaced covers that were merely
+     soft with ones that were wrong. _2x leads for the deck's 361px
+     cards; the 600 wide is already ample for an 84px mini. */
+  /* What /steam/art resolved for this appid, if anything. capsule_img is
+     the portrait; header_img is the wide one. Both carry Steam's content
+     hash, so they reach art no constructed URL can. */
+  function resolvedArt(app){
+    var LA = window.LobbyArt;
+    return (LA && LA.get) ? (LA.get(app) || null) : null;
+  }
+
+  function portraitUrls(app){
+    var a = resolvedArt(app), h = steamHosts(app);
+    /* Resolved first: it is authoritative, and for a recent title it is
+       the ONLY portrait that exists. The constructed paths stay behind
+       it for the older titles that predate the hash. */
+    return (a && a.capsule_img ? [a.capsule_img] : []).concat([
+      h.A + 'library_600x900_2x.jpg', h.C + 'library_600x900_2x.jpg',
+      h.A + 'library_600x900.jpg',    h.C + 'library_600x900.jpg',
+      h.B + 'library_600x900.jpg'
+    ]);
+  }
+
+  /* The band owns library_hero, so the card may NOT have it. Home can
+     fall through to the hero because its art is a 287px column beside a
+     block of text -- a centre crop there is an accent. Here the card IS
+     the picture, sitting directly under a band already showing that
+     exact hero at full bleed, so falling through drew the same image
+     twice down the page. capsule_616x353 is different framing and is
+     allowed; past that the card takes the designed fallback instead. */
+  function capsuleUrls(app){
+    var h = steamHosts(app);
+    return [h.A + 'capsule_616x353.jpg', h.C + 'capsule_616x353.jpg',
+            h.B + 'capsule_616x353.jpg'];
+  }
+
+  /* No art worth showing. A gradient with the game's initial on it is a
+     designed state; the 231x87 capsule smeared over 361px is not. Same
+     call Home's .game-card-placeholder makes. */
+  function designedFallback(el, id, name){
+    var app = appIdFor(id);
+    var g = GAMES().find(function (x){ return x.id === id; })
+         || GAMES().find(function (x){ return String(x.steamAppId) === app; });
+    el.style.backgroundImage = 'none';
+    /* Lighter than the old near-black: with no art on it, a #1a1d27 tile
+       against a #12151f card is invisible, which is why these two read
+       as "no image at all" rather than as a fallback. */
+    el.style.background = (g && g.fallback) || 'linear-gradient(160deg,#2a3040,#12151f)';
+    if (!el.querySelector('.qc-fb')){
+      var d = document.createElement('div');
+      d.className = 'qc-fb';
+      d.textContent = String((g && (g.initial || g.short)) || name || '?')
+                        .charAt(0).toUpperCase();
+      el.appendChild(d);
+    }
+
+    /* Better than a flat tile: a heavily blurred copy of whatever wide
+       art the title DOES have, which is the ambient treatment Home puts
+       behind its cards. It carries the game's own colours, and being
+       blurred it cannot be mistaken for a second copy of the sharp hero
+       in the band above -- the objection that barred the hero here. */
+    var e = lib.find(function (x){ return x.id === id; });
+    var wide = [resolvedArt(app) && resolvedArt(app).header_img,
+                e && e.hero,
+                steamHosts(app).A + 'library_hero.jpg'].filter(Boolean);
+    var i = 0;
+    (function next(){
+      if (i >= wide.length) return;             // keep the plain tile
+      var c = wide[i++];
+      var probe = new Image();
+      probe.onerror = next;
+      probe.onload = function (){
+        el.style.background = '';               // let .qc-amb go transparent
+        el.style.backgroundImage = 'none';
+        el.style.setProperty('--qc-amb', url(c));
+        el.classList.add('qc-amb');
+      };
+      probe.src = c;
+    })();
+  }
+
+  /* Elements waiting on a chain that is already in flight. Every game in
+     the filmstrip is also in the deck, so without this each one is
+     probed twice over. */
+  var artWaiters = {};
+
+  /* What an image must measure to earn this box. Steam's asset index
+     hands back capsule_231x87 as a title's capsule_img when that is all
+     it has, and at 231px across a 361px card that is precisely the
+     smear Home's chain excludes by name ("a placeholder is honest, a
+     smeared thumbnail just looks broken"). A resolved URL is hashed, so
+     it cannot be excluded by name here -- the gate is the decoded image
+     instead. Below three quarters of the box's REAL pixels (CSS width x
+     dpr) it is rejected and the chain carries on, which is the whole of
+     "do not pull a blurry one" and holds for assets not yet invented.
+     The mini's bar is far lower, so an 84px cover still passes. */
+  function boxPixels(el, box){
+    var r = el.getBoundingClientRect(), dpr = window.devicePixelRatio || 1;
+    return {
+      w: (r.width  || (box === 'band' ? 1560 : box === 'card' ? 250 : 84))  * dpr,
+      h: (r.height || (box === 'band' ? 660  : box === 'card' ? 375 : 118)) * dpr
+    };
+  }
+
+  /* How far background-size:cover would have to magnify this image to
+     fill that box. Width alone is not the test -- a 460x215 header has
+     plenty of width for a 361px card but cover has to blow it up 3.8x to
+     reach the height, which is a magnified centre sliver. One number
+     catches both "too small" and "wrong shape", and needs no list of
+     filenames, so it holds for assets Steam has not invented yet. */
+  function coverScale(box, img){
+    if (!img.naturalWidth || !img.naturalHeight) return Infinity;
+    return Math.max(box.w / img.naturalWidth, box.h / img.naturalHeight);
+  }
+
+  /* Cover when the art matches the box, contain-over-its-own-blur when
+     it does not. A 600x900 in a 2:3 card is an exact match and stays
+     sharp and full bleed; anything else was having its logo sliced off
+     at the edges, which is what cropped "COUNTER-STRIKE" and "MARVEL
+     TOKON" mid-word. */
+  function applyArt(el, rec){
+    el.style.backgroundImage = url(rec.url);
+    /* Cards ALWAYS contain over a blurred copy of the same art -- no
+       ratio test, because there is a choice here that cannot be wrong.
+       For a true 2:3 asset contain and cover are identical: it fills the
+       box exactly, no letterbox, nothing lost. For anything else contain
+       shows the whole cover instead of a magnified middle, which is what
+       was slicing "COUNTER-STRIKE" and "RAGNAROK" in half. A threshold
+       would only be another thing to get wrong.
+
+       Minis keep cover: at 84px a letterbox reads worse than the small
+       crop it avoids. */
+    if (el.classList.contains('qc-art')){
+      el.style.setProperty('--qc-amb', url(rec.url));
+      el.classList.add('qc-amb');
+    }
+  }
+
+  function upgradeArt(el, id, box, name){
+    var app = appIdFor(id);
+    if (!el || !app) return;
+    var key = app + '|' + box, hit = artCache[key];
+    if (hit){ applyArt(el, hit); return; }
+    if (hit === false){
+      /* Nothing fits this box. The mini keeps its capsule -- at 84px it
+         is barely upscaled and still recognisable. The card does not. */
+      if (box === 'card') designedFallback(el, id, name);
+      return;
+    }
+    if (artWaiters[key]){ artWaiters[key].push(el); return; }
+    artWaiters[key] = [el];
+    var chain = portraitUrls(app);
+    if (box === 'card') chain = chain.concat(capsuleUrls(app));
+    var need = boxPixels(el, box);
+    var i = 0;
+    (function tryNext(){
+      if (i >= chain.length){
+        artCache[key] = false;
+        var waiting = artWaiters[key] || [];
+        delete artWaiters[key];
+        if (box === 'card') waiting.forEach(function (n){ designedFallback(n, id, name); });
+        return;
+      }
+      var c = chain[i++];
+      var probe = new Image();
+      probe.onload = function (){
+        /* 1.5x is the most upscaling this will accept. A 600x900 in a
+           361px card is 0.9 (downscaled, sharp); a 231x87 is 9.3. */
+        if (coverScale(need, probe) > 1.5){ tryNext(); return; }
+        var rec = { url:c };
+        artCache[key] = rec;
+        (artWaiters[key] || []).forEach(function (n){ applyArt(n, rec); });
+        delete artWaiters[key];
+      };
+      probe.onerror = tryNext;
+      probe.src = c;
+    })();
+  }
 
   /* Titles with real cover art first: the catalogue is 87 entries and
      over half are a gradient with two letters on it, which is a poor
      deck. This is only ever the fallback -- your own library is the
      normal case. */
-  function catalogue(){
+  function catalogue(limit){
     return GAMES()
       .filter(function (g){ return g.id !== 'other' && (g.cover || g.header); })
-      .slice(0, 24)
+      .slice(0, limit || 24)
       .map(function (g){
         return { id:g.id, name:g.name, cover:g.cover || g.header,
                  hero:g.heroHi || g.header || g.cover, hrsTotal:0, hrsRecent:0 };
       });
   }
 
-  function deckSource(){ return lib.length ? lib : catalogue(); }
+  /* Three shelves, because they answer three different questions.
+     "recent" is /steam/recent -- GetRecentlyPlayedGames, a fortnight's
+     worth. Calling that "your library" was wrong: the library is
+     everything you OWN, which is a separate endpoint, and neither of
+     them reaches a game you have not bought. */
+  var deckSrc = 'recent';                 // 'recent' | 'owned' | 'find'
+  var owned = null;                       // lazy, from /steam/owned
+  var ownedLoading = false, ownedError = false;
+  var found = [];                         // results for the current query
+
+  function recentCount(){ return lib.length; }
+  function ownedCount(){ return owned ? owned.length : 0; }
+
+  function rebuildDeck(){
+    idx = 0;
+    /* The art pass only runs on a signature change, and the whole point
+       here is that the list has changed. */
+    var t = document.getElementById('qTrack');
+    if (t) t.__sig = '';
+    buildDeck();
+    paintMarquee();
+  }
+
+  /* Rows from /steam/owned and /steam/search arrive as bare appids. The
+     deck needs no cover from them -- upgradeArt resolves art from the
+     appid alone -- so this only has to shape the record. */
+  function fromAppRows(rows){
+    return (rows || []).map(function (g){
+      var gg = GAMES().find(function (x){ return String(x.steamAppId) === String(g.appid); }) || {};
+      return {
+        id: idFor(g.appid),
+        name: g.name,
+        cover: gg.cover || '',
+        hero:  gg.heroHi || '',
+        hrsTotal: Math.round(g.hours_total || 0),
+        hrsRecent: g.hours_recent || 0
+      };
+    });
+  }
+
+  function primeFor(rows){
+    var apps = (rows || []).map(function (g){ return g.appid; })
+                 .filter(function (a){ return /^\d+$/.test(String(a)); });
+    if (!apps.length) return;
+    try { if (window.LobbyArt)   window.LobbyArt.prime(apps).then(rebuildDeck); } catch (e) {}
+    try { if (window.LobbyModes) window.LobbyModes.prime(apps).then(paintHow); } catch (e) {}
+  }
+
+  async function loadOwned(){
+    if (owned || ownedLoading) return;
+    ownedLoading = true;
+    var r = await window.api('/steam/owned').catch(function (){ return null; });
+    ownedLoading = false;
+    /* Distinguish "the request failed" from "you own nothing" -- they
+       look identical here and mean completely different things. */
+    ownedError = !Array.isArray(r);
+    owned = Array.isArray(r) ? fromAppRows(r) : [];
+    primeFor(r);
+    if (deckSrc === 'owned') rebuildDeck(); else paintDeckTabs();
+  }
+
+  window.qSetSource = function (which){
+    if (which === deckSrc) return;
+    if (which === 'recent' && !lib.length) return;
+    deckSrc = which;
+    if (which !== 'find'){ deckQuery = ''; found = []; }
+    if (which === 'owned') loadOwned();
+    rebuildDeck();
+    if (which === 'find'){
+      var el = document.getElementById('qDeckQ');
+      if (el) el.focus();
+    }
+    var d = document.getElementById('qDeck');
+    if (d && d.scrollIntoView) d.scrollIntoView({ behavior:'smooth', block:'center' });
+  };
+
+  var deckQuery = '';
+
+  /* Everything on offer, library first so a game you own supplies the
+     entry (with your hours on it) rather than the bare catalogue row. */
+  function allGames(){
+    var out = lib.slice(), seen = {};
+    out.forEach(function (g){ seen[g.id] = true; });
+    (owned || []).forEach(function (g){ if (!seen[g.id]){ seen[g.id] = true; out.push(g); } });
+    catalogue(999).forEach(function (g){ if (!seen[g.id]) out.push(g); });
+    return out;
+  }
+
+  function deckSource(){
+    if (deckSrc === 'find') return found;
+    if (deckSrc === 'owned') return owned || [];
+    return lib.length ? lib : catalogue();
+  }
+
+  var qsTimer = null, qsSeq = 0;
+
+  window.qDeckSearch = function (v){
+    deckQuery = String(v == null ? '' : v);
+    var q = deckQuery.trim();
+    clearTimeout(qsTimer);
+
+    /* Whatever we already hold that matches, immediately -- recents,
+       library, catalogue. The store lookup then fills in everything
+       nobody here owns. */
+    var lower = q.toLowerCase();
+    var local = q ? allGames().filter(function (g){
+      return String(g.name).toLowerCase().indexOf(lower) !== -1;
+    }) : [];
+    found = local.slice(0, 60);
+    rebuildDeck();
+    if (q.length < 2) return;
+
+    /* Debounced, and sequenced: a slow response for "te" must not land
+       on top of the results for "tekken". */
+    var seq = ++qsSeq;
+    qsTimer = setTimeout(async function (){
+      var r = await window.api('/steam/search?q=' + encodeURIComponent(q))
+                          .catch(function (){ return null; });
+      if (seq !== qsSeq || !Array.isArray(r)) return;
+      var seen = {};
+      local.forEach(function (g){ seen[String(appIdFor(g.id))] = true; });
+      var extra = fromAppRows(r.filter(function (g){ return !seen[String(g.appid)]; }));
+      found = local.concat(extra).slice(0, 60);
+      primeFor(r);
+      rebuildDeck();
+    }, 260);
+  };
 
   function ensureStage(){
     var setup = document.getElementById('qViewSetup');
@@ -65189,23 +66091,106 @@ async function reactComment(ev, id, btn){
     return stage;
   }
 
+  /* Repainted on every build, because the shelf can change under it --
+     built once, the count and the active tab would go stale the moment
+     you switched. */
+  function paintDeckHead(src){
+    var head = document.getElementById('qDeckHead');
+    if (!head) return;
+    var q = deckQuery.trim(), find = deckSrc === 'find';
+    var kick, sub;
+
+    if (find){
+      kick = 'Find any game';
+      sub  = !q ? 'Type a name. This searches all of Steam, not just what you own.'
+           : src.length ? 'Matching “' + esc(q) + '” across Steam.'
+           : 'Nothing matches “' + esc(q) + '” yet.';
+    } else if (deckSrc === 'owned'){
+      kick = 'Your Steam library';
+      sub  = owned === null ? 'Loading your library…'
+           : owned.length ? 'Everything you own, most played first.'
+           : ownedError  ? 'Could not load your library just now. Your recents still work.'
+           : 'No games found on this Steam account.';
+    } else {
+      kick = recentCount() ? 'Your recents' : 'Popular on Lobby';
+      sub  = recentCount() ? 'What you have actually been playing. Step the deck to choose.'
+                           : 'Step the deck to choose, or find any game on Steam.';
+    }
+
+    head.innerHTML =
+      '<div class="qsec-t">Choose your game</div>' +
+      '<div class="qsec-bar"></div>' +
+      '<div class="qsec-k"><span class="i">01</span><span class="sep">/</span>' +
+        '<span>' + kick + '</span>' +
+        '<span class="sep">·</span><b>' + src.length + '</b> ' +
+        (find && q ? (src.length === 1 ? 'match' : 'matches') : 'games') + '</div>' +
+      '<div class="qsec-s">' + sub + '</div>';
+
+    paintDeckTabs();
+  }
+
+  /* The tabs and the search box live OUTSIDE the repainted heading and
+     are built once. Rewriting the input's markup on every deck build
+     would blow away focus and the caret mid-word, which is exactly what
+     happens while someone is typing into it. */
+  function ensureDeckTools(){
+    var host = document.getElementById('qDeckTools');
+    if (!host || host.__built) return host;
+    host.__built = true;
+    host.innerHTML =
+      '<div id="qSrc" role="tablist">' +
+        '<button class="qsrc" data-src="recent" onclick="window.qSetSource(\'recent\')"></button>' +
+        '<button class="qsrc" data-src="owned"  onclick="window.qSetSource(\'owned\')"></button>' +
+        '<button class="qsrc" data-src="find"   onclick="window.qSetSource(\'find\')"></button>' +
+      '</div>' +
+      '<div id="qSearch">' + I.find +
+        '<input id="qDeckQ" type="text" autocomplete="off" spellcheck="false" ' +
+          'placeholder="Search all of Steam…" oninput="window.qDeckSearch(this.value)">' +
+        '<button id="qSearchX" type="button" aria-label="Clear search" ' +
+          'onclick="window.qClearSearch()">×</button>' +
+      '</div>';
+    return host;
+  }
+
+  function paintDeckTabs(){
+    ensureDeckTools();
+    var nRec = recentCount(), nOwn = ownedCount();
+    function set(which, text, n, off, why){
+      var b = document.querySelector('#qSrc [data-src="' + which + '"]');
+      if (!b) return;
+      b.className = 'qsrc' + (deckSrc === which ? ' on' : '');
+      b.disabled = !!off;
+      if (why) b.title = why;
+      b.innerHTML = text + (n ? '<b>' + n + '</b>' : '');
+    }
+    set('recent', 'Your recents', nRec, !nRec, 'Connect Steam to see what you have played');
+    set('owned',  'Your library', nOwn, false,
+        owned === null ? 'Your full Steam library' : '');
+    set('find',   'Find any game', 0, false, 'Search all of Steam');
+
+    /* The search box belongs to the Find shelf and only appears with
+       it -- shown on the other two it would imply it filters them. */
+    var box = document.getElementById('qSearch');
+    if (box) box.hidden = deckSrc !== 'find';
+    var x = document.getElementById('qSearchX');
+    if (x) x.hidden = !deckQuery.trim();
+  }
+
+  window.qClearSearch = function (){
+    var el = document.getElementById('qDeckQ');
+    if (el) el.value = '';
+    window.qDeckSearch('');
+  };
+
   function buildDeck(){
     var setup = ensureStage() ? document.getElementById('qViewSetup') : null;
+    if (!setup) return;
     var src = deckSource();
-    if (!setup || !src.length) return;
     if (!document.getElementById('qDeck')){
       var wrap = document.createElement('div');
       wrap.innerHTML =
-        '<div class="qsec">' +
-          '<div class="qsec-t">Choose your game</div>' +
-          '<div class="qsec-bar"></div>' +
-          '<div class="qsec-k"><span class="i">01</span><span class="sep">/</span>' +
-            '<span>' + (lib.length ? 'Your Steam library' : 'Popular on Lobby') + '</span>' +
-            '<span class="sep">·</span><b>' + src.length + '</b> games</div>' +
-          '<div class="qsec-s">' + (lib.length
-            ? 'The games you actually play. Step the deck to choose.'
-            : 'Step the deck to choose, or search the full library.') + '</div>' +
-        '</div>' +
+        '<div class="qsec" id="qDeckHead"></div>' +
+        '<div id="qDeckTools"></div>' +
         '<div id="qDeck">' +
           '<button class="qnav p" onclick="window.qStep2(-1)" aria-label="Previous">‹</button>' +
           '<div id="qTrack"></div>' +
@@ -65225,26 +66210,59 @@ async function reactComment(ev, id, btn){
          page reads marquee then deck then pools in that order. */
       var host = ensureStage();
       while (wrap.firstChild) host.appendChild(wrap.firstChild);
+      /* paintHow appends the strip to the end of the stage, but if it
+         ran BEFORE this did, appending the deck after it leaves the
+         strip stranded between the band and the deck -- the one gap the
+         reference keeps clear, and exactly where it kept reappearing.
+         Settled in CSS now -- #qStage is a flex column and #qHow
+         carries order:-1, so it lands at the top whatever sequence the
+         painters ran in and there is nothing to re-append here. */
     }
 
+    paintDeckHead(src);
     var track = document.getElementById('qTrack');
+    if (!track) return;
+    deckScale();
+
+    /* An empty shelf is a STATE, not a reason to stop. The library
+       arrives asynchronously, so it is empty for the moment between the
+       click and the response -- and returning early there left the
+       heading, the tabs and the cards all showing the previous shelf,
+       which is exactly what made the Library button look dead. */
+    if (!src.length){
+      track.__sig = '';
+      track.innerHTML = '';
+      var dots0 = document.getElementById('qDots');
+      if (dots0) dots0.innerHTML = '';
+      buildBar();
+      return;
+    }
+
     var sig = src.map(function (g){ return g.id; }).join('|');
     if (track.__sig !== sig){
       track.__sig = sig;
       track.innerHTML = src.map(function (g){
         return '<div class="qc" data-id="' + esc(g.id) + '">' +
-          '<div class="qc-art" style="' + (g.cover ? 'background-image:' + url(g.cover) : '') + '">' +
+          /* Painted contained-over-blur from the outset, so the first
+             frame matches what the resolved art will look like instead
+             of flashing a cropped one. */
+          '<div class="qc-art' + (g.cover ? ' qc-amb' : '') + '" style="' +
+            (g.cover ? 'background-image:' + url(g.cover) + ';--qc-amb:' + url(g.cover) : '') + '">' +
             (g.cover ? '' : '<div class="qc-fb">' + esc(g.name.charAt(0).toUpperCase()) + '</div>') + '</div>' +
           '<div class="qc-cap"><div class="qc-nm">' + esc(g.name) + '</div>' +
             '<div class="qc-hr">' + (g.hrsRecent ? g.hrsRecent + 'h this fortnight' : g.hrsTotal + 'h total') + '</div>' +
           '</div></div>';
       }).join('');
+      Array.prototype.forEach.call(track.children, function (c, i){
+        upgradeArt(c.querySelector('.qc-art'), src[i].id, 'card', src[i].name);
+      });
       var s = S();
       var at = s ? src.findIndex(function (g){ return g.id === s.game; }) : -1;
       idx = at >= 0 ? at : 0;
       commit();
     } else apply();
     buildBar();
+    paintDeckWash();
   }
 
   function apply(){
@@ -65268,7 +66286,7 @@ async function reactComment(ev, id, btn){
       else if (a === 2){ st.setProperty('--x',(off/a*STEP2)+'px'); st.setProperty('--s','.7');
                     st.setProperty('--b','.44'); st.setProperty('--sat','.5');
                     st.setProperty('--o','1'); st.zIndex = 10; }
-      else { st.setProperty('--x',(off>0 ? 600 : -600)+'px');
+      else { st.setProperty('--x',(off>0 ? FAR : -FAR)+'px');
              st.setProperty('--s','.62'); st.setProperty('--o','0'); st.zIndex = 1; }
       c.onclick = (off === 0) ? null : function (){ idx = i; commit(); };
     });
