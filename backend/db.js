@@ -681,6 +681,43 @@ async function initDb() {
       );
     `);
 
+    // ── Blocking ───────────────────────────────────────────────────
+    // The queue puts you in a voice call with strangers, and until this
+    // existed nothing stopped it putting you back with someone you had
+    // already left. queue_members.kicked is per-session; this is not.
+    //
+    // Read in BOTH directions when matching: if either party has blocked
+    // the other, neither should be offered the other's table. Blocking
+    // someone who can still be matched with you is not blocking.
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS user_blocks (
+        id         SERIAL PRIMARY KEY,
+        user_id    INTEGER REFERENCES users(id) ON DELETE CASCADE,
+        blocked_id INTEGER REFERENCES users(id) ON DELETE CASCADE,
+        reason     TEXT DEFAULT NULL,
+        created_at TIMESTAMPTZ DEFAULT NOW(),
+        UNIQUE(user_id, blocked_id)
+      );
+    `);
+    await pool.query(
+      `CREATE INDEX IF NOT EXISTS idx_user_blocks_pair ON user_blocks(user_id, blocked_id);`
+    );
+
+    // Reports raised from a queue session. Kept separate from blocks:
+    // blocking is a private preference and takes effect immediately,
+    // reporting is a request for someone to look.
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS queue_reports (
+        id          SERIAL PRIMARY KEY,
+        session_id  INTEGER REFERENCES queue_sessions(id) ON DELETE SET NULL,
+        reporter_id INTEGER REFERENCES users(id) ON DELETE CASCADE,
+        target_id   INTEGER REFERENCES users(id) ON DELETE CASCADE,
+        reason      TEXT NOT NULL,
+        detail      TEXT DEFAULT NULL,
+        created_at  TIMESTAMPTZ DEFAULT NOW()
+      );
+    `);
+
     // Filters added after the table shipped. Idempotent, so an existing
     // database picks them up on the next boot.
     //
@@ -693,6 +730,9 @@ async function initDb() {
       ALTER TABLE queue_sessions ADD COLUMN IF NOT EXISTS playstyle TEXT    DEFAULT NULL;
       ALTER TABLE queue_sessions ADD COLUMN IF NOT EXISTS mode      TEXT    DEFAULT NULL;
       ALTER TABLE queue_sessions ADD COLUMN IF NOT EXISTS width     TEXT    DEFAULT NULL;
+      ALTER TABLE queue_sessions ADD COLUMN IF NOT EXISTS steam_only    BOOLEAN DEFAULT FALSE;
+      ALTER TABLE queue_sessions ADD COLUMN IF NOT EXISTS min_age_days  INTEGER DEFAULT 0;
+      ALTER TABLE queue_sessions ADD COLUMN IF NOT EXISTS verified_tier BOOLEAN DEFAULT FALSE;
     `);
 
     await pool.query(`

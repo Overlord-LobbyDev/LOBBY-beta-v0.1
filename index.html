@@ -29191,6 +29191,9 @@ let _qState = {
   // Filters. null is "no preference" everywhere, matching the server's
   // rule that two sides agree when either has not asked for anything.
   mic: null,         // true = mic required
+  steamOnly: false,  // only players with a linked Steam account
+  minAgeDays: 0,     // 0 = any account age
+  verifiedTier: false, // the ladder supplied the rank, not the player
   playstyle: null,   // 'casual' | 'comp'
   mode: null,        // 'pvp' | 'pve' — only offered for games that are both
   width: 'one',      // 'strict' | 'one' | 'any' — the rank window you accept
@@ -29328,25 +29331,67 @@ function _qRenderSelectedGame() {
 }
 
 // ── Skill tier picker ────────────────────────────────────────
+/* The colour is the tier. It was carried here from the start and used
+   for nothing while an emoji did the identifying. It is now the only
+   thing distinguishing the tiles, and _qTierIcon fills every emblem
+   from it rather than shipping seven separate pictures. */
 const Q_SKILL_TIERS = [
-  { id:'bronze',  name:'Bronze',   emoji:'🥉', color:'#c97a3a' },
-  { id:'silver',  name:'Silver',   emoji:'🥈', color:'#c0c8d2' },
-  { id:'gold',    name:'Gold',     emoji:'🥇', color:'#ffcc33' },
-  /* Not a second gem: 💠 next to 💎 is two blue diamonds a tile apart,
-     and at this size they read as the same badge. */
-  { id:'plat',    name:'Platinum', emoji:'🛡️', color:'#58d9ff' },
-  { id:'diamond', name:'Diamond',  emoji:'💎', color:'#a8e5ff' },
-  { id:'master',  name:'Master',   emoji:'👑', color:'#c598ff' },
-  { id:'pro',     name:'Pro',      emoji:'⚡', color:'#ff5d8a' },
+  { id:'bronze',  name:'Bronze',   color:'#c97a3a' },
+  { id:'silver',  name:'Silver',   color:'#c0c8d2' },
+  { id:'gold',    name:'Gold',     color:'#ffcc33' },
+  { id:'plat',    name:'Platinum', color:'#58d9ff' },
+  { id:'diamond', name:'Diamond',  color:'#a8e5ff' },
+  { id:'master',  name:'Master',   color:'#c598ff' },
+  { id:'pro',     name:'Pro',      color:'#ff5d8a' },
 ];
+// One crest, drawn seven ways, instead of seven unrelated emoji.
+//
+// Emoji were doing three jobs badly: they are somebody else's artwork,
+// they render as full-colour 3D glyphs against a flat UI, and as a SET
+// they said nothing — a medal, a shield and a lightning bolt are not a
+// ladder, they are a pile. This is a ladder:
+//
+//   colour     the tier's own, which the data already carried and
+//              nothing was using
+//   chevrons   1, 2, 3 — your position within a band
+//   rim        single for the lower band, double for the upper, so
+//              Bronze-to-Gold and Platinum-to-Master read as two
+//              distinct halves rather than six steps of the same thing
+//   Pro        breaks the pattern deliberately, because it is the one
+//              tier that is not a step on the same scale
+// Numeral badges. The tier's own colour, its own number, set in the
+// app's display face.
+//
+// Every pictorial attempt before this one — emoji, crest, dial, shield —
+// had the same flaw: there is no picture of "Platinum". Inventing one
+// means borrowing an idiom from somewhere else, which is exactly why
+// each looked like stock art. A numeral is not borrowed from anywhere,
+// it is unambiguously ordinal without needing to be learned, and it is
+// the same typographic language as the rest of the page.
+//
+// Drawn as markup rather than SVG: it is a coloured tile with a glyph
+// on it, and it should inherit type rendering like everything else.
+function _qTierIcon(i) {
+  return `<span class="q-skill-badge">${i + 1}</span>`;
+}
+
+// Master upward. Mirrors Q_PROOF_FROM on the server -- the server is the
+// one that enforces it; this exists so the page can say so BEFORE you
+// press the button rather than bouncing you afterwards.
+const Q_PROOF_FROM = 5;
+function _qNeedsProof(tier) {
+  const i = Q_SKILL_TIERS.findIndex(t => t.id === tier);
+  return i >= Q_PROOF_FROM;
+}
+
 function _qPopulateSkillTiles() {
   const host = document.getElementById('qSkillGrid');
   if (!host) return;
-  host.innerHTML = Q_SKILL_TIERS.map(t => {
+  host.innerHTML = Q_SKILL_TIERS.map((t, i) => {
     const sel = t.id === _qState.skill ? ' is-selected' : '';
     return `
       <div class="q-skill-tile${sel}" data-skill="${t.id}" style="--qst-color:${t.color}" onclick="window._qSelectSkill('${t.id}')">
-        <div class="q-skill-emoji">${t.emoji}</div>
+        ${_qTierIcon(i)}
         <div class="q-skill-name">${t.name}</div>
       </div>`;
   }).join('');
@@ -29354,6 +29399,9 @@ function _qPopulateSkillTiles() {
 window._qSelectSkill = function(id) {
   _qState.skill = id;
   _qPopulateSkillTiles();
+  // Picking Master or Pro is what triggers the proof requirement, so it
+  // is also when the page should start saying so.
+  if (typeof window.qPaintProofRule === 'function') window.qPaintProofRule();
 };
 
 async function _qLoadFriends() {
@@ -29453,6 +29501,18 @@ window.qBeginSearch = async function() {
     return;
   }
   if (!_qState.skill) _qState.skill = 'plat';
+
+  // Master and Pro have to show their working. Checked before the view
+  // changes, so the panel that holds the field is what opens rather than
+  // a search screen that is about to be rejected by the server.
+  if (_qNeedsProof(_qState.skill) && !_qState.proof) {
+    if (typeof showToast === 'function') {
+      showToast('Master and Pro need skill proof — add a tracker link or a recent result.', 'warn');
+    }
+    if (typeof window.qOpenProof === 'function') window.qOpenProof();
+    return;
+  }
+
   _qShowView('searching');
   _qState.searchStarted = Date.now();
   _qState.searchTipIdx = 0;
@@ -29488,6 +29548,8 @@ window.qBeginSearch = async function() {
         // which the server reads as "matches anything" — a default of
         // its own would quietly exclude everyone who left it alone.
         mic:       _qState.mic,
+        steamOnly:  _qState.steamOnly,
+        minAgeDays: _qState.minAgeDays,
         playstyle: _qState.playstyle,
         mode:      _qState.mode,
         width:     _qState.width,
@@ -55276,7 +55338,7 @@ body.double-dock[data-feed-position="right"].feed-open:not(.rail-hidden) #settin
 
 .rc-dots{ display:flex; justify-content:center; gap:7px; margin-top:8px; }
 .rc-dot{
-  width:7px; height:7px; border-radius:99px; cursor:pointer; border:0; padding:0;
+  width:calc(7px * var(--qk)); height:calc(7px * var(--qk)); border-radius:99px; cursor:pointer; border:0; padding:0;
   background:rgba(255,255,255,.18); transition:background .2s, width .2s;
 }
 .rc-dot:hover{ background:rgba(255,255,255,.34); }
@@ -64921,6 +64983,11 @@ async function reactComment(ev, id, btn){
 #queueOverlay .q-body-setup > .q-actions{ display:none !important; }
 
 .qsec{ text-align:center; margin:0 0 4px; }
+/* Tracked text centres left. letter-spacing is applied AFTER the last
+   character too, so the glyphs sit half a space left of true centre.
+   The padding gives that space back. Only the heading: the eyebrow
+   sets its own padding further down and would override this anyway. */
+.qsec-t{ padding-left:2.2px; }
 .qsec-t{
   font-family:'Archivo', var(--font), sans-serif;
   font-size:calc(25px * var(--qk)); font-weight:900; letter-spacing:2.2px; text-transform:uppercase;
@@ -64936,7 +65003,7 @@ async function reactComment(ev, id, btn){
     color-mix(in srgb, var(--hub-accent) 95%, white) 65%, transparent);
 }
 .qsec-k{
-  display:inline-flex; align-items:center; gap:10px;
+  display:inline-flex; align-items:center; gap:calc(10px * var(--qk));
   font-family:'JetBrains Mono', ui-monospace, monospace;
   font-size:10px; font-weight:700; letter-spacing:2.2px; text-transform:uppercase;
   color:var(--text-3);
@@ -64944,27 +65011,29 @@ async function reactComment(ev, id, btn){
   background:rgba(255,255,255,.035); border:1px solid rgba(255,255,255,.07);
 }
 .qsec-k b{ color:#fff; font-weight:800; }
-.qsec-k .i{ color:color-mix(in srgb, var(--hub-accent) 90%, white); font-weight:800; }
 .qsec-k .sep{ color:rgba(255,255,255,.18); }
-.qsec-s{ font-size:12.5px; color:var(--text-3); margin-top:9px; }
+.qsec-s{ font-size:calc(12.5px * var(--qk)); color:var(--text-3); margin-top:calc(9px * var(--qk)); }
 
 /* Which shelf the deck is showing. A segmented pair rather than a link,
    so the state is readable at a glance and the alternative is visible
    before you need it. */
+/* Your library is the centre column, so it lands on the same axis as
+   the heading, the rule and the eyebrow above it. Equal 1fr flanks are
+   what hold that true as recents' count changes width. */
 #qDeckTools{
-  display:flex; align-items:center; justify-content:center;
-  gap:12px; flex-wrap:wrap; margin-top:15px;
+  display:grid; grid-template-columns:1fr auto 1fr;
+  align-items:center; gap:14px;
+  margin-top:calc(15px * var(--qk));
 }
-#qSrc{
-  display:inline-flex; gap:4px;
-  padding:4px; border-radius:12px;
-  background:rgba(0,0,0,.35); border:1px solid rgba(255,255,255,.07);
-}
+#qDeckTools > .qsrc:nth-of-type(1){ justify-self:end; }
+#qDeckTools > .qsrc:nth-of-type(2){ justify-self:center; }
+#qDeckTools > #qSearch{ justify-self:start; }
 /* Search reaches every game, so it sits beside the shelf tabs rather
    than inside either one. */
 #qSearch{
   position:relative; display:inline-flex; align-items:center; gap:9px;
-  padding:0 12px 0 13px; height:40px; border-radius:12px;
+  /* Same height and radius as .qsrc, from the same numbers. */
+  padding:0 14px; height:34px; border-radius:10px;
   background:rgba(0,0,0,.35); border:1px solid rgba(255,255,255,.07);
   transition:border-color .2s, background .2s;
 }
@@ -64972,9 +65041,12 @@ async function reactComment(ev, id, btn){
   border-color:color-mix(in srgb, var(--hub-accent) 45%, transparent);
   background:rgba(0,0,0,.5);
 }
-#qSearch svg{ width:14px; height:14px; flex:0 0 auto; color:var(--text-3); }
+#qSearch svg{ width:13px; height:13px; flex:0 0 auto; color:var(--text-3); }
 #qDeckQ{
-  width:220px; border:0; outline:0; background:transparent; color:#fff;
+  /* Fixed, deliberately. A text field does not become more useful for
+     being wider, and scaling it with the section made the search twice
+     the width of the two tabs it sits beside. */
+  width:168px; border:0; outline:0; background:transparent; color:#fff;
   font-family:'JetBrains Mono', ui-monospace, monospace;
   font-size:11px; letter-spacing:.6px;
 }
@@ -64984,24 +65056,52 @@ async function reactComment(ev, id, btn){
   color:var(--text-3); font-size:17px; line-height:1;
 }
 #qSearchX:hover{ color:#fff; }
+/* Each carries its own seat now that they are not sharing a segmented
+   track. Vertical padding is down from 8 to 5.6, which takes about 15%
+   off the height -- the type inside is a fixed size, so the padding is
+   the only part of it that can give. */
+/* Explicit height, not padding plus a line box. The type is one fixed
+   size and the padding scaled with --qk, so the two grew apart and the
+   buttons ended up ~32px against the search box's 44 -- three controls
+   in a row at three different heights. Same height, same radius, same
+   seat and same type as #qSearch: they are siblings, so they are built
+   from the same numbers. */
+/* --qk is 1.74 in this section, so these were being multiplied up as if
+   they were the deck. They are not: a shelf tab is a small control and
+   should stay one however large the cards beside it get. Base numbers
+   are set so they land around 33px tall rather than 44.
+   min-width makes the two of them one pair -- at natural width "Your
+   library" is 60px narrower than "Your recents 11" and they read as two
+   unrelated buttons rather than a choice between two shelves. */
 .qsrc{
-  display:inline-flex; align-items:center; gap:7px;
-  padding:8px 16px; border-radius:9px; border:0; cursor:pointer;
-  background:transparent; color:var(--text-3);
+  display:inline-flex; align-items:center; justify-content:center; gap:8px;
+  height:34px; min-width:178px; padding:0 18px;
+  border-radius:10px; cursor:pointer;
+  background:rgba(0,0,0,.35); border:1px solid rgba(255,255,255,.07);
+  color:var(--text-3);
   font-family:'JetBrains Mono', ui-monospace, monospace;
-  font-size:10.5px; font-weight:700; letter-spacing:1.4px; text-transform:uppercase;
-  transition:background .2s, color .2s;
+  font-size:11px; font-weight:700;
+  letter-spacing:1.3px; text-transform:uppercase; white-space:nowrap;
+  transition:background .2s, color .2s, border-color .2s;
 }
-.qsrc b{ font-weight:800; opacity:.55; }
+/* The count is a second piece of information, not part of the label --
+   set apart in its own chip rather than run on after the words. */
+.qsrc b{
+  font-weight:800; font-size:9.5px;
+  padding:2px 6px;
+  border-radius:99px; background:rgba(255,255,255,.09); color:inherit;
+  opacity:.8; line-height:1;
+}
+.qsrc.on b{ background:rgba(11,3,32,.16); opacity:.75; }
 .qsrc:hover:not(:disabled):not(.on){ color:#fff; background:rgba(255,255,255,.05); }
 .qsrc:disabled{ opacity:.4; cursor:not-allowed; }
 .qsrc.on{
   color:#0d0320;
   background:linear-gradient(180deg,
     color-mix(in srgb, var(--hub-accent) 94%, white), var(--hub-accent));
+  border-color:color-mix(in srgb, var(--hub-accent) 70%, transparent);
   box-shadow:0 6px 18px -6px color-mix(in srgb, var(--hub-accent) 55%, transparent);
 }
-.qsrc.on b{ opacity:.65; }
 
 #qDeck{
   position:relative; height:calc(392px * var(--qk)); margin:26px 0 0; --qwash:none;
@@ -65035,12 +65135,16 @@ async function reactComment(ev, id, btn){
      that hard edge is visible as a vertical seam down each side of the
      page. Fading it out means it has no edge to see -- and unlike the
      old -14% bleed, a fade cannot widen the page. */
+  /* Fades in at the TOP as well now. At #000 0% the mask was fully
+     opaque on the first row of the element, so the wash began with a
+     hard horizontal edge straight across the page -- a visible border
+     where there is no border. Both ends of both axes taper. */
   -webkit-mask-image:
-    linear-gradient(180deg, #000 0%, rgba(0,0,0,.6) 46%, transparent 92%),
+    linear-gradient(180deg, transparent 0%, #000 22%, rgba(0,0,0,.55) 62%, transparent 94%),
     linear-gradient(90deg, transparent 0%, #000 15%, #000 85%, transparent 100%);
   -webkit-mask-composite:source-in;
           mask-image:
-    linear-gradient(180deg, #000 0%, rgba(0,0,0,.6) 46%, transparent 92%),
+    linear-gradient(180deg, transparent 0%, #000 22%, rgba(0,0,0,.55) 62%, transparent 94%),
     linear-gradient(90deg, transparent 0%, #000 15%, #000 85%, transparent 100%);
           mask-composite:intersect;
   transition:background-image .6s ease;
@@ -65071,11 +65175,15 @@ async function reactComment(ev, id, btn){
 #qStage > .qsec{ padding-top:56px; }
 /* The one thing that should NOT stretch: a row of controls 2000px wide
    puts the rank tiles a screen away from the stepper. */
-/* 1200, not the reference's 900: the bar carried two controls when that
-   number was chosen and now carries five. Still capped -- a row of
-   controls the full width of the frame puts the last one a screen away
-   from the first. */
-#qStage > #qBar{ max-width:calc(1200px * var(--qk)); margin-left:auto; margin-right:auto; }
+/* Hugs its contents. At a fixed width the controls sat as a small
+   island with ~340px of empty bar either side, which is what read as
+   off-centre -- the rank was within 3px of the middle the whole time,
+   it was the BOX that was too big for what was in it. Equal flanks
+   above keep the centring exact now that the width can move. */
+#qStage > #qBar{
+  width:max-content; max-width:calc(1000px * var(--qk));
+  margin-left:auto; margin-right:auto;
+}
 #qTrack{ position:relative; height:100%; z-index:1; }
 .qc{
   position:absolute; top:0; left:50%;
@@ -65165,24 +65273,55 @@ async function reactComment(ev, id, btn){
 .qnav:hover{ background:var(--hub-accent); color:#0d0320; transform:translateY(-50%) scale(1.08); }
 .qnav.p{ left:40px; } .qnav.n{ right:40px; }
 @media (max-width:900px){ .qnav{ display:none; } }
-#qDots{ display:flex; justify-content:center; gap:7px; margin-top:22px; }
+#qDots{ display:flex; justify-content:center; gap:calc(7px * var(--qk)); margin-top:calc(22px * var(--qk)); }
 #qDots i{
   width:7px; height:7px; border-radius:99px; cursor:pointer;
   background:rgba(255,255,255,.2); transition:width .28s, background .28s;
 }
 #qDots i.on{
-  width:26px; background:var(--hub-accent);
+  width:calc(26px * var(--qk)); background:var(--hub-accent);
   box-shadow:0 0 12px color-mix(in srgb, var(--hub-accent) 60%, transparent);
 }
 
 /* The settings bar under the deck. */
 #qBar{
-  display:flex; align-items:center; justify-content:center; gap:12px; flex-wrap:wrap;
-  margin:30px auto 0; padding:14px 18px; max-width:900px;
+  display:flex; flex-direction:column; gap:13px;
+  margin:30px auto 0; padding:15px 20px; max-width:900px;
   border-radius:16px;
   background:linear-gradient(160deg, rgba(255,255,255,.045), rgba(255,255,255,.015));
   border:1px solid rgba(255,255,255,.08);
 }
+.qbar-main{
+  display:grid; grid-template-columns:1fr auto 1fr;
+  align-items:center; gap:13px;
+}
+/* Equal min-widths are what make the centre column ACTUALLY central in
+   a box that hugs its contents. Without them the two 1fr tracks size to
+   whatever each side happens to hold, the wider one wins, and the rank
+   drifts by half the difference. */
+.qbar-l, .qbar-r{
+  display:flex; align-items:center; gap:11px;
+  min-width:calc(165px * var(--qk));
+}
+.qbar-l{ justify-self:end; justify-content:flex-end; }
+.qbar-c{ display:flex; align-items:center; justify-self:center; }
+.qbar-r{ justify-self:start; justify-content:flex-start; }
+/* Secondary by treatment as well as by position: a hairline above it
+   and it reads as a second tier rather than as more of the first. */
+/* [spacer][Match][Voice][Style][More]. The two 1fr tracks are equal and
+   the spacer matches More, so column three is dead centre whatever any
+   of them contains -- and More sits as far right as the row goes. */
+.qbar-sub{
+  display:grid; grid-template-columns:auto 1fr auto 1fr auto;
+  align-items:center; gap:calc(14px * var(--qk));
+  padding-top:13px; border-top:1px solid rgba(255,255,255,.07);
+}
+.qsub-l{ display:flex; align-items:center; gap:11px; justify-self:end; }
+.qsub-c{ display:flex; align-items:center; gap:11px; justify-self:center; }
+.qsub-r{ display:flex; align-items:center; gap:11px; justify-self:start; }
+#qMore, .qmore-spacer{ min-width:calc(96px * var(--qk)); }
+#qMore{ justify-self:end; text-align:right; }
+.qmore-spacer{ visibility:hidden; pointer-events:none; }
 .qbl{
   font-family:'JetBrains Mono', ui-monospace, monospace;
   font-size:9.5px; font-weight:700; letter-spacing:1.8px; text-transform:uppercase;
@@ -65204,15 +65343,96 @@ async function reactComment(ev, id, btn){
 }
 #queueOverlay #qBar .q-skill-tile{
   padding:7px 11px !important; border-radius:8px !important;
-  flex-direction:row !important; gap:6px !important;
+  flex-direction:column !important; gap:3px !important; align-items:center;
   background:transparent !important; border:0 !important; box-shadow:none !important;
 }
-#queueOverlay #qBar .q-skill-tile.is-selected{
-  background:var(--qst-color) !important;
+/* A tinted seat with the tier's numeral on it. Bebas is the app's
+   display face and it is what keeps this from looking like a generic
+   badge component: tall, condensed, and already the voice of every
+   heading on the page. */
+.q-skill-badge{
+  display:flex; align-items:center; justify-content:center;
+  width:26px; height:26px; border-radius:8px; margin:0 auto;
+  font-family:'Bebas Neue', var(--font), sans-serif;
+  font-size:17px; line-height:1; letter-spacing:1px;
+  padding-top:2px;                       /* Bebas sits high in its box */
+  color:color-mix(in srgb, var(--qst-color) 82%, white);
+  background:color-mix(in srgb, var(--qst-color) 16%, transparent);
+  box-shadow:inset 0 0 0 1px color-mix(in srgb, var(--qst-color) 34%, transparent);
+  transition:background .18s, color .18s, box-shadow .18s;
 }
-#queueOverlay #qBar .q-skill-tile.is-selected .q-skill-name{ color:#0d0320 !important; }
-#queueOverlay #qBar .q-skill-tile.is-selected .q-skill-pip{ color:#0d0320 !important; filter:none; }
-#queueOverlay #qBar .q-skill-pip{ width:14px !important; height:14px !important; }
+.q-skill-tile:hover .q-skill-badge{
+  background:color-mix(in srgb, var(--qst-color) 26%, transparent);
+}
+/* Selected inverts: the tier's colour becomes the fill and the numeral
+   drops to the page's own dark, which is the strongest contrast
+   available and needs no glow to carry it. */
+.q-skill-tile.is-selected .q-skill-badge{
+  color:#0b0d13;
+  background:var(--qst-color);
+  box-shadow:0 2px 10px color-mix(in srgb, var(--qst-color) 45%, transparent);
+}
+/* Master and Pro are gated on proof, and the badge is where to say it:
+   a notched corner marks the two tiers that ask for something, so the
+   requirement is legible in the row itself instead of only appearing as
+   a refusal after you press Find. */
+#qSkillGrid .q-skill-tile:nth-child(6) .q-skill-badge,
+#qSkillGrid .q-skill-tile:nth-child(7) .q-skill-badge{
+  position:relative;
+  border-top-right-radius:2px;
+}
+#qSkillGrid .q-skill-tile:nth-child(6) .q-skill-badge::after,
+#qSkillGrid .q-skill-tile:nth-child(7) .q-skill-badge::after{
+  content:''; position:absolute; top:0; right:0;
+  border-width:0 6px 6px 0; border-style:solid;
+  border-color:transparent color-mix(in srgb, var(--qst-color) 80%, white) transparent transparent;
+}
+.q-skill-tile.is-selected .q-skill-badge::after{
+  border-right-color:rgba(11,13,19,.55) !important;
+}
+/* What the app knows about your rank, in a line, above the field that
+   asks you to prove it. */
+.qpn{
+  font-size:11.5px; line-height:1.5; color:var(--text-3); margin:0 0 9px;
+}
+.qpn.ok{ color:#7fe0a3; }
+.qpn.warn{ color:color-mix(in srgb, var(--hub-accent) 62%, white); }
+
+/* The field the rule points at, while it is still empty. */
+.q-input.q-need{
+  border-color:color-mix(in srgb, var(--hub-accent) 55%, transparent) !important;
+  box-shadow:0 0 0 3px color-mix(in srgb, var(--hub-accent) 14%, transparent) !important;
+}
+/* Not disabled -- pressing it is how you find out why, and a dead
+   button explains nothing. */
+#qFind.q-gated{ filter:saturate(.75) brightness(.92); }
+#queueOverlay #qBar .q-skill-tile.is-selected{
+  background:color-mix(in srgb, var(--qst-color) 15%, transparent) !important;
+  box-shadow:inset 0 0 0 1px color-mix(in srgb, var(--qst-color) 55%, transparent) !important;
+}
+#queueOverlay #qBar .q-skill-name{
+  font-family:'JetBrains Mono', ui-monospace, monospace;
+  font-size:8.5px !important; font-weight:700; letter-spacing:1px;
+  text-transform:uppercase; color:var(--text-3);
+}
+#queueOverlay #qBar .q-skill-tile.is-selected .q-skill-name{
+  color:color-mix(in srgb, var(--qst-color) 72%, white);
+}
+/* The selected tile used to be filled SOLID with the tier colour. That
+   worked while an emoji sat on it and stops working the moment the mark
+   is drawn in the tier's own colour: Platinum's crest was cyan on cyan
+   and simply disappeared. The fill is now a dark seat with a coloured
+   rim, so the mark is the brightest thing on the tile — which is what
+   you are actually choosing. */
+#queueOverlay #qBar .q-skill-tile.is-selected{
+  background:linear-gradient(180deg,
+    color-mix(in srgb, var(--qst-color) 20%, #0b0d13), #0b0d13) !important;
+  box-shadow:inset 0 0 0 1.5px color-mix(in srgb, var(--qst-color) 70%, transparent),
+             0 0 22px color-mix(in srgb, var(--qst-color) 26%, transparent) !important;
+}
+#queueOverlay #qBar .q-skill-tile.is-selected .q-skill-name{
+  color:color-mix(in srgb, var(--qst-color) 55%, white) !important;
+}
 #queueOverlay #qBar .q-skill-name{ font-size:9.5px !important; letter-spacing:.9px !important; }
 .qvr{ width:1px; height:24px; background:rgba(255,255,255,.1); }
 #qMore{
@@ -65246,8 +65466,26 @@ async function reactComment(ev, id, btn){
 #qMorePanel .q-form-grid{ display:grid; gap:14px; }
 #qMoreRow{
   display:flex; align-items:center; justify-content:center;
-  gap:26px; flex-wrap:wrap; margin:0 auto 18px;
+  gap:18px 26px; flex-wrap:wrap; margin:0 auto 20px;
   max-width:calc(900px * var(--qk));
+}
+/* A heading for the group, in the same mono voice as every other label
+   in the queue -- the panel used to open with "STACK YOUR STACK" in the
+   display face, which is a different product's typography. */
+.qmr-h{
+  flex:0 0 100%; text-align:center;
+  font-family:'JetBrains Mono', ui-monospace, monospace;
+  font-size:9px; font-weight:700; letter-spacing:2.2px; text-transform:uppercase;
+  color:var(--text-3); margin-bottom:2px;
+}
+/* A count on the button, so filters living in the panel are still
+   visible as SET from the bar. */
+.qmore-n{
+  display:inline-flex; align-items:center; justify-content:center;
+  min-width:16px; height:16px; padding:0 4px; margin-left:7px;
+  border-radius:99px; font-style:normal;
+  font-size:9.5px; font-weight:800; line-height:1;
+  color:#0d0320; background:var(--hub-accent);
 }
 .qmr{ display:flex; align-items:center; gap:11px; }
 .qmr[hidden]{ display:none !important; }
@@ -65276,12 +65514,29 @@ async function reactComment(ev, id, btn){
 /* ── Open tables ─────────────────────────────────────────────────── */
 #qFindList{ display:none; margin-top:18px; }
 #qFindList.on{ display:block; }
+.qft-bar{
+  display:flex; align-items:center; justify-content:space-between; gap:14px;
+  max-width:calc(900px * var(--qk)); margin:0 auto 11px;
+}
 .qft-head{
   font-family:'JetBrains Mono', ui-monospace, monospace;
   font-size:10px; font-weight:700; letter-spacing:2px; text-transform:uppercase;
-  color:var(--text-3); text-align:center; margin-bottom:11px;
+  color:var(--text-3);
 }
 .qft-head b{ color:#fff; }
+.qft-find{
+  display:inline-flex; align-items:center; gap:8px;
+  padding:0 11px; height:32px; border-radius:9px;
+  background:rgba(0,0,0,.3); border:1px solid rgba(255,255,255,.07);
+  transition:border-color .2s;
+}
+.qft-find:focus-within{ border-color:color-mix(in srgb, var(--hub-accent) 45%, transparent); }
+.qft-find svg{ width:12px; height:12px; color:var(--text-3); flex:0 0 auto; }
+#qFindQ{
+  width:150px; border:0; outline:0; background:transparent; color:#fff;
+  font-family:'JetBrains Mono', ui-monospace, monospace; font-size:10.5px;
+}
+#qFindQ::placeholder{ color:var(--text-3); letter-spacing:.8px; }
 .qft-empty{
   text-align:center; font-size:12.5px; color:var(--text-3);
   padding:18px; border-radius:14px;
@@ -65777,6 +66032,9 @@ async function reactComment(ev, id, btn){
     var modeRow = document.getElementById('qModeRow');
     if (modeRow) modeRow.hidden = mPvx !== 'PvP · PvE';
 
+    /* The game changed, so what the ladder and Steam know changed too. */
+    if (typeof window.qLoadVerified === 'function') window.qLoadVerified();
+
     paintTitleLogo(app, name);
     paintStrip();
     paintHow();
@@ -65858,7 +66116,7 @@ async function reactComment(ev, id, btn){
      a 2560 window gets the reference's PROPORTIONS rather than its
      pixels -- at 1560 the maths is the identity and the deck is the
      reference exactly. */
-  var REF_W = 1560, BASE = { step:220, step2:390, far:600 };
+  var REF_W = 1560, BASE = { step:220, step2:390, far:600 }, DECK_ZOOM = 1.2;
   var idx = 0, STEP = BASE.step, STEP2 = BASE.step2, FAR = BASE.far;
 
   function deckScale(){
@@ -65868,7 +66126,11 @@ async function reactComment(ev, id, btn){
     var cs = getComputedStyle(dk);
     var w = dk.clientWidth - parseFloat(cs.paddingLeft || 0) - parseFloat(cs.paddingRight || 0);
     if (!(w > 0)) return;
-    var k = Math.max(1, Math.min(1.6, w / REF_W));
+    /* DECK_ZOOM lifts everything from "Choose your game" down by 20%.
+       Applied after the clamp rather than inside it so the proportion
+       to the reference is unchanged -- the whole block is simply drawn
+       larger, rather than the geometry being re-derived. */
+    var k = Math.max(1, Math.min(1.6, w / REF_W)) * DECK_ZOOM;
     stage.style.setProperty('--qk', String(k));
     STEP  = BASE.step  * k;
     STEP2 = BASE.step2 * k;
@@ -66163,7 +66425,10 @@ async function reactComment(ev, id, btn){
      worth. Calling that "your library" was wrong: the library is
      everything you OWN, which is a separate endpoint, and neither of
      them reaches a game you have not bought. */
-  var deckSrc = 'recent';                 // 'recent' | 'owned'  (search overrides)
+  /* Your library is the default shelf. Recents is a fortnight's worth
+     -- useful, but it is the smaller question; what you actually own is
+     the fuller answer to "name your game". */
+  var deckSrc = 'owned';                  // 'recent' | 'owned'  (search overrides)
   var owned = null;                       // lazy, from /steam/owned
   var ownedLoading = false, ownedError = false;
   var found = [];                         // results for the current query
@@ -66222,6 +66487,10 @@ async function reactComment(ev, id, btn){
        look identical here and mean completely different things. */
     ownedError = !Array.isArray(r);
     owned = Array.isArray(r) ? fromAppRows(r) : [];
+    /* Nothing to show and recents has something? Then show that rather
+       than opening on an empty deck. The library is the better default
+       only when there IS one. */
+    if (!owned.length && lib.length && deckSrc === 'owned') deckSrc = 'recent';
     primeFor(r);
     if (deckSrc === 'owned') rebuildDeck(); else paintDeckTabs();
   }
@@ -66335,9 +66604,22 @@ async function reactComment(ev, id, btn){
     }
 
     head.innerHTML =
-      '<div class="qsec-t">Choose your game</div>' +
+      /* NAME YOUR GAME, not CHOOSE YOUR GAME. Four letters either side
+         of a four-letter middle, so the word YOUR falls on the phrase's
+         own centre and therefore on the rule, the eyebrow, the sub-line
+         and the tabs -- all of it, with no nudging.
+         CHOOSE is six letters against GAME's four, which is why YOUR sat
+         40px right of centre: the only ways to fix that were to shove
+         the rule off the axis it shares with three other things, or to
+         shove the heading off it instead. Both looked exactly as wrong
+         as they were. Balanced copy needs neither. */
+      '<div class="qsec-t">Name <span class="qsec-mid">your</span> game</div>' +
       '<div class="qsec-bar"></div>' +
-      '<div class="qsec-k"><span class="i">01</span><span class="sep">/</span>' +
+      /* No "01" any more. It was a step number from the mockup, back
+         when this was step one of three -- step two's controls are in
+         the settings bar now and step three is the More options drawer,
+         so it counted off a sequence that no longer exists. */
+      '<div class="qsec-k">' +
         '<span>' + kick + '</span>' +
         '<span class="sep">·</span><b>' + src.length + '</b> ' +
         (find && q ? (src.length === 1 ? 'match' : 'matches') : 'games') + '</div>' +
@@ -66345,6 +66627,12 @@ async function reactComment(ev, id, btn){
 
     paintDeckTabs();
   }
+
+  /* Nothing to align any more -- the copy is balanced, so every element
+     in the block sits on one axis by itself. The measuring pass, the
+     fonts.ready re-measure and the resize handler are all gone with it:
+     a layout that is correct by construction beats one held in place by
+     JavaScript that has to keep running. */
 
   /* The tabs and the search box live OUTSIDE the repainted heading and
      are built once. Rewriting the input's markup on every deck build
@@ -66355,10 +66643,12 @@ async function reactComment(ev, id, btn){
     if (!host || host.__built) return host;
     host.__built = true;
     host.innerHTML =
-      '<div id="qSrc" role="tablist">' +
-        '<button class="qsrc" data-src="recent" onclick="window.qSetSource(\'recent\')"></button>' +
-        '<button class="qsrc" data-src="owned"  onclick="window.qSetSource(\'owned\')"></button>' +
-      '</div>' +
+      /* Three separate controls, not a segmented pair plus a box. Your
+         library takes the centre column so it sits on the section's
+         axis with the heading, the rule and the eyebrow; recents and
+         search press inward from equal flanks. */
+      '<button class="qsrc" data-src="recent" onclick="window.qSetSource(\'recent\')"></button>' +
+      '<button class="qsrc" data-src="owned"  onclick="window.qSetSource(\'owned\')"></button>' +
       /* No third tab: the search box IS "find any game". A tab that only
          put the caret in the field beside it was a step to reach the
          thing rather than the thing. */
@@ -66376,7 +66666,7 @@ async function reactComment(ev, id, btn){
     var nRec = recentCount(), nOwn = ownedCount();
     var searching = !!deckQuery.trim();
     function set(which, text, n, off, why){
-      var b = document.querySelector('#qSrc [data-src="' + which + '"]');
+      var b = document.querySelector('#qDeckTools [data-src="' + which + '"]');
       if (!b) return;
       /* Neither tab is lit while a search is up: the deck is showing
          matches from everywhere, so claiming a shelf would be a lie.
@@ -66391,6 +66681,91 @@ async function reactComment(ev, id, btn){
 
     var x = document.getElementById('qSearchX');
     if (x) x.hidden = !deckQuery.trim();
+  }
+
+  /* Opens the panel and puts the caret in the proof field. The rule is
+     only fair if the thing it asks for is one action away. */
+  window.qOpenProof = function (){
+    var panel = document.getElementById('qMorePanel');
+    var btn = document.getElementById('qMore');
+    if (panel && !panel.classList.contains('on') && btn) btn.click();
+    var el = document.getElementById('qFormProof');
+    if (el){
+      el.classList.add('q-need');
+      el.focus();
+      el.scrollIntoView({ behavior:'smooth', block:'center' });
+    }
+  };
+
+  /* The requirement is stated the moment a tier that carries it is
+     picked, not held back until the button is pressed. */
+  /* What the ladder and Steam already know, for the selected game.
+     Asked once per game and cached: the answer only changes when the
+     selection does. */
+  var tierCache = {};
+  async function loadVerified(){
+    var st = S(); if (!st || !st.game) return;
+    var key = st.game;
+    if (tierCache[key] === undefined){
+      tierCache[key] = null;                       // in flight
+      var r = await window.api('/queue/tier?game=' + encodeURIComponent(key))
+                          .catch(function (){ return null; });
+      tierCache[key] = (r && typeof r === 'object') ? r : { tier:null, verified:false, proof:null };
+    }
+    var v = tierCache[key];
+    if (!v || S() !== st || st.game !== key) return;
+    /* A rating outranks a declared tier: it is a record, not a claim.
+       The tiles follow it so the page is never showing a rank the
+       server is about to overrule. */
+    if (v.verified && v.tier && st.skill !== v.tier){
+      st.skill = v.tier;
+      if (typeof _qPopulateSkillTiles === 'function') _qPopulateSkillTiles();
+    }
+    st.verifiedTier = !!v.verified;
+    if (!st.proof && v.proof) st.proof = v.proof;
+    paintProofRule();
+  }
+  window.qLoadVerified = function (){ loadVerified(); };
+
+  window.qPaintProofRule = function (){ paintProofRule(); };
+
+  function paintProofRule(){
+    var st = S() || {};
+    var need = typeof _qNeedsProof === 'function' && _qNeedsProof(st.skill);
+    /* A verified rank needs no proof: there is nothing to substantiate
+       when the number came from the ladder rather than from the player. */
+    var gated = need && !st.verifiedTier && !st.proof;
+
+    var el = document.getElementById('qFormProof');
+    if (el){
+      el.placeholder = need
+        ? 'Required for Master and Pro — tracker link, or a recent result'
+        : 'Tracker link, a recent result — optional';
+      el.classList.toggle('q-need', !!gated);
+    }
+    var b = document.getElementById('qFind');
+    if (b) b.classList.toggle('q-gated', !!gated);
+
+    /* The state of your rank, said plainly. Steam hours count as proof
+       and the server can see them, so a player who has put the time in
+       is never asked to type it out. */
+    var note = document.getElementById('qProofNote');
+    if (note){
+      var auto = /^steam:(\d+)h$/.exec(String(st.proof || ''));
+      if (st.verifiedTier){
+        note.className = 'qpn ok';
+        note.textContent = 'Rank verified from your Lobby ladder rating for this game.';
+      } else if (auto){
+        note.className = 'qpn ok';
+        note.textContent = 'Proof from Steam — ' + auto[1] + 'h played in this game.';
+      } else if (need){
+        note.className = 'qpn warn';
+        note.textContent = 'Master and Pro need proof. Play a ladder match, or add a link below.';
+      } else {
+        note.className = 'qpn';
+        note.textContent = 'Optional, and it helps you match faster.';
+      }
+    }
   }
 
   window.qClearSearch = function (){
@@ -66435,6 +66810,11 @@ async function reactComment(ev, id, btn){
          carries order:-1, so it lands at the top whatever sequence the
          painters ran in and there is nothing to re-append here. */
     }
+
+    /* The default shelf is loaded lazily like any other, so the first
+       build is what asks for it -- otherwise it defaults to a list that
+       nothing has fetched. */
+    if (deckSrc === 'owned' && owned === null && !ownedLoading) loadOwned();
 
     paintDeckHead(src);
     var track = document.getElementById('qTrack');
@@ -66556,6 +66936,7 @@ async function reactComment(ev, id, btn){
         b.onclick = function (){
           onPick(o.v);
           paintSeg(wrap, key);
+          paintMoreCount();
         };
         wrap.appendChild(b);
       });
@@ -66565,8 +66946,6 @@ async function reactComment(ev, id, btn){
 
     var l1 = document.createElement('span'); l1.className = 'qbl'; l1.textContent = 'Players';
     var l2 = document.createElement('span'); l2.className = 'qbl'; l2.textContent = 'Rank';
-    var v1 = document.createElement('span'); v1.className = 'qvr';
-    var v2 = document.createElement('span'); v2.className = 'qvr';
     /* More options opens a panel attached to the BAR. It used to reveal
        the legacy step cards where they sat -- at the foot of the page,
        below the pools, which is nowhere near the control that opened
@@ -66582,11 +66961,17 @@ async function reactComment(ev, id, btn){
          .q-body-setup are the same element -- "#qViewSetup
          .q-body-setup > .q-step-card" asked for a descendant of itself
          and matched nothing, which is why this opened empty. */
-      /* The two filters that do not earn a place in the bar: playstyle
-         is a preference rather than a constraint, and mode only means
-         anything for the minority of games that are both. */
+      /* Grouped by what each thing is FOR, not by which step of a flow
+         it used to belong to. "Stack your stack" and the numbered-step
+         voice went with the flow that no longer exists. */
       var row = document.createElement('div');
       row.id = 'qMoreRow';
+      row.appendChild(sectionTitle('Who can sit down'));
+      function sectionTitle(text){
+        var h = document.createElement('div');
+        h.className = 'qmr-h'; h.textContent = text;
+        return h;
+      }
       function labelled(text, node, id){
         var w = document.createElement('div');
         w.className = 'qmr';
@@ -66596,22 +66981,52 @@ async function reactComment(ev, id, btn){
         w.appendChild(l); w.appendChild(node);
         return w;
       }
-      row.appendChild(labelled('Playstyle', seg('playstyle', [
-        { v:null,     t:'Any' },
-        { v:'casual', t:'Casual', title:'Here for the game, not the ladder' },
-        { v:'comp',   t:'Comp',   title:'Playing to win' }
-      ], function (v){ var st = S(); if (st) st.playstyle = v; })));
-
       row.appendChild(labelled('Mode', seg('mode', [
         { v:null,  t:'Any' },
         { v:'pvp', t:'PvP' },
         { v:'pve', t:'PvE' }
       ], function (v){ var st = S(); if (st) st.mode = v; }), 'qModeRow'));
+
+      /* Safety sits with the other options rather than in a settings
+         page nobody opens: the moment you are deciding who to play with
+         is the moment these mean something. */
+      row.appendChild(labelled('Account', seg('steamOnly', [
+        { v:false, t:'Any',   title:'Anyone can join' },
+        { v:true,  t:'Steam', title:'Only players with a linked Steam account' }
+      ], function (v){ var st = S(); if (st) st.steamOnly = v; })));
+
+      row.appendChild(labelled('Age', seg('minAgeDays', [
+        { v:0,  t:'Any',  title:'Any account age' },
+        { v:7,  t:'7d+',  title:'No accounts younger than a week' },
+        { v:30, t:'30d+', title:'No accounts younger than a month' }
+      ], function (v){ var st = S(); if (st) st.minAgeDays = v; })));
+
       panel.appendChild(row);
 
       var proof = document.getElementById('qFormProof');
       var extra = proof && proof.closest ? proof.closest('.q-step-card') : null;
-      if (extra){ extra.classList.add('q-extra'); panel.appendChild(extra); }
+      if (extra){
+        extra.classList.add('q-extra');
+        /* Retitled. It was step three of a flow that no longer exists,
+           and "Stack your stack" described a numbered journey rather
+           than the thing on the card. */
+        var lbl = extra.querySelector('.q-step-label');
+        if (lbl) lbl.textContent = 'Proof and friends';
+        var sub = extra.querySelector('.q-step-sub');
+        if (sub) sub.textContent = 'Rank is verified from your ladder rating where you have one.';
+        var pc = extra.querySelector('.q-card-label');
+        if (pc && pc.firstChild) pc.firstChild.textContent = 'Skill proof ';
+        var note = document.createElement('div');
+        note.id = 'qProofNote'; note.className = 'qpn';
+        if (proof && proof.parentNode) proof.parentNode.insertBefore(note, proof);
+        panel.appendChild(extra);
+      }
+      /* State was only read off this field at submit time, so the gate
+         could not tell whether it had been filled. */
+      if (proof) proof.addEventListener('input', function (){
+        var st = S(); if (st) st.proof = proof.value.trim();
+        paintProofRule();
+      });
       bar.parentNode.insertBefore(panel, bar.nextSibling);
     }
 
@@ -66620,8 +67035,9 @@ async function reactComment(ev, id, btn){
     more.setAttribute('aria-expanded', 'false');
     more.onclick = function (){
       var open = panel.classList.toggle('on');
-      more.textContent = open ? 'Fewer options' : 'More options';
+      more.setAttribute('data-open', open ? '1' : '0');
       more.setAttribute('aria-expanded', open ? 'true' : 'false');
+      paintMoreCount();
       if (open) panel.scrollIntoView({ behavior:'smooth', block:'nearest' });
     };
     var s = S() || {};
@@ -66650,18 +67066,99 @@ async function reactComment(ev, id, btn){
       { v:true,  t:'Mic',  title:'Everyone must have a microphone' }
     ], function (v){ var st = S(); if (st) st.mic = v; });
 
-    var l3 = document.createElement('span'); l3.className = 'qbl'; l3.textContent = 'Match';
-    var l4 = document.createElement('span'); l4.className = 'qbl'; l4.textContent = 'Voice';
-    var v3 = document.createElement('span'); v3.className = 'qvr';
-    var v4 = document.createElement('span'); v4.className = 'qvr';
+    var playSeg = seg('playstyle', [
+      { v:null,     t:'Any' },
+      { v:'casual', t:'Casual', title:'Here for the game, not the ladder' },
+      { v:'comp',   t:'Comp',   title:'Playing to win' }
+    ], function (v){ var st = S(); if (st) st.playstyle = v; });
 
-    bar.appendChild(hostSeg);
-    bar.appendChild(document.createElement('span')).className = 'qvr';
-    bar.appendChild(l1); bar.appendChild(stepper);
-    bar.appendChild(v1); bar.appendChild(l2); bar.appendChild(skills);
-    bar.appendChild(v3); bar.appendChild(l3); bar.appendChild(widthSeg);
-    bar.appendChild(v4); bar.appendChild(l4); bar.appendChild(micSeg);
-    bar.appendChild(v2); bar.appendChild(more);
+    /* Three columns, not a flex row. The rank grid is the thing the eye
+       goes to and it has to sit on the CENTRE of the bar -- in a flex
+       row it lands wherever the controls beside it happen to end, which
+       is what left it sitting left of centre. Equal 1fr flanks put it
+       in the middle whatever they contain.
+
+       Everything that describes WHO you want is gathered on the left
+       with the host switch; the rank stands alone in the middle. */
+    function vr(){ var s = document.createElement('span'); s.className = 'qvr'; return s; }
+    function lb(t){ var s = document.createElement('span'); s.className = 'qbl'; s.textContent = t; return s; }
+
+    /* Two rows, because six controls do not fit on one at this width --
+       Style was wrapping on its own and no amount of moving things
+       between the ends fixes that.
+
+       Row one is the three you set every time, and it balances: one
+       control each side of the rank, which keeps the rank genuinely
+       centred. Row two is how loose or what kind, which you set far
+       less often, sitting under a hairline so it reads as secondary
+       rather than as more of the same. */
+    var row1 = document.createElement('div'); row1.className = 'qbar-main';
+    var row2 = document.createElement('div'); row2.className = 'qbar-sub';
+
+    /* Three columns, but the flanks press INWARD rather than out to the
+       edges. 1fr each side puts the rank on the true centre of the bar;
+       justify-self end/start keeps the controls gathered around it
+       instead of stranded at the ends, which is what made the earlier
+       grid read as three islands. Centred and together, not one or the
+       other. */
+    var gl = document.createElement('div'); gl.className = 'qbar-l';
+    var gc = document.createElement('div'); gc.className = 'qbar-c';
+    var gr = document.createElement('div'); gr.className = 'qbar-r';
+
+    gl.appendChild(hostSeg); gl.appendChild(vr()); gl.appendChild(l2);
+    gc.appendChild(skills);
+    gr.appendChild(vr()); gr.appendChild(l1); gr.appendChild(stepper);
+
+    row1.appendChild(gl); row1.appendChild(gc); row1.appendChild(gr);
+
+    /* Voice takes the centre column so it lands on the true middle of
+       the bar; Match and Style press inward from equal flanks either
+       side of it. More options is lifted out of the flow entirely and
+       pinned right, so its width cannot drag the trio off centre. */
+    var sl = document.createElement('div'); sl.className = 'qsub-l';
+    var sc = document.createElement('div'); sc.className = 'qsub-c';
+    var sr = document.createElement('div'); sr.className = 'qsub-r';
+    sl.appendChild(lb('Match')); sl.appendChild(widthSeg);
+    sc.appendChild(lb('Voice'));  sc.appendChild(micSeg);
+    sr.appendChild(lb('Style'));  sr.appendChild(playSeg);
+    /* A mirror of the More button on the far left, hidden. It is the
+       only way to keep Voice on the true centre AND have the bar hug
+       its contents: absolute positioning would take More out of flow,
+       and a box sized by max-content would then ignore it and let it
+       hang off the edge. The spacer balances the row instead. */
+    var spacer = document.createElement('span');
+    spacer.className = 'qmore-spacer';
+    spacer.setAttribute('aria-hidden', 'true');
+
+    row2.appendChild(spacer);
+    row2.appendChild(sl); row2.appendChild(sc); row2.appendChild(sr);
+    row2.appendChild(more);
+
+    bar.appendChild(row1); bar.appendChild(row2);
+    paintMoreCount();
+    paintProofRule();
+  }
+
+  /* How many filters are away from their default. Shown on the More
+     options button so moving them off the bar does not make them
+     invisible -- you can still see at a glance that something is set. */
+  /* Only counts what the panel still holds. Match, voice and style are
+     on the bar now and show their own state, so counting them here
+     would be telling you twice. */
+  function activeFilters(){
+    var st = S() || {}, n = 0;
+    if (st.mode) n++;
+    if (st.steamOnly) n++;
+    if (st.minAgeDays) n++;
+    return n;
+  }
+
+  function paintMoreCount(){
+    var b = document.getElementById('qMore');
+    if (!b) return;
+    var n = activeFilters();
+    var base = b.getAttribute('data-open') === '1' ? 'Fewer options' : 'More options';
+    b.innerHTML = esc(base) + (n ? '<i class="qmore-n">' + n + '</i>' : '');
   }
 
   /* Repaints a segmented control from state, so every one of them shows
@@ -66680,7 +67177,7 @@ async function reactComment(ev, id, btn){
      The other half of matchmaking. /queue/intent picks a table FOR you;
      this lists the same open sessions so you can see who is already in
      one, and how long they have been sat there, before committing. */
-  var findRows = [], findTimer = null;
+  var findRows = [], findTimer = null, findQuery = '', findFocused = false;
 
   function ensureFindList(){
     var stage = document.getElementById('qStage');
@@ -66712,17 +67209,43 @@ async function reactComment(ev, id, btn){
     if (st.host){ el.classList.remove('on'); el.innerHTML = ''; return; }
     el.classList.add('on');
 
-    if (!findRows.length){
-      el.innerHTML = '<div class="qft-empty">No open tables right now. ' +
-        'Start searching and one opens for you.</div>';
+    /* Named once so the filter and the row both read the same title --
+       a table whose game is not in any shelf still has to be findable. */
+    function titleOf(r){
+      var e = entry(r.game);
+      return e ? e.name : String(r.game || '').replace(/^steam:/, 'App ');
+    }
+    var fq = findQuery.trim().toLowerCase();
+    var rows = fq ? findRows.filter(function (r){
+      return titleOf(r).toLowerCase().indexOf(fq) !== -1;
+    }) : findRows;
+
+    /* The search stays on screen even when the result is empty --
+       removing the control that caused the emptiness is how you strand
+       someone with no way back. */
+    var head =
+      '<div class="qft-bar">' +
+        '<span class="qft-head"><b>' + rows.length + '</b> open ' +
+          (rows.length === 1 ? 'table' : 'tables') +
+          (fq && rows.length !== findRows.length ? ' of ' + findRows.length : '') + '</span>' +
+        '<span class="qft-find">' + I.find +
+          '<input id="qFindQ" type="text" autocomplete="off" spellcheck="false" ' +
+            'placeholder="Filter tables…" value="' + esc(findQuery) + '" ' +
+            'oninput="window.qFindFilter(this.value)">' +
+        '</span>' +
+      '</div>';
+
+    if (!rows.length){
+      el.innerHTML = head + '<div class="qft-empty">' + (fq
+        ? 'No open table matches “' + esc(fq) + '”.'
+        : 'No open tables right now. Start searching and one opens for you.') +
+        '</div>';
+      restoreFindFocus();
       return;
     }
-    el.innerHTML =
-      '<div class="qft-head"><b>' + findRows.length + '</b> open ' +
-        (findRows.length === 1 ? 'table' : 'tables') + '</div>' +
-      findRows.map(function (r){
-        var e = entry(r.game);
-        var nm = e ? e.name : String(r.game || '').replace(/^steam:/, 'App ');
+    el.innerHTML = head +
+      rows.map(function (r){
+        var nm = titleOf(r);
         var tier = String(r.skill || '').toUpperCase();
         return '<button class="qft" onclick="window.qJoinTable(' + r.id + ',' +
             jsStr(r.game) + ',' + (r.players | 0) + ')">' +
@@ -66736,7 +67259,25 @@ async function reactComment(ev, id, btn){
           '<span class="qft-j">Join</span>' +
         '</button>';
       }).join('');
+    restoreFindFocus();
   }
+
+  /* The list repaints on the 10s pulse, which would otherwise take the
+     caret out of the box mid-word every time it fired. */
+  function restoreFindFocus(){
+    if (!findFocused) return;
+    var el = document.getElementById('qFindQ');
+    if (!el || el === document.activeElement) return;
+    el.focus();
+    var n = el.value.length;
+    try { el.setSelectionRange(n, n); } catch (e) {}
+  }
+
+  window.qFindFilter = function (v){
+    findQuery = String(v == null ? '' : v);
+    findFocused = true;
+    paintFindList();
+  };
 
   async function loadFind(){
     var st = S();

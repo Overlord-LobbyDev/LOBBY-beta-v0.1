@@ -3892,6 +3892,77 @@ function _qWindowWith(ageMs, width) {
   return _qWindowFor(ageMs);
 }
 
+// Every user this one cannot be matched with, in either direction. One
+// query rather than a check per candidate, because the matcher runs
+// this against every open session.
+async function _qBlockedIds(userId) {
+  const r = await pool.query(
+    `SELECT blocked_id AS id FROM user_blocks WHERE user_id = $1
+     UNION
+     SELECT user_id   AS id FROM user_blocks WHERE blocked_id = $1`,
+    [userId]
+  );
+  return new Set(r.rows.map(x => x.id));
+}
+
+// What the ladder already knows about this player for this game.
+//
+// The queue asks people to declare their own tier and then asks for
+// proof, which is a workaround for not having a number. There IS a
+// number: rating-engine keeps per-game Elo and RP with seasons and
+// smurf penalties applied. Where it has one, it wins — a declared tier
+// is a claim and this is a record.
+async function _qLadderTier(userId, game) {
+  try {
+    const eng = require("./rating-engine.js");
+    if (!eng || !eng.getUserTier || !eng.normalizeGameTag) return null;
+    const tag = eng.normalizeGameTag(String(game || "").replace(/^pl:/, ""));
+    if (!tag) return null;
+    const t = await eng.getUserTier(userId, tag);
+    const name = t && (t.tier || t.name || t.rank);
+    if (!name) return null;
+    const id = String(name).toLowerCase().split(/[\s_-]/)[0];
+    return Q_TIERS.includes(id) ? id : null;
+  } catch (e) {
+    return null;                 // the ladder is an enhancement, never a gate
+  }
+}
+
+// Hours in this game, from Steam, for the account that owns them.
+//
+// The proof field asks people to paste a link nobody checks. The server
+// can already see their playtime, which is the thing the link was
+// standing in for — so it fills it in rather than asking.
+async function _qSteamProof(userId, game) {
+  try {
+    const appid = String(game || "").match(/^steam:(\d+)$/)?.[1]
+               || (/^\d+$/.test(String(game)) ? String(game) : null);
+    if (!appid || !STEAM_KEY) return null;
+    const u = await pool.query("SELECT steam_id FROM users WHERE id = $1", [userId]);
+    const sid = u.rows[0]?.steam_id;
+    if (!sid) return null;
+    const r = await fetch(
+      `https://api.steampowered.com/IPlayerService/GetOwnedGames/v1/?key=${STEAM_KEY}` +
+      `&steamid=${sid}&include_appinfo=0&appids_filter[0]=${appid}&input_json=` +
+      encodeURIComponent(JSON.stringify({ steamid: sid, appids_filter: [Number(appid)] }))
+    );
+    const j = await r.json();
+    const row = (j?.response?.games || []).find(g => String(g.appid) === appid);
+    if (!row) return null;
+    const hrs = Math.round((row.playtime_forever || 0) / 60);
+    return hrs > 0 ? `steam:${hrs}h` : null;
+  } catch (e) {
+    return null;
+  }
+}
+
+// The tiers that must show proof. Read from the end of the ladder so
+// adding a tier above Pro does not silently exempt it.
+const Q_PROOF_FROM = 5;                    // Master upward
+function _qNeedsProof(tier) {
+  return _qTierIdx(tier) >= Q_PROOF_FROM;
+}
+
 // Two sides agree on a preference when either does not have one. NULL is
 // "no preference", so it matches anything -- which is what keeps a
 // filter from quietly excluding every player who left it alone.
@@ -3977,6 +4048,10 @@ app.post("/queue/intent", requireAuth, async (req, res) => {
   const wPlay  = ["casual", "comp"].includes(playstyle) ? playstyle : null;
   const wMode  = ["pvp", "pve"].includes(mode) ? mode : null;
   const wWidth = ["strict", "one", "any"].includes(width) ? width : null;
+  // Door policy for a table you are opening. Clamped, because a host
+  // asking for a two-year-old account is asking for an empty table.
+  const wSteamOnly = (req.body || {}).steamOnly === true;
+  const wMinAge = Math.max(0, Math.min(90, parseInt((req.body || {}).minAgeDays, 10) || 0));
 
   // A playlist fixes both halves of the bucket, which is the whole
   // point of it: its id becomes the game, its size becomes the size,
@@ -3989,6 +4064,31 @@ app.post("/queue/intent", requireAuth, async (req, res) => {
   if (!game) return res.status(400).json({ error: "game or playlist is required" });
   const size = pl ? pl.players : Math.max(2, Math.min(10, parseInt(players, 10) || 2));
   const tier = String(skill || "plat").toLowerCase();
+
+  // What the ladder says, if it says anything. A rating outranks a
+  // self-declared tier: it is a record rather than a claim, and it
+  // already has the smurf penalties applied.
+  const ladderTier = await _qLadderTier(req.userId, game);
+  const effTier = ladderTier || tier;
+  const verified = !!ladderTier;
+
+  // Master and Pro have to show their working. The top of a ladder is
+  // where claiming a rank you do not hold costs other people the most.
+  //
+  // A verified tier is exempt: it was never a claim, so there is nothing
+  // to substantiate. Where it is a claim, Steam playtime stands in for
+  // the pasted link if the account has any — the server can see the
+  // hours, so asking the player to type them was always theatre.
+  let effProof = String(proof || "").trim();
+  if (_qNeedsProof(effTier) && !verified && !effProof) {
+    effProof = (await _qSteamProof(req.userId, game)) || "";
+  }
+  if (_qNeedsProof(effTier) && !verified && !effProof) {
+    return res.status(400).json({
+      error: "Master and Pro need skill proof — add a tracker link or a recent result.",
+      code: "proof_required",
+    });
+  }
 
   try {
     // Already queueing? Return that session rather than opening a second
@@ -4020,11 +4120,41 @@ app.post("/queue/intent", requireAuth, async (req, res) => {
     `, [game, size, req.userId]);
 
 
-    const mine = _qTierIdx(tier);
+    const mine = _qTierIdx(effTier);
+
+    // Everyone this player must never be matched with, and everything
+    // known about the player that a host might be gating on.
+    const blocked = await _qBlockedIds(req.userId);
+    const meRow = await pool.query(
+      "SELECT steam_id, created_at FROM users WHERE id = $1", [req.userId]);
+    const meSteam = !!meRow.rows[0]?.steam_id;
+    const meAgeDays = meRow.rows[0]?.created_at
+      ? (Date.now() - new Date(meRow.rows[0].created_at).getTime()) / 86400000
+      : 0;
+
+    // Which open sessions hold somebody in the block set. Done as one
+    // query rather than per candidate.
+    const blockedSess = new Set();
+    if (blocked.size && open.rows.length) {
+      const bs = await pool.query(
+        `SELECT DISTINCT session_id FROM queue_members
+          WHERE left_at IS NULL AND session_id = ANY($1) AND user_id = ANY($2)`,
+        [open.rows.map(r => r.id), Array.from(blocked)]
+      );
+      bs.rows.forEach(r => blockedSess.add(r.session_id));
+    }
+
     // Hosting means "open my own table and wait", so no candidate is
     // considered at all -- the point is that people come to you.
     const fit = host ? null : open.rows.find(row => {
       if ((row.filled || 0) >= row.players) return false;
+      // A block is absolute and is checked before anything else: no
+      // preference should be able to talk you into a table with someone
+      // you have blocked, or them into yours.
+      if (blockedSess.has(row.id)) return false;
+      // The table's own door policy.
+      if (row.steam_only && !meSteam) return false;
+      if ((row.min_age_days || 0) > 0 && meAgeDays < row.min_age_days) return false;
       // Both sides must accept: the waiting session has widened by age,
       // and the arriving player has not waited at all. Using the widest
       // of the two is what lets a long-waiting group take anyone.
@@ -4046,16 +4176,18 @@ app.post("/queue/intent", requireAuth, async (req, res) => {
         VALUES ($1,$2,$3,$4)
         ON CONFLICT (session_id, user_id)
         DO UPDATE SET left_at = NULL, skill = EXCLUDED.skill, proof = EXCLUDED.proof
-      `, [sessionId, req.userId, tier, proof || null]);
+      `, [sessionId, req.userId, effTier, effProof || null]);
     } else {
       const created = await pool.query(`
-        INSERT INTO queue_sessions (game, players, skill, owner_id, mic, playstyle, mode, width)
-        VALUES ($1,$2,$3,$4,$5,$6,$7,$8) RETURNING *
-      `, [game, size, tier, req.userId, wMic, wPlay, wMode, wWidth]);
+        INSERT INTO queue_sessions (game, players, skill, owner_id, mic, playstyle, mode, width,
+                                    steam_only, min_age_days, verified_tier)
+        VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11) RETURNING *
+      `, [game, size, effTier, req.userId, wMic, wPlay, wMode, wWidth,
+          wSteamOnly, wMinAge, verified]);
       sessionId = created.rows[0].id;
       await pool.query(
         "INSERT INTO queue_members (session_id, user_id, skill, proof) VALUES ($1,$2,$3,$4)",
-        [sessionId, req.userId, tier, proof || null]
+        [sessionId, req.userId, effTier, effProof || null]
       );
     }
 
@@ -4076,6 +4208,99 @@ app.post("/queue/intent", requireAuth, async (req, res) => {
   }
 });
 
+// GET /queue/tier?game=… -- what the ladder knows about you here.
+//
+// So the page can show a rank as verified BEFORE you search, rather than
+// the server quietly overriding a tier you picked and never saying so.
+app.get("/queue/tier", requireAuth, async (req, res) => {
+  const game = String(req.query.game || "");
+  if (!game) return res.json({ tier: null, verified: false });
+  try {
+    const tier = await _qLadderTier(req.userId, game);
+    const proof = tier ? null : await _qSteamProof(req.userId, game);
+    res.json({ tier, verified: !!tier, proof });
+  } catch (e) {
+    res.json({ tier: null, verified: false, proof: null });
+  }
+});
+
+// ── Blocking ─────────────────────────────────────────────────────────
+//
+// The queue's whole job is putting you in a call with strangers, and
+// until now the only recourse was a vote-kick that lasted one session.
+// A block is personal, permanent and silent: the other party is never
+// told, they simply stop being matchable with you.
+
+app.get("/blocks", requireAuth, async (req, res) => {
+  try {
+    const r = await pool.query(
+      `SELECT b.blocked_id AS id, u.username, u.avatar_url, b.created_at
+         FROM user_blocks b JOIN users u ON u.id = b.blocked_id
+        WHERE b.user_id = $1 ORDER BY b.created_at DESC`, [req.userId]);
+    res.json(r.rows);
+  } catch (e) {
+    console.error("[blocks]", e.message);
+    res.status(500).json({ error: "Could not load your block list" });
+  }
+});
+
+app.post("/blocks/:id", requireAuth, async (req, res) => {
+  const target = parseInt(req.params.id, 10);
+  if (!target) return res.status(400).json({ error: "Bad user id" });
+  if (target === req.userId) return res.status(400).json({ error: "You cannot block yourself" });
+  try {
+    await pool.query(
+      `INSERT INTO user_blocks (user_id, blocked_id, reason) VALUES ($1,$2,$3)
+       ON CONFLICT (user_id, blocked_id) DO NOTHING`,
+      [req.userId, target, (req.body || {}).reason || null]);
+    res.json({ ok: true });
+  } catch (e) {
+    console.error("[blocks/add]", e.message);
+    res.status(500).json({ error: "Could not block that player" });
+  }
+});
+
+app.delete("/blocks/:id", requireAuth, async (req, res) => {
+  const target = parseInt(req.params.id, 10);
+  if (!target) return res.status(400).json({ error: "Bad user id" });
+  try {
+    await pool.query("DELETE FROM user_blocks WHERE user_id=$1 AND blocked_id=$2",
+      [req.userId, target]);
+    res.json({ ok: true });
+  } catch (e) {
+    console.error("[blocks/remove]", e.message);
+    res.status(500).json({ error: "Could not unblock that player" });
+  }
+});
+
+// POST /queue/:id/report -- raise something for a human to look at.
+//
+// Separate from blocking on purpose: blocking is a private preference
+// that takes effect immediately, reporting is a request for review. Most
+// people want the first and are offered only the second.
+app.post("/queue/:id/report", requireAuth, async (req, res) => {
+  const sid = parseInt(req.params.id, 10) || null;
+  const { targetId, reason, detail, alsoBlock } = req.body || {};
+  const target = parseInt(targetId, 10);
+  if (!target || !reason) return res.status(400).json({ error: "targetId and reason are required" });
+  try {
+    await pool.query(
+      `INSERT INTO queue_reports (session_id, reporter_id, target_id, reason, detail)
+       VALUES ($1,$2,$3,$4,$5)`,
+      [sid, req.userId, target, String(reason).slice(0, 40), (detail || "").slice(0, 500)]);
+    if (alsoBlock) {
+      await pool.query(
+        `INSERT INTO user_blocks (user_id, blocked_id, reason) VALUES ($1,$2,$3)
+         ON CONFLICT (user_id, blocked_id) DO NOTHING`,
+        [req.userId, target, "reported: " + String(reason).slice(0, 40)]);
+    }
+    res.json({ ok: true, blocked: !!alsoBlock });
+  } catch (e) {
+    console.error("[queue/report]", e.message);
+    res.status(500).json({ error: "Could not file that report" });
+  }
+});
+
 // GET /queue/open -- the tables you could walk up to.
 //
 // /queue/intent picks one FOR you. This is the other half: the same
@@ -4087,6 +4312,7 @@ app.get("/queue/open", requireAuth, async (req, res) => {
   try {
     const r = await pool.query(`
       SELECT s.id, s.game, s.players, s.skill, s.mic, s.playstyle, s.mode, s.width,
+             s.steam_only, s.min_age_days, s.verified_tier,
              s.created_at,
              EXTRACT(EPOCH FROM (NOW() - s.created_at)) * 1000 AS age_ms,
              (SELECT COUNT(*)::int FROM queue_members m
@@ -4099,6 +4325,15 @@ app.get("/queue/open", requireAuth, async (req, res) => {
                          WHERE k.session_id = s.id AND k.user_id = $1 AND k.kicked)
         AND NOT EXISTS (SELECT 1 FROM queue_members me
                          WHERE me.session_id = s.id AND me.user_id = $1 AND me.left_at IS NULL)
+        -- A blocked player's table is not shown at all. Listing one you
+        -- can never join would be worse than not listing it.
+        AND NOT EXISTS (
+          SELECT 1 FROM queue_members bm
+           WHERE bm.session_id = s.id AND bm.left_at IS NULL
+             AND bm.user_id IN (
+               SELECT blocked_id FROM user_blocks WHERE user_id = $1
+               UNION
+               SELECT user_id    FROM user_blocks WHERE blocked_id = $1))
       ORDER BY s.created_at ASC
       LIMIT 60
     `, [req.userId]);
@@ -4109,6 +4344,8 @@ app.get("/queue/open", requireAuth, async (req, res) => {
         id: x.id, game: x.game, players: x.players, filled: x.filled || 0,
         skill: x.skill, mic: x.mic, playstyle: x.playstyle, mode: x.mode,
         width: x.width, ageMs: Math.round(Number(x.age_ms) || 0),
+        steamOnly: !!x.steam_only, minAgeDays: x.min_age_days || 0,
+        verifiedTier: !!x.verified_tier,
         owner: x.owner_name || null, ownerAvatar: x.owner_avatar || null,
       })));
   } catch (e) {
@@ -4144,6 +4381,32 @@ app.post("/queue/:id/join", requireAuth, async (req, res) => {
     const kicked = await pool.query(
       "SELECT 1 FROM queue_members WHERE session_id=$1 AND user_id=$2 AND kicked", [id, req.userId]);
     if (kicked.rows.length) return res.status(403).json({ error: "You cannot rejoin that table" });
+
+    /* The list already hides these, but the endpoint cannot rely on that
+       -- a table can fill with a blocked player between the fetch and
+       the click, and this is the door rather than the window. */
+    const blk = await _qBlockedIds(req.userId);
+    if (blk.size) {
+      const hit = await pool.query(
+        `SELECT 1 FROM queue_members WHERE session_id=$1 AND left_at IS NULL
+           AND user_id = ANY($2) LIMIT 1`, [id, Array.from(blk)]);
+      if (hit.rows.length) return res.status(403).json({ error: "That table is not available to you" });
+    }
+
+    /* The table's door policy applies to a chosen seat exactly as it
+       does to a matched one, or the list would be a way around it. */
+    const meRow = await pool.query(
+      "SELECT steam_id, created_at FROM users WHERE id = $1", [req.userId]);
+    if (sess.steam_only && !meRow.rows[0]?.steam_id) {
+      return res.status(403).json({ error: "That table is for Steam-linked players" });
+    }
+    if ((sess.min_age_days || 0) > 0) {
+      const days = meRow.rows[0]?.created_at
+        ? (Date.now() - new Date(meRow.rows[0].created_at).getTime()) / 86400000 : 0;
+      if (days < sess.min_age_days) {
+        return res.status(403).json({ error: "That table is not open to new accounts yet" });
+      }
+    }
 
     const win = _qWindowWith(Number(sess.age_ms) || 0, sess.width);
     if (Math.abs(_qTierIdx(sess.skill) - _qTierIdx(tier)) > win) {
