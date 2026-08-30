@@ -65448,5 +65448,367 @@ async function reactComment(ev, id, btn){
 })();
 </script>
 
+
+<!-- ══════════════════════════════════════════════════════════════════
+     QUEUE — FOUR SKINS, PICKED LIVE
+
+     "It still looks AI" is a fair read and worth naming precisely: the
+     page is dark panels, one radius on everything, hairline borders, a
+     violet accent, mono uppercase micro-labels, centred headings, even
+     spacing. None of that is bad. All of it is the DEFAULT dark-product
+     look, which is exactly why it reads as generated — nothing about it
+     is specific to matchmaking, or to games, or to Lobby.
+
+     Describing alternatives is useless when the links to mockups will
+     not open, so the alternatives ship instead. A control at the top of
+     the page swaps between four complete treatments, live, on the real
+     data. Pick one and it sticks.
+
+       STANDARD   what is there now, as the control
+       GLASS      frosted panels floating over the page's own colour
+       BROADCAST  an esports lower-third: angled cuts, no radius
+       ARCADE     a cabinet: neon, scanlines, segment numerals
+
+     Each one changes MATERIAL, not layout. Nothing moves, so the
+     comparison is honest and any of them can be thrown away without
+     touching the structure underneath.
+
+     THE ANGLED AND THE SQUARE ONES ARE THE POINT. "Everything is a
+     rounded rectangle" is the single loudest generated-design tell, and
+     two of these break it outright rather than restyling within it.
+     ══════════════════════════════════════════════════════════════════ -->
+<style>
+/* ═══ The switcher ════════════════════════════════════════════════ */
+#qSkins{
+  display:flex; align-items:center; gap:7px; flex-wrap:wrap;
+  margin:0 0 20px; padding:0 2px;
+}
+#qSkins .l{
+  font-family:'JetBrains Mono', ui-monospace, monospace;
+  font-size:9.5px; font-weight:700; letter-spacing:2px; text-transform:uppercase;
+  color:var(--text-3); margin-right:5px;
+}
+.qskin{
+  padding:7px 14px; border-radius:99px; cursor:pointer;
+  font-family:'Archivo', var(--font), sans-serif;
+  font-size:11px; font-weight:800; letter-spacing:1.1px; text-transform:uppercase;
+  color:var(--text-3);
+  background:rgba(255,255,255,.035);
+  border:1px solid rgba(255,255,255,.08);
+  transition:color .16s ease, background .16s ease, border-color .16s ease;
+}
+.qskin:hover{ color:#fff; border-color:rgba(255,255,255,.2); }
+.qskin.on{
+  color:#0b0416;
+  background:linear-gradient(180deg,
+    color-mix(in srgb, var(--hub-accent) 94%, white), var(--hub-accent));
+  border-color:transparent;
+}
+
+/* ══════════════════════════════════════════════════════════════════
+   GLASS — frosted panels over the page's own colour
+
+   Everything becomes a sheet of glass with a lit top edge, floating on
+   a ground that is actually coloured rather than near-black. The tell it
+   breaks is flatness: panels currently sit ON the background, and here
+   they sit ABOVE it with the background visible through them.
+   ══════════════════════════════════════════════════════════════════ */
+#queueOverlay.q-skin-glass{
+  background:
+    radial-gradient(900px 640px at 12% -8%, rgba(168,99,255,.34) 0%, transparent 62%),
+    radial-gradient(760px 520px at 88% 8%, rgba(64,190,255,.2) 0%, transparent 60%),
+    radial-gradient(900px 620px at 70% 108%, rgba(255,90,180,.16) 0%, transparent 62%),
+    linear-gradient(165deg, #0d0a18 0%, #0a0c14 100%) !important;
+}
+#queueOverlay.q-skin-glass .q-step-card,
+#queueOverlay.q-skin-glass .qhow-row,
+#queueOverlay.q-skin-glass .qhow-rules,
+#queueOverlay.q-skin-glass #qPicked,
+#queueOverlay.q-skin-glass #qPulse,
+#queueOverlay.q-skin-glass .qp,
+#queueOverlay.q-skin-glass .ql-search,
+#queueOverlay.q-skin-glass .q-card{
+  background:rgba(255,255,255,.055) !important;
+  backdrop-filter:blur(26px) saturate(1.7);
+  -webkit-backdrop-filter:blur(26px) saturate(1.7);
+  border:1px solid rgba(255,255,255,.16) !important;
+  border-radius:20px !important;
+  box-shadow:
+    inset 0 1px 0 rgba(255,255,255,.34),
+    inset 0 -1px 0 rgba(255,255,255,.06),
+    0 18px 50px rgba(0,0,0,.42) !important;
+}
+#queueOverlay.q-skin-glass .q-step-card::before,
+#queueOverlay.q-skin-glass .qhow + .qhow::before{ display:none !important; }
+#queueOverlay.q-skin-glass .qhow + .qhow{ border-left-color:rgba(255,255,255,.12); }
+#queueOverlay.q-skin-glass .ql-card{
+  border-radius:20px !important;
+  border:1px solid rgba(255,255,255,.18) !important;
+  box-shadow:inset 0 1px 0 rgba(255,255,255,.3), 0 16px 40px rgba(0,0,0,.5) !important;
+}
+#queueOverlay.q-skin-glass .qhow-ico{
+  border-radius:14px !important;
+  background:rgba(255,255,255,.12) !important;
+  border-color:rgba(255,255,255,.24) !important;
+  box-shadow:inset 0 1px 0 rgba(255,255,255,.4);
+}
+#queueOverlay.q-skin-glass .qrule,
+#queueOverlay.q-skin-glass .q-skill-tile{
+  background:rgba(255,255,255,.07) !important;
+  border-color:rgba(255,255,255,.16) !important;
+  backdrop-filter:blur(14px);
+  box-shadow:inset 0 1px 0 rgba(255,255,255,.24) !important;
+}
+#queueOverlay.q-skin-glass .q-skill-tile{ border-radius:16px !important; }
+#queueOverlay.q-skin-glass #qGo{
+  border-radius:18px !important;
+  background:rgba(255,255,255,.16) !important;
+  backdrop-filter:blur(20px) saturate(1.5);
+  border:1px solid rgba(255,255,255,.3) !important;
+  color:#fff !important;
+  box-shadow:inset 0 1px 0 rgba(255,255,255,.45), 0 14px 38px rgba(0,0,0,.4) !important;
+}
+#queueOverlay.q-skin-glass .qh-t{ text-shadow:0 2px 18px rgba(0,0,0,.5); }
+
+/* ══════════════════════════════════════════════════════════════════
+   BROADCAST — an esports lower-third
+
+   Angled cuts, near-zero radius, a solid accent slab down the left of
+   every heading, and numerals that behave like a scoreboard. This is
+   the one that breaks "everything is a rounded rectangle" hardest,
+   because nothing in it is one.
+   ══════════════════════════════════════════════════════════════════ */
+#queueOverlay.q-skin-cast .q-step-card,
+#queueOverlay.q-skin-cast .qhow-row,
+#queueOverlay.q-skin-cast .qhow-rules,
+#queueOverlay.q-skin-cast #qPicked,
+#queueOverlay.q-skin-cast #qPulse,
+#queueOverlay.q-skin-cast .qp,
+#queueOverlay.q-skin-cast .ql-search,
+#queueOverlay.q-skin-cast .q-card,
+#queueOverlay.q-skin-cast .ql-card,
+#queueOverlay.q-skin-cast .q-skill-tile{
+  border-radius:3px !important;
+}
+#queueOverlay.q-skin-cast .q-step-card,
+#queueOverlay.q-skin-cast .qhow-row,
+#queueOverlay.q-skin-cast #qPicked,
+#queueOverlay.q-skin-cast #qPulse,
+#queueOverlay.q-skin-cast .qp{
+  position:relative;
+  background:linear-gradient(100deg, rgba(255,255,255,.055), rgba(255,255,255,.012)) !important;
+  border:0 !important;
+  border-left:3px solid var(--hub-accent) !important;
+  box-shadow:0 1px 0 rgba(255,255,255,.06) inset, 0 12px 30px rgba(0,0,0,.4) !important;
+}
+#queueOverlay.q-skin-cast .q-step-card::before{ display:none !important; }
+/* The corner cut is what makes it read as broadcast rather than as a
+   card with a coloured edge. */
+#queueOverlay.q-skin-cast #qPicked,
+#queueOverlay.q-skin-cast .qhow-row{
+  clip-path:polygon(0 0, 100% 0, 100% calc(100% - 16px), calc(100% - 16px) 100%, 0 100%);
+}
+#queueOverlay.q-skin-cast .qh-t,
+#queueOverlay.q-skin-cast .q-step-label{
+  font-style:italic;
+  letter-spacing:1.2px !important;
+  transform:skewX(-6deg);
+  display:inline-block;
+}
+#queueOverlay.q-skin-cast .qh{ align-items:flex-start; text-align:left; }
+#queueOverlay.q-skin-cast .qh-bar{
+  width:100%; height:2px; margin-top:9px;
+  background:linear-gradient(90deg, var(--hub-accent), transparent 60%) !important;
+}
+#queueOverlay.q-skin-cast .qh-k{
+  border-radius:2px !important;
+  background:var(--hub-accent) !important;
+  border:0 !important;
+  color:#0b0416 !important;
+}
+#queueOverlay.q-skin-cast .qh-k b,
+#queueOverlay.q-skin-cast .qh-k .i,
+#queueOverlay.q-skin-cast .qh-k .sep{ color:#0b0416 !important; }
+#queueOverlay.q-skin-cast .qhow-ico{
+  border-radius:2px !important;
+  background:var(--hub-accent) !important;
+  color:#0b0416 !important; border:0 !important;
+}
+#queueOverlay.q-skin-cast .qhow-n{
+  font-size:26px !important; font-weight:800 !important;
+  color:rgba(255,255,255,.09) !important; top:8px !important;
+}
+#queueOverlay.q-skin-cast .qrule{
+  border-radius:2px !important; letter-spacing:1.6px !important;
+}
+#queueOverlay.q-skin-cast #qPulse .n{ font-size:26px !important; }
+#queueOverlay.q-skin-cast #qGo{
+  border-radius:2px !important;
+  clip-path:polygon(14px 0, 100% 0, calc(100% - 14px) 100%, 0 100%);
+  letter-spacing:2.4px !important;
+}
+#queueOverlay.q-skin-cast .ql-card{
+  border-radius:3px !important;
+  border-bottom:3px solid transparent !important;
+}
+#queueOverlay.q-skin-cast .ql-card.on{ border-bottom-color:var(--hub-accent) !important; }
+#queueOverlay.q-skin-cast .ql-hrs{ letter-spacing:1.6px !important; }
+
+/* ══════════════════════════════════════════════════════════════════
+   ARCADE — a cabinet
+
+   Neon on near-black, doubled outlines, scanlines over the whole page,
+   and numerals that glow like a segment display. The most committed of
+   the four and the least like anything else in the app, which is either
+   the point or the problem depending on your taste.
+   ══════════════════════════════════════════════════════════════════ */
+#queueOverlay.q-skin-arcade{
+  background:linear-gradient(170deg, #07060f 0%, #05070c 100%) !important;
+}
+#queueOverlay.q-skin-arcade::after{
+  content:''; position:absolute; inset:0; z-index:50; pointer-events:none;
+  background:repeating-linear-gradient(180deg,
+    rgba(255,255,255,.035) 0px, rgba(255,255,255,.035) 1px, transparent 1px, transparent 3px);
+  mix-blend-mode:overlay;
+}
+#queueOverlay.q-skin-arcade .q-step-card,
+#queueOverlay.q-skin-arcade .qhow-row,
+#queueOverlay.q-skin-arcade .qhow-rules,
+#queueOverlay.q-skin-arcade #qPicked,
+#queueOverlay.q-skin-arcade #qPulse,
+#queueOverlay.q-skin-arcade .qp,
+#queueOverlay.q-skin-arcade .ql-search,
+#queueOverlay.q-skin-arcade .q-card{
+  background:rgba(10,8,20,.72) !important;
+  border:1px solid color-mix(in srgb, var(--hub-accent) 46%, transparent) !important;
+  border-radius:6px !important;
+  box-shadow:
+    0 0 0 1px rgba(0,0,0,.9),
+    inset 0 0 26px color-mix(in srgb, var(--hub-accent) 9%, transparent),
+    0 0 26px color-mix(in srgb, var(--hub-accent) 15%, transparent) !important;
+}
+#queueOverlay.q-skin-arcade .q-step-card::before{ display:none !important; }
+#queueOverlay.q-skin-arcade .qh-t,
+#queueOverlay.q-skin-arcade .q-step-label{
+  color:#fff !important;
+  text-shadow:
+    0 0 6px color-mix(in srgb, var(--hub-accent) 90%, white),
+    0 0 22px color-mix(in srgb, var(--hub-accent) 70%, transparent),
+    0 0 48px color-mix(in srgb, var(--hub-accent) 45%, transparent) !important;
+}
+#queueOverlay.q-skin-arcade .qh-k,
+#queueOverlay.q-skin-arcade .qrule{
+  border-radius:3px !important;
+  background:rgba(0,0,0,.5) !important;
+  border-color:color-mix(in srgb, var(--hub-accent) 40%, transparent) !important;
+}
+#queueOverlay.q-skin-arcade #qPulse .n,
+#queueOverlay.q-skin-arcade .qp-c,
+#queueOverlay.q-skin-arcade .ql-hrs{
+  color:color-mix(in srgb, var(--hub-accent) 60%, white) !important;
+  text-shadow:0 0 12px color-mix(in srgb, var(--hub-accent) 80%, transparent);
+}
+#queueOverlay.q-skin-arcade #qPulse .n{ font-size:24px !important; letter-spacing:2px; }
+#queueOverlay.q-skin-arcade .qhow-ico{
+  border-radius:5px !important;
+  background:rgba(0,0,0,.55) !important;
+  border-color:color-mix(in srgb, var(--hub-accent) 60%, transparent) !important;
+  box-shadow:inset 0 0 16px color-mix(in srgb, var(--hub-accent) 22%, transparent),
+             0 0 16px color-mix(in srgb, var(--hub-accent) 26%, transparent);
+}
+#queueOverlay.q-skin-arcade .ql-card{
+  border-radius:6px !important;
+  border-color:rgba(255,255,255,.14) !important;
+}
+#queueOverlay.q-skin-arcade .ql-card.on{
+  border-color:var(--hub-accent) !important;
+  box-shadow:0 0 0 1px var(--hub-accent),
+             0 0 34px color-mix(in srgb, var(--hub-accent) 55%, transparent) !important;
+}
+#queueOverlay.q-skin-arcade .q-skill-tile{
+  border-radius:5px !important; background:rgba(0,0,0,.45) !important;
+}
+#queueOverlay.q-skin-arcade #qGo{
+  border-radius:5px !important;
+  background:rgba(10,8,20,.8) !important;
+  border:1px solid var(--hub-accent) !important;
+  color:color-mix(in srgb, var(--hub-accent) 40%, white) !important;
+  text-shadow:0 0 12px color-mix(in srgb, var(--hub-accent) 85%, transparent);
+  box-shadow:inset 0 0 24px color-mix(in srgb, var(--hub-accent) 18%, transparent),
+             0 0 30px color-mix(in srgb, var(--hub-accent) 30%, transparent) !important;
+}
+
+@media (prefers-reduced-motion: reduce){
+  #queueOverlay.q-skin-arcade::after{ display:none; }
+}
+</style>
+<script>
+(function () {
+  'use strict';
+
+  var SKINS = [
+    { id:'',        label:'Standard'  },
+    { id:'glass',   label:'Glass'     },
+    { id:'cast',    label:'Broadcast' },
+    { id:'arcade',  label:'Arcade'    },
+  ];
+  var KEY = 'lobby_queue_skin_v1';
+
+  function current(){
+    try { return localStorage.getItem(KEY) || ''; } catch (e){ return ''; }
+  }
+
+  function apply(id){
+    var ov = document.getElementById('queueOverlay');
+    if (!ov) return;
+    SKINS.forEach(function (s){ if (s.id) ov.classList.remove('q-skin-' + s.id); });
+    if (id) ov.classList.add('q-skin-' + id);
+    try { localStorage.setItem(KEY, id); } catch (e){}
+    render();
+  }
+  window.qSetSkin = apply;
+
+  function render(){
+    var host = document.getElementById('qSkins');
+    if (!host) return;
+    var cur = current();
+    host.innerHTML = '<span class="l">Look</span>' + SKINS.map(function (s){
+      return '<button type="button" class="qskin' + (s.id === cur ? ' on' : '') + '" ' +
+        'onclick="window.qSetSkin(\'' + s.id + '\')">' + s.label + '</button>';
+    }).join('');
+  }
+
+  function mount(){
+    var setup = document.getElementById('qViewSetup');
+    if (!setup) return;
+    if (!document.getElementById('qSkins')){
+      var el = document.createElement('div');
+      el.id = 'qSkins';
+      var how = document.getElementById('qHow');
+      if (how && how.parentNode) how.parentNode.insertBefore(el, how);
+      else setup.insertBefore(el, setup.firstChild);
+    }
+    apply(current());
+  }
+
+  function start(){
+    var orig = window.openQueuePanel;
+    if (typeof orig !== 'function'){ setTimeout(start, 300); return; }
+    if (orig.__skins) return;
+    var wrapped = function (){
+      var out = orig.apply(this, arguments);
+      /* After v4's tidy(), which inserts #qHow. */
+      setTimeout(mount, 10);
+      return out;
+    };
+    wrapped.__skins = true;
+    window.openQueuePanel = wrapped;
+  }
+
+  if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', start);
+  else start();
+})();
+</script>
+
 </body>
 </html>
