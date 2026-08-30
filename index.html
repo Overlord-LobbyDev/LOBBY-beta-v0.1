@@ -65752,5 +65752,724 @@ async function reactComment(ev, id, btn){
 })();
 </script>
 
+
+<!-- ══════════════════════════════════════════════════════════════════
+     QUEUE — MARQUEE, DECK, TABLE
+
+     Three screens that are really one idea: the game you picked is
+     always the biggest thing you can see, and you are never looking at
+     a loading state.
+
+     THE MARQUEE is the page's title bar. Full-bleed library_hero art —
+     the wide cinematic key art Steam ships, which this app already
+     resolves server-side and until now only ever used as a blurred
+     smudge behind a card. Nothing else in Lobby is full-bleed, so this
+     is the most cinematic surface in the product by a distance, and it
+     costs one image that was already being fetched.
+
+     THE DECK is Home's deck, pointed at the thing it suits best. Same
+     geometry, same recede — dimming and desaturation, never opacity,
+     because a see-through card lets the one behind it read straight
+     through and the stack looks like it is melting. The game you are
+     about to spend an evening in deserves that treatment more than one
+     you played last week.
+
+     THE TABLE replaces the search screen, and this is the real change.
+     You were staring at a spinner while a request said "searching",
+     which is a progress bar for something that has no progress. Now
+     queueing SEATS YOU. The room exists from the moment you press the
+     button, you are in it, and the empty chairs fill as people arrive.
+     Nothing is loading, because there is nothing to load — you are
+     already where you were trying to get to.
+
+     AND IT ACTUALLY POLLS NOW. The search view ran a tip rotator and an
+     elapsed counter and never once asked the server what had happened.
+     /queue/:id/status existed and nothing called it, so a match could
+     complete and the page would sit there counting seconds at you.
+     ══════════════════════════════════════════════════════════════════ -->
+<style>
+/* ═══ MARQUEE ═════════════════════════════════════════════════════ */
+#queueOverlay .q-hero{
+  position:relative; overflow:hidden;
+  min-height:290px;
+  display:flex; flex-direction:column; justify-content:flex-end;
+  padding:36px 46px 30px !important;
+  border-bottom:1px solid rgba(255,255,255,.07);
+}
+#qMarqArt{
+  position:absolute; inset:0; z-index:0;
+  background-size:cover; background-position:center 28%;
+  transition:background-image .55s ease, opacity .55s ease;
+  opacity:0;
+}
+#qMarqArt.on{ opacity:1; }
+#qMarqArt::after{
+  content:''; position:absolute; inset:0;
+  background:
+    linear-gradient(92deg, rgba(7,8,13,.96) 0%, rgba(7,8,13,.78) 40%, rgba(7,8,13,.2) 76%, transparent 100%),
+    linear-gradient(180deg, rgba(7,8,13,.5) 0%, transparent 34%, rgba(7,8,13,.9) 100%);
+}
+#queueOverlay .q-hero > *:not(#qMarqArt){ position:relative; z-index:1; }
+#queueOverlay .q-hero-title{ margin:0 0 8px !important; }
+
+#qMarqMeta{
+  display:flex; align-items:center; gap:0; flex-wrap:wrap;
+  margin-top:18px;
+}
+.qmq-stat{
+  padding-right:22px; margin-right:22px;
+  border-right:1px solid rgba(255,255,255,.14);
+}
+.qmq-stat:last-child{ border-right:0; margin-right:0; padding-right:0; }
+.qmq-stat b{
+  display:block;
+  font-family:'JetBrains Mono', ui-monospace, monospace;
+  font-size:21px; font-weight:800; color:#fff; line-height:1;
+  font-variant-numeric:tabular-nums;
+}
+.qmq-stat span{
+  display:block; margin-top:6px;
+  font-family:'JetBrains Mono', ui-monospace, monospace;
+  font-size:9px; font-weight:700; letter-spacing:1.6px; text-transform:uppercase;
+  color:var(--text-3);
+}
+#qMarqNow{
+  font-family:'Archivo', var(--font), sans-serif;
+  font-size:15px; font-weight:800; color:#fff; letter-spacing:.3px;
+  margin-bottom:3px;
+}
+#qMarqNow small{
+  display:block; margin-bottom:6px;
+  font-family:'JetBrains Mono', ui-monospace, monospace;
+  font-size:9.5px; font-weight:700; letter-spacing:2px; text-transform:uppercase;
+  color:color-mix(in srgb, var(--hub-accent) 70%, white);
+}
+
+/* ═══ DECK ════════════════════════════════════════════════════════ */
+#qDeck{ position:relative; height:400px; margin:26px 0 0; }
+#qDeckTrack{ position:relative; height:100%; }
+.qd-card{
+  position:absolute; top:0; left:50%;
+  width:252px; height:378px; margin-left:-126px;
+  border-radius:16px; overflow:hidden; cursor:pointer;
+  background:#12151f;
+  border:1px solid rgba(255,255,255,.09);
+  box-shadow:0 26px 60px -18px rgba(0,0,0,.85);
+  transform-origin:center center;
+  transform:translateX(var(--qd-x,0)) scale(var(--qd-s,1));
+  filter:brightness(var(--qd-b,1)) saturate(var(--qd-sat,1));
+  opacity:var(--qd-o,1);
+  transition:transform .5s cubic-bezier(.22,1,.36,1),
+             filter .42s ease, opacity .42s ease,
+             box-shadow .42s ease, border-color .42s ease;
+  will-change:transform;
+  backface-visibility:hidden;
+}
+.qd-art{
+  position:absolute; inset:0;
+  background-size:cover; background-position:center; background-color:#161a26;
+}
+.qd-fb{
+  position:absolute; inset:0; display:flex; align-items:center; justify-content:center;
+  font-family:'Archivo', var(--font), sans-serif;
+  font-size:44px; font-weight:900; color:rgba(255,255,255,.14);
+}
+.qd-cap{
+  position:absolute; left:0; right:0; bottom:0; padding:16px 16px 14px;
+  background:linear-gradient(180deg, transparent, rgba(6,8,13,.96));
+}
+.qd-nm{
+  font-family:'Archivo', var(--font), sans-serif;
+  font-size:15px; font-weight:800; color:#fff; line-height:1.2;
+  display:-webkit-box; -webkit-line-clamp:2; line-clamp:2;
+  -webkit-box-orient:vertical; overflow:hidden;
+}
+.qd-hr{
+  font-family:'JetBrains Mono', ui-monospace, monospace;
+  font-size:9.5px; font-weight:700; letter-spacing:1.2px; text-transform:uppercase;
+  color:rgba(255,255,255,.62); margin-top:5px;
+}
+.qd-card.on{
+  cursor:default;
+  border-color:rgba(255,255,255,.34);
+  box-shadow:0 0 0 1px color-mix(in srgb, var(--hub-accent) 55%, transparent),
+             0 40px 90px -20px rgba(0,0,0,.95),
+             0 0 60px color-mix(in srgb, var(--hub-accent) 22%, transparent);
+}
+.qd-nav{
+  position:absolute; top:50%; transform:translateY(-50%); z-index:40;
+  width:44px; height:44px; border-radius:50%;
+  display:flex; align-items:center; justify-content:center;
+  border:1px solid rgba(255,255,255,.14);
+  background:rgba(10,13,18,.7); backdrop-filter:blur(12px);
+  color:#fff; cursor:pointer; font-size:19px; line-height:1;
+  transition:background .2s ease, transform .2s ease;
+}
+.qd-nav:hover{ background:var(--hub-accent); color:#0d0320; transform:translateY(-50%) scale(1.08); }
+.qd-nav.p{ left:26px; } .qd-nav.n{ right:26px; }
+#qDeckDots{ display:flex; justify-content:center; gap:7px; margin-top:20px; }
+#qDeckDots i{
+  width:7px; height:7px; border-radius:99px; cursor:pointer;
+  background:rgba(255,255,255,.2); transition:width .28s ease, background .28s ease;
+}
+#qDeckDots i.on{
+  width:26px; background:var(--hub-accent);
+  box-shadow:0 0 12px color-mix(in srgb, var(--hub-accent) 60%, transparent);
+}
+/* The old flat rail and the picked banner are what the deck replaces. */
+#queueOverlay .ql-rail, #queueOverlay #qPickedHost{ display:none !important; }
+
+/* ═══ TABLE ═══════════════════════════════════════════════════════ */
+#queueOverlay .q-search-orb,
+#queueOverlay #qSearchTitle,
+#queueOverlay #qSearchMeta,
+#queueOverlay #qViewSearching > .q-actions{ display:none !important; }
+#queueOverlay #qViewSearching{
+  display:flex; flex-direction:column; align-items:center; justify-content:center;
+  padding:40px 32px !important;
+}
+#qTable{
+  display:grid; grid-template-columns:296px 1fr; gap:34px;
+  width:100%; max-width:1120px; align-items:center;
+}
+#qTableSide{ display:flex; flex-direction:column; gap:0; }
+.qt-label{
+  font-family:'JetBrains Mono', ui-monospace, monospace;
+  font-size:9px; font-weight:700; letter-spacing:1.9px; text-transform:uppercase;
+  color:var(--text-3); margin:22px 0 9px;
+}
+.qt-label:first-child{ margin-top:0; }
+#qTableArt{
+  width:100%; border-radius:14px; overflow:hidden;
+  border:1px solid rgba(255,255,255,.1);
+  aspect-ratio:2/3; background-size:cover; background-position:center;
+  background-color:#161a26;
+  box-shadow:0 20px 46px -14px rgba(0,0,0,.8);
+}
+.qt-win{ font-size:14.5px; color:#fff; font-weight:600; }
+.qt-track{
+  height:5px; border-radius:99px; margin-top:11px;
+  background:rgba(255,255,255,.08); overflow:hidden;
+}
+.qt-track i{
+  display:block; height:100%; border-radius:99px;
+  background:linear-gradient(90deg,
+    color-mix(in srgb, var(--hub-accent) 70%, white), var(--hub-accent));
+  transition:width .9s linear;
+}
+.qt-next{
+  font-family:'JetBrains Mono', ui-monospace, monospace;
+  font-size:10px; font-weight:700; letter-spacing:1.2px; text-transform:uppercase;
+  color:var(--text-3); margin-top:10px;
+}
+
+#qSeatsWrap{ display:flex; flex-direction:column; align-items:center; }
+#qSeats{ position:relative; width:440px; height:440px; }
+.qt-seat{
+  position:absolute; width:94px; height:94px; margin:-47px 0 0 -47px;
+  border-radius:50%;
+  display:flex; align-items:center; justify-content:center;
+  overflow:hidden;
+  font-family:'JetBrains Mono', ui-monospace, monospace;
+  font-size:9px; font-weight:700; letter-spacing:1.2px; text-transform:uppercase;
+  color:var(--text-3);
+  border:1.5px dashed rgba(255,255,255,.18);
+  transition:border-color .4s ease, transform .5s cubic-bezier(.22,1,.36,1),
+             box-shadow .4s ease, background .4s ease;
+}
+.qt-seat.filled{
+  border:2px solid rgba(255,255,255,.24);
+  background:linear-gradient(135deg,#3a4a6b,#1a2030);
+  box-shadow:0 14px 34px rgba(0,0,0,.62);
+  color:#fff; font-family:'Archivo', var(--font), sans-serif;
+  font-size:24px; font-weight:900; letter-spacing:0;
+  animation:qSeatIn .5s cubic-bezier(.22,1,.36,1);
+}
+.qt-seat.filled img{ width:100%; height:100%; object-fit:cover; }
+.qt-seat.you{
+  border-color:var(--hub-accent);
+  box-shadow:0 0 0 2px color-mix(in srgb, var(--hub-accent) 45%, transparent),
+             0 14px 34px rgba(0,0,0,.62);
+}
+@keyframes qSeatIn{ from{ transform:scale(.72); opacity:0; } }
+.qt-name{
+  position:absolute; left:50%; transform:translateX(-50%);
+  top:100px; white-space:nowrap;
+  font-family:'JetBrains Mono', ui-monospace, monospace;
+  font-size:9.5px; font-weight:700; letter-spacing:1.2px;
+  color:var(--text-2);
+}
+#qTableCore{
+  position:absolute; left:50%; top:50%; transform:translate(-50%,-50%);
+  width:200px; height:200px; border-radius:50%;
+  display:flex; flex-direction:column; align-items:center; justify-content:center;
+  background:radial-gradient(circle at 50% 34%,
+    color-mix(in srgb, var(--hub-accent) 24%, transparent), rgba(10,12,20,.92) 70%);
+  border:1px solid rgba(255,255,255,.1);
+}
+#qTableCore b{
+  font-family:'JetBrains Mono', ui-monospace, monospace;
+  font-size:32px; font-weight:800; color:#fff; line-height:1;
+  font-variant-numeric:tabular-nums;
+}
+#qTableCore span{
+  font-family:'JetBrains Mono', ui-monospace, monospace;
+  font-size:9px; font-weight:700; letter-spacing:1.9px; text-transform:uppercase;
+  color:var(--text-3); margin-top:9px;
+}
+.qt-ring{
+  position:absolute; inset:0; border-radius:50%; pointer-events:none;
+  border:1px solid color-mix(in srgb, var(--hub-accent) 30%, transparent);
+  animation:qRing 2.8s ease-out infinite;
+}
+.qt-ring.b{ animation-delay:1.4s; }
+@keyframes qRing{
+  0%{ transform:scale(.8); opacity:.85; }
+  100%{ transform:scale(1.08); opacity:0; }
+}
+#qTableActions{ display:flex; gap:11px; margin-top:32px; }
+
+@media (max-width:1080px){
+  #qTable{ grid-template-columns:1fr; gap:24px; }
+  #qTableSide{ order:2; }
+  #qSeats{ width:360px; height:360px; }
+  .qt-seat{ width:78px; height:78px; margin:-39px 0 0 -39px; }
+}
+@media (prefers-reduced-motion: reduce){
+  .qt-ring{ animation:none; opacity:.35; }
+  .qt-seat.filled{ animation:none; }
+  .qd-card{ transition:none; }
+}
+</style>
+<script>
+(function () {
+  'use strict';
+
+  function esc(v){
+    return String(v == null ? '' : v)
+      .replace(/&/g,'&amp;').replace(/</g,'&lt;')
+      .replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+  }
+  function cssUrl(u){
+    return u ? "url('" + String(u).replace(/\\/g,'%5C').replace(/'/g,'%27') + "')" : '';
+  }
+  function state(){
+    try { if (typeof _qState !== 'undefined') return _qState; } catch (e){}
+    return null;
+  }
+  function games(){
+    try { if (typeof GT_GAMES !== 'undefined') return GT_GAMES; } catch (e){}
+    return [];
+  }
+
+  /* The library that #qLib already loaded. Read back off the rail rather
+     than fetched again — same data, one request. */
+  function library(){
+    var out = [];
+    document.querySelectorAll('#qLib .ql-rail .ql-card').forEach(function (c){
+      var art = c.querySelector('.ql-art');
+      var bg = art ? art.style.backgroundImage : '';
+      out.push({
+        id: (c.getAttribute('onclick') || '').replace(/.*qPickGame\(['"]?([^'")]*)['"]?\).*/, '$1'),
+        name: (c.querySelector('.ql-name') || {}).textContent || '',
+        hrs:  (c.querySelector('.ql-hrs')  || {}).textContent || '',
+        art:  bg && bg !== 'none' ? bg.replace(/^url\(['"]?/, '').replace(/['"]?\)$/, '') : '',
+      });
+    });
+    return out;
+  }
+  function heroFor(id){
+    var g = games().find(function (x){ return x.id === id; });
+    return g ? (g.heroHi || g.header || g.cover || '') : '';
+  }
+
+  /* ── Marquee ─────────────────────────────────────────────────── */
+  function marquee(){
+    var hero = document.querySelector('#queueOverlay .q-hero');
+    if (!hero) return;
+    if (!document.getElementById('qMarqArt')){
+      var art = document.createElement('div');
+      art.id = 'qMarqArt';
+      art.setAttribute('aria-hidden', 'true');
+      hero.insertBefore(art, hero.firstChild);
+      var meta = document.createElement('div');
+      meta.id = 'qMarqMeta';
+      hero.appendChild(meta);
+    }
+    paintMarquee();
+  }
+
+  function paintMarquee(){
+    var s = state();
+    var art = document.getElementById('qMarqArt');
+    var meta = document.getElementById('qMarqMeta');
+    if (!art || !meta || !s) return;
+
+    var sel = s.game || '';
+    var lib = library();
+    var entry = lib.find(function (g){ return g.id === sel; });
+    var h = sel && sel.indexOf('pl:') !== 0 ? heroFor(sel) : '';
+    if (!h && entry) h = entry.art;
+
+    if (h){
+      art.style.backgroundImage = cssUrl(h);
+      art.classList.add('on');
+    } else {
+      art.classList.remove('on');
+    }
+
+    if (!sel || sel.indexOf('pl:') === 0){
+      meta.innerHTML = '<div id="qMarqNow"><small>Nothing picked yet</small>' +
+        'Scroll down and choose a game</div>';
+      return;
+    }
+
+    var name = entry ? entry.name : (games().find(function (x){ return x.id === sel; }) || {}).name || sel;
+    var hrs = entry && entry.hrs ? entry.hrs : '';
+    meta.innerHTML =
+      '<div class="qmq-stat" style="border-right:0;padding-right:26px;margin-right:26px;' +
+        'border-right:1px solid rgba(255,255,255,.14)">' +
+        '<div id="qMarqNow"><small>Queueing for</small>' + esc(name) + '</div></div>' +
+      (hrs ? '<div class="qmq-stat"><b>' + esc(hrs.replace(/\s.*$/, '')) + '</b>' +
+             '<span>' + esc(hrs.replace(/^\S+\s/, '')) + '</span></div>' : '') +
+      '<div class="qmq-stat"><b>' + (s.players || 2) + '</b><span>Players</span></div>' +
+      '<div class="qmq-stat"><b>' + String(s.skill || 'plat').toUpperCase() + '</b><span>Rank</span></div>';
+  }
+
+  /* ── Deck ────────────────────────────────────────────────────── */
+  var deckIdx = 0;
+  var STEP = 224, STEP2 = 392;
+
+  function buildDeck(){
+    var lib = library();
+    var host = document.getElementById('qLib');
+    if (!host || !lib.length) return;
+
+    var deck = document.getElementById('qDeck');
+    if (!deck){
+      deck = document.createElement('div');
+      deck.id = 'qDeck';
+      deck.innerHTML =
+        '<button class="qd-nav p" onclick="window.qDeckStep(-1)" aria-label="Previous">‹</button>' +
+        '<div id="qDeckTrack"></div>' +
+        '<button class="qd-nav n" onclick="window.qDeckStep(1)" aria-label="Next">›</button>';
+      var dots = document.createElement('div');
+      dots.id = 'qDeckDots';
+      var rail = host.querySelector('.ql-rail');
+      var anchor = rail ? rail.parentNode : null;
+      if (anchor && anchor.parentNode){
+        anchor.parentNode.insertBefore(deck, anchor.nextSibling);
+        anchor.parentNode.insertBefore(dots, deck.nextSibling);
+      } else {
+        host.appendChild(deck); host.appendChild(dots);
+      }
+    }
+
+    var track = document.getElementById('qDeckTrack');
+    var sig = lib.map(function (g){ return g.id; }).join('|');
+    if (track.__sig !== sig){
+      track.__sig = sig;
+      track.innerHTML = lib.map(function (g, i){
+        return '<div class="qd-card" data-i="' + i + '" data-id="' + esc(g.id) + '">' +
+          '<div class="qd-art" style="' + (g.art ? 'background-image:' + cssUrl(g.art) : '') + '">' +
+            (g.art ? '' : '<div class="qd-fb">' + esc(g.name.charAt(0).toUpperCase()) + '</div>') +
+          '</div>' +
+          '<div class="qd-cap"><div class="qd-nm">' + esc(g.name) + '</div>' +
+          (g.hrs ? '<div class="qd-hr">' + esc(g.hrs) + '</div>' : '') + '</div>' +
+        '</div>';
+      }).join('');
+      /* Keep the deck on whatever is already selected, so returning to
+         the page does not silently move the choice. */
+      var s = state();
+      var at = s ? lib.findIndex(function (g){ return g.id === s.game; }) : -1;
+      deckIdx = at >= 0 ? at : 0;
+    }
+    applyDeck();
+  }
+
+  function applyDeck(){
+    var track = document.getElementById('qDeckTrack');
+    if (!track) return;
+    var cards = Array.prototype.slice.call(track.children);
+    var n = cards.length;
+    if (!n) return;
+    deckIdx = ((deckIdx % n) + n) % n;
+
+    cards.forEach(function (c, i){
+      var off = i - deckIdx;
+      if (off >  n/2) off -= n;
+      if (off < -n/2) off += n;
+      var a = Math.abs(off), st = c.style;
+      c.classList.toggle('on', off === 0);
+      if (a === 0){
+        st.setProperty('--qd-x','0px');  st.setProperty('--qd-s','1');
+        st.setProperty('--qd-b','1');    st.setProperty('--qd-sat','1');
+        st.setProperty('--qd-o','1');    st.zIndex = 30;
+      } else if (a === 1){
+        /* Depth by dimming, never opacity — a see-through card lets the
+           one behind it read straight through and the stack melts. */
+        st.setProperty('--qd-x',(off*STEP)+'px'); st.setProperty('--qd-s','.84');
+        st.setProperty('--qd-b','.62');  st.setProperty('--qd-sat','.7');
+        st.setProperty('--qd-o','1');    st.zIndex = 20;
+      } else if (a === 2){
+        st.setProperty('--qd-x',(off/a*STEP2)+'px'); st.setProperty('--qd-s','.7');
+        st.setProperty('--qd-b','.44');  st.setProperty('--qd-sat','.5');
+        st.setProperty('--qd-o','1');    st.zIndex = 10;
+      } else {
+        st.setProperty('--qd-x',(off>0 ? STEP2+220 : -(STEP2+220))+'px');
+        st.setProperty('--qd-s','.62');  st.setProperty('--qd-o','0');
+        st.zIndex = 1;
+      }
+      c.onclick = (off === 0) ? null : function (){ deckIdx = i; commitDeck(); };
+    });
+
+    var dots = document.getElementById('qDeckDots');
+    if (dots){
+      dots.innerHTML = cards.map(function (_, i){
+        return '<i class="' + (i === deckIdx ? 'on' : '') + '" onclick="window.qDeckGoto(' + i + ')"></i>';
+      }).join('');
+    }
+  }
+
+  /* Stepping the deck IS choosing — the front card is the selection, so
+     there is no separate confirm. */
+  function commitDeck(){
+    var track = document.getElementById('qDeckTrack');
+    if (!track) return;
+    var card = track.children[deckIdx];
+    if (!card) return;
+    var id = card.getAttribute('data-id');
+    applyDeck();
+    if (id && typeof window.qPickGame === 'function') window.qPickGame(id);
+    paintMarquee();
+  }
+
+  window.qDeckStep = function (d){
+    var track = document.getElementById('qDeckTrack');
+    var n = track ? track.children.length : 0;
+    if (!n) return;
+    deckIdx = (deckIdx + d + n) % n;
+    commitDeck();
+  };
+  window.qDeckGoto = function (i){ deckIdx = i; commitDeck(); };
+
+  /* ── Table ───────────────────────────────────────────────────── */
+  var pollTimer = null, tickTimer = null;
+
+  var WIN = [
+    { at:0,   label:'Exact rank only',      next:30  },
+    { at:30,  label:'One rank either way',  next:90  },
+    { at:90,  label:'Two ranks either way', next:180 },
+    { at:180, label:'Any rank at all',      next:null },
+  ];
+
+  function buildTable(){
+    var view = document.getElementById('qViewSearching');
+    if (!view || document.getElementById('qTable')) return;
+    var t = document.createElement('div');
+    t.id = 'qTable';
+    t.innerHTML =
+      '<div id="qTableSide">' +
+        '<div class="qt-label">Queueing for</div>' +
+        '<div id="qTableArt"></div>' +
+        '<div class="qt-label">Matching window</div>' +
+        '<div class="qt-win" id="qtWin">Exact rank only</div>' +
+        '<div class="qt-track"><i id="qtBar" style="width:0%"></i></div>' +
+        '<div class="qt-next" id="qtNext">—</div>' +
+      '</div>' +
+      '<div id="qSeatsWrap">' +
+        '<div id="qSeats">' +
+          '<div id="qTableCore">' +
+            '<div class="qt-ring"></div><div class="qt-ring b"></div>' +
+            '<b id="qtCount">1/2</b><span id="qtState">Forming</span>' +
+          '</div>' +
+        '</div>' +
+        '<div id="qTableActions">' +
+          '<button class="q-cta-secondary" onclick="window.qBackToSetup()">Edit</button>' +
+          '<button class="q-cta-danger" onclick="window.qCancelSearch()">Leave table</button>' +
+        '</div>' +
+      '</div>';
+    view.appendChild(t);
+  }
+
+  function seatPositions(count){
+    var out = [], R = 172, C = 220;
+    for (var i = 0; i < count; i++){
+      var ang = (-90 + i * (360 / count)) * Math.PI / 180;
+      out.push({ x: C + Math.cos(ang) * R, y: C + Math.sin(ang) * R });
+    }
+    return out;
+  }
+
+  function renderSeats(members){
+    var host = document.getElementById('qSeats');
+    var s = state();
+    if (!host || !s) return;
+    var size = Math.max(2, s.players || 2);
+    var pos = seatPositions(size);
+
+    /* Seat zero is you, and it is filled the instant the table exists —
+       that is the entire point. Everyone else appears as they arrive. */
+    var me = null;
+    try { me = (typeof window.me === 'object' && window.me) ? window.me : null; } catch (e){}
+    var seats = [];
+    for (var i = 0; i < size; i++){
+      var m = members[i] || null;
+      if (i === 0 && !m){
+        m = { username: (me && (me.display_name || me.username)) || 'You',
+              avatar_url: me && me.avatar_url, __me:true };
+      }
+      seats.push(m);
+    }
+
+    host.querySelectorAll('.qt-seat, .qt-name').forEach(function (n){ n.remove(); });
+    seats.forEach(function (m, i){
+      var el = document.createElement('div');
+      el.className = 'qt-seat' + (m ? ' filled' : '') + (i === 0 ? ' you' : '');
+      el.style.left = pos[i].x + 'px';
+      el.style.top  = pos[i].y + 'px';
+      if (m){
+        el.innerHTML = m.avatar_url
+          ? '<img src="' + esc(m.avatar_url) + '" alt="">'
+          : esc(String(m.username || '?').trim().charAt(0).toUpperCase());
+      } else {
+        el.textContent = 'Open';
+      }
+      host.appendChild(el);
+
+      var nm = document.createElement('div');
+      nm.className = 'qt-name';
+      nm.style.left = pos[i].x + 'px';
+      nm.style.top  = (pos[i].y + 52) + 'px';
+      nm.textContent = m ? (m.__me ? 'You' : (m.username || 'Player')) : '';
+      host.appendChild(nm);
+    });
+
+    var filled = seats.filter(Boolean).length;
+    var cnt = document.getElementById('qtCount');
+    var stt = document.getElementById('qtState');
+    if (cnt) cnt.textContent = filled + '/' + size;
+    if (stt) stt.textContent = filled >= size ? 'Ready' : 'Forming';
+  }
+
+  function tick(){
+    var s = state();
+    if (!s || !s.searchStarted) return;
+    var sec = Math.floor((Date.now() - s.searchStarted) / 1000);
+    var cur = WIN[0];
+    for (var i = 0; i < WIN.length; i++) if (sec >= WIN[i].at) cur = WIN[i];
+    var pct, next;
+    if (cur.next == null){ pct = 100; next = 'Taking anyone who arrives'; }
+    else {
+      pct = Math.min(100, Math.round(((sec - cur.at) / (cur.next - cur.at)) * 100));
+      next = 'Widens again in ' + Math.max(0, cur.next - sec) + 's';
+    }
+    var w = document.getElementById('qtWin');
+    var b = document.getElementById('qtBar');
+    var nx = document.getElementById('qtNext');
+    if (w) w.textContent = cur.label;
+    if (b) b.style.width = pct + '%';
+    if (nx) nx.textContent = next;
+  }
+
+  /* The search screen never asked the server anything. /queue/:id/status
+     existed and nothing called it, so a completed match would sit there
+     while the page counted seconds. */
+  async function poll(){
+    var s = state();
+    if (!s || !s.queueId) return;
+    var r = await window.api('/queue/' + s.queueId + '/status').catch(function (){ return null; });
+    if (!r) return;
+    renderSeats(r.members || []);
+    if (r.state === 'matched'){
+      clearInterval(pollTimer); pollTimer = null;
+      clearInterval(tickTimer); tickTimer = null;
+      /* _qOnMatched is what the websocket "queue-matched" push already
+         calls: it sets the roster, switches the view, names the game and
+         starts the three-hour timer. Reaching the same entry point from
+         the poll means a match looks identical whether the socket
+         delivered it or we noticed it ourselves. */
+      if (typeof window._qOnMatched === 'function') window._qOnMatched(r);
+    }
+  }
+
+  function enterTable(){
+    buildTable();
+    var s = state();
+    var art = document.getElementById('qTableArt');
+    if (art && s){
+      var lib = library();
+      var e = lib.find(function (g){ return g.id === s.game; });
+      var a = e ? e.art : '';
+      art.style.backgroundImage = a ? cssUrl(a) : '';
+    }
+    renderSeats([]);
+    tick();
+    clearInterval(pollTimer); clearInterval(tickTimer);
+    pollTimer = setInterval(poll, 2500);
+    tickTimer = setInterval(tick, 1000);
+    poll();
+  }
+
+  function stopTable(){
+    clearInterval(pollTimer); pollTimer = null;
+    clearInterval(tickTimer); tickTimer = null;
+  }
+
+  /* ── Wire in ─────────────────────────────────────────────────── */
+  function start(){
+    if (typeof window.api !== 'function'){ setTimeout(start, 300); return; }
+
+    var origOpen = window.openQueuePanel;
+    if (typeof origOpen === 'function' && !origOpen.__mq){
+      var w = function (){
+        var out = origOpen.apply(this, arguments);
+        setTimeout(function (){ marquee(); buildDeck(); }, 40);
+        /* The library arrives a moment after open. */
+        setTimeout(function (){ buildDeck(); paintMarquee(); }, 700);
+        return out;
+      };
+      w.__mq = true;
+      window.openQueuePanel = w;
+    }
+
+    /* Selecting from search, the deck or a pool all repaint the top. */
+    ['qPickGame','qStep','_qSelectSkill'].forEach(function (fn){
+      var orig = window[fn];
+      if (typeof orig !== 'function' || orig.__mq) return;
+      var wrapped = function (){
+        var r = orig.apply(this, arguments);
+        paintMarquee();
+        return r;
+      };
+      wrapped.__mq = true;
+      window[fn] = wrapped;
+    });
+
+    var origBegin = window.qBeginSearch;
+    if (typeof origBegin === 'function' && !origBegin.__mq){
+      var wb = async function (){
+        var r = await origBegin.apply(this, arguments);
+        setTimeout(enterTable, 0);
+        return r;
+      };
+      wb.__mq = true;
+      window.qBeginSearch = wb;
+    }
+
+    ['qCancelSearch','qBackToSetup','closeQueuePanel'].forEach(function (fn){
+      var orig = window[fn];
+      if (typeof orig !== 'function' || orig.__mq) return;
+      var wrapped = function (){ stopTable(); return orig.apply(this, arguments); };
+      wrapped.__mq = true;
+      window[fn] = wrapped;
+    });
+  }
+
+  if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', start);
+  else start();
+})();
+</script>
+
 </body>
 </html>
