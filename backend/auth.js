@@ -2916,6 +2916,45 @@ app.delete("/steam/unlink", requireAuth, async (req, res) => {
 // Cached for six hours. The call runs once per game per request and
 // store art changes about never.
 const STEAM_ASSET_HOST = "https://shared.akamai.steamstatic.com/store_item_assets/";
+// How many recently played titles to ask Steam for.
+//
+// This was 10, and Steam sorts the list by playtime in the last two
+// weeks. A player with eleven recent titles therefore lost the
+// eleventh -- and because the tail of that list is everything with 0h
+// this fortnight, what fell off was the back catalogue: exactly where
+// a 100%-completed game with 2800 hours on it lives. The card simply
+// stopped appearing, with nothing to indicate it had been cut.
+//
+// 24 because the list is inherently bounded -- it is two weeks of
+// activity, not a library -- so this is a ceiling almost nobody
+// reaches rather than a page size. Each title costs two more Steam
+// calls for its achievement schema and progress, which is what the
+// cache below is for.
+const RECENT_COUNT = 24;
+
+// Recently-played responses, briefly. Raising the count above doubled
+// the fan-out per request -- 24 titles is up to 48 achievement calls --
+// and the front page asks for this on every open. Two-week playtime
+// does not move minute to minute, so a short TTL costs the reader
+// nothing and takes the repeat loads off Steam entirely.
+const _steamRecentCache = new Map();
+const RECENT_TTL_MS = 3 * 60 * 1000;
+function _recentCached(key) {
+  const hit = _steamRecentCache.get(key);
+  if (hit && Date.now() - hit.at < RECENT_TTL_MS) return hit.data;
+  if (hit) _steamRecentCache.delete(key);
+  return null;
+}
+function _recentStore(key, data) {
+  _steamRecentCache.set(key, { data, at: Date.now() });
+  // Bounded so a long-lived process cannot accumulate one entry per
+  // account that has ever loaded the page.
+  if (_steamRecentCache.size > 500) {
+    const oldest = _steamRecentCache.keys().next().value;
+    _steamRecentCache.delete(oldest);
+  }
+}
+
 const _steamArtCache = new Map();
 const STEAM_ART_TTL = 6 * 60 * 60 * 1000;
 
@@ -3031,10 +3070,17 @@ app.get("/steam/recent", requireAuth, async (req, res) => {
   const steam_id = userRow.rows[0]?.steam_id;
   if (!steam_id) return res.json([]);
   if (!STEAM_KEY) return res.status(503).json({ error: "Steam API key not configured" });
+
+  // Keyed by steam_id, not by our user id: two accounts linked to the
+  // same Steam profile have the same answer, and the profile view asks
+  // this about other people.
+  const cached = _recentCached(steam_id);
+  if (cached) return res.json(cached);
+
   try {
     // Fetch recently played games
     const gamesRes = await fetch(
-      `https://api.steampowered.com/IPlayerService/GetRecentlyPlayedGames/v1/?key=${STEAM_KEY}&steamid=${steam_id}&count=10`
+      `https://api.steampowered.com/IPlayerService/GetRecentlyPlayedGames/v1/?key=${STEAM_KEY}&steamid=${steam_id}&count=${RECENT_COUNT}`
     );
     const gamesData = await gamesRes.json();
     const games = gamesData?.response?.games || [];
@@ -3100,6 +3146,7 @@ app.get("/steam/recent", requireAuth, async (req, res) => {
       };
     }));
 
+    _recentStore(steam_id, enriched);
     res.json(enriched);
   } catch (err) {
     console.error("[steam/recent]", err);
@@ -3114,10 +3161,17 @@ app.get("/steam/recent/:userId", requireAuth, async (req, res) => {
   const steam_id = userRow.rows[0]?.steam_id;
   if (!steam_id) return res.json([]);
   if (!STEAM_KEY) return res.status(503).json({ error: "Steam API key not configured" });
+
+  // Keyed by steam_id, not by our user id: two accounts linked to the
+  // same Steam profile have the same answer, and the profile view asks
+  // this about other people.
+  const cached = _recentCached(steam_id);
+  if (cached) return res.json(cached);
+
   try {
     // Fetch recently played games
     const gamesRes = await fetch(
-      `https://api.steampowered.com/IPlayerService/GetRecentlyPlayedGames/v1/?key=${STEAM_KEY}&steamid=${steam_id}&count=10`
+      `https://api.steampowered.com/IPlayerService/GetRecentlyPlayedGames/v1/?key=${STEAM_KEY}&steamid=${steam_id}&count=${RECENT_COUNT}`
     );
     const gamesData = await gamesRes.json();
     const games = gamesData?.response?.games || [];
@@ -3183,6 +3237,7 @@ app.get("/steam/recent/:userId", requireAuth, async (req, res) => {
       };
     }));
 
+    _recentStore(steam_id, enriched);
     res.json(enriched);
   } catch (err) {
     console.error("[steam/recent/:userId]", err);
