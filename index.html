@@ -64796,8 +64796,9 @@ async function reactComment(ev, id, btn){
 }
 .qp-c.cold{ color:var(--text-3); }
 
-/* The old step-1 card is replaced by the library above it. */
-#queueOverlay .q-body-setup > .q-step-card:first-of-type{ display:none !important; }
+/* Superseded: :first-of-type matches by element TYPE, so this stopped
+   matching the moment anything was inserted before the card. The card is
+   now hidden by what it contains -- see .q-dup-picker below. */
 #queueOverlay.q-exact-closed .q-body-setup > .q-step-card{ display:block !important; }
 #qExactToggle{ display:none !important; }
 
@@ -65213,6 +65214,233 @@ async function reactComment(ev, id, btn){
       w.__v2 = true;
       window[fn] = w;
     });
+  }
+
+  if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', start);
+  else start();
+})();
+</script>
+
+
+<!-- ══════════════════════════════════════════════════════════════════
+     QUEUE — HOW IT WORKS, AND A RAIL THAT IS ONLY SETTINGS
+
+     Three faults from moving the form into a rail, all of them mine.
+
+     THE OLD GAME PICKER CAME WITH IT. Step one's card was supposed to be
+     hidden and was not: the rule used :first-of-type, which matches by
+     element TYPE, not by class -- so it stopped matching the moment
+     anything else was inserted before it. The rail ended up holding a
+     second, worse copy of the picker that the main column already does
+     properly. It is hidden by what it CONTAINS now, which cannot drift.
+
+     THE ORIGINAL ACTION BAR STAYED BEHIND. .q-actions is a sibling of
+     the step cards, not one of them, so it did not travel with them --
+     and because the two-column grid was appended after it, Cancel and
+     Start Searching ended up floating above the whole page. There is one
+     commit button now, at the foot of the rail.
+
+     NOBODY IS TOLD HOW THIS WORKS. Queue does something no other page
+     does -- it goes and finds strangers, puts them in a call, and holds
+     them for three hours -- and the page opened straight into a form. It
+     now opens on what is about to happen, in three steps, with the rules
+     stated up front rather than as a warning strip nobody reads: no
+     camera, screen share fine, three-hour cap, convert to a lobby to
+     keep the people.
+     ══════════════════════════════════════════════════════════════════ -->
+<style>
+/* ═══ How it works ════════════════════════════════════════════════ */
+#qHow{ margin:0 0 34px; }
+.qhow-row{
+  display:grid; grid-template-columns:repeat(3, minmax(0,1fr));
+  gap:0; border-radius:16px; overflow:hidden;
+  background:linear-gradient(160deg, rgba(255,255,255,.035), rgba(255,255,255,.012));
+  border:1px solid rgba(255,255,255,.08);
+}
+.qhow{
+  position:relative;
+  display:flex; align-items:flex-start; gap:15px;
+  padding:20px 24px;
+}
+.qhow + .qhow{ border-left:1px solid rgba(255,255,255,.07); }
+/* The chevron sits ON the seam, so the three read as a sequence rather
+   than as three unrelated boxes in a row. */
+.qhow + .qhow::before{
+  content:''; position:absolute; left:-7px; top:50%;
+  width:13px; height:13px; transform:translateY(-50%) rotate(45deg);
+  background:#12141d;
+  border-top:1px solid rgba(255,255,255,.07);
+  border-right:1px solid rgba(255,255,255,.07);
+}
+.qhow-ico{
+  flex:0 0 auto; width:42px; height:42px; border-radius:12px;
+  display:flex; align-items:center; justify-content:center;
+  color:color-mix(in srgb, var(--hub-accent) 90%, white);
+  background:color-mix(in srgb, var(--hub-accent) 13%, transparent);
+  border:1px solid color-mix(in srgb, var(--hub-accent) 30%, transparent);
+}
+.qhow-ico svg{ width:20px; height:20px; }
+.qhow-n{
+  position:absolute; top:14px; right:16px;
+  font-family:'JetBrains Mono', ui-monospace, monospace;
+  font-size:10px; font-weight:800; letter-spacing:1.4px;
+  color:rgba(255,255,255,.16);
+}
+.qhow-t{
+  font-family:'Archivo', var(--font), sans-serif;
+  font-size:14.5px; font-weight:800; color:#fff; letter-spacing:.2px;
+}
+.qhow-s{ font-size:12.5px; color:var(--text-3); margin-top:5px; line-height:1.5; }
+
+.qhow-rules{
+  display:flex; align-items:center; gap:9px; flex-wrap:wrap;
+  margin-top:10px; padding:11px 16px; border-radius:12px;
+  background:rgba(255,255,255,.022);
+  border:1px solid rgba(255,255,255,.07);
+}
+.qrule{
+  display:inline-flex; align-items:center; gap:7px;
+  font-family:'JetBrains Mono', ui-monospace, monospace;
+  font-size:9.5px; font-weight:700; letter-spacing:1.2px; text-transform:uppercase;
+  color:var(--text-3);
+  padding:5px 11px; border-radius:99px;
+  background:rgba(255,255,255,.035); border:1px solid rgba(255,255,255,.07);
+}
+.qrule svg{ width:12px; height:12px; flex:0 0 auto; }
+.qrule.no{ color:#ff9a9a; border-color:rgba(255,120,120,.28); background:rgba(255,90,90,.08); }
+.qrule.yes{ color:#7fe0a3; border-color:rgba(90,220,140,.26); background:rgba(70,220,130,.07); }
+
+@media (max-width:1100px){
+  .qhow-row{ grid-template-columns:1fr; }
+  .qhow + .qhow{ border-left:0; border-top:1px solid rgba(255,255,255,.07); }
+  .qhow + .qhow::before{ display:none; }
+}
+
+/* ═══ The rail is settings only ═══════════════════════════════════ */
+/* Hidden by what it contains, not by where it sits — the previous rule
+   keyed off :first-of-type and silently stopped matching. */
+#queueOverlay .q-step-card.q-dup-picker{ display:none !important; }
+/* One commit button. The original bar is a sibling of the step cards so
+   it never moved with them, and ended up above the entire page. */
+#queueOverlay .q-body-setup > .q-actions{ display:none !important; }
+/* Folded into the rules strip above, where it is read rather than
+   skipped. */
+#queueOverlay .q-camera-notice{ display:none !important; }
+
+#qSide{
+  max-height:calc(100vh - 190px);
+  overflow-y:auto; overflow-x:hidden;
+  padding-right:4px;
+  scrollbar-width:thin; scrollbar-color:rgba(255,255,255,.16) transparent;
+}
+#qSide::-webkit-scrollbar{ width:6px; }
+#qSide::-webkit-scrollbar-track{ background:transparent; }
+#qSide::-webkit-scrollbar-thumb{ background:rgba(255,255,255,.14); border-radius:99px; }
+
+/* A rail of settings does not need step numbers — the numbered sequence
+   is the strip at the top of the page now. */
+#qSide .q-step-num{ display:none !important; }
+#qSide .q-step-head{ gap:0 !important; }
+#qSide .q-step-label{ font-size:14px !important; letter-spacing:1.4px !important; }
+
+#qSideTitle{
+  display:flex; align-items:center; gap:10px;
+  padding:0 2px 2px;
+  font-family:'JetBrains Mono', ui-monospace, monospace;
+  font-size:10px; font-weight:700; letter-spacing:2.2px; text-transform:uppercase;
+  color:var(--text-3);
+}
+#qSideTitle::after{ content:''; flex:1; height:1px; background:rgba(255,255,255,.08); }
+</style>
+<script>
+(function () {
+  'use strict';
+
+  var I = {
+    pick:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="14" rx="3"/><path d="M8 20h8"/><path d="M9 9.5h.01"/><path d="M15 9.5h.01"/><path d="M12 12.5h.01"/></svg>',
+    squad:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="9" cy="8" r="3.2"/><path d="M3 20v-1.5A4.5 4.5 0 0 1 7.5 14h3A4.5 4.5 0 0 1 15 18.5V20"/><circle cx="17" cy="9" r="2.4"/><path d="M17.5 13.4A4 4 0 0 1 21 17.3V19"/></svg>',
+    find:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="7"/><line x1="21" y1="21" x2="16.65" y2="16.65"/><path d="M11 8v3l2 1.4"/></svg>',
+    noCam:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M16 10.5 22 7v10l-6-3.5"/><rect x="2" y="6" width="14" height="12" rx="3"/><line x1="3" y1="3" x2="21" y2="21"/></svg>',
+    screen:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2.5" y="4" width="19" height="13" rx="2.5"/><path d="M8 21h8"/><path d="M12 17v4"/></svg>',
+    clock:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3.2 1.9"/></svg>',
+    keep:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 21s-7-4.4-7-9.7A4.3 4.3 0 0 1 12 8a4.3 4.3 0 0 1 7 3.3C19 16.6 12 21 12 21Z"/></svg>',
+  };
+
+  var STEPS = [
+    { ico:I.pick,  t:'Pick a game',
+      s:'Your Steam library first, or search all 88 titles. No game? Drop into a pool instead.' },
+    { ico:I.squad, t:'Set your squad',
+      s:'How many players and your rank. We match within one tier, then widen the longer you wait.' },
+    { ico:I.find,  t:'We find the players',
+      s:'You land in a voice call together. Nothing to accept — it opens when the group is full.' },
+  ];
+
+  var RULES = [
+    { k:'no',  ico:I.noCam,  t:'Camera off' },
+    { k:'yes', ico:I.screen, t:'Screen share allowed' },
+    { k:'',    ico:I.clock,  t:'3 hour cap' },
+    { k:'',    ico:I.keep,   t:'Convert to a lobby to keep them' },
+  ];
+
+  function howHtml(){
+    return '<div class="qhow-row">' + STEPS.map(function (s, i){
+      return '<div class="qhow">' +
+        '<span class="qhow-n">0' + (i + 1) + '</span>' +
+        '<span class="qhow-ico">' + s.ico + '</span>' +
+        '<div><div class="qhow-t">' + s.t + '</div>' +
+        '<div class="qhow-s">' + s.s + '</div></div>' +
+      '</div>';
+    }).join('') + '</div>' +
+    '<div class="qhow-rules">' + RULES.map(function (r){
+      return '<span class="qrule ' + r.k + '">' + r.ico + r.t + '</span>';
+    }).join('') + '</div>';
+  }
+
+  function tidy(){
+    var setup = document.getElementById('qViewSetup');
+    if (!setup) return;
+
+    /* The old picker card, found by what is inside it. Position-based
+       rules kept drifting as the layout moved around them. */
+    var grid = document.getElementById('qGameGrid');
+    if (grid){
+      var card = grid.closest('.q-step-card');
+      if (card) card.classList.add('q-dup-picker');
+    }
+
+    /* The how-it-works strip goes above the two columns. */
+    if (!document.getElementById('qHow')){
+      var how = document.createElement('div');
+      how.id = 'qHow';
+      how.innerHTML = howHtml();
+      var cols = document.getElementById('qCols');
+      if (cols && cols.parentNode) cols.parentNode.insertBefore(how, cols);
+      else setup.insertBefore(how, setup.firstChild);
+    }
+
+    /* The rail says what it is. Without this the settings read as more
+       of the page rather than as the panel belonging to the choice. */
+    var side = document.getElementById('qSide');
+    if (side && !document.getElementById('qSideTitle')){
+      var t = document.createElement('div');
+      t.id = 'qSideTitle';
+      t.textContent = 'Your setup';
+      side.insertBefore(t, side.firstChild);
+    }
+  }
+
+  function start(){
+    var orig = window.openQueuePanel;
+    if (typeof orig !== 'function'){ setTimeout(start, 300); return; }
+    if (orig.__v4) return;
+    var wrapped = function (){
+      var out = orig.apply(this, arguments);
+      /* After the v2/v3 mount has built the columns and moved the cards. */
+      setTimeout(tidy, 0);
+      return out;
+    };
+    wrapped.__v4 = true;
+    window.openQueuePanel = wrapped;
   }
 
   if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', start);
