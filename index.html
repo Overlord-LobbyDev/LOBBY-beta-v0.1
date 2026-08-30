@@ -64483,16 +64483,33 @@ async function reactComment(ev, id, btn){
      better, because the game art is doing the work.
      ══════════════════════════════════════════════════════════════════ -->
 <style>
-/* ═══ 1 · MARQUEE ═════════════════════════════════════════════════ */
-#queueOverlay .q-hero{
+/* ═══ 1 · MARQUEE ═════════════════════════════════════════════════
+   .lobby-overlay is a flex column in which .q-hero is a fixed item and
+   only .q-body scrolls. A marquee built in the hero therefore CANNOT be
+   scrolled past — it is welded to the top and steals the deck's height
+   for as long as the page is open, which is the opposite of "scroll
+   down and you see the deck".
+
+   So the hero is stood down entirely and the marquee is the first
+   section INSIDE the scroller, full-bleed and 62vh tall. It has real
+   cinematic presence because it is big, and it gets out of the way
+   because it scrolls. */
+#queueOverlay > .q-hero{ display:none !important; }
+
+#queueOverlay .q-body-setup{
+  padding:0 0 70px !important;
+  max-width:none !important;
+}
+
+#qMarquee{
   position:relative; overflow:hidden;
-  min-height:420px;
-  display:flex !important; flex-direction:column; justify-content:flex-end;
-  padding:44px 56px 40px !important;
+  height:clamp(440px, 62vh, 640px);
+  display:flex; align-items:flex-end;
+  margin:0 0 8px;
   border-bottom:1px solid rgba(255,255,255,.07);
 }
 #qArt{
-  position:absolute; inset:0; z-index:0;
+  position:absolute !important; inset:0 !important; z-index:0 !important;
   background-size:cover; background-position:center 26%;
   opacity:0; transition:opacity .6s ease;
 }
@@ -64500,17 +64517,24 @@ async function reactComment(ev, id, btn){
 #qArt::after{
   content:''; position:absolute; inset:0;
   background:
-    linear-gradient(92deg, rgba(7,8,13,.97) 0%, rgba(7,8,13,.82) 38%,
-                    rgba(7,8,13,.24) 74%, transparent 100%),
-    linear-gradient(180deg, rgba(7,8,13,.55) 0%, transparent 30%, rgba(7,8,13,.95) 100%);
+    linear-gradient(92deg, rgba(7,8,13,.97) 0%, rgba(7,8,13,.8) 36%,
+                    rgba(7,8,13,.2) 72%, transparent 100%),
+    linear-gradient(180deg, rgba(7,8,13,.62) 0%, transparent 28%, rgba(7,8,13,.96) 100%);
 }
-#queueOverlay .q-hero > *{ position:relative; z-index:1; }
-#queueOverlay .q-hero-title{ display:none !important; }
-#queueOverlay .q-hero-sub{ display:none !important; }
-#queueOverlay .q-camera-notice{ display:none !important; }
-#queueOverlay .q-hero-eyebrow{ margin-bottom:20px !important; }
-
-#qMq{ max-width:720px; }
+/* NOT "> *" — that outranks #qArt on specificity and drags the art
+   layer back into flow with no height, which is exactly how the
+   cinematic band went missing. */
+#qMq{
+  position:relative; z-index:1;
+  width:100%; max-width:1500px;
+  margin:0 auto; padding:0 40px 52px;
+}
+#qMq > *{ max-width:660px; }
+#qMq > #qHow{ max-width:none; }
+#queueOverlay .q-hero-title,
+#queueOverlay .q-hero-sub,
+#queueOverlay .q-camera-notice,
+#queueOverlay .q-hero-eyebrow{ display:none !important; }
 #qMqKick{
   font-family:'JetBrains Mono', ui-monospace, monospace;
   font-size:10px; font-weight:700; letter-spacing:2.6px; text-transform:uppercase;
@@ -64641,6 +64665,13 @@ async function reactComment(ev, id, btn){
 .qsec-s{ font-size:12.5px; color:var(--text-3); margin-top:9px; }
 
 #qDeck{ position:relative; height:400px; margin:30px 0 0; }
+#qStage > .qsec,
+#qStage > #qDeck,
+#qStage > #qDots,
+#qStage > #qBar,
+#qStage > #qPools{ max-width:1500px; margin-left:auto; margin-right:auto; padding-left:40px; padding-right:40px; }
+#qStage > .qsec{ padding-top:52px; }
+#qStage > #qBar{ max-width:940px; }
 #qTrack{ position:relative; height:100%; }
 .qc{
   position:absolute; top:0; left:50%;
@@ -64953,20 +64984,19 @@ async function reactComment(ev, id, btn){
   /* Builds the two nodes the painter writes into. Idempotent, and
      called before every paint so a re-render cannot outrun it. */
   function ensureMarquee(){
-    var hero = document.querySelector('#queueOverlay .q-hero');
-    if (!hero) return false;
-    if (!document.getElementById('qArt')){
-      var art = document.createElement('div');
-      art.id = 'qArt';
-      art.setAttribute('aria-hidden', 'true');
-      hero.insertBefore(art, hero.firstChild);
+    /* Into the scroller, above everything else, so it can be scrolled
+       past. The hero it replaces is a fixed flex item and never could
+       be. */
+    var stage = document.getElementById('qStage');
+    if (!stage) return false;
+    var m = document.getElementById('qMarquee');
+    if (!m){
+      m = document.createElement('section');
+      m.id = 'qMarquee';
+      m.innerHTML = '<div id="qArt" aria-hidden="true"></div><div id="qMq"></div>';
+      stage.insertBefore(m, stage.firstChild);
     }
-    if (!document.getElementById('qMq')){
-      var mq = document.createElement('div');
-      mq.id = 'qMq';
-      hero.appendChild(mq);
-    }
-    return true;
+    return !!document.getElementById('qMq');
   }
 
   function paintMarquee(){
@@ -65044,8 +65074,20 @@ async function reactComment(ev, id, btn){
 
   function deckSource(){ return lib.length ? lib : catalogue(); }
 
-  function buildDeck(){
+  function ensureStage(){
     var setup = document.getElementById('qViewSetup');
+    if (!setup) return null;
+    var stage = document.getElementById('qStage');
+    if (!stage){
+      stage = document.createElement('div');
+      stage.id = 'qStage';
+      setup.insertBefore(stage, setup.firstChild);
+    }
+    return stage;
+  }
+
+  function buildDeck(){
+    var setup = ensureStage() ? document.getElementById('qViewSetup') : null;
     var src = deckSource();
     if (!setup || !src.length) return;
     if (!document.getElementById('qDeck')){
@@ -65076,13 +65118,10 @@ async function reactComment(ev, id, btn){
           '</div>' +
           '<div id="qPoolRow"></div>' +
         '</div>';
-      /* One container, prepended. Inserting the children one at a time
-         reverses them or lands them in the wrong place depending on
-         what is already in the view. */
-      var host = document.createElement('div');
-      host.id = 'qStage';
+      /* Appended to the stage, which already holds the marquee, so the
+         page reads marquee then deck then pools in that order. */
+      var host = ensureStage();
       while (wrap.firstChild) host.appendChild(wrap.firstChild);
-      setup.insertBefore(host, setup.firstChild);
     }
 
     var track = document.getElementById('qTrack');
@@ -65323,7 +65362,7 @@ async function reactComment(ev, id, btn){
     if (card) card.classList.add('q-picker');
   }
 
-  function refresh(){ tagPicker(); buildDeck(); paintMarquee(); paintPools(); }
+  function refresh(){ ensureStage(); tagPicker(); buildDeck(); paintMarquee(); paintPools(); }
 
   function start(){
     if (typeof window.api !== 'function'){ setTimeout(start, 300); return; }
@@ -65333,6 +65372,7 @@ async function reactComment(ev, id, btn){
       var w = function (){
         var out = o.apply(this, arguments);
         setTimeout(function (){
+          ensureStage();
           paintMarquee();
           loadLib().then(refresh);
           loadPulse();
