@@ -64592,9 +64592,9 @@ async function reactComment(ev, id, btn){
    than three components arguing inside one image. */
 #qHow{
   display:flex; align-items:center; gap:0; flex-wrap:wrap;
-  padding:18px clamp(32px, 4vw, 76px);
-  border-bottom:1px solid rgba(255,255,255,.07);
-  background:rgba(255,255,255,.016);
+  margin-top:56px; padding:20px clamp(32px, 4vw, 76px);
+  border-top:1px solid rgba(255,255,255,.07);
+  background:rgba(255,255,255,.014);
 }
 #qFind{
   display:inline-flex; align-items:center; justify-content:center; gap:11px;
@@ -64688,7 +64688,7 @@ async function reactComment(ev, id, btn){
 .qsec-k .sep{ color:rgba(255,255,255,.18); }
 .qsec-s{ font-size:12.5px; color:var(--text-3); margin-top:9px; }
 
-#qDeck{ position:relative; height:456px; margin:34px 0 0; }
+#qDeck{ position:relative; height:392px; margin:26px 0 0; }
 #qStage > .qsec,
 #qStage > #qDeck,
 #qStage > #qDots,
@@ -64701,11 +64701,11 @@ async function reactComment(ev, id, btn){
 #qStage > .qsec{ padding-top:56px; }
 /* The one thing that should NOT stretch: a row of controls 2000px wide
    puts the rank tiles a screen away from the stepper. */
-#qStage > #qBar{ max-width:1180px; margin-left:auto; margin-right:auto; }
+#qStage > #qBar{ max-width:900px; margin-left:auto; margin-right:auto; }
 #qTrack{ position:relative; height:100%; }
 .qc{
   position:absolute; top:0; left:50%;
-  width:288px; height:432px; margin-left:-144px;
+  width:250px; height:375px; margin-left:-125px;
   border-radius:16px; overflow:hidden; cursor:pointer;
   background:#12151f; border:1px solid rgba(255,255,255,.09);
   box-shadow:0 26px 60px -18px rgba(0,0,0,.85);
@@ -64755,8 +64755,8 @@ async function reactComment(ev, id, btn){
   transition:background .2s, transform .2s, color .2s;
 }
 .qnav:hover{ background:var(--hub-accent); color:#0d0320; transform:translateY(-50%) scale(1.08); }
-.qnav.p{ left:30px; } .qnav.n{ right:30px; }
-#qDots{ display:flex; justify-content:center; gap:7px; margin-top:20px; }
+.qnav.p{ left:40px; } .qnav.n{ right:40px; }
+#qDots{ display:flex; justify-content:center; gap:7px; margin-top:22px; }
 #qDots i{
   width:7px; height:7px; border-radius:99px; cursor:pointer;
   background:rgba(255,255,255,.2); transition:width .28s, background .28s;
@@ -64769,7 +64769,7 @@ async function reactComment(ev, id, btn){
 /* The settings bar under the deck. */
 #qBar{
   display:flex; align-items:center; justify-content:center; gap:12px; flex-wrap:wrap;
-  margin:30px auto 0; padding:14px 18px; max-width:940px;
+  margin:30px auto 0; padding:14px 18px; max-width:900px;
   border-radius:16px;
   background:linear-gradient(160deg, rgba(255,255,255,.045), rgba(255,255,255,.015));
   border:1px solid rgba(255,255,255,.08);
@@ -64942,10 +64942,6 @@ async function reactComment(ev, id, btn){
 @keyframes qRing{ 0%{ transform:scale(.8); opacity:.85; } 100%{ transform:scale(1.08); opacity:0; } }
 #qtActs{ display:flex; gap:11px; margin-top:32px; }
 
-@media (max-width:1500px){
-  .qc{ width:252px; height:378px; margin-left:-126px; }
-  #qDeck{ height:400px; }
-}
 @media (max-width:1080px){
   #qTable{ grid-template-columns:1fr; }
   #qSeats{ width:360px; height:360px; }
@@ -65014,6 +65010,31 @@ async function reactComment(ev, id, btn){
         || null;
   }
 
+  /* Steam serves library_hero.jpg for most titles but not all, and a
+     background-image cannot report a 404 -- the band would just be
+     empty, indistinguishable from a layout fault. Probing it with an
+     Image first means a missing wide asset falls back to the header,
+     then to the capsule, rather than to nothing. */
+  function setArt(el, first, e, g){
+    var chain = [first,
+                 e && e.hero, e && e.cover,
+                 g && g.header, g && g.cover].filter(function (u, i, a){
+                   return !!u && a.indexOf(u) === i;
+                 });
+    var i = 0;
+    (function tryNext(){
+      if (i >= chain.length){ el.classList.remove('on'); return; }
+      var candidate = chain[i++];
+      var probe = new Image();
+      probe.onload = function (){
+        el.style.backgroundImage = url(candidate);
+        el.classList.add('on');
+      };
+      probe.onerror = tryNext;
+      probe.src = candidate;
+    })();
+  }
+
   /* ── 1 · Marquee ─────────────────────────────────────────────── */
   /* Builds the two nodes the painter writes into. Idempotent, and
      called before every paint so a re-render cannot outrun it. */
@@ -65074,7 +65095,7 @@ async function reactComment(ev, id, btn){
     var g = GAMES().find(function (x){ return x.id === sel; });
     var hero = e ? e.hero : (g ? (g.heroHi || g.header || g.cover) : '');
 
-    if (hero && !isPool){ art.style.backgroundImage = url(hero); art.classList.add('on'); }
+    if (hero && !isPool) setArt(art, hero, e, g);
     else art.classList.remove('on');
 
     var name = isPool ? 'A pool' : (e ? e.name : (g ? g.name : ''));
@@ -65109,17 +65130,17 @@ async function reactComment(ev, id, btn){
     var btn = document.getElementById('qFind');
     if (btn) btn.onclick = function (){ if (window.qBeginSearch) window.qBeginSearch(); };
   }
-  /* One line under the band: the three steps and the rules. Outside the
-     image, so the image stays an image. */
+  /* The reference has nothing between the band and the deck, so this
+     goes to the FOOT of the page: still there for anyone who wants it,
+     no longer standing where the deck's heading should be. */
   function paintHow(){
     var stage = document.getElementById('qStage');
-    var m = document.getElementById('qMarquee');
-    if (!stage || !m) return;
+    if (!stage) return;
     var how = document.getElementById('qHow');
     if (!how){
       how = document.createElement('div');
       how.id = 'qHow';
-      stage.insertBefore(how, m.nextSibling);
+      stage.appendChild(how);
     }
     how.innerHTML =
       '<div class="qhw"><i>' + I.pick + '</i><div><b>Pick a game</b><span>Your library, or a pool</span></div></div>' +
@@ -65138,7 +65159,7 @@ async function reactComment(ev, id, btn){
   };
 
   /* ── 2 · Deck ────────────────────────────────────────────────── */
-  var idx = 0, STEP = 288, STEP2 = 540, STEP3 = 752;
+  var idx = 0, STEP = 220, STEP2 = 390;
 
   /* Titles with real cover art first: the catalogue is 87 entries and
      over half are a gradient with two letters on it, which is a poor
@@ -65244,17 +65265,11 @@ async function reactComment(ev, id, btn){
       else if (a === 1){ st.setProperty('--x',(off*STEP)+'px'); st.setProperty('--s','.84');
                     st.setProperty('--b','.62'); st.setProperty('--sat','.7');
                     st.setProperty('--o','1'); st.zIndex = 20; }
-      else if (a === 2){ st.setProperty('--x',(off/a*STEP2)+'px'); st.setProperty('--s','.72');
-                    st.setProperty('--b','.46'); st.setProperty('--sat','.52');
+      else if (a === 2){ st.setProperty('--x',(off/a*STEP2)+'px'); st.setProperty('--s','.7');
+                    st.setProperty('--b','.44'); st.setProperty('--sat','.5');
                     st.setProperty('--o','1'); st.zIndex = 10; }
-      /* A third ring, because a wide window has the room for it and a
-         deck that stops at two looks like it ran out rather than
-         receding. */
-      else if (a === 3){ st.setProperty('--x',(off/a*STEP3)+'px'); st.setProperty('--s','.6');
-                    st.setProperty('--b','.3'); st.setProperty('--sat','.36');
-                    st.setProperty('--o','1'); st.zIndex = 5; }
-      else { st.setProperty('--x',(off>0 ? STEP3+240 : -(STEP3+240))+'px');
-             st.setProperty('--s','.54'); st.setProperty('--o','0'); st.zIndex = 1; }
+      else { st.setProperty('--x',(off>0 ? 600 : -600)+'px');
+             st.setProperty('--s','.62'); st.setProperty('--o','0'); st.zIndex = 1; }
       c.onclick = (off === 0) ? null : function (){ idx = i; commit(); };
     });
     var dots = document.getElementById('qDots');
