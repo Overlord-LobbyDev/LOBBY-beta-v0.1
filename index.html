@@ -64606,8 +64606,10 @@ async function reactComment(ev, id, btn){
 #queueOverlay .q-body-setup{
   max-width:1500px; margin:0 auto; padding:46px 40px 60px !important;
 }
-/* The original picker card and action bar are what the deck replaces. */
-#queueOverlay .q-body-setup > .q-step-card,
+/* The deck replaces the picker card specifically. The other two are
+   hidden because the settings bar borrows their controls, and they come
+   back under More options. */
+#queueOverlay .q-body-setup > .q-step-card{ display:none !important; }
 #queueOverlay .q-body-setup > .q-actions{ display:none !important; }
 
 .qsec{ text-align:center; margin:0 0 4px; }
@@ -64749,7 +64751,7 @@ async function reactComment(ev, id, btn){
   background:none; border:0; cursor:pointer; padding:8px 6px;
 }
 #qMore:hover{ color:#fff; }
-#queueOverlay.q-more .q-body-setup > .q-step-card:not(:first-of-type){ display:block !important; }
+#queueOverlay.q-more .q-body-setup > .q-step-card:not(.q-picker){ display:block !important; }
 
 /* ═══ 3 · POOLS ═══════════════════════════════════════════════════ */
 #qPools{ margin:56px 0 0; }
@@ -64941,10 +64943,34 @@ async function reactComment(ev, id, btn){
     if (r && typeof r.total === 'number') pulse = r;
     paintPools();
   }
-  function entry(id){ return lib.find(function (g){ return g.id === id; }) || null; }
+  function entry(id){
+    return lib.find(function (g){ return g.id === id; })
+        || catalogue().find(function (g){ return g.id === id; })
+        || null;
+  }
 
   /* ── 1 · Marquee ─────────────────────────────────────────────── */
+  /* Builds the two nodes the painter writes into. Idempotent, and
+     called before every paint so a re-render cannot outrun it. */
+  function ensureMarquee(){
+    var hero = document.querySelector('#queueOverlay .q-hero');
+    if (!hero) return false;
+    if (!document.getElementById('qArt')){
+      var art = document.createElement('div');
+      art.id = 'qArt';
+      art.setAttribute('aria-hidden', 'true');
+      hero.insertBefore(art, hero.firstChild);
+    }
+    if (!document.getElementById('qMq')){
+      var mq = document.createElement('div');
+      mq.id = 'qMq';
+      hero.appendChild(mq);
+    }
+    return true;
+  }
+
   function paintMarquee(){
+    if (!ensureMarquee()) return;
     var s = S(); if (!s) return;
     var art = document.getElementById('qArt');
     var mq  = document.getElementById('qMq');
@@ -65002,9 +65028,26 @@ async function reactComment(ev, id, btn){
   /* ── 2 · Deck ────────────────────────────────────────────────── */
   var idx = 0, STEP = 224, STEP2 = 392;
 
+  /* Titles with real cover art first: the catalogue is 87 entries and
+     over half are a gradient with two letters on it, which is a poor
+     deck. This is only ever the fallback -- your own library is the
+     normal case. */
+  function catalogue(){
+    return GAMES()
+      .filter(function (g){ return g.id !== 'other' && (g.cover || g.header); })
+      .slice(0, 24)
+      .map(function (g){
+        return { id:g.id, name:g.name, cover:g.cover || g.header,
+                 hero:g.heroHi || g.header || g.cover, hrsTotal:0, hrsRecent:0 };
+      });
+  }
+
+  function deckSource(){ return lib.length ? lib : catalogue(); }
+
   function buildDeck(){
     var setup = document.getElementById('qViewSetup');
-    if (!setup || !lib.length) return;
+    var src = deckSource();
+    if (!setup || !src.length) return;
     if (!document.getElementById('qDeck')){
       var wrap = document.createElement('div');
       wrap.innerHTML =
@@ -65012,9 +65055,11 @@ async function reactComment(ev, id, btn){
           '<div class="qsec-t">Choose your game</div>' +
           '<div class="qsec-bar"></div>' +
           '<div class="qsec-k"><span class="i">01</span><span class="sep">/</span>' +
-            '<span>Your Steam library</span><span class="sep">·</span>' +
-            '<b>' + lib.length + '</b> games</div>' +
-          '<div class="qsec-s">The games you actually play. Step the deck to choose.</div>' +
+            '<span>' + (lib.length ? 'Your Steam library' : 'Popular on Lobby') + '</span>' +
+            '<span class="sep">·</span><b>' + src.length + '</b> games</div>' +
+          '<div class="qsec-s">' + (lib.length
+            ? 'The games you actually play. Step the deck to choose.'
+            : 'Step the deck to choose, or search the full library.') + '</div>' +
         '</div>' +
         '<div id="qDeck">' +
           '<button class="qnav p" onclick="window.qStep2(-1)" aria-label="Previous">‹</button>' +
@@ -65041,10 +65086,10 @@ async function reactComment(ev, id, btn){
     }
 
     var track = document.getElementById('qTrack');
-    var sig = lib.map(function (g){ return g.id; }).join('|');
+    var sig = src.map(function (g){ return g.id; }).join('|');
     if (track.__sig !== sig){
       track.__sig = sig;
-      track.innerHTML = lib.map(function (g){
+      track.innerHTML = src.map(function (g){
         return '<div class="qc" data-id="' + esc(g.id) + '">' +
           '<div class="qc-art" style="' + (g.cover ? 'background-image:' + url(g.cover) : '') + '">' +
             (g.cover ? '' : '<div class="qc-fb">' + esc(g.name.charAt(0).toUpperCase()) + '</div>') + '</div>' +
@@ -65053,7 +65098,7 @@ async function reactComment(ev, id, btn){
           '</div></div>';
       }).join('');
       var s = S();
-      var at = s ? lib.findIndex(function (g){ return g.id === s.game; }) : -1;
+      var at = s ? src.findIndex(function (g){ return g.id === s.game; }) : -1;
       idx = at >= 0 ? at : 0;
       commit();
     } else apply();
@@ -65270,7 +65315,15 @@ async function reactComment(ev, id, btn){
   function stop(){ clearInterval(pollT); clearInterval(tickT); pollT = tickT = null; }
 
   /* ── Wire in ─────────────────────────────────────────────────── */
-  function refresh(){ buildDeck(); paintMarquee(); paintPools(); }
+  /* The old picker card is identified by what it holds, not by where it
+     sits -- position-based rules have drifted twice already. */
+  function tagPicker(){
+    var grid = document.getElementById('qGameGrid');
+    var card = grid && grid.closest('.q-step-card');
+    if (card) card.classList.add('q-picker');
+  }
+
+  function refresh(){ tagPicker(); buildDeck(); paintMarquee(); paintPools(); }
 
   function start(){
     if (typeof window.api !== 'function'){ setTimeout(start, 300); return; }
