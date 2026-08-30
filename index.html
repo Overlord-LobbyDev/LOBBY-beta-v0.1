@@ -62252,20 +62252,10 @@ async function reactComment(ev, id, btn){
   display:none !important;
 }
 
-.rc-play{
-  display:inline-flex; align-items:center; gap:8px;
-  padding:10px 19px; border-radius:10px; border:0; cursor:pointer;
-  font-family:'Archivo', var(--font), sans-serif;
-  font-size:12.5px; font-weight:900; letter-spacing:.7px;
-  color:#052a10;
-  background:linear-gradient(180deg,#86efac 0%,#3fbf63 100%);
-  box-shadow:0 8px 20px rgba(63,191,99,.34),
-             inset 0 1px 0 rgba(255,255,255,.55);
-  transition:transform .18s cubic-bezier(.22,1,.36,1), filter .18s ease;
-}
-.rc-play:hover{ transform:translateY(-2px); filter:brightness(1.07); }
-.rc-play:active{ transform:translateY(0); }
-.rc-play svg{ width:13px; height:13px; }
+/* Appearance lives in one place further down; this block only owns
+   where the controls sit. The green fill that was here is gone -- see
+   the note there on why a filled slab of any colour sat on the card
+   rather than in it. */
 .rc-play[disabled]{ opacity:.6; cursor:default; transform:none; }
 
 /* ── The small grid card: a launch disc over the art ───────────── */
@@ -62274,12 +62264,9 @@ async function reactComment(ev, id, btn){
   position:absolute; top:9px; right:9px; z-index:7;
   width:36px; height:36px; border-radius:50%;
   display:flex; align-items:center; justify-content:center;
-  border:1px solid rgba(255,255,255,.2); cursor:pointer;
-  color:#052a10;
-  background:linear-gradient(180deg,#86efac 0%,#3fbf63 100%);
-  box-shadow:0 6px 16px rgba(0,0,0,.5), inset 0 1px 0 rgba(255,255,255,.5);
-  /* Hidden until wanted: on a grid of ten covers, ten green discs is a
-     row of buttons rather than a shelf of games. */
+  cursor:pointer;
+  /* Hidden until wanted: on a grid of ten covers, ten launch buttons is
+     a row of controls rather than a shelf of games. */
   opacity:0; transform:scale(.82) translateY(-3px);
   transition:opacity .18s ease, transform .18s cubic-bezier(.22,1,.36,1);
 }
@@ -62647,57 +62634,69 @@ async function reactComment(ev, id, btn){
 }
 
 /* ── Play ──────────────────────────────────────────────────────── */
-/* Deliberately the same geometry as .rc-cta beside it. The difference
-   between them is fill versus tint, which is the contrast this app uses
-   for primary versus secondary everywhere else. */
+/* THE CARD IS MADE OF GLASS. Every part of it -- the stat cells, the
+   achievement rows, the playtime bar, View on Steam -- is a dark
+   translucent panel with a hairline. A solid filled button is the only
+   opaque object on it, which is why a green one looked pasted on and an
+   accent-filled one still did: the problem was never the hue, it was
+   that it was filled at all.
+   So Play is made of the same material as everything around it and
+   takes the accent as a tint and an edge, which is exactly the
+   treatment .rc-cta was already using on this card. Its weight comes
+   from being brighter than its neighbour, not from being solid. */
 .rc-play{
-  display:inline-flex; align-items:center; gap:7px;
-  padding:9px 16px; border-radius:10px; cursor:pointer;
+  display:inline-flex; align-items:center; gap:8px;
+  padding:9px 15px; border-radius:10px; cursor:pointer;
   font-family:'Archivo', var(--font), sans-serif;
   font-size:11.5px; font-weight:800; letter-spacing:.6px;
   color:#fff;
-  background:linear-gradient(180deg,
-    color-mix(in srgb, var(--accent) 88%, white) 0%,
-    var(--accent) 100%);
-  border:1px solid color-mix(in srgb, var(--accent) 72%, transparent);
-  box-shadow:inset 0 1px 0 rgba(255,255,255,.26),
-             0 4px 14px color-mix(in srgb, var(--accent) 26%, transparent);
-  transition:filter .18s ease, box-shadow .18s ease;
+  background:color-mix(in srgb, var(--accent) 26%, transparent);
+  border:1px solid color-mix(in srgb, var(--accent) 60%, transparent);
+  box-shadow:inset 0 1px 0 rgba(255,255,255,.1);
+  transition:background .18s ease, border-color .18s ease;
 }
 .rc-play:hover{
-  filter:brightness(1.08);
-  box-shadow:inset 0 1px 0 rgba(255,255,255,.3),
-             0 6px 20px color-mix(in srgb, var(--accent) 38%, transparent);
+  background:color-mix(in srgb, var(--accent) 40%, transparent);
+  border-color:color-mix(in srgb, var(--accent) 78%, transparent);
 }
-.rc-play:active{ filter:brightness(.96); }
-.rc-play svg{ width:10px; height:10px; flex:0 0 auto; }
+.rc-play:active{ background:color-mix(in srgb, var(--accent) 30%, transparent); }
+/* The glyph carries the colour so the button does not have to. */
+.rc-play svg{
+  width:9px; height:9px; flex:0 0 auto;
+  color:color-mix(in srgb, var(--accent) 55%, white);
+}
 
 /* Steam is the quiet half of the pair. */
 #homeContent [data-home-slot="hero"] .rc-actions .rc-cta{
   padding:9px 15px !important;
   border-radius:10px !important;
   font-size:11.5px !important; font-weight:700 !important;
-  background:rgba(255,255,255,.05) !important;
-  border:1px solid rgba(255,255,255,.12) !important;
-  color:rgba(255,255,255,.78) !important;
+  background:rgba(255,255,255,.04) !important;
+  border:1px solid rgba(255,255,255,.1) !important;
+  color:rgba(255,255,255,.72) !important;
 }
 #homeContent [data-home-slot="hero"] .rc-actions .rc-cta:hover{
-  background:rgba(255,255,255,.1) !important;
+  background:rgba(255,255,255,.09) !important;
   color:#fff !important;
 }
 
 /* ── The grid card's launch control ────────────────────────────── */
 .rc-play-mini{
   width:30px !important; height:30px !important;
-  border:1px solid color-mix(in srgb, var(--accent) 62%, transparent) !important;
-  background:color-mix(in srgb, var(--accent) 82%, rgba(10,12,18,.6)) !important;
-  color:#fff !important;
-  box-shadow:0 4px 12px rgba(0,0,0,.45),
-             inset 0 1px 0 rgba(255,255,255,.22) !important;
-  backdrop-filter:blur(6px);
+  border:1px solid color-mix(in srgb, var(--accent) 55%, transparent) !important;
+  background:rgba(10,12,18,.62) !important;
+  color:color-mix(in srgb, var(--accent) 50%, white) !important;
+  box-shadow:0 4px 12px rgba(0,0,0,.5),
+             inset 0 1px 0 rgba(255,255,255,.12) !important;
+  backdrop-filter:blur(8px);
 }
 .rc-play-mini svg{ width:11px !important; height:11px !important; margin-left:1px; }
-.rc-play-mini:hover{ filter:brightness(1.1); transform:scale(1.06) !important; }
+.rc-play-mini:hover{
+  background:color-mix(in srgb, var(--accent) 34%, rgba(10,12,18,.62)) !important;
+  border-color:color-mix(in srgb, var(--accent) 80%, transparent) !important;
+  color:#fff !important;
+  transform:scale(1.06) !important;
+}
 
 @media (prefers-reduced-motion: reduce){
   .rc-play, .rc-play-mini{ transition:none; }
