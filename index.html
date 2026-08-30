@@ -64873,5 +64873,723 @@ async function reactComment(ev, id, btn){
 })();
 </script>
 
+
+<!-- ══════════════════════════════════════════════════════════════════
+     QUEUE — YOUR LIBRARY FIRST
+
+     The last pass led with pools. That was solving my problem, not the
+     product's: pools exist because 783 buckets never fill, but "Fighters"
+     is a category, and nobody sits down wanting to play a category. They
+     want to play Tekken. So the specific game comes first and the pools
+     drop to the bottom as the thing you do when nobody is about.
+
+     THE PICKER IS THE PAGE, SO IT HAD TO EARN IT. It was 88 flat tiles
+     in two overflowing rows, 55 of them two letters on a gradient,
+     because it rendered the whole of GT_GAMES in alphabetical-ish order
+     regardless of whether you own any of it.
+
+     It now opens on YOUR games — pulled from the same Steam recents the
+     front page uses, at 600x900 capsule art, sized to be looked at.
+     Those are the titles you would actually queue for, they all have
+     real artwork by definition, and the full 88 stay one keystroke away
+     behind search. A library you own beats a catalogue you don't.
+
+     THE SETUP IS ALL THERE AND ALL VISIBLE. Party size, rank, proof and
+     stack are three numbered sections in the front page's own heading
+     treatment, not a collapsed drawer. Nothing is hidden behind a
+     toggle any more.
+
+     The rank tiles lose their emoji. 🥉🥈🥇💠💎👑⚡ are drawn by the
+     operating system and were the one set of marks on the page not in
+     Lobby's idiom — the same fault as the achievement trophy. They are
+     drawn pips now, in each tier's own colour.
+     ══════════════════════════════════════════════════════════════════ -->
+<style>
+/* ═══ Layout ══════════════════════════════════════════════════════ */
+#queueOverlay .q-body-setup{ max-width:1560px; margin:0 auto; }
+
+/* Section headings borrow the front page's, so Queue reads as the same
+   product rather than a settings screen wearing its colours. */
+#queueOverlay .qh{
+  display:flex; flex-direction:column; align-items:center;
+  text-align:center; position:relative;
+  margin:0 0 22px; padding:6px 0;
+}
+#queueOverlay .qh-t{
+  font-family:'Archivo', var(--font), sans-serif;
+  font-size:23px; font-weight:900; letter-spacing:2.2px; text-transform:uppercase;
+  line-height:1.06; color:#fff; position:relative; padding-bottom:2px;
+  text-shadow:
+    0 -1px 0 rgba(255,255,255,.28),
+    0 1px 0 rgba(0,0,0,.55),
+    0 3px 7px rgba(0,0,0,.42),
+    0 0 42px color-mix(in srgb, var(--hub-accent) 36%, transparent);
+}
+#queueOverlay .qh-bar{
+  width:64px; height:3px; border-radius:99px; margin-top:11px;
+  background:linear-gradient(90deg, transparent,
+    color-mix(in srgb, var(--hub-accent) 95%, white) 35%,
+    color-mix(in srgb, var(--hub-accent) 95%, white) 65%, transparent);
+}
+#queueOverlay .qh-k{
+  display:inline-flex; align-items:center; gap:10px; margin-top:13px;
+  font-family:'JetBrains Mono', ui-monospace, monospace;
+  font-size:10px; font-weight:700; letter-spacing:2.2px; text-transform:uppercase;
+  color:var(--text-3);
+  padding:5px 13px; border-radius:99px;
+  background:rgba(255,255,255,.035); border:1px solid rgba(255,255,255,.07);
+}
+#queueOverlay .qh-k b{ color:#fff; font-weight:800; font-variant-numeric:tabular-nums; }
+#queueOverlay .qh-k .i{ color:color-mix(in srgb, var(--hub-accent) 90%, white); font-weight:800; }
+#queueOverlay .qh-k .sep{ color:rgba(255,255,255,.18); }
+#queueOverlay .qh-s{ font-size:12.5px; color:var(--text-3); margin-top:7px; }
+
+/* ═══ Pulse strip ═════════════════════════════════════════════════ */
+#qPulse{
+  display:flex; align-items:center; gap:14px; flex-wrap:wrap;
+  padding:12px 18px; margin:0 0 30px; border-radius:12px;
+  background:rgba(255,255,255,.028);
+  border:1px solid rgba(255,255,255,.075);
+  font-size:13px; color:var(--text-2);
+}
+#qPulse .n{
+  font-family:'JetBrains Mono', ui-monospace, monospace;
+  font-size:15px; font-weight:800; color:#fff; font-variant-numeric:tabular-nums;
+}
+#qPulse .dot{
+  width:7px; height:7px; border-radius:50%;
+  background:#3ddc84; box-shadow:0 0 10px rgba(61,220,132,.8);
+  animation:qPulseDot 2s ease-in-out infinite;
+}
+#qPulse .dot.cold{ background:rgba(255,255,255,.2); box-shadow:none; animation:none; }
+@keyframes qPulseDot{ 50%{ opacity:.35; } }
+
+/* ═══ The library ═════════════════════════════════════════════════ */
+#qLib{ margin:0 0 40px; position:relative; }
+.ql-rail{
+  display:flex; gap:16px; overflow-x:auto; overflow-y:hidden;
+  padding:6px 4px 18px; scroll-behavior:smooth; scroll-snap-type:x proximity;
+  scrollbar-width:thin; scrollbar-color:rgba(255,255,255,.16) transparent;
+  -webkit-mask-image:linear-gradient(90deg, transparent 0, #000 24px, #000 calc(100% - 24px), transparent 100%);
+          mask-image:linear-gradient(90deg, transparent 0, #000 24px, #000 calc(100% - 24px), transparent 100%);
+}
+.ql-rail::-webkit-scrollbar{ height:6px; }
+.ql-rail::-webkit-scrollbar-track{ background:transparent; }
+.ql-rail::-webkit-scrollbar-thumb{ background:rgba(255,255,255,.14); border-radius:99px; }
+
+.ql-card{
+  position:relative; flex:0 0 176px; width:176px;
+  scroll-snap-align:start; cursor:pointer;
+  border-radius:14px; overflow:hidden;
+  background:#10131b;
+  border:1px solid rgba(255,255,255,.08);
+  box-shadow:0 10px 26px rgba(0,0,0,.45);
+  transition:transform .22s cubic-bezier(.22,1,.36,1),
+             border-color .22s ease, box-shadow .22s ease;
+}
+.ql-card:hover{
+  transform:translateY(-6px);
+  border-color:color-mix(in srgb, var(--hub-accent) 55%, transparent);
+  box-shadow:0 22px 46px rgba(0,0,0,.6),
+             0 0 28px color-mix(in srgb, var(--hub-accent) 18%, transparent);
+}
+.ql-card.on{
+  border-color:var(--hub-accent);
+  box-shadow:0 0 0 1px var(--hub-accent),
+             0 18px 44px rgba(0,0,0,.6),
+             0 0 34px color-mix(in srgb, var(--hub-accent) 32%, transparent);
+}
+.ql-art{
+  position:relative; width:100%; aspect-ratio:2/3;
+  background-size:cover; background-position:center; background-color:#161a26;
+}
+.ql-art::after{
+  content:''; position:absolute; inset:0;
+  background:linear-gradient(180deg, transparent 48%, rgba(8,10,15,.94) 100%);
+}
+.ql-fb{
+  position:absolute; inset:0; display:flex; align-items:center; justify-content:center;
+  font-family:'Archivo', var(--font), sans-serif;
+  font-size:34px; font-weight:900; color:rgba(255,255,255,.16);
+}
+.ql-meta{ position:absolute; left:0; right:0; bottom:0; padding:12px 13px; z-index:2; }
+.ql-name{
+  font-family:'Archivo', var(--font), sans-serif;
+  font-size:13.5px; font-weight:800; color:#fff; line-height:1.25;
+  text-shadow:0 1px 3px rgba(0,0,0,.8);
+  display:-webkit-box; -webkit-line-clamp:2; line-clamp:2;
+  -webkit-box-orient:vertical; overflow:hidden;
+}
+.ql-hrs{
+  font-family:'JetBrains Mono', ui-monospace, monospace;
+  font-size:9.5px; font-weight:700; letter-spacing:1.1px; text-transform:uppercase;
+  color:rgba(255,255,255,.62); margin-top:5px;
+}
+.ql-tick{
+  position:absolute; top:10px; right:10px; z-index:3;
+  width:26px; height:26px; border-radius:50%;
+  display:flex; align-items:center; justify-content:center;
+  background:var(--hub-accent); color:#0b0416;
+  box-shadow:0 4px 12px rgba(0,0,0,.5);
+  opacity:0; transform:scale(.7);
+  transition:opacity .18s ease, transform .18s cubic-bezier(.22,1,.36,1);
+}
+.ql-card.on .ql-tick{ opacity:1; transform:scale(1); }
+
+.ql-arrow{
+  position:absolute; top:calc(50% - 26px); transform:translateY(-50%);
+  width:40px; height:40px; border-radius:50%; z-index:6;
+  display:flex; align-items:center; justify-content:center;
+  border:1px solid rgba(255,255,255,.14);
+  background:rgba(10,13,18,.84); backdrop-filter:blur(12px);
+  color:#fff; cursor:pointer; font-size:18px; line-height:1;
+  opacity:0; transition:opacity .2s ease, background .2s ease, transform .2s ease;
+}
+#qLib:hover .ql-arrow{ opacity:1; }
+.ql-arrow:hover{ background:var(--hub-accent); color:#0b0416; transform:translateY(-50%) scale(1.08); }
+.ql-arrow.prev{ left:-8px; }  .ql-arrow.next{ right:-8px; }
+
+/* Search + full library */
+.ql-search{
+  display:flex; align-items:center; gap:11px;
+  padding:12px 16px; border-radius:12px; margin:4px 0 0;
+  background:rgba(8,10,16,.55);
+  border:1px solid rgba(255,255,255,.09);
+  transition:border-color .18s ease, box-shadow .18s ease;
+}
+.ql-search:focus-within{
+  border-color:color-mix(in srgb, var(--hub-accent) 54%, transparent);
+  box-shadow:0 0 0 3px color-mix(in srgb, var(--hub-accent) 15%, transparent);
+}
+.ql-search svg{ color:var(--text-3); flex:0 0 auto; }
+.ql-search input{
+  flex:1; background:none; border:0; outline:none; color:#fff;
+  font-family:'Archivo', var(--font), sans-serif; font-size:13.5px;
+}
+.ql-search input::placeholder{ color:var(--text-3); }
+.ql-hint{
+  font-family:'JetBrains Mono', ui-monospace, monospace;
+  font-size:9.5px; font-weight:700; letter-spacing:1.3px; text-transform:uppercase;
+  color:var(--text-3); white-space:nowrap;
+}
+#qLibResults{
+  display:grid; grid-template-columns:repeat(auto-fill, minmax(132px, 1fr));
+  gap:12px; margin-top:16px;
+}
+#qLibResults:empty{ display:none; }
+#qLibResults .ql-card{ flex:none; width:auto; }
+#qLibResults .ql-name{ font-size:12px; }
+
+/* ═══ Selected banner ═════════════════════════════════════════════ */
+#qPicked{
+  position:relative; overflow:hidden;
+  display:flex; align-items:center; gap:20px;
+  padding:20px 24px; border-radius:16px; margin:0 0 8px;
+  border:1px solid color-mix(in srgb, var(--hub-accent) 42%, transparent);
+  background:#0e111a;
+}
+#qPicked::before{
+  content:''; position:absolute; inset:0; z-index:0;
+  background-image:var(--qp-art, none);
+  background-size:cover; background-position:center 30%;
+  filter:blur(38px) saturate(1.5); opacity:.4; transform:scale(1.3);
+}
+#qPicked > *{ position:relative; z-index:1; }
+#qPicked .art{
+  width:58px; height:87px; border-radius:9px; flex:0 0 auto;
+  background-size:cover; background-position:center; background-color:#161a26;
+  box-shadow:0 8px 20px rgba(0,0,0,.6);
+}
+#qPicked .nm{
+  font-family:'Archivo', var(--font), sans-serif;
+  font-size:22px; font-weight:900; color:#fff; letter-spacing:.2px; line-height:1.15;
+}
+#qPicked .sb{
+  font-family:'JetBrains Mono', ui-monospace, monospace;
+  font-size:10px; font-weight:700; letter-spacing:1.6px; text-transform:uppercase;
+  color:var(--text-3); margin-top:7px;
+}
+#qPicked .chg{
+  margin-left:auto;
+  padding:9px 15px; border-radius:10px; cursor:pointer;
+  font-family:'Archivo', var(--font), sans-serif;
+  font-size:11.5px; font-weight:700; letter-spacing:.5px; color:var(--text-2);
+  background:rgba(255,255,255,.06); border:1px solid rgba(255,255,255,.12);
+}
+#qPicked .chg:hover{ background:rgba(255,255,255,.12); color:#fff; }
+
+/* ═══ Rank tiles, drawn not typed ═════════════════════════════════ */
+#queueOverlay .q-skill-tile{
+  position:relative;
+  display:flex !important; flex-direction:column; align-items:center; justify-content:center;
+  gap:9px !important; padding:16px 10px !important;
+  border-radius:13px !important;
+  background:rgba(255,255,255,.028) !important;
+  border:1px solid rgba(255,255,255,.08) !important;
+  transition:border-color .18s ease, background .18s ease, transform .18s ease !important;
+}
+#queueOverlay .q-skill-tile:hover{
+  transform:translateY(-2px);
+  border-color:color-mix(in srgb, var(--qst-color) 60%, transparent) !important;
+  background:rgba(255,255,255,.055) !important;
+}
+#queueOverlay .q-skill-tile.is-selected{
+  border-color:var(--qst-color) !important;
+  background:color-mix(in srgb, var(--qst-color) 14%, transparent) !important;
+  box-shadow:0 0 0 1px var(--qst-color), 0 0 26px color-mix(in srgb, var(--qst-color) 26%, transparent);
+}
+#queueOverlay .q-skill-emoji{ font-size:0 !important; line-height:0 !important; }
+#queueOverlay .q-skill-pip{
+  display:block; width:26px; height:26px; color:var(--qst-color);
+  filter:drop-shadow(0 0 10px color-mix(in srgb, var(--qst-color) 55%, transparent));
+}
+#queueOverlay .q-skill-name{
+  font-family:'Archivo', var(--font), sans-serif !important;
+  font-size:12px !important; font-weight:800 !important;
+  letter-spacing:1.2px !important; text-transform:uppercase !important;
+  color:#fff !important;
+}
+
+/* ═══ The commit ══════════════════════════════════════════════════ */
+#qGoWrap{
+  display:flex; flex-direction:column; align-items:center; gap:12px;
+  margin:34px 0 10px;
+}
+#qGo{
+  display:inline-flex; align-items:center; gap:12px;
+  padding:16px 42px; border-radius:14px; border:0; cursor:pointer;
+  font-family:'Archivo', var(--font), sans-serif;
+  font-size:15px; font-weight:900; letter-spacing:1.6px; text-transform:uppercase;
+  color:#0b0416;
+  background:linear-gradient(180deg,
+    color-mix(in srgb, var(--hub-accent) 92%, white), var(--hub-accent));
+  box-shadow:0 14px 34px color-mix(in srgb, var(--hub-accent) 36%, transparent),
+             inset 0 1px 0 rgba(255,255,255,.45);
+  transition:transform .18s cubic-bezier(.22,1,.36,1), filter .18s ease;
+}
+#qGo:hover{ transform:translateY(-2px); filter:brightness(1.07); }
+#qGo:disabled{ opacity:.4; cursor:not-allowed; transform:none; box-shadow:none; }
+#qGoNote{
+  font-family:'JetBrains Mono', ui-monospace, monospace;
+  font-size:10px; font-weight:700; letter-spacing:1.6px; text-transform:uppercase;
+  color:var(--text-3);
+}
+
+/* ═══ Pools, demoted ══════════════════════════════════════════════ */
+#qPools{ margin:44px 0 0; padding-top:30px; border-top:1px solid rgba(255,255,255,.07); }
+.qp-row{ display:grid; grid-template-columns:repeat(auto-fill, minmax(215px, 1fr)); gap:11px; }
+.qp{
+  display:flex; align-items:center; gap:11px;
+  padding:13px 15px; border-radius:12px; cursor:pointer;
+  background:rgba(255,255,255,.025);
+  border:1px solid rgba(255,255,255,.075);
+  transition:border-color .18s ease, background .18s ease;
+}
+.qp:hover{
+  border-color:color-mix(in srgb, var(--hub-accent) 50%, transparent);
+  background:color-mix(in srgb, var(--hub-accent) 10%, transparent);
+}
+.qp-n{ font-family:'Archivo', var(--font), sans-serif; font-size:13px; font-weight:800; color:#fff; }
+.qp-s{
+  font-family:'JetBrains Mono', ui-monospace, monospace;
+  font-size:9px; font-weight:700; letter-spacing:1.1px; text-transform:uppercase;
+  color:var(--text-3); margin-top:4px;
+}
+.qp-c{
+  margin-left:auto; flex:0 0 auto;
+  font-family:'JetBrains Mono', ui-monospace, monospace;
+  font-size:10px; font-weight:800; color:#3ddc84;
+}
+.qp-c.cold{ color:var(--text-3); }
+
+/* The old step-1 card is replaced by the library above it. */
+#queueOverlay .q-body-setup > .q-step-card:first-of-type{ display:none !important; }
+#queueOverlay.q-exact-closed .q-body-setup > .q-step-card{ display:block !important; }
+#qExactToggle{ display:none !important; }
+
+@media (prefers-reduced-motion: reduce){
+  .ql-card, #qGo, .q-skill-tile{ transition:none !important; }
+  #qPulse .dot{ animation:none; }
+}
+</style>
+<script>
+(function () {
+  'use strict';
+
+  function esc(v){
+    return String(v == null ? '' : v)
+      .replace(/&/g,'&amp;').replace(/</g,'&lt;')
+      .replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+  }
+  function jsStr(v){ return JSON.stringify(String(v == null ? '' : v)).replace(/"/g,'&quot;'); }
+  function cssUrl(u){
+    return u ? "url('" + String(u).replace(/\\/g,'%5C').replace(/'/g,'%27') + "')" : '';
+  }
+
+  var lib = [];          // the player's own titles, with art
+  var art = {};          // appid -> { capsule_img, header_img }
+  var pulse = { total:0, playlists:{}, definitions:[] };
+  var pulseTimer = null;
+  var booted = false;
+
+  function games(){
+    try { if (typeof GT_GAMES !== 'undefined') return GT_GAMES; } catch (e){}
+    return [];
+  }
+  /* Steam recents give an appid; the queue wants an id it can store. Use
+     the GT_GAMES entry when one exists so an exact-game session from the
+     library and one from the full picker land in the same bucket, and
+     fall back to the appid otherwise. */
+  function idForAppid(appid){
+    var g = games().find(function (x){ return String(x.steamAppId) === String(appid); });
+    return g ? g.id : ('steam:' + appid);
+  }
+  function nameFor(id){
+    var g = games().find(function (x){ return x.id === id; });
+    if (g) return g.name;
+    var l = lib.find(function (x){ return x.id === id; });
+    return l ? l.name : id;
+  }
+  function artFor(id){
+    var l = lib.find(function (x){ return x.id === id; });
+    if (l && l.art) return l.art;
+    var g = games().find(function (x){ return x.id === id; });
+    return g ? (g.cover || g.header || '') : '';
+  }
+
+  /* ── Data ────────────────────────────────────────────────────── */
+  async function loadLibrary(){
+    var rec = await window.api('/steam/recent').catch(function (){ return null; });
+    if (!Array.isArray(rec) || !rec.length) { lib = []; return; }
+    var ids = rec.map(function (g){ return g.appid; }).filter(Boolean);
+    try {
+      art = await window.api('/steam/art?appids=' + ids.slice(0, 50).join(',')) || {};
+    } catch (e){ art = {}; }
+    lib = rec.map(function (g){
+      var a = art[String(g.appid)] || {};
+      return {
+        id: idForAppid(g.appid),
+        appid: g.appid,
+        name: g.name,
+        hours: Math.round((g.playtime_forever || 0) / 60),
+        recent: Math.round(((g.playtime_2weeks || 0) / 60) * 10) / 10,
+        art: a.capsule_img || a.header_img || '',
+      };
+    });
+  }
+
+  async function loadPulse(){
+    try {
+      var r = await window.api('/queue/pulse');
+      if (r && typeof r.total === 'number') pulse = r;
+    } catch (e){}
+    renderPulse();
+    renderPools();
+  }
+
+  /* ── Render ──────────────────────────────────────────────────── */
+  function head(idx, title, sub, kicker){
+    return '<div class="qh">' +
+      '<div class="qh-t">' + esc(title) + '</div>' +
+      '<span class="qh-bar"></span>' +
+      '<div class="qh-k"><span class="i">' + ('0' + idx).slice(-2) + '</span>' +
+        '<span class="sep">/</span>' + kicker + '</div>' +
+      '<div class="qh-s">' + esc(sub) + '</div>' +
+    '</div>';
+  }
+
+  function cardHtml(g, selected){
+    return '<div class="ql-card' + (selected ? ' on' : '') + '" ' +
+        'onclick="window.qPickGame(' + jsStr(g.id) + ')" title="' + esc(g.name) + '">' +
+      '<div class="ql-art" style="' + (g.art ? 'background-image:' + cssUrl(g.art) : '') + '">' +
+        (g.art ? '' : '<div class="ql-fb">' + esc(String(g.name || '?').charAt(0).toUpperCase()) + '</div>') +
+      '</div>' +
+      '<span class="ql-tick"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" ' +
+        'stroke="currentColor" stroke-width="3.2" stroke-linecap="round" stroke-linejoin="round">' +
+        '<polyline points="20 6 9 17 4 12"/></svg></span>' +
+      '<div class="ql-meta">' +
+        '<div class="ql-name">' + esc(g.name) + '</div>' +
+        (g.hours != null ? '<div class="ql-hrs">' + g.hours + 'h played</div>' : '') +
+      '</div>' +
+    '</div>';
+  }
+
+  function renderLibrary(){
+    var host = document.getElementById('qLib');
+    if (!host) return;
+    var sel = '';
+    try { if (typeof _qState !== 'undefined') sel = _qState.game || ''; } catch (e){}
+
+    var kicker = lib.length
+      ? '<span>Your Steam library</span><span class="sep">·</span>' +
+        '<b>' + lib.length + '</b> games'
+      : '<span>Full catalogue</span><span class="sep">·</span><b>' + games().length + '</b> titles';
+
+    var rail = lib.length
+      ? '<div style="position:relative">' +
+          '<button class="ql-arrow prev" onclick="window.qLibScroll(-1)" aria-label="Scroll left">‹</button>' +
+          '<div class="ql-rail" id="qLibRail">' +
+            lib.map(function (g){ return cardHtml(g, g.id === sel); }).join('') +
+          '</div>' +
+          '<button class="ql-arrow next" onclick="window.qLibScroll(1)" aria-label="Scroll right">›</button>' +
+        '</div>'
+      : '';
+
+    host.innerHTML =
+      head(1, 'Choose your game',
+        lib.length ? 'The games you actually play, first. Search for anything else.'
+                   : 'Search the full library.',
+        kicker) +
+      '<div id="qPickedHost"></div>' +
+      rail +
+      '<div class="ql-search">' +
+        '<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" ' +
+          'stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round">' +
+          '<circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>' +
+        '<input id="qLibSearch" type="text" placeholder="Search every game…" ' +
+          'oninput="window.qLibSearch(this.value)" autocomplete="off">' +
+        '<span class="ql-hint">' + games().length + ' titles</span>' +
+      '</div>' +
+      '<div id="qLibResults"></div>';
+
+    renderPicked();
+  }
+
+  function renderPicked(){
+    var host = document.getElementById('qPickedHost');
+    if (!host) return;
+    var sel = '';
+    try { if (typeof _qState !== 'undefined') sel = _qState.game || ''; } catch (e){}
+    if (!sel || String(sel).indexOf('pl:') === 0){ host.innerHTML = ''; return; }
+    var a = artFor(sel);
+    var l = lib.find(function (x){ return x.id === sel; });
+    host.innerHTML = '<div id="qPicked" style="--qp-art:' + (a ? cssUrl(a) : 'none') + '">' +
+      '<div class="art" style="' + (a ? 'background-image:' + cssUrl(a) : '') + '"></div>' +
+      '<div><div class="nm">' + esc(nameFor(sel)) + '</div>' +
+      '<div class="sb">' + (l && l.hours ? l.hours + 'h played · ' : '') + 'Queueing for this' + '</div></div>' +
+      '<button class="chg" onclick="window.qPickGame(\'\')">Change</button>' +
+    '</div>';
+  }
+
+  window.qLibScroll = function (dir){
+    var r = document.getElementById('qLibRail');
+    if (r) r.scrollBy({ left: dir * Math.max(300, r.clientWidth * 0.8), behavior:'smooth' });
+  };
+
+  window.qLibSearch = function (q){
+    var host = document.getElementById('qLibResults');
+    if (!host) return;
+    q = String(q || '').trim().toLowerCase();
+    if (!q){ host.innerHTML = ''; return; }
+    var sel = '';
+    try { if (typeof _qState !== 'undefined') sel = _qState.game || ''; } catch (e){}
+    var hits = games().filter(function (g){
+      if (g.id === 'other') return false;
+      return (g.name || '').toLowerCase().indexOf(q) !== -1
+          || (g.id || '').toLowerCase().indexOf(q) !== -1
+          || (g.short || '').toLowerCase().indexOf(q) !== -1;
+    }).slice(0, 24);
+    host.innerHTML = hits.length
+      ? hits.map(function (g){
+          return cardHtml({ id:g.id, name:g.name, art:g.cover || g.header || '', hours:null }, g.id === sel);
+        }).join('')
+      : '<div style="grid-column:1/-1;padding:18px 2px;color:var(--text-3);font-size:13px">' +
+        'Nothing matches “' + esc(q) + '”.</div>';
+  };
+
+  window.qPickGame = function (id){
+    try {
+      if (typeof _qState !== 'undefined'){
+        _qState.game = id || '';
+        _qState.playlist = null;   /* a specific title is not a pool */
+      }
+    } catch (e){}
+    renderLibrary();
+    syncGo();
+    if (id){
+      var p = document.getElementById('qPicked');
+      if (p) p.scrollIntoView({ behavior:'smooth', block:'nearest' });
+    }
+  };
+
+  function renderPulse(){
+    var el = document.getElementById('qPulse');
+    if (!el) return;
+    var live = pulse.total > 0;
+    el.innerHTML = '<span class="dot' + (live ? '' : ' cold') + '"></span>' +
+      '<span class="n">' + pulse.total + '</span>' +
+      '<span>' + (live
+        ? (pulse.total === 1 ? 'player is queueing right now.' : 'players are queueing right now.')
+        : 'players queueing right now — pick your game and you will be first in line.') +
+      '</span>';
+  }
+
+  function renderPools(){
+    var host = document.getElementById('qPools');
+    if (!host) return;
+    var defs = pulse.definitions || [];
+    if (!defs.length){ host.innerHTML = ''; return; }
+    host.innerHTML =
+      head(4, 'Or drop into a pool',
+        'Wider nets, so they fill faster. Your rank still applies.',
+        '<span>Shared pools</span><span class="sep">·</span><b>' + defs.length + '</b> open') +
+      '<div class="qp-row">' + defs.map(function (d){
+        var n = (pulse.playlists[d.id] || {}).waiting || 0;
+        return '<div class="qp" onclick="window.qJoinPlaylist(' + jsStr(d.id) + ')">' +
+          '<div><div class="qp-n">' + esc(d.name) + '</div>' +
+          '<div class="qp-s">' + d.players + ' players · ' +
+            (d.games ? d.games.length + ' games' : 'any game') + '</div></div>' +
+          '<span class="qp-c' + (n ? '' : ' cold') + '">' + (n ? n + ' waiting' : '—') + '</span>' +
+        '</div>';
+      }).join('') + '</div>';
+  }
+
+  /* ── The commit ──────────────────────────────────────────────── */
+  function syncGo(){
+    var btn = document.getElementById('qGo');
+    var note = document.getElementById('qGoNote');
+    if (!btn) return;
+    var sel = '', players = 2, skill = 'plat';
+    try {
+      if (typeof _qState !== 'undefined'){
+        sel = _qState.game || ''; players = _qState.players; skill = _qState.skill;
+      }
+    } catch (e){}
+    var ready = !!sel;
+    btn.disabled = !ready;
+    btn.innerHTML =
+      '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" ' +
+      'stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round">' +
+      '<circle cx="11" cy="11" r="7"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>' +
+      (ready ? 'Find players' : 'Pick a game');
+    if (note){
+      note.textContent = ready
+        ? nameFor(sel) + ' · ' + players + ' players · ' + String(skill).toUpperCase()
+        : 'Choose a title above, or drop into a pool below';
+    }
+  }
+  window.qSyncGo = syncGo;
+
+  /* ── Rank pips ───────────────────────────────────────────────── */
+  /* The tier marks were emoji, drawn by the OS. These are drawn here,
+     in the tier's own colour, at the app's stroke weight. */
+  var PIPS = {
+    bronze:'<path d="M12 3 4 8v8l8 5 8-5V8l-8-5Z"/>',
+    silver:'<path d="M12 3 4 8v8l8 5 8-5V8l-8-5Z"/><path d="M12 8v8"/>',
+    gold:'<path d="M12 3 4 8v8l8 5 8-5V8l-8-5Z"/><path d="M8.5 10.5 12 8l3.5 2.5"/><path d="M12 8v8"/>',
+    plat:'<path d="M12 2.5 21 12l-9 9.5L3 12l9-9.5Z"/>',
+    diamond:'<path d="M12 2.5 21 12l-9 9.5L3 12l9-9.5Z"/><path d="M7.5 12 12 7l4.5 5-4.5 5-4.5-5Z"/>',
+    master:'<path d="M4 18h16"/><path d="M4 18 3 7l5 3.5L12 4l4 6.5L21 7l-1 11"/>',
+    pro:'<path d="M13 2 4.5 13.5H11L10 22l8.5-11.5H12L13 2Z"/>',
+  };
+  function drawPips(){
+    document.querySelectorAll('#queueOverlay .q-skill-tile').forEach(function (t){
+      if (t.__pip) return;
+      var id = t.getAttribute('data-skill');
+      var d = PIPS[id];
+      if (!d) return;
+      var slot = t.querySelector('.q-skill-emoji');
+      if (!slot) return;
+      t.__pip = true;
+      slot.outerHTML = '<svg class="q-skill-pip" viewBox="0 0 24 24" fill="none" ' +
+        'stroke="currentColor" stroke-width="1.9" stroke-linecap="round" ' +
+        'stroke-linejoin="round" aria-hidden="true">' + d + '</svg>';
+    });
+  }
+
+  /* ── Mount ───────────────────────────────────────────────────── */
+  function mount(){
+    var setup = document.getElementById('qViewSetup');
+    if (!setup) return false;
+
+    var ov = document.getElementById('queueOverlay');
+    /* Borrows the hub heading styles that were generalised to [data-hub]
+       — no Hub instance, just the same typography. */
+    if (ov && !ov.getAttribute('data-hub')) ov.setAttribute('data-hub', 'queue');
+    if (ov) ov.classList.remove('q-exact-closed');
+
+    if (!document.getElementById('qLib')){
+      var pulseEl = document.createElement('div');
+      pulseEl.id = 'qPulse';
+      var libEl = document.createElement('div');
+      libEl.id = 'qLib';
+      setup.insertBefore(libEl, setup.firstChild);
+      setup.insertBefore(pulseEl, libEl);
+
+      /* The commit button and the pools go after the existing step
+         cards, which keep every setup option exactly where it was. */
+      var go = document.createElement('div');
+      go.id = 'qGoWrap';
+      go.innerHTML = '<button id="qGo" type="button" disabled></button>' +
+                     '<div id="qGoNote"></div>';
+      setup.appendChild(go);
+      var pools = document.createElement('div');
+      pools.id = 'qPools';
+      setup.appendChild(pools);
+
+      document.getElementById('qGo').addEventListener('click', function (){
+        if (typeof window.qBeginSearch === 'function') window.qBeginSearch();
+      });
+    }
+    return true;
+  }
+
+  function refresh(){
+    renderLibrary();
+    renderPulse();
+    renderPools();
+    drawPips();
+    syncGo();
+  }
+
+  function start(){
+    if (typeof window.api !== 'function'){ setTimeout(start, 300); return; }
+    if (booted) return;
+    booted = true;
+
+    var origOpen = window.openQueuePanel;
+    if (typeof origOpen === 'function' && !origOpen.__v2){
+      var wrapped = function (){
+        var out = origOpen.apply(this, arguments);
+        if (mount()){
+          refresh();
+          loadLibrary().then(refresh);
+          loadPulse();
+          clearInterval(pulseTimer);
+          pulseTimer = setInterval(loadPulse, 10000);
+        }
+        return out;
+      };
+      wrapped.__v2 = true;
+      window.openQueuePanel = wrapped;
+    }
+
+    var origClose = window.closeQueuePanel;
+    if (typeof origClose === 'function' && !origClose.__v2){
+      var wc = function (){ clearInterval(pulseTimer); pulseTimer = null; return origClose.apply(this, arguments); };
+      wc.__v2 = true;
+      window.closeQueuePanel = wc;
+    }
+
+    /* The steppers and rank tiles write straight into _qState, so the
+       summary under the button follows them. */
+    ['qStep','_qSelectSkill','_qSelectGame'].forEach(function (fn){
+      var orig = window[fn];
+      if (typeof orig !== 'function' || orig.__v2) return;
+      var w = function (){
+        var r = orig.apply(this, arguments);
+        drawPips(); renderPicked(); syncGo();
+        return r;
+      };
+      w.__v2 = true;
+      window[fn] = w;
+    });
+  }
+
+  if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', start);
+  else start();
+})();
+</script>
+
 </body>
 </html>
