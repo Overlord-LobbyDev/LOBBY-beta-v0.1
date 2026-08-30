@@ -64526,11 +64526,16 @@ async function reactComment(ev, id, btn){
    cinematic band went missing. */
 #qMq{
   position:relative; z-index:1;
-  width:100%; max-width:1500px;
-  margin:0 auto; padding:0 40px 52px;
+  width:100%; max-width:none;
+  margin:0; padding:0 clamp(28px, 3.4vw, 72px) 52px;
+  display:grid; grid-template-columns:minmax(0, 660px) 1fr;
+  gap:48px; align-items:end;
 }
-#qMq > *{ max-width:660px; }
-#qMq > #qHow{ max-width:none; }
+/* Running text stays at a readable measure whatever the window does;
+   the SPACE beside it gets used instead of the line length growing. */
+#qMqMain{ min-width:0; }
+#qMqMain > *{ max-width:660px; }
+#qMq > #qHow{ grid-column:1 / -1; max-width:none; }
 #queueOverlay .q-hero-title,
 #queueOverlay .q-hero-sub,
 #queueOverlay .q-camera-notice,
@@ -64567,6 +64572,51 @@ async function reactComment(ev, id, btn){
   color:var(--text-3);
 }
 #qMqBtns{ display:flex; align-items:center; gap:11px; flex-wrap:wrap; }
+
+/* The right half of a 62vh cinematic band was empty. This is the one
+   thing worth putting there: who is actually queueing, right now. */
+#qMqLive{
+  justify-self:end; align-self:end;
+  width:min(340px, 100%);
+  padding:20px 22px; border-radius:16px;
+  background:rgba(8,10,15,.52);
+  backdrop-filter:blur(18px) saturate(1.3);
+  border:1px solid rgba(255,255,255,.12);
+  box-shadow:0 20px 50px -18px rgba(0,0,0,.8);
+}
+#qMqLive .h{
+  display:flex; align-items:center; gap:9px; margin-bottom:14px;
+  font-family:'JetBrains Mono', ui-monospace, monospace;
+  font-size:9.5px; font-weight:700; letter-spacing:1.9px; text-transform:uppercase;
+  color:var(--text-3);
+}
+#qMqLive .h i{
+  width:7px; height:7px; border-radius:50%; background:#3ddc84;
+  box-shadow:0 0 10px rgba(61,220,132,.85);
+}
+#qMqLive .h i.cold{ background:rgba(255,255,255,.22); box-shadow:none; }
+#qMqLive .row{
+  display:flex; align-items:center; gap:10px;
+  padding:9px 0; cursor:pointer;
+  border-top:1px solid rgba(255,255,255,.07);
+}
+#qMqLive .row:first-of-type{ border-top:0; }
+#qMqLive .row:hover .nm{ color:#fff; }
+#qMqLive .nm{
+  font-family:'Archivo', var(--font), sans-serif;
+  font-size:12.5px; font-weight:700; color:var(--text-2);
+  transition:color .16s ease;
+}
+#qMqLive .ct{
+  margin-left:auto;
+  font-family:'JetBrains Mono', ui-monospace, monospace;
+  font-size:10px; font-weight:800; color:#3ddc84;
+}
+#qMqLive .ct.cold{ color:var(--text-3); }
+@media (max-width:1180px){
+  #qMq{ grid-template-columns:1fr !important; }
+  #qMqLive{ display:none; }
+}
 #qFind{
   display:inline-flex; align-items:center; justify-content:center; gap:11px;
   padding:16px 34px; border-radius:12px; border:0; cursor:pointer;
@@ -64628,7 +64678,7 @@ async function reactComment(ev, id, btn){
 
 /* ═══ 2 · DECK ════════════════════════════════════════════════════ */
 #queueOverlay .q-body-setup{
-  max-width:1500px; margin:0 auto; padding:46px 40px 60px !important;
+  padding:0 0 70px !important;
 }
 /* The deck replaces the picker card specifically. The other two are
    hidden because the settings bar borrows their controls, and they come
@@ -64664,18 +64714,24 @@ async function reactComment(ev, id, btn){
 .qsec-k .sep{ color:rgba(255,255,255,.18); }
 .qsec-s{ font-size:12.5px; color:var(--text-3); margin-top:9px; }
 
-#qDeck{ position:relative; height:400px; margin:30px 0 0; }
+#qDeck{ position:relative; height:456px; margin:34px 0 0; }
 #qStage > .qsec,
 #qStage > #qDeck,
 #qStage > #qDots,
 #qStage > #qBar,
-#qStage > #qPools{ max-width:1500px; margin-left:auto; margin-right:auto; padding-left:40px; padding-right:40px; }
-#qStage > .qsec{ padding-top:52px; }
-#qStage > #qBar{ max-width:940px; }
+#qStage > #qPools{
+  max-width:none; margin-left:0; margin-right:0;
+  padding-left:clamp(28px, 3.4vw, 72px);
+  padding-right:clamp(28px, 3.4vw, 72px);
+}
+#qStage > .qsec{ padding-top:56px; }
+/* The one thing that should NOT stretch: a row of controls 2000px wide
+   puts the rank tiles a screen away from the stepper. */
+#qStage > #qBar{ max-width:1180px; margin-left:auto; margin-right:auto; }
 #qTrack{ position:relative; height:100%; }
 .qc{
   position:absolute; top:0; left:50%;
-  width:252px; height:378px; margin-left:-126px;
+  width:288px; height:432px; margin-left:-144px;
   border-radius:16px; overflow:hidden; cursor:pointer;
   background:#12151f; border:1px solid rgba(255,255,255,.09);
   box-shadow:0 26px 60px -18px rgba(0,0,0,.85);
@@ -64787,8 +64843,8 @@ async function reactComment(ev, id, btn){
 /* ═══ 3 · POOLS ═══════════════════════════════════════════════════ */
 #qPools{ margin:56px 0 0; }
 #qPoolRow{
-  display:grid; grid-template-columns:repeat(auto-fill, minmax(212px, 1fr));
-  gap:12px; margin-top:26px;
+  display:grid; grid-template-columns:repeat(auto-fill, minmax(248px, 1fr));
+  gap:14px; margin-top:28px;
 }
 .qpool{
   display:flex; align-items:center; gap:12px;
@@ -64827,7 +64883,7 @@ async function reactComment(ev, id, btn){
 }
 #qTable{
   display:grid; grid-template-columns:288px 1fr; gap:38px;
-  width:100%; max-width:1080px; align-items:center;
+  width:100%; max-width:1320px; align-items:center;
 }
 .qtl{
   font-family:'JetBrains Mono', ui-monospace, monospace;
@@ -64912,6 +64968,10 @@ async function reactComment(ev, id, btn){
 @keyframes qRing{ 0%{ transform:scale(.8); opacity:.85; } 100%{ transform:scale(1.08); opacity:0; } }
 #qtActs{ display:flex; gap:11px; margin-top:32px; }
 
+@media (max-width:1500px){
+  .qc{ width:252px; height:378px; margin-left:-126px; }
+  #qDeck{ height:400px; }
+}
 @media (max-width:1080px){
   #qTable{ grid-template-columns:1fr; }
   #qSeats{ width:360px; height:360px; }
@@ -65018,7 +65078,11 @@ async function reactComment(ev, id, btn){
     var name = isPool ? 'A pool' : (e ? e.name : (g ? g.name : ''));
     var ready = !!sel;
 
+    /* Two columns: the copy stays at a readable measure on the left and
+       the live board fills the right, so a 62vh band is not two thirds
+       empty on a wide screen. */
     mq.innerHTML =
+      '<div id="qMqMain">' +
       '<div id="qMqKick">' + (ready ? '◆ Queueing for' : '◆ Find players · 1v1 or squad up') + '</div>' +
       '<h1 id="qMqName">' + esc(ready ? name : 'Lobby Queue') + '</h1>' +
       '<p id="qMqDesc">' + (ready
@@ -65036,6 +65100,8 @@ async function reactComment(ev, id, btn){
           (ready ? 'Find players' : 'Pick a game below') + '</button>' +
         (ready ? '<button class="qghost" onclick="window.qScrollDeck()">Change game</button>' : '') +
       '</div>' +
+      '</div>' +
+      liveHtml() +
       '<div id="qHow">' +
         '<div class="qhw"><i>' + I.pick + '</i><div><b>Pick a game</b><span>Your library, or a pool</span></div></div>' +
         '<div class="qhw"><i>' + I.squad + '</i><div><b>Set your squad</b><span>Size and rank</span></div></div>' +
@@ -65050,13 +65116,32 @@ async function reactComment(ev, id, btn){
     var btn = document.getElementById('qFind');
     if (btn) btn.onclick = function (){ if (window.qBeginSearch) window.qBeginSearch(); };
   }
+  /* The pools, live, in the band. Doubles as the fast path: the whole
+     row is a click. */
+  function liveHtml(){
+    var defs = (pulse.definitions || []).slice(0, 5);
+    if (!defs.length) return '';
+    var live = pulse.total > 0;
+    return '<div id="qMqLive">' +
+      '<div class="h"><i class="' + (live ? '' : 'cold') + '"></i>' +
+        (live ? pulse.total + ' waiting right now' : 'Nobody waiting — be first') + '</div>' +
+      defs.map(function (d){
+        var c = (pulse.playlists[d.id] || {}).waiting || 0;
+        return '<div class="row" onclick="window.qJoinPlaylist(' + jsStr(d.id) + ')">' +
+          '<span class="nm">' + esc(d.name) + '</span>' +
+          '<span class="ct' + (c ? '' : ' cold') + '">' + (c ? c : '—') + '</span>' +
+        '</div>';
+      }).join('') +
+    '</div>';
+  }
+
   window.qScrollDeck = function (){
     var d = document.getElementById('qDeck');
     if (d) d.scrollIntoView({ behavior:'smooth', block:'center' });
   };
 
   /* ── 2 · Deck ────────────────────────────────────────────────── */
-  var idx = 0, STEP = 224, STEP2 = 392;
+  var idx = 0, STEP = 288, STEP2 = 540, STEP3 = 752;
 
   /* Titles with real cover art first: the catalogue is 87 entries and
      over half are a gradient with two letters on it, which is a poor
@@ -65162,11 +65247,17 @@ async function reactComment(ev, id, btn){
       else if (a === 1){ st.setProperty('--x',(off*STEP)+'px'); st.setProperty('--s','.84');
                     st.setProperty('--b','.62'); st.setProperty('--sat','.7');
                     st.setProperty('--o','1'); st.zIndex = 20; }
-      else if (a === 2){ st.setProperty('--x',(off/a*STEP2)+'px'); st.setProperty('--s','.7');
-                    st.setProperty('--b','.44'); st.setProperty('--sat','.5');
+      else if (a === 2){ st.setProperty('--x',(off/a*STEP2)+'px'); st.setProperty('--s','.72');
+                    st.setProperty('--b','.46'); st.setProperty('--sat','.52');
                     st.setProperty('--o','1'); st.zIndex = 10; }
-      else { st.setProperty('--x',(off>0 ? STEP2+220 : -(STEP2+220))+'px');
-             st.setProperty('--s','.62'); st.setProperty('--o','0'); st.zIndex = 1; }
+      /* A third ring, because a wide window has the room for it and a
+         deck that stops at two looks like it ran out rather than
+         receding. */
+      else if (a === 3){ st.setProperty('--x',(off/a*STEP3)+'px'); st.setProperty('--s','.6');
+                    st.setProperty('--b','.3'); st.setProperty('--sat','.36');
+                    st.setProperty('--o','1'); st.zIndex = 5; }
+      else { st.setProperty('--x',(off>0 ? STEP3+240 : -(STEP3+240))+'px');
+             st.setProperty('--s','.54'); st.setProperty('--o','0'); st.zIndex = 1; }
       c.onclick = (off === 0) ? null : function (){ idx = i; commit(); };
     });
     var dots = document.getElementById('qDots');
