@@ -62619,7 +62619,7 @@ async function reactComment(ev, id, btn){
 #homeContent [data-home-slot="hero"] .rc-stat .rc-trophy{
   margin-left:auto !important;
   align-self:center;
-  width:19px !important; height:19px !important;
+  width:20px !important; height:20px !important;
   font-size:0 !important;
 }
 /* The cell keeps a trace of warmth so the mark is not floating on grey,
@@ -62707,17 +62707,33 @@ async function reactComment(ev, id, btn){
   'use strict';
 
   /* fill:none, stroke:currentColor, stroke-width:2, round caps — the
-     same construction as the other 164 icons in this file, so it sits
-     in the set rather than beside it. */
+     same construction as the other 164 icons in this file.
+     
+     The first outline was the right idiom at the wrong proportions: a
+     bowl wider than it was tall, handles that were stubs rather than
+     arcs, and a base drawn twice — a trapezoid whose bottom edge landed
+     exactly on a separate foot line, so the two merged into a smudge.
+     Squat and doubled is what made it read as a toy.
+     
+     Redrawn to the proportions the object actually has: the cup taller
+     than it is wide, handles that are real half-circles standing clear
+     of it, a stem with room to be a stem, and one plinth that tapers.
+     Every number below is deliberate — this is the mark for finishing a
+     game, at 20px, and at that size proportion is the only thing doing
+     any work. */
   var TROPHY =
-    '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" ' +
+    '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" ' +
       'stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">' +
-      '<path d="M7 4h10v5a5 5 0 0 1-10 0V4Z"/>' +
-      '<path d="M7 6H4.5v1a3.5 3.5 0 0 0 3 3.4"/>' +
-      '<path d="M17 6h2.5v1a3.5 3.5 0 0 1-3 3.4"/>' +
-      '<path d="M12 14v3"/>' +
-      '<path d="M8.5 20h7"/>' +
-      '<path d="M10 17h4l.8 3h-5.6l.8-3Z"/>' +
+      /* Cup: 9.6 across, 10.2 down. Taller than wide, which is the whole
+         difference between a trophy and an egg cup. */
+      '<path d="M7.2 3h9.6v5.4a4.8 4.8 0 0 1-9.6 0V3Z"/>' +
+      /* Handles: true half-circles springing off the rim and returning
+         to the bowl, not tabs stuck on the side. */
+      '<path d="M7.2 4.8H4.9a2.45 2.45 0 0 0 0 4.9h1.3"/>' +
+      '<path d="M16.8 4.8h2.3a2.45 2.45 0 0 1 0 4.9h-1.3"/>' +
+      '<path d="M12 13.2v3.4"/>' +
+      /* One plinth, tapered, and nothing drawn underneath it. */
+      '<path d="M8.4 20.8h7.2l-.95-3.1a1.2 1.2 0 0 0-1.15-.85h-3a1.2 1.2 0 0 0-1.15.85l-.95 3.1Z"/>' +
     '</svg>';
 
   var PLAY =
@@ -62732,8 +62748,8 @@ async function reactComment(ev, id, btn){
        the old flag, and a session that has already run it would
        otherwise keep the filled trophy until reload. */
     document.querySelectorAll('.rc-trophy').forEach(function (el){
-      if (el.__gold2) return;
-      el.__gold2 = true;
+      if (el.__gold3) return;
+      el.__gold3 = true;
       el.innerHTML = TROPHY;
       el.setAttribute('title', 'Every achievement unlocked');
       el.setAttribute('aria-label', 'Every achievement unlocked');
