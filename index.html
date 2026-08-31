@@ -67890,8 +67890,16 @@ async function reactComment(ev, id, btn){
     if (!el){
       el = document.createElement('div');
       el.id = 'qFindList';
+      /* insertBefore only accepts a reference node that is a CHILD of
+         the parent. #qMorePanel lives inside #qBar, so its sibling is
+         not a child of #qStage -- which threw NotFoundError on every
+         pulse once the panel existed, ten seconds apart, forever. */
       var panel = document.getElementById('qMorePanel');
-      stage.insertBefore(el, (panel || bar).nextSibling);
+      var ref = null;
+      if (panel && panel.parentNode === stage) ref = panel.nextSibling;
+      else if (bar.parentNode === stage) ref = bar.nextSibling;
+      if (ref) stage.insertBefore(el, ref);
+      else stage.appendChild(el);
     }
     return el;
   }
@@ -68420,6 +68428,12 @@ async function reactComment(ev, id, btn){
     if (card) card.classList.add('q-picker');
   }
 
+  /* The room is a separate module and cannot see this one's shelves.
+     A game picked from Steam search lives only in `found`, so without
+     this the table was titled "App 1808500" with a blank cover. */
+  window.qEntry = entry;
+  window.qAppIdFor = appIdFor;
+
   function refresh(){ ensureStage(); tagPicker(); buildDeck(); paintMarquee(); paintPools(); }
 
   function start(){
@@ -68793,7 +68807,27 @@ async function reactComment(ev, id, btn){
    has to say it wants the row, or it sits in a narrow letterbox no
    matter what max-width it asks for. */
 #queueOverlay #qRoom{ align-self:stretch; }
-#queueOverlay #qViewSearching:has(#qRoom){ padding:24px 34px !important; }
+
+#queueOverlay #qViewSearching:has(#qRoom),
+#queueOverlay #qViewInCall:has(#qRoom){
+  display:block !important;
+  padding:0 !important;
+  height:100%;
+}
+/* Everything the old views own stays in the DOM -- other modules still
+   look their nodes up -- but nothing of theirs is on screen. */
+#queueOverlay #qViewSearching:has(#qRoom) > *:not(#qRoom),
+#queueOverlay #qViewInCall:has(#qRoom) > *:not(#qRoom){
+  display:none !important;
+}
+#queueOverlay #qRoom{
+  height:100%; padding:16px 20px 14px;
+  display:flex; flex-direction:column;
+}
+/* The middle takes the slack, so the bar sits on the bottom edge rather
+   than halfway up a column of empty space. */
+#queueOverlay #qRoom .qr-main{ flex:1 1 auto; min-height:0; }
+#queueOverlay #qRoom .qr-side{ overflow-y:auto; }
 
 /* ── Top: what this table is, and how long it has ─────────────── */
 .qr-top{
@@ -69261,6 +69295,908 @@ async function reactComment(ev, id, btn){
 .qr-bar .gap{ flex:1; }
 .qr-b svg{ flex:0 0 auto; }
 </style>
+<style id="qRoomSkin">
+/* ═══ QUEUE · THE ROOM'S SKIN ═══════════════════════════════════════
+   Loaded after the room's own stylesheet, so every rule here is a
+   deliberate override rather than an edit to the layer underneath.
+
+   The whole surface is lit by ONE colour, --qa, pulled at runtime out of
+   the game's own key art. Nothing below hard-codes an accent: a
+   Counter-Strike table is orange-black and a Valorant table is red
+   without either being designed, because the game supplies its own
+   atmosphere and the room simply carries it. ══ */
+
+#qRoom{
+  position:relative;
+  /* Its own stacking context, so the wash can sit behind everything in
+     the room without escaping into the page. */
+  isolation:isolate;
+}
+
+/* ── The wash ─────────────────────────────────────────────────────
+   Two layers: the art itself, blurred past recognition and dimmed to
+   almost nothing, and a colour bloom over it. Legibility first -- this
+   has to survive white 12px text sitting on top of it. */
+#qRoom::before{
+  content:''; position:absolute; inset:-40px -40px 0; z-index:-2;
+  background-image:var(--qr-hero, none);
+  background-size:cover; background-position:center 22%;
+  filter:blur(64px) saturate(1.5);
+  opacity:0; transition:opacity .9s ease;
+  pointer-events:none;
+}
+#qRoom.lit::before{ opacity:.30; }
+#qRoom::after{
+  content:''; position:absolute; inset:-40px -40px 0; z-index:-1;
+  pointer-events:none;
+  background:
+    radial-gradient(900px 420px at 50% -8%, rgba(var(--qa), .20), transparent 68%),
+    radial-gradient(700px 400px at 12% 108%, rgba(var(--qa), .10), transparent 70%),
+    linear-gradient(180deg, rgba(6,7,12,.55) 0%, rgba(6,7,12,.86) 62%, rgba(6,7,12,.95) 100%);
+}
+
+/* Panels are glass over that wash rather than solid boxes on a flat
+   ground -- which is the whole difference between a room and a form. */
+#qRoom .qr-top,
+#qRoom .qr-bar,
+#qRoom .qr-card,
+#qRoom .qr-chat,
+#qRoom .qr-stage{
+  background:linear-gradient(158deg, rgba(255,255,255,.062), rgba(255,255,255,.016));
+  border:1px solid rgba(255,255,255,.09);
+  backdrop-filter:blur(16px) saturate(1.15);
+  box-shadow:
+    inset 0 1px 0 rgba(255,255,255,.07),
+    0 18px 44px -26px rgba(0,0,0,.9);
+}
+
+/* ── The banner ───────────────────────────────────────────────── */
+#qRoom .qr-top{
+  display:block;            /* not a flex row -- .qr-top-in is the row */
+  position:relative; overflow:hidden; padding:0; border-radius:18px;
+}
+#qRoom .qr-top-in .qr-id{ flex:1 1 auto; min-width:0; }
+#qRoom .qr-top-in .qr-clock{ margin-left:auto; text-align:right; }
+.qr-top-art{
+  position:absolute; inset:0; z-index:0;
+  background-image:var(--qr-hero, none);
+  /* Anchored to the lower third: key art puts its logo across the middle
+     and its subject below it, so a centred crop of a wide image lands on
+     the one part nobody wants to see. */
+  background-size:cover; background-position:center 62%;
+  -webkit-mask-image:linear-gradient(90deg, transparent 0%, #000 34%, #000 74%, transparent 99%);
+          mask-image:linear-gradient(90deg, transparent 0%, #000 34%, #000 74%, transparent 99%);
+  opacity:.34; filter:saturate(1.2) contrast(1.05);
+  transform:scale(1.04);
+}
+.qr-top::after{
+  content:''; position:absolute; inset:0; z-index:1; pointer-events:none;
+  background:
+    linear-gradient(90deg,
+      rgba(8,9,14,.96) 0%, rgba(8,9,14,.84) 28%,
+      rgba(8,9,14,.66) 58%, rgba(8,9,14,.92) 100%),
+    linear-gradient(180deg, rgba(255,255,255,.05), transparent 40%);
+}
+.qr-top-in{
+  position:relative; z-index:2;
+  display:flex; align-items:center; gap:18px;
+  padding:16px 22px; min-height:96px;
+}
+#qRoom .qr-art{
+  width:58px; height:78px; border-radius:10px;
+  box-shadow:0 14px 30px -12px rgba(0,0,0,.95), 0 0 0 1px rgba(255,255,255,.1);
+}
+#qRoom .qr-name{
+  font-size:26px; letter-spacing:-.4px;
+  text-shadow:0 2px 18px rgba(0,0,0,.6);
+}
+#qRoom .qr-phase{
+  color:rgb(var(--qa));
+  background:rgba(var(--qa), .16);
+  border-color:rgba(var(--qa), .42);
+}
+/* A phase that has just changed is worth one beat of attention and no
+   more -- it is a state, not an alarm. */
+#qRoom .qr-phase.live{
+  color:#0b0510; border-color:transparent;
+  background:linear-gradient(180deg, rgb(var(--qa)), rgba(var(--qa), .82));
+  animation:qrPulse 2.4s ease-out 1;
+}
+@keyframes qrPulse{
+  0%   { box-shadow:0 0 0 0 rgba(var(--qa), .55); }
+  70%  { box-shadow:0 0 0 14px rgba(var(--qa), 0); }
+  100% { box-shadow:0 0 0 0 rgba(var(--qa), 0); }
+}
+#qRoom .qr-clock{ font-size:21px; letter-spacing:.5px; }
+
+/* ── The table ────────────────────────────────────────────────────
+   Seats sit around a surface. The arrangement carries the information:
+   a gap at a table is a thing everyone already knows how to read, and
+   it leaves the middle free for whatever the table is looking at. */
+#qRoom .qr-stage{
+  padding:26px; border-radius:18px;
+  min-height:0; justify-content:center;
+}
+#qRoom{ min-height:0; }
+#qRoom .qr-main{ align-items:stretch; }
+.qr-table{
+  position:relative; margin:0 auto;
+  width:min(100%, 940px); aspect-ratio:2.05 / 1;
+  min-height:340px;
+}
+.qr-felt{
+  position:absolute; inset:11% 8%; border-radius:50%;
+  /* Lit from above and darker at the near edge, which is what stops an
+     ellipse reading as a flat grey hole. */
+  background:
+    radial-gradient(80% 120% at 50% -14%, rgba(var(--qa), .22), transparent 60%),
+    radial-gradient(100% 140% at 50% 120%, rgba(0,0,0,.5), transparent 62%),
+    linear-gradient(176deg, rgba(255,255,255,.07), rgba(255,255,255,.014) 58%);
+  border:1px solid rgba(255,255,255,.08);
+  box-shadow:
+    inset 0 1px 0 rgba(255,255,255,.13),
+    inset 0 -20px 60px rgba(0,0,0,.42),
+    inset 0 0 0 1px rgba(var(--qa), .12),
+    0 50px 90px -60px #000;
+}
+/* A second rim just inside the first: one hairline reads as a border,
+   two read as an edge with thickness. */
+.qr-felt::after{
+  content:''; position:absolute; inset:9px; border-radius:50%;
+  border:1px solid rgba(255,255,255,.045);
+  pointer-events:none;
+}
+.qr-mid{
+  position:absolute; inset:15% 17%; z-index:2;
+  display:flex; align-items:center; justify-content:center;
+}
+/* What the middle says when nobody is sharing: the count, big, and what
+   it is waiting for. */
+.qr-mid-t{ text-align:center; }
+.qr-mid-t b{
+  display:block;
+  font-family:'Archivo', var(--font), sans-serif;
+  font-size:54px; font-weight:800; color:#fff; line-height:1;
+  letter-spacing:-1.5px;
+  text-shadow:0 4px 30px rgba(0,0,0,.8);
+}
+.qr-mid-t b i{
+  font-style:normal; color:var(--text-3); font-weight:700; margin:0 2px;
+}
+/* A sentence, set as a sentence. In mono small-caps it read as a system
+   label stamped across the middle of the table. */
+.qr-mid-t span{
+  display:block; margin-top:10px; max-width:280px;
+  font-family:'Archivo', var(--font), sans-serif;
+  font-size:14px; font-weight:600; letter-spacing:0; text-transform:none;
+  color:var(--text-2); line-height:1.5;
+}
+/* Once the code is posted it IS the middle of the table -- it is the
+   thing every person there needs to read and copy. */
+.qr-mid-code{
+  display:flex; flex-direction:column; align-items:center; gap:5px;
+  padding:16px 26px; border-radius:14px; cursor:pointer; max-width:100%;
+  background:rgba(0,0,0,.45); border:1px dashed rgba(var(--qa), .5);
+  transition:border-color .18s, background .18s, transform .18s;
+}
+.qr-mid-code:hover{ transform:translateY(-2px); background:rgba(0,0,0,.6); }
+.qr-mid-code span{
+  font-family:'JetBrains Mono', ui-monospace, monospace;
+  font-size:8.5px; font-weight:700; letter-spacing:1.8px; text-transform:uppercase;
+  color:var(--text-3);
+}
+.qr-mid-code b{
+  font-family:'JetBrains Mono', ui-monospace, monospace;
+  font-size:26px; font-weight:800; letter-spacing:2px; color:#fff;
+  max-width:100%; overflow:hidden; text-overflow:ellipsis;
+}
+.qr-mid-code i{
+  font-style:normal; font-size:10px; color:rgb(var(--qa));
+  font-family:'JetBrains Mono', ui-monospace, monospace; letter-spacing:1px;
+}
+
+/* A share takes the surface. It is what everyone is looking at, so it
+   gets the middle rather than a panel of its own. */
+.qr-table.sharing .qr-mid{ inset:11% 13%; }
+/* Superseded by .qr-screen, which rises out of the table instead of
+   sitting on it. Kept as the filmstrip fallback on narrow layouts. */
+#qRoom .qr-share{
+  width:100%; height:100%; border-radius:14px;
+  border:1px solid rgba(var(--qa), .3);
+  box-shadow:0 30px 70px -40px #000, 0 0 60px -30px rgba(var(--qa), .5);
+}
+
+/* Seats, placed around the ellipse by the renderer. */
+#qRoom .qr-table .qr-seat{
+  position:absolute; transform:translate(-50%, -50%);
+  width:186px; padding:18px 14px; z-index:3;
+  animation:qrSeat .45s cubic-bezier(.2,.9,.3,1) both;
+}
+@keyframes qrSeat{
+  from{ opacity:0; transform:translate(-50%, -46%) scale(.94); }
+  to  { opacity:1; transform:translate(-50%, -50%) scale(1); }
+}
+#qRoom .qr-seat{
+  border-radius:16px;
+  background:linear-gradient(165deg, rgba(255,255,255,.075), rgba(255,255,255,.02));
+  border:1px solid rgba(255,255,255,.1);
+  box-shadow:inset 0 1px 0 rgba(255,255,255,.08), 0 16px 34px -22px rgba(0,0,0,.95);
+  backdrop-filter:blur(10px);
+}
+#qRoom .qr-av{ width:74px; height:74px; font-size:24px; }
+/* Two short rows beat one clipped one. The base rule forced every tag
+   onto a single line and then cut it off, so a seat read "ADER YOU 52MS
+   PL." -- four truncated words that mean nothing. */
+#qRoom .qr-tags{
+  flex-wrap:wrap; row-gap:4px; overflow:visible;
+}
+#qRoom .qr-tag{
+  max-width:100%; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;
+}
+#qRoom .qr-seat.talking .qr-av{
+  box-shadow:0 0 0 3px rgb(var(--qa)), 0 0 26px -2px rgba(var(--qa), .9);
+}
+#qRoom .qr-seat.talking{
+  border-color:rgba(var(--qa), .5);
+}
+/* An empty seat is an invitation, so it breathes rather than sits
+   there dead. Slow enough not to nag. */
+#qRoom .qr-seat.empty{
+  background:rgba(255,255,255,.012);
+  border:1px dashed rgba(255,255,255,.16);
+  box-shadow:none; backdrop-filter:none;
+  animation:qrSeat .45s cubic-bezier(.2,.9,.3,1) both, qrBreathe 4.5s ease-in-out 1s infinite;
+}
+@keyframes qrBreathe{
+  0%,100%{ border-color:rgba(255,255,255,.14); }
+  50%    { border-color:rgba(var(--qa), .42); }
+}
+#qRoom .qr-tag.you,
+#qRoom .qr-tag.role,
+#qRoom .qr-tag.ping{ border-color:rgba(var(--qa), .34); }
+#qRoom .qr-tag.you{ color:rgb(var(--qa)); }
+
+#qRoom .qr-hint{
+  font-size:12.5px; color:var(--text-3); letter-spacing:.1px;
+  opacity:.75; margin-top:2px;
+}
+
+/* Narrow: the ellipse stops being an ellipse and the seats go back to a
+   row. A table metaphor squeezed into 600px is just overlapping cards. */
+@media (max-width:1100px){
+  .qr-table{ min-height:0; display:flex; flex-wrap:wrap; gap:12px;
+             align-items:center; justify-content:center; }
+  .qr-felt{ display:none; }
+  .qr-mid{ position:static; inset:auto; order:-1; width:100%; }
+  #qRoom .qr-table .qr-seat{
+    position:static; transform:none; animation:none; flex:0 1 168px;
+  }
+}
+
+/* ── The rail reads as one panel ──────────────────────────────── */
+#qRoom .qr-side{ gap:14px; }
+#qRoom .qr-card{ padding:16px 17px; border-radius:16px; }
+#qRoom .qr-card.hot{
+  border-color:rgba(var(--qa), .45);
+  box-shadow:inset 0 1px 0 rgba(255,255,255,.08), 0 0 40px -22px rgba(var(--qa), .8);
+}
+/* Every card is headed the same way: a hairline, a label, and the count
+   or action pinned to the right. Section rhythm is what makes a stack of
+   boxes read as one rail. */
+#qRoom .qr-h{
+  margin:-2px 0 12px; padding-bottom:10px;
+  border-bottom:1px solid rgba(255,255,255,.07);
+  font-size:9px; letter-spacing:1.9px;
+}
+#qRoom .qr-h .sp{
+  color:rgb(var(--qa)); font-family:'JetBrains Mono', ui-monospace, monospace;
+}
+#qRoom .qr-role.mine,
+#qRoom .qr-opt.mine{
+  border-color:rgba(var(--qa), .7);
+}
+#qRoom .qr-role.mine{
+  color:#0b0510;
+  background:linear-gradient(180deg, rgb(var(--qa)), rgba(var(--qa), .8));
+}
+#qRoom .qr-fill{ background:rgba(var(--qa), .24); }
+#qRoom .qr-mini:hover,
+#qRoom .qr-b:hover{
+  border-color:rgba(var(--qa), .55);
+  background:rgba(var(--qa), .14);
+  color:#fff;
+}
+#qRoom .qr-in:focus, #qRoom .qr-chat-i:focus{
+  border-color:rgba(var(--qa), .6);
+  box-shadow:0 0 0 3px rgba(var(--qa), .13);
+}
+
+/* ── Chat ─────────────────────────────────────────────────────── */
+#qRoom .qr-chat{ border-radius:18px; }
+#qRoom .qr-chat-h{
+  padding:15px 16px; letter-spacing:1.9px;
+  border-bottom:1px solid rgba(255,255,255,.07);
+}
+#qRoom .qr-msgs{ padding:14px 16px; gap:12px; }
+/* A run of lines from one person is one turn in a conversation. The
+   continuation lines keep the text column and drop everything else. */
+.qr-m.run{ margin-top:-7px; }
+.qr-m.run .qr-m-b{ margin-left:35px; }
+#qRoom .qr-m-t code{
+  border-color:rgba(var(--qa), .38); color:#fff;
+  transition:background .16s, border-color .16s;
+}
+#qRoom .qr-m-t code:hover{ background:rgba(var(--qa), .2); }
+#qRoom .qr-chat-f{ padding:12px 14px; border-top:1px solid rgba(255,255,255,.07); }
+#qRoom .qr-chat-i{
+  border-radius:11px; padding:11px 13px;
+  background:rgba(0,0,0,.46);
+}
+#qRoom .qr-empty{ font-size:12.5px; line-height:1.65; }
+
+/* ── The control bar ──────────────────────────────────────────── */
+#qRoom .qr-bar{
+  padding:12px 14px; border-radius:18px; gap:10px;
+}
+/* Groups, with a hairline between them: audio you press by feel, then
+   what the table is deciding, then what happens to the group after. */
+.qr-grp{
+  display:flex; align-items:center; gap:8px; padding-right:10px;
+  border-right:1px solid rgba(255,255,255,.08);
+}
+.qr-grp:last-of-type{ border-right:0; padding-right:0; }
+#qRoom .qr-b{
+  padding:11px 15px; border-radius:11px; gap:8px;
+  font-size:9.5px; letter-spacing:1.1px;
+}
+#qRoom .qr-b span{ line-height:1; }
+/* The two you reach for without looking sit slightly proud of the rest. */
+#qRoom .qr-b.key{
+  background:rgba(255,255,255,.075);
+  border-color:rgba(255,255,255,.14);
+  color:#fff;
+}
+#qRoom .qr-b.on{
+  color:#0b0510; border-color:transparent;
+  background:linear-gradient(180deg, rgb(var(--qa)), rgba(var(--qa), .84));
+  box-shadow:0 8px 26px -12px rgba(var(--qa), .9);
+}
+#qRoom .qr-b.join{
+  color:#0b0510; border-color:transparent;
+  background:linear-gradient(180deg, rgb(var(--qa)), rgba(var(--qa), .84));
+  box-shadow:0 10px 30px -14px rgba(var(--qa), .95);
+  animation:qrPulse 2.8s ease-out 2;
+}
+#qRoom .qr-b.danger{
+  color:#ff9aad; border-color:rgba(255,143,163,.34); background:rgba(255,60,90,.09);
+}
+#qRoom .qr-b.danger:hover{
+  color:#fff; border-color:rgba(255,90,120,.75); background:rgba(255,60,90,.24);
+}
+/* Leaving is set apart from everything else on purpose. */
+#qRoom .qr-b.solo{ margin-left:12px; }
+
+/* ═══ PASS TWO ══════════════════════════════════════════════════════
+   The rail folds, the table is lit rather than drawn, and a seat is a
+   person standing at it rather than a card floating over it. ══ */
+
+/* ── Rail: folding sections ───────────────────────────────────── */
+#qRoom .qr-card{ padding:0; overflow:hidden; }
+#qRoom .qr-h{
+  display:flex; align-items:center; gap:10px; width:100%;
+  margin:0; padding:14px 16px; border:0; border-bottom:1px solid rgba(255,255,255,.07);
+  background:transparent; cursor:pointer; text-align:left;
+  transition:background .16s, color .16s;
+}
+#qRoom .qr-h:hover{ background:rgba(255,255,255,.035); }
+#qRoom .qr-h-t{
+  font-family:'JetBrains Mono', ui-monospace, monospace;
+  font-size:9px; font-weight:700; letter-spacing:1.9px; text-transform:uppercase;
+  color:var(--text-2);
+}
+#qRoom .qr-h .sp{
+  margin-left:auto; color:rgb(var(--qa));
+  font-family:'JetBrains Mono', ui-monospace, monospace;
+  font-size:9px; font-weight:700; letter-spacing:1.1px; text-transform:uppercase;
+}
+.qr-chev{ flex:0 0 auto; color:var(--text-3); transition:transform .22s, color .16s; }
+#qRoom .qr-h:hover .qr-chev{ color:#fff; }
+.qr-card.folded .qr-chev{ transform:rotate(-90deg); }
+.qr-card.folded .qr-h{ border-bottom-color:transparent; }
+#qRoom .qr-body{ padding:14px 16px 16px; }
+.qr-card.folded .qr-body{ display:none; }
+
+/* Buttons that live inside a card body, sharing one shape. */
+.qr-post, .qr-quiet{
+  width:100%; margin-top:9px; padding:11px 12px; border-radius:10px; cursor:pointer;
+  font-family:'JetBrains Mono', ui-monospace, monospace;
+  font-size:9.5px; font-weight:700; letter-spacing:1.3px; text-transform:uppercase;
+  transition:background .16s, color .16s, border-color .16s;
+}
+.qr-post{
+  color:#0b0510; border:0;
+  background:linear-gradient(180deg, rgb(var(--qa)), rgba(var(--qa), .84));
+}
+.qr-post:hover{ filter:brightness(1.08); }
+.qr-quiet{
+  color:var(--text-3); background:transparent; border:1px solid rgba(255,255,255,.1);
+}
+.qr-quiet:hover{ color:#fff; border-color:rgba(var(--qa), .5); }
+
+/* ── The friend search ────────────────────────────────────────── */
+.qr-find{
+  display:flex; align-items:center; gap:8px; margin-bottom:10px;
+  padding:8px 11px; border-radius:10px;
+  background:rgba(0,0,0,.42); border:1px solid rgba(255,255,255,.1);
+  color:var(--text-3);
+  transition:border-color .16s;
+}
+.qr-find:focus-within{ border-color:rgba(var(--qa), .55); color:rgb(var(--qa)); }
+.qr-find input{
+  flex:1; min-width:0; background:none; border:0; outline:none; color:#fff;
+  font-family:'Archivo', var(--font), sans-serif; font-size:12.5px;
+}
+.qr-find input::placeholder{ color:var(--text-3); }
+.qr-find-x{
+  flex:0 0 auto; background:none; border:0; cursor:pointer;
+  color:var(--text-3); font-size:11px; padding:2px 4px;
+}
+.qr-find-x:hover{ color:#fff; }
+
+/* ── The table: lit, not drawn ────────────────────────────────────
+   The old felt was a flat grey ellipse with a border, which is a shape
+   rather than a surface. This is the same ellipse described by light:
+   a pool from above in the game's colour, a bright rim where the near
+   edge catches it, darkness underneath, and a shadow it sits in. */
+#qRoom .qr-stage{ position:relative; overflow:hidden; }
+#qRoom .qr-stage::before{
+  content:''; position:absolute; left:50%; top:-38%;
+  width:820px; height:520px; transform:translateX(-50%);
+  background:radial-gradient(closest-side, rgba(var(--qa), .16), transparent 72%);
+  pointer-events:none;
+}
+/* (superseded below: the slab with a real edge) */
+/* The rim: brightest at the top where the light falls, fading round the
+   sides. One hairline all the way round reads as a drawn shape; this
+   reads as an edge. */
+.qr-felt::before{
+  content:''; position:absolute; inset:0; border-radius:50%;
+  padding:1px;
+  background:linear-gradient(180deg,
+    rgba(255,255,255,.34), rgba(var(--qa), .22) 34%, rgba(255,255,255,.03) 72%);
+  -webkit-mask:linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
+          mask:linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
+  -webkit-mask-composite:xor; mask-composite:exclude;
+  pointer-events:none;
+}
+.qr-felt::after{
+  content:''; position:absolute; inset:16px; border-radius:50%;
+  border:1px solid rgba(255,255,255,.04);
+  pointer-events:none;
+}
+
+/* ── Seats: people at a table ─────────────────────────────────────
+   The card chrome went. A box with a border floating over a table looks
+   like a card lying on it; a person is an avatar, a name, and one quiet
+   line, with the light doing the grouping. */
+#qRoom .qr-seat{
+  background:none; border:0; box-shadow:none; backdrop-filter:none;
+  padding:0; gap:9px; width:150px;
+}
+#qRoom .qr-table .qr-seat{ width:150px; padding:0; }
+.qr-avwrap{ position:relative; }
+#qRoom .qr-av{
+  width:78px; height:78px; font-size:25px;
+  box-shadow:
+    0 0 0 2px rgba(255,255,255,.1),
+    0 14px 30px -14px rgba(0,0,0,.95);
+  transition:box-shadow .16s, transform .16s;
+}
+#qRoom .qr-seat.talking .qr-av{
+  box-shadow:
+    0 0 0 3px rgb(var(--qa)),
+    0 0 30px -4px rgba(var(--qa), .95),
+    0 14px 30px -14px rgba(0,0,0,.95);
+  transform:translateY(-2px);
+}
+/* Marks sit on the person. A crown is read without being read; a chip
+   saying LEADER has to be parsed against four others. */
+.qr-pip{
+  position:absolute; width:23px; height:23px; border-radius:50%;
+  display:flex; align-items:center; justify-content:center;
+  border:2px solid #0b0d13;
+}
+.qr-pip.crown{
+  top:-3px; right:-5px; color:#3a2600;
+  background:linear-gradient(180deg,#ffd977,#efb42a);
+  box-shadow:0 5px 14px -5px rgba(239,180,42,.95);
+}
+.qr-pip.mute{
+  bottom:-1px; right:-5px; color:#fff;
+  background:linear-gradient(180deg,#ff6a83,#df2f50);
+}
+#qRoom .qr-nm{
+  font-family:'Archivo', var(--font), sans-serif;
+  font-size:14.5px; font-weight:700; color:#fff; letter-spacing:-.1px;
+  text-shadow:0 2px 12px rgba(0,0,0,.75);
+}
+/* One line, small and quiet: it is context, not a headline. */
+.qr-sub2{
+  display:flex; align-items:center; gap:6px; flex-wrap:wrap; justify-content:center;
+  font-family:'JetBrains Mono', ui-monospace, monospace;
+  font-size:9px; font-weight:700; letter-spacing:1.1px; text-transform:uppercase;
+  color:var(--text-3);
+}
+.qr-sub2 i{ font-style:normal; opacity:.4; }
+.qr-sub2 em{ font-style:normal; color:#7ee2a8; }
+.qr-sub2 em.mid{ color:#ffd166; }
+.qr-sub2 em.bad{ color:#ff8fa3; }
+
+/* An empty seat is an invitation: a dashed ring with nothing in it, and
+   a line telling you what it is for. */
+#qRoom .qr-seat.empty{
+  border:0; background:none; animation:qrSeat .45s cubic-bezier(.2,.9,.3,1) both;
+}
+#qRoom .qr-seat.empty .qr-av{
+  background:transparent; border:2px dashed rgba(255,255,255,.18);
+  box-shadow:none;
+  animation:qrRing 4.5s ease-in-out 1s infinite;
+}
+@keyframes qrRing{
+  0%,100%{ border-color:rgba(255,255,255,.15); }
+  50%    { border-color:rgba(var(--qa), .5); }
+}
+#qRoom .qr-seat.empty .qr-nm{ color:var(--text-2); font-weight:600; }
+#qRoom .qr-seat.empty .qr-sub2{ opacity:.7; }
+
+/* ── Type ─────────────────────────────────────────────────────── */
+#qRoom .qr-name{ font-size:27px; font-weight:800; letter-spacing:-.5px; }
+#qRoom .qr-sub{ gap:9px; font-size:9px; letter-spacing:1.5px; }
+#qRoom .qr-mid-t b{ font-size:56px; letter-spacing:-2px; }
+#qRoom .qr-mid-t span{ font-size:14.5px; font-weight:500; color:var(--text-2); }
+#qRoom .qr-q{ font-size:14px; line-height:1.4; }
+#qRoom .qr-note{ font-size:12px; line-height:1.6; }
+#qRoom .qr-note b{ color:#fff; font-weight:700; }
+#qRoom .qr-row-n{ font-size:13px; }
+#qRoom .qr-ev{ font-size:11.5px; }
+
+/* ═══ THE TABLE OPENS ═══════════════════════════════════════════════
+   A shared screen used to appear in the middle of the table the way a
+   dialog appears over a page -- it had nothing to do with the room it
+   landed in. Now the surface opens for it: a seam cuts across the
+   table, light comes up out of it, the screen rises on that light, and
+   everyone sitting there shifts outwards to make room.
+
+   The whole sequence is a second, and it only ever runs when the share
+   actually starts. ══ */
+
+/* The seam: a hairline of the game's colour across the middle of the
+   table, dark and invisible until something is coming through it. */
+.qr-seam{
+  position:absolute; left:50%; top:50%; z-index:1;
+  width:0; height:3px; border-radius:3px;
+  transform:translate(-50%, -50%);
+  background:linear-gradient(90deg,
+    transparent, rgba(var(--qa), .95) 22%, #fff 50%, rgba(var(--qa), .95) 78%, transparent);
+  opacity:0; pointer-events:none;
+}
+.qr-seam.open{ width:62%; opacity:.5; box-shadow:0 0 30px rgba(var(--qa), .7); }
+/* The cut: the line races out from the centre, flares, then settles. */
+.qr-seam.cut{ animation:qrSeam 620ms cubic-bezier(.2,.85,.25,1) both; }
+@keyframes qrSeam{
+  0%   { width:0;   opacity:0; }
+  35%  { width:66%; opacity:1; box-shadow:0 0 46px rgba(var(--qa), .95); }
+  100% { width:62%; opacity:.5; box-shadow:0 0 30px rgba(var(--qa), .7); }
+}
+
+/* The screen stands ON the table, so it is hinged at its bottom edge and
+   tips up out of the surface rather than fading in on top of it. */
+.qr-screen{
+  width:100%; height:100%;
+  perspective:1400px;
+}
+.qr-screen-in{
+  position:relative; width:100%; height:100%;
+  border-radius:14px; overflow:hidden;
+  transform-origin:50% 100%;
+  background:#05070d;
+  border:1px solid rgba(var(--qa), .34);
+  box-shadow:
+    0 30px 70px -40px #000,
+    0 0 70px -28px rgba(var(--qa), .6),
+    inset 0 1px 0 rgba(255,255,255,.09);
+}
+.qr-screen.rise .qr-screen-in{
+  animation:qrRise 780ms cubic-bezier(.16,.9,.24,1) 120ms both;
+}
+@keyframes qrRise{
+  0%{
+    opacity:0;
+    transform:rotateX(84deg) translateY(14%) scale(.86);
+    filter:brightness(2.4) blur(3px);
+  }
+  55%{
+    opacity:1;
+    filter:brightness(1.25) blur(0);
+  }
+  100%{
+    opacity:1;
+    transform:rotateX(0deg) translateY(0) scale(1);
+    filter:none;
+  }
+}
+.qr-screen video{ width:100%; height:100%; object-fit:contain; display:block; }
+
+/* Light spills up out of the seam while the screen is rising -- the glow
+   belongs to the table, not to the panel. */
+.qr-screen.rise::before{
+  content:''; position:absolute; left:50%; bottom:-6%;
+  width:70%; height:56%; transform:translateX(-50%);
+  background:radial-gradient(closest-side, rgba(var(--qa), .55), transparent 70%);
+  filter:blur(18px); pointer-events:none;
+  animation:qrSpill 900ms ease-out both;
+}
+@keyframes qrSpill{
+  0%  { opacity:0; }
+  25% { opacity:1; }
+  100%{ opacity:0; }
+}
+
+/* Seats move for it. The position itself is set by the renderer; this is
+   what makes the move a movement rather than a jump. */
+#qRoom .qr-table .qr-seat{
+  transition:left .6s cubic-bezier(.2,.85,.25,1), top .6s cubic-bezier(.2,.85,.25,1);
+}
+/* The table dims under an open screen so the bright thing is the screen,
+   and widens its own shadow as if something heavy is standing on it. */
+.qr-table.sharing .qr-felt{
+  filter:brightness(.72);
+  transition:filter .6s ease;
+}
+.qr-table.sharing .qr-mid{ inset:9% 11%; }
+#qRoom .qr-mid{ transition:inset .6s cubic-bezier(.2,.85,.25,1); }
+
+/* ═══ THE TABLE, WITH THICKNESS ═════════════════════════════════════
+   An ellipse painted flat on a dark panel is an oval, and no amount of
+   gradient fixes that -- what was missing is that a table is an OBJECT.
+   Three things make it read as one:
+
+     · an edge with depth, so it has a side as well as a top;
+     · a shadow on the floor under it, so it is standing somewhere;
+     · people whose feet are hidden BEHIND its near edge, so they are at
+       it rather than floating over it.
+
+   All of it is still one ellipse. ══ */
+
+.qr-felt{
+  position:absolute; inset:13% 9%; border-radius:50%;
+  /* The top: light pooling from above, the far side catching it, the
+     near side falling into shadow. */
+  background:
+    radial-gradient(58% 78% at 50% 4%, rgba(var(--qa), .20), transparent 60%),
+    radial-gradient(120% 120% at 50% 114%, rgba(0,0,0,.66), transparent 58%),
+    linear-gradient(178deg,
+      rgba(255,255,255,.075) 0%,
+      rgba(255,255,255,.022) 34%,
+      rgba(0,0,0,.10) 72%,
+      rgba(0,0,0,.24) 100%);
+  border:0;
+  /* The side of the slab, built from stacked hard shadows: each one a
+     couple of pixels lower and a shade darker, so the ellipse gains a
+     visible thickness instead of being a decal. Then the floor shadow
+     under all of it. */
+  box-shadow:
+    inset 0 1px 0 rgba(255,255,255,.2),
+    inset 0 -30px 60px rgba(0,0,0,.4),
+    0 2px 0 rgba(255,255,255,.05),
+    0 4px 0 #16171f,
+    0 7px 0 #131419,
+    0 10px 0 #101116,
+    0 13px 0 #0d0e12,
+    0 16px 0 #0a0b0e,
+    0 19px 0 #08090b,
+    0 30px 42px -14px rgba(0,0,0,.85),
+    0 60px 70px -30px rgba(0,0,0,.9),
+    0 0 100px -40px rgba(var(--qa), .5);
+}
+/* The rim light on the far edge only -- a hairline all the way round is
+   what made it look drawn. */
+.qr-felt::before{
+  content:''; position:absolute; inset:0; border-radius:50%; padding:1px;
+  background:linear-gradient(180deg,
+    rgba(255,255,255,.42) 0%,
+    rgba(var(--qa), .26) 26%,
+    rgba(255,255,255,.02) 58%,
+    transparent 100%);
+  -webkit-mask:linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
+          mask:linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
+  -webkit-mask-composite:xor; mask-composite:exclude;
+  pointer-events:none;
+}
+/* An inlay ring, the way a real table has a playing surface inside its
+   border. Gives the middle something to sit inside. */
+.qr-felt::after{
+  content:''; position:absolute; inset:26px; border-radius:50%;
+  border:1px solid rgba(255,255,255,.05);
+  box-shadow:inset 0 0 60px rgba(0,0,0,.35);
+  pointer-events:none;
+}
+
+/* People stand AT the table: the seat overlaps the near edge, and a
+   contact shadow under each one puts them on the surface rather than
+   above it. */
+#qRoom .qr-table .qr-seat{ z-index:4; }
+.qr-avwrap::after{
+  content:''; position:absolute; left:50%; bottom:-9px;
+  width:74%; height:12px; transform:translateX(-50%);
+  background:radial-gradient(closest-side, rgba(0,0,0,.75), transparent 72%);
+  filter:blur(3px); pointer-events:none;
+}
+#qRoom .qr-seat.empty .qr-avwrap::after{ opacity:.35; }
+
+/* The middle sits ON the inlay, so the count has somewhere to be rather
+   than floating in the void. */
+#qRoom .qr-mid-t b{
+  text-shadow:0 6px 30px rgba(0,0,0,.9), 0 1px 0 rgba(255,255,255,.12);
+}
+
+/* ═══ CHAIRS ════════════════════════════════════════════════════════
+   The last thing standing between "an ellipse" and "a table" is that
+   nobody was sitting at it -- people were floating at its edge. A chair
+   behind each person does more for the read than any amount of shading,
+   because a chair is only ever found at a table.
+
+   Each one is rotated to face the middle. The rotation is flattened,
+   because the table is seen at an angle rather than from directly
+   overhead, so chairs at the sides turn less than the maths would say. */
+.qr-chair{
+  position:absolute; left:50%; top:52%;
+  width:104px; height:104px; z-index:-1; pointer-events:none;
+  transform:translate(-50%, -50%) rotate(var(--ang, 0deg)) translateY(-30px);
+  transition:transform .6s cubic-bezier(.2,.85,.25,1);
+}
+/* The back: a wide arc with a little height to it, catching the same
+   light the table does. */
+.qr-chair::before{
+  content:''; position:absolute; left:50%; top:0;
+  width:86px; height:56px; transform:translateX(-50%);
+  border-radius:44px 44px 16px 16px;
+  background:
+    linear-gradient(180deg, rgba(255,255,255,.14), rgba(255,255,255,.03) 40%, rgba(0,0,0,.25)),
+    linear-gradient(180deg, #23252f, #14161d);
+  box-shadow:
+    inset 0 1px 0 rgba(255,255,255,.22),
+    inset 0 -8px 16px rgba(0,0,0,.5),
+    0 6px 0 #0c0d12,
+    0 10px 0 #090a0d,
+    0 20px 26px -12px rgba(0,0,0,.85);
+}
+/* The seat pad, tucked under the person and slightly forward. */
+.qr-chair::after{
+  content:''; position:absolute; left:50%; top:44px;
+  width:74px; height:44px; transform:translateX(-50%);
+  border-radius:14px 14px 26px 26px;
+  background:linear-gradient(180deg, #1c1e26, #101219);
+  box-shadow:
+    inset 0 1px 0 rgba(255,255,255,.1),
+    0 5px 0 #0a0b0f,
+    0 14px 20px -10px rgba(0,0,0,.8);
+}
+/* An occupied chair takes a little of the game's colour, so a full table
+   glows and an empty one does not. */
+#qRoom .qr-seat:not(.empty) .qr-chair::before{
+  box-shadow:
+    inset 0 1px 0 rgba(255,255,255,.24),
+    inset 0 -8px 16px rgba(0,0,0,.5),
+    0 6px 0 #0c0d12,
+    0 10px 0 #090a0d,
+    0 20px 26px -12px rgba(0,0,0,.85),
+    0 0 30px -12px rgba(var(--qa), .55);
+}
+#qRoom .qr-seat.talking .qr-chair::before{
+  box-shadow:
+    inset 0 1px 0 rgba(255,255,255,.3),
+    inset 0 -8px 16px rgba(0,0,0,.5),
+    0 6px 0 #0c0d12,
+    0 10px 0 #090a0d,
+    0 20px 26px -12px rgba(0,0,0,.85),
+    0 0 40px -6px rgba(var(--qa), .8);
+}
+/* An empty chair is pushed back from the table and unlit -- the seat is
+   free and it looks free. */
+#qRoom .qr-seat.empty .qr-chair{
+  transform:translate(-50%, -50%) rotate(var(--ang, 0deg)) translateY(-38px);
+  opacity:.5;
+}
+#qRoom .qr-seat{ position:relative; }
+#qRoom .qr-table .qr-seat{ z-index:4; }
+
+/* ── "Start, keep the table open" ─────────────────────────────────
+   In the banner beside the clock, because it says what this table IS
+   rather than being another thing you do inside it. */
+.qr-start{
+  display:flex; align-items:center; gap:8px; flex:0 0 auto;
+  margin-left:auto; padding:11px 16px; border-radius:11px; cursor:pointer;
+  color:var(--text-2);
+  background:rgba(255,255,255,.06); border:1px solid rgba(255,255,255,.13);
+  font-family:'JetBrains Mono', ui-monospace, monospace;
+  font-size:9.5px; font-weight:700; letter-spacing:1.2px; text-transform:uppercase;
+  transition:background .16s, color .16s, border-color .16s, transform .16s;
+}
+.qr-start:hover{
+  color:#fff; border-color:rgba(var(--qa), .6);
+  background:rgba(var(--qa), .16);
+}
+.qr-start:active{ transform:translateY(1px); }
+.qr-start.on{
+  color:#7ee2a8; border-color:rgba(126,226,168,.4); background:rgba(126,226,168,.12);
+}
+.qr-start.on:hover{ color:#fff; border-color:rgba(126,226,168,.7); }
+/* A live dot, because "in play" is a state that is currently true rather
+   than a thing that happened. */
+.qr-dot{
+  width:7px; height:7px; border-radius:50%; background:#7ee2a8;
+  box-shadow:0 0 0 0 rgba(126,226,168,.7);
+  animation:qrLive 2.2s ease-out infinite;
+}
+@keyframes qrLive{
+  0%  { box-shadow:0 0 0 0 rgba(126,226,168,.6); }
+  70% { box-shadow:0 0 0 9px rgba(126,226,168,0); }
+  100%{ box-shadow:0 0 0 0 rgba(126,226,168,0); }
+}
+/* The clock stops claiming the whole right end now something sits beside it. */
+#qRoom .qr-top-in .qr-clock{ margin-left:18px; }
+#qRoom .qr-phase{ white-space:nowrap; }
+
+/* ── The reclaim countdown ────────────────────────────────────────
+   A rule nobody can see is a rule that feels like a bug when it fires.
+   This is the twenty-minute idle rule, shown only in its last eight
+   minutes, with the single press that answers it. */
+.qr-timeout{
+  display:flex; align-items:center; gap:12px; flex:0 0 auto; margin-left:auto;
+  padding:8px 10px 8px 14px; border-radius:12px;
+  background:rgba(255,180,80,.08); border:1px solid rgba(255,180,80,.24);
+}
+.qr-timeout.low{
+  background:rgba(255,90,120,.11); border-color:rgba(255,120,145,.38);
+  animation:qrPulseWarn 3s ease-out infinite;
+}
+@keyframes qrPulseWarn{
+  0%  { box-shadow:0 0 0 0 rgba(255,120,145,.34); }
+  70% { box-shadow:0 0 0 12px rgba(255,120,145,0); }
+  100%{ box-shadow:0 0 0 0 rgba(255,120,145,0); }
+}
+.qr-timeout-t{ text-align:right; line-height:1.15; }
+.qr-timeout-t b{
+  display:block; color:#ffd39b;
+  font-family:'JetBrains Mono', ui-monospace, monospace;
+  font-size:16px; font-weight:800;
+}
+.qr-timeout.low .qr-timeout-t b{ color:#ffb3c0; }
+.qr-timeout-t span{
+  display:block; margin-top:2px; color:var(--text-3);
+  font-family:'JetBrains Mono', ui-monospace, monospace;
+  font-size:8px; font-weight:700; letter-spacing:1.4px; text-transform:uppercase;
+}
+.qr-keep{
+  flex:0 0 auto; padding:9px 14px; border-radius:9px; cursor:pointer; color:#0b0510;
+  border:0; background:linear-gradient(180deg,#ffd08a,#f5a83c);
+  font-family:'JetBrains Mono', ui-monospace, monospace;
+  font-size:9px; font-weight:800; letter-spacing:1.2px; text-transform:uppercase;
+  transition:filter .16s, transform .16s;
+}
+.qr-keep:hover{ filter:brightness(1.08); }
+.qr-keep:active{ transform:translateY(1px); }
+
+/* "In voice" and "In play" are states rather than actions, so they read
+   as indicators that happen to be pressable. */
+#qRoom .qr-b.live{
+  color:#7ee2a8; border-color:rgba(126,226,168,.4); background:rgba(126,226,168,.1);
+}
+#qRoom .qr-b.live:hover{
+  color:#fff; border-color:rgba(126,226,168,.75); background:rgba(126,226,168,.2);
+}
+</style>
 <script>
 /* ═══ The table, as a room ═══════════════════════════════════════════
    Self-contained: it reads the voice stack's state and drives it
@@ -69531,9 +70467,21 @@ async function reactComment(ev, id, btn){
     catch (er) { return []; }
   }
 
+  /* The queue module owns the shelves -- recents, library, search
+     results -- and a game picked out of Steam search exists in none of
+     the local catalogues. Asking it directly is the difference between
+     "Counter-Strike 2" and "App 1808500". */
+  function entryFor(id){
+    try { if (typeof window.qEntry === 'function') return window.qEntry(id); }
+    catch (e) {}
+    return null;
+  }
+
   function gameName(){
     var s = S();
     var g = room && room.game || (s && s.game) || '';
+    var e = entryFor(g);
+    if (e && e.name) return e.name;
     /* GT_GAMES is a const, so it is script-scoped like the rest -- it is
        not on window either, and reading it there left the room showing
        raw ids where the game name belongs. */
@@ -69544,9 +70492,45 @@ async function reactComment(ev, id, btn){
     return String(g).replace(/^steam:/, 'App ');
   }
   function gameArt(){
-    var g = GAMES().find(function (x){ return x.id === (room && room.game); });
-    return (g && (g.cover || g.header)) || '';
+    var id = room && room.game;
+    var e = entryFor(id);
+    if (e && (e.cover || e.header)) return e.cover || e.header;
+    var g = GAMES().find(function (x){ return x.id === id; });
+    if (g && (g.cover || g.header)) return g.cover || g.header;
+    /* Nothing local knows it, but the art service does -- it is keyed by
+       appid, which is the one thing every Steam game has. */
+    var a = artFor(appId());
+    return (a && a.capsule_img) || '';
   }
+
+  /* The wide art. This is what the room is lit by, so it is worth
+     reaching for the cinematic asset rather than cropping a poster. */
+  function heroArt(){
+    var id = room && room.game;
+    var e = entryFor(id);
+    if (e && (e.heroHi || e.hero)) return e.heroHi || e.hero;
+    var g = GAMES().find(function (x){ return x.id === id; });
+    if (g && (g.heroHi || g.hero || g.header)) return g.heroHi || g.hero || g.header;
+    var a = artFor(appId());
+    return (a && (a.header_img || a.capsule_img)) || '';
+  }
+
+  function artFor(app){
+    if (!app) return null;
+    try {
+      if (!window.LobbyArt) return null;
+      var hit = window.LobbyArt.get(app);
+      if (hit) return hit;
+      /* Asked once. prime() caches in sessionStorage, so the second
+         table on the same game costs nothing. */
+      if (!artAsked[app]){
+        artAsked[app] = true;
+        window.LobbyArt.prime([app]).then(function (){ paint(); });
+      }
+    } catch (e) {}
+    return null;
+  }
+  var artAsked = {};
   function seated(){ return (room && room.members) || []; }
 
   /* Steam's own run protocol. The gap between "we agreed on a game" and
@@ -69686,6 +70670,58 @@ async function reactComment(ev, id, btn){
     paint();
   }
 
+  /* ── The ambient wash ─────────────────────────────────────────
+     One colour, pulled out of the game's own key art and used for every
+     accent in the room. It means a Counter-Strike table is lit orange
+     and a Valorant one red without anybody designing either -- the game
+     supplies its own atmosphere, and the room stops looking like a
+     generic panel that happens to contain it. */
+  var tint = {}, tintAsked = {};
+  function tintFor(url){
+    if (!url) return null;
+    if (tint[url]) return tint[url];
+    if (tintAsked[url]) return null;
+    tintAsked[url] = true;
+
+    var img = new Image();
+    img.crossOrigin = 'anonymous';
+    img.onload = function (){
+      try {
+        /* Sampled tiny: a 24px thumbnail is all an average needs, and it
+           keeps this off the main thread's back. */
+        var c = document.createElement('canvas');
+        c.width = c.height = 24;
+        var x = c.getContext('2d');
+        x.drawImage(img, 0, 0, 24, 24);
+        var d = x.getImageData(0, 0, 24, 24).data;
+        var r = 0, g = 0, b = 0, n = 0;
+        for (var i = 0; i < d.length; i += 4){
+          var rr = d[i], gg = d[i+1], bb = d[i+2];
+          var mx = Math.max(rr, gg, bb), mn = Math.min(rr, gg, bb);
+          /* Grey pixels carry no hue and would drag every game towards
+             the same muddy brown. Only coloured ones get a vote. */
+          if (mx - mn < 26 || mx < 42) continue;
+          r += rr; g += gg; b += bb; n++;
+        }
+        if (!n) return;
+        r = Math.round(r / n); g = Math.round(g / n); b = Math.round(b / n);
+        /* Lifted towards something usable as an accent on a dark ground:
+           a dim average is a smudge, not a colour. */
+        var mx2 = Math.max(r, g, b);
+        if (mx2 < 170){
+          var k = 170 / Math.max(1, mx2);
+          r = Math.min(255, Math.round(r * k));
+          g = Math.min(255, Math.round(g * k));
+          b = Math.min(255, Math.round(b * k));
+        }
+        tint[url] = r + ',' + g + ',' + b;
+        paint();
+      } catch (e) { /* a cross-origin refusal is not worth a broken room */ }
+    };
+    img.src = url;
+    return null;
+  }
+
   /* ── Paint ────────────────────────────────────────────────────── */
   /* Whichever of the two table views is currently on screen. Both are
      the same table at different stages, so the room follows the one the
@@ -69742,7 +70778,7 @@ async function reactComment(ev, id, btn){
     return el;
   }
 
-  function seatHTML(m, i, strip){
+  function seatHTML(m, i, strip, pos){
     var me = ME();
     var mine = me && m && m.userId === me.id;
     var vm = V.members().find(function (x){ return x.userId === (m && m.userId); });
@@ -69753,73 +70789,149 @@ async function reactComment(ev, id, btn){
     var speak = m ? talking(m.userId) : false;
 
     if (!m){
-      return '<div class="qr-seat empty">' +
-        '<div class="qr-av" style="background:transparent;box-shadow:none;color:var(--text-3)">+</div>' +
-        '<div class="qr-nm" style="color:var(--text-3)">Open seat</div>' +
+      return '<div class="qr-seat empty"' + (pos ? ' style="' + pos + '"' : '') + '>' +
+        '<i class="qr-chair"></i>' +
+        '<div class="qr-avwrap"><div class="qr-av"></div></div>' +
+        '<div class="qr-nm">Open seat</div>' +
+        '<div class="qr-sub2">Anyone can take it</div>' +
       '</div>';
     }
     var k = kickOf(m.userId);
     return '<div class="qr-seat' + (speak ? ' talking' : '') + (muted ? ' muted' : '') + '" ' +
-        'data-uid="' + m.userId + '">' +
+        'data-uid="' + m.userId + '"' + (pos ? ' style="' + pos + '"' : '') + '>' +
       (!mine && !strip
         ? '<button class="qr-kick' + (k ? ' on' : '') + '" title="Vote to remove" ' +
             'onclick="window.qrKick(' + m.userId + ')">' + (k ? k.votes + '/' + k.needed : '⋯') + '</button>'
         : '') +
-      '<div class="qr-av"' + (m.avatar_url ? ' style="background-image:url(\'' + esc(m.avatar_url) + '\')"' : '') + '>' +
-        (m.avatar_url ? '' : esc(String(m.username || '?').charAt(0).toUpperCase())) +
+      '<i class="qr-chair"></i>' +
+      '<div class="qr-avwrap">' +
+        '<div class="qr-av"' + (m.avatar_url ? ' style="background-image:url(\'' + esc(m.avatar_url) + '\')"' : '') + '>' +
+          (m.avatar_url ? '' : esc(String(m.username || '?').charAt(0).toUpperCase())) +
+        '</div>' +
+        (m.isOwner ? '<span class="qr-pip crown" title="Table leader">' +
+          '<svg viewBox="0 0 24 24" width="11" height="11" fill="currentColor">' +
+          '<path d="M3 8.5l4.6 3L12 5.5l4.4 6 4.6-3-1.7 9.5H4.7z"/></svg></span>' : '') +
+        (muted ? '<span class="qr-pip mute" title="Muted">' +
+          '<svg viewBox="0 0 24 24" width="11" height="11" fill="none" stroke="currentColor" ' +
+          'stroke-width="2.6" stroke-linecap="round"><path d="M4 4l16 16"/>' +
+          '<path d="M15 9V5.5a3 3 0 0 0-6 0V9M5 11a7 7 0 0 0 10.6 6"/></svg></span>' : '') +
       '</div>' +
       '<div class="qr-nm">' + esc(mine ? 'You' : (m.username || 'Player')) + '</div>' +
-      '<div class="qr-tags">' +
-        (m.isOwner ? '<span class="qr-tag lead">Leader</span>' : '') +
-        (mine ? '<span class="qr-tag you">You</span>' : '') +
-        (m.pingMs != null
-          ? '<span class="qr-tag ping' + pingClass(m.pingMs) + '">' + m.pingMs + 'ms</span>' : '') +
-        (m.role ? '<span class="qr-tag role">' + esc(roleName(m.role)) + '</span>' : '') +
-        (m.skill ? '<span class="qr-tag">' + esc(String(m.skill).toUpperCase()) + '</span>' : '') +
-        (muted ? '<span class="qr-tag off">Muted</span>' : '') +
-        (away ? '<span class="qr-tag">No voice</span>' : '') +
+      /* One quiet line: what this person brings to the table, in the
+         order you would ask -- what they play, how good, how far away. */
+      '<div class="qr-sub2">' +
+        [ m.role ? esc(roleName(m.role)) : '',
+          m.skill ? esc(String(m.skill).charAt(0).toUpperCase() + String(m.skill).slice(1)) : '',
+          m.pingMs != null ? '<em class="qr-ping' + pingClass(m.pingMs) + '">' + m.pingMs + 'ms</em>' : '',
+          away ? 'No voice' : ''
+        ].filter(Boolean).join('<i>·</i>') +
       '</div>' +
     '</div>';
   }
+
+  /* Seats sit AROUND a surface rather than in a row. The arrangement is
+     the information: a half-empty table reads as gaps at a table, which
+     is a thing everybody already knows how to read, and the middle is
+     then free for the one thing everyone is looking at.
+
+     Distribution starts at the left and runs clockwise, so two players
+     face each other across the table rather than stacking top and
+     bottom. */
+  function seatPos(i, n, open){
+    var deg = 180 + (i * 360 / n);
+    var a = deg * Math.PI / 180;
+    /* Everyone shifts outwards while the table is open, which is what
+       makes room for the screen instead of it landing on top of them. */
+    var rx = (n <= 2 ? 33 : 40) + (open ? 8 : 0);
+    var ry = (n <= 2 ? 0 : 37) + (open ? 4 : 0);
+    /* The chair faces the table, so it is rotated to point back at the
+       middle -- the seat's own angle, plus a quarter turn because the
+       chair graphic is drawn with its back at the top.
+
+       Flattened by 45%: the table is seen at an angle, not from directly
+       overhead, so a chair at the side of it turns less than a chair at
+       the near edge would. */
+    return {
+      x: 50 + Math.cos(a) * rx,
+      y: 50 + Math.sin(a) * ry,
+      ang: Math.atan2(Math.sin(a) * 0.55, Math.cos(a)) * 180 / Math.PI + 90,
+    };
+  }
+
+  var lastSharer = null;
 
   function stageHTML(){
     var size = Math.max(seated().length, (room && room.players) || 2);
     var list = [];
     for (var i = 0; i < size; i++) list.push(seated()[i] || null);
 
-    /* Whoever is sharing owns the middle of the room. */
     var sharer = null;
     seated().forEach(function (m){ if (!sharer && V.streamFor(m.userId)) sharer = m; });
 
-    var seats = '<div class="qr-seats' + (sharer ? ' strip' : '') + '">' +
-      list.map(function (m, i){ return seatHTML(m, i, !!sharer); }).join('') + '</div>';
-
     var free = Math.max(0, ((room && room.players) || 2) - seated().length);
-    var hint = free
-      ? '<div class="qr-hint">Waiting for <b>' + free + ' more</b> · ' +
-        'you can talk and set up while the seat fills</div>'
-      : '<div class="qr-hint">Everyone is here · share your screen to show the lobby</div>';
-
-    if (!sharer) return seats + hint + netWarnHTML();
-
     var me = ME();
-    return '<div class="qr-share">' +
-        '<video id="qrShareV" autoplay playsinline muted></video>' +
-        '<div class="qr-share-who">' +
-          esc((me && sharer.userId === me.id) ? 'You are sharing' : sharer.username + ' is sharing') +
-        '</div>' +
-      '</div>' + seats;
+
+    /* What the middle of the table is for, in order of how much anyone
+       cares: a screen someone is showing, then the state of the table. */
+    /* Only a CHANGE of sharer opens the table. The paint runs on every
+       poll and on every speaking-ring tick; replaying the animation each
+       time would make the screen flutter. */
+    var sid = sharer ? sharer.userId : null;
+    var opening = sid !== lastSharer && sid != null;
+    lastSharer = sid;
+
+    var middle;
+    if (sharer){
+      middle = '<div class="qr-screen' + (opening ? ' rise' : '') + '">' +
+          '<div class="qr-screen-in">' +
+            '<video id="qrShareV" autoplay playsinline muted></video>' +
+            '<div class="qr-share-who">' +
+              esc((me && sharer.userId === me.id) ? 'You are sharing' : sharer.username + ' is sharing') +
+            '</div>' +
+          '</div>' +
+        '</div>';
+    } else if (room && room.lobbyCode){
+      middle = '<button class="qr-mid-code" onclick="window.qrCopyCode()">' +
+          '<span>Lobby code</span><b>' + esc(room.lobbyCode) + '</b>' +
+          '<i>Click to copy</i>' +
+        '</button>';
+    } else {
+      middle = '<div class="qr-mid-t">' +
+          '<b>' + seated().length + '<i>/</i>' + ((room && room.players) || 2) + '</b>' +
+          '<span>' + (free
+            ? 'Waiting for ' + (free === 1 ? 'one more player' : free + ' more players')
+            : 'Everyone is here — ready when you are') + '</span>' +
+        '</div>';
+    }
+
+    var hint = free
+      ? 'You can talk and set up while the seat fills'
+      : 'Share your screen to show the lobby';
+
+    return '<div class="qr-table' + (sharer ? ' sharing' : '') + '">' +
+        '<div class="qr-felt"></div>' +
+        /* The seam the screen comes out of. It lives on the table rather
+           than on the screen, so the surface is what opens. */
+        '<div class="qr-seam' + (sharer ? ' open' : '') + (opening ? ' cut' : '') + '"></div>' +
+        '<div class="qr-mid">' + middle + '</div>' +
+        list.map(function (m, i){
+          var pos = seatPos(i, size, !!sharer);
+          return seatHTML(m, i, false,
+            'left:' + pos.x.toFixed(2) + '%;top:' + pos.y.toFixed(2) + '%;' +
+            '--ang:' + pos.ang.toFixed(1) + 'deg');
+        }).join('') +
+      '</div>' +
+      '<div class="qr-hint">' + hint + '</div>' +
+      netWarnHTML();
   }
 
   /* Said once, at the bottom of the rail, rather than repeated inside
      every card it happens to affect. Two identical paragraphs stacked on
      each other read as a fault in the page, not as one missing feature. */
   function degradedHTML(){
-    return '<div class="qr-card">' +
-      '<div class="qr-h">Not yet available</div>' +
+    return card('degraded', 'Not yet available', '',
       '<div class="qr-note">Table votes and the game lobby code arrive with ' +
-        'the next server update. Seats, voice and screenshare work now.</div>' +
-    '</div>';
+      'the next server update. Seats, voice and screenshare work now.</div>');
   }
 
   function codeCardHTML(){
@@ -69828,32 +70940,25 @@ async function reactComment(ev, id, btn){
     var code = room && room.lobbyCode;
 
     if (code && !codeEditing){
-      return '<div class="qr-card hot">' +
-        '<div class="qr-h">Game lobby' +
-          (lead ? '<button class="sp qr-tpl" style="all:unset;cursor:pointer;color:var(--text-3);' +
-                  'font-size:9px;letter-spacing:1.2px" onclick="window.qrEditCode()">CHANGE</button>' : '') +
-        '</div>' +
+      return card('code', 'Game lobby', 'Posted',
         '<button class="qr-code" onclick="window.qrCopyCode()">' +
           '<b>' + esc(code) + '</b><span>Copy</span>' +
         '</button>' +
-        (room.lobbyNote ? '<div class="qr-note" style="margin-top:8px">' + esc(room.lobbyNote) + '</div>' : '') +
-      '</div>';
+        (room.lobbyNote ? '<div class="qr-note" style="margin-top:9px">' + esc(room.lobbyNote) + '</div>' : '') +
+        (lead ? '<button class="qr-quiet" onclick="window.qrEditCode()">Change the code</button>' : ''),
+        'hot');
     }
     if (!lead){
-      return '<div class="qr-card">' +
-        '<div class="qr-h">Game lobby</div>' +
-        '<div class="qr-note">The leader has not posted a code yet. When they do it appears here for everyone.</div>' +
-      '</div>';
+      return card('code', 'Game lobby', '',
+        '<div class="qr-note">No code yet. When the leader posts one it ' +
+        'appears here for everyone.</div>');
     }
-    return '<div class="qr-card">' +
-      '<div class="qr-h">Game lobby</div>' +
+    return card('code', 'Game lobby', '',
       '<input class="qr-in" id="qrCodeIn" placeholder="Invite code or link" ' +
         'value="' + esc((room && room.lobbyCode) || '') + '" spellcheck="false">' +
       '<input class="qr-in" id="qrNoteIn" placeholder="Anything else? (optional)" ' +
         'value="' + esc((room && room.lobbyNote) || '') + '" maxlength="120">' +
-      '<button class="qr-b" style="width:100%;justify-content:center" onclick="window.qrPostCode()">' +
-        'Post to the table</button>' +
-    '</div>';
+      '<button class="qr-post" onclick="window.qrPostCode()">Post to the table</button>');
   }
 
   function pollCardHTML(){
@@ -69862,9 +70967,8 @@ async function reactComment(ev, id, btn){
     if (p){
       var left = Math.max(0, new Date(p.closesAt) - Date.now());
       var total = Math.max(1, p.votes);
-      return '<div class="qr-card hot">' +
-        '<div class="qr-h">' + (p.kind === 'kick' ? 'Vote to remove' : 'Table vote') +
-          '<span class="sp" id="qrPollLeft">' + clock(left) + '</span></div>' +
+      return card('poll', (p.kind === 'kick' ? 'Vote to remove' : 'Table vote'),
+        '<span id="qrPollLeft">' + clock(left) + '</span>',
         '<div class="qr-q">' + esc(p.question) + '</div>' +
         '<div class="qr-meta">' + esc(p.author || '') + ' asked · ' +
           p.needed + ' of ' + Math.max(p.needed, seated().length) + ' to carry it</div>' +
@@ -69876,22 +70980,19 @@ async function reactComment(ev, id, btn){
             '<span class="qr-opt-t">' + esc(o) + '</span>' +
             '<span class="qr-opt-n">' + n + '</span>' +
           '</button>';
-        }).join('') +
-      '</div>';
+        }).join(''), 'hot');
     }
 
     var done = ((room && room.polls) || []).filter(function (x){ return x.closed && x.result; })[0];
-    return '<div class="qr-card">' +
-      '<div class="qr-h">Ask the table</div>' +
-      (done ? '<div class="qr-note" style="margin-bottom:10px">Last vote: <b style="color:#fff">' +
+    return card('ask', 'Ask the table', '',
+      (done ? '<div class="qr-note" style="margin-bottom:11px">Last vote: <b>' +
               esc(done.question) + '</b> → ' + esc(done.result) + '</div>' : '') +
       '<div class="qr-tpl">' +
         '<button onclick="window.qrAsk(\'ready\')">Ready check</button>' +
         '<button onclick="window.qrAsk(\'again\')">One more?</button>' +
         '<button onclick="window.qrAsk(\'switch\')">Switch game</button>' +
         '<button onclick="window.qrAsk(\'custom\')">Ask something…</button>' +
-      '</div>' +
-    '</div>';
+      '</div>');
   }
 
   function chatHTML(){
@@ -69901,8 +71002,20 @@ async function reactComment(ev, id, btn){
       '<div class="qr-chat-h">Table chat</div>' +
       '<div class="qr-msgs" id="qrMsgs">' +
         (msgs.length
-          ? msgs.map(function (m){
+          ? msgs.map(function (m, i){
               var mine = me && m.userId === me.id;
+              /* Consecutive lines from the same person inside a couple of
+                 minutes are one turn in a conversation, not three
+                 announcements: the second and third drop the avatar and
+                 the name and simply continue. */
+              var prev = msgs[i - 1];
+              var run = prev && prev.userId === m.userId &&
+                (new Date(m.at) - new Date(prev.at)) < 120000;
+              if (run){
+                return '<div class="qr-m run">' +
+                  '<div class="qr-m-b"><div class="qr-m-t">' + linkify(m.body) + '</div></div>' +
+                '</div>';
+              }
               return '<div class="qr-m">' +
                 '<div class="qr-m-av"' +
                   (m.avatar ? ' style="background-image:url(\'' + esc(m.avatar) + '\')"' : '') + '>' +
@@ -69947,8 +71060,7 @@ async function reactComment(ev, id, btn){
     var takenBy = {};
     seated().forEach(function (m){ if (m.role) takenBy[m.role] = m.username; });
 
-    return '<div class="qr-card">' +
-      '<div class="qr-h">Your role</div>' +
+    return card('role', 'Your role', mineRole ? roleName(mineRole) : '',
       '<div class="qr-roles">' +
         set.map(function (r){
           var who = takenBy[r[0]];
@@ -69960,14 +71072,58 @@ async function reactComment(ev, id, btn){
             (who ? '<b>' + esc(mine ? 'You' : who) + '</b>' : '') +
           '</button>';
         }).join('') +
-      '</div>' +
-    '</div>';
+      '</div>');
   }
 
   /* Your friends, in the room, next to the seat they could fill. The
      matcher can only send strangers; the likeliest person to take that
      seat is someone you already know is online. */
-  var friends = null, friendsAt = 0, invited = {};
+  var friends = null, friendsAt = 0, invited = {}, friendQ = '';
+  /* null | 'ask' | 'sched' -- which inline composer is open. */
+  var compose = null;
+
+  /* Which rail cards are folded away. Remembered across sittings,
+     because somebody who never uses the lobby-code card does not want to
+     close it at every table. */
+  var folded = (function (){
+    try { return JSON.parse(localStorage.getItem('qr.folded') || '{}') || {}; }
+    catch (e) { return {}; }
+  })();
+  function saveFolded(){
+    try { localStorage.setItem('qr.folded', JSON.stringify(folded)); } catch (e) {}
+  }
+
+  /* Every rail card is built through this, so the fold, the chevron and
+     the keyboard behaviour are identical in all of them rather than
+     re-implemented six times with six small differences. */
+  function card(id, title, right, body, cls){
+    var off = !!folded[id];
+    return '<div class="qr-card' + (cls ? ' ' + cls : '') + (off ? ' folded' : '') + '">' +
+      '<button class="qr-h qr-fold" type="button" aria-expanded="' + (!off) + '" ' +
+        'onclick="window.qrFold(' + jsStr(id) + ')">' +
+        '<span class="qr-h-t">' + title + '</span>' +
+        (right ? '<span class="sp">' + right + '</span>' : '<span class="sp"></span>') +
+        '<svg class="qr-chev" viewBox="0 0 24 24" width="13" height="13" fill="none" ' +
+          'stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round">' +
+          '<path d="M6 9l6 6 6-6"/></svg>' +
+      '</button>' +
+      '<div class="qr-body">' + body + '</div>' +
+    '</div>';
+  }
+
+  window.qrFold = function (id){
+    folded[id] = !folded[id];
+    saveFolded();
+    paint(true);
+  };
+
+  window.qrFriendQ = function (v){
+    friendQ = String(v == null ? '' : v);
+    paint(true);
+    /* The caret goes back where it was: this repaints the whole rail. */
+    var el = document.getElementById('qrFriendQ');
+    if (el){ el.focus(); el.setSelectionRange(el.value.length, el.value.length); }
+  };
   async function loadFriends(){
     if (friends && Date.now() - friendsAt < 60000) return;
     var r = await _api('/friends').catch(function (){ return null; });
@@ -69988,30 +71144,56 @@ async function reactComment(ev, id, btn){
 
     var here = {};
     seated().forEach(function (m){ here[m.userId] = true; });
-    var list = friends.filter(function (f){ return !here[f.id]; }).slice(0, 8);
-    if (!list.length) return '';
+    var all = friends.filter(function (f){ return !here[f.id]; });
+    if (!all.length) return '';
 
-    return '<div class="qr-card">' +
-      '<div class="qr-h">Invite a friend<span class="sp">' + free + ' free</span></div>' +
-      list.map(function (f){
-        var sent = invited[f.id];
-        return '<div class="qr-row">' +
-          '<div class="qr-row-av"' +
-            (f.avatar ? ' style="background-image:url(\'' + esc(f.avatar) + '\')"' : '') + '>' +
-            (f.avatar ? '' : esc(String(f.name || '?').charAt(0).toUpperCase())) + '</div>' +
-          '<div class="qr-row-n">' + esc(f.name) + '</div>' +
-          '<button class="qr-mini' + (sent ? ' sent' : '') + '"' + (sent ? ' disabled' : '') +
-            ' onclick="window.qrInvite(' + f.id + ')">' + (sent ? 'Asked' : 'Invite') + '</button>' +
-        '</div>';
-      }).join('') +
-    '</div>';
+    /* A friends list is only a list until it is long, and then it is a
+       haystack. The search stays on screen even when it matches nothing,
+       so there is always a way back. */
+    var q = friendQ.trim().toLowerCase();
+    var list = q
+      ? all.filter(function (f){ return String(f.name || '').toLowerCase().indexOf(q) !== -1; })
+      : all;
+    var shown = list.slice(0, q ? 12 : 8);
+
+    var search = all.length > 5 || q
+      ? '<div class="qr-find">' +
+          '<svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" ' +
+            'stroke-width="2.2" stroke-linecap="round"><circle cx="11" cy="11" r="7"/>' +
+            '<path d="M20 20l-3.6-3.6"/></svg>' +
+          '<input id="qrFriendQ" type="text" spellcheck="false" autocomplete="off" ' +
+            'placeholder="Search friends" value="' + esc(friendQ) + '" ' +
+            'oninput="window.qrFriendQ(this.value)">' +
+          (q ? '<button class="qr-find-x" onclick="window.qrFriendQ(\'\')" ' +
+               'title="Clear">✕</button>' : '') +
+        '</div>'
+      : '';
+
+    var rows = shown.length
+      ? shown.map(function (f){
+          var sent = invited[f.id];
+          return '<div class="qr-row">' +
+            '<div class="qr-row-av"' +
+              (f.avatar ? ' style="background-image:url(\'' + esc(f.avatar) + '\')"' : '') + '>' +
+              (f.avatar ? '' : esc(String(f.name || '?').charAt(0).toUpperCase())) + '</div>' +
+            '<div class="qr-row-n">' + esc(f.name) + '</div>' +
+            '<button class="qr-mini' + (sent ? ' sent' : '') + '"' + (sent ? ' disabled' : '') +
+              ' onclick="window.qrInvite(' + f.id + ')">' + (sent ? 'Asked' : 'Invite') + '</button>' +
+          '</div>';
+        }).join('')
+      : '<div class="qr-note">Nobody matches “' + esc(friendQ) + '”.</div>';
+
+    var more = !q && all.length > shown.length
+      ? '<div class="qr-note" style="margin-top:9px">' +
+        (all.length - shown.length) + ' more · search to find them</div>' : '';
+
+    return card('invite', 'Invite a friend', free + ' free', search + rows + more);
   }
 
   function waitCardHTML(){
     var w = (room && room.waitlist) || [];
     if (!w.length) return '';
-    return '<div class="qr-card">' +
-      '<div class="qr-h">Waiting for a seat<span class="sp">' + w.length + '</span></div>' +
+    return card('wait', 'Waiting for a seat', String(w.length),
       w.slice(0, 6).map(function (x, i){
         return '<div class="qr-row">' +
           '<div class="qr-row-av"' +
@@ -70021,9 +71203,8 @@ async function reactComment(ev, id, btn){
             '<span>' + (i === 0 ? 'Next in line' : '#' + (i + 1) + ' in line') + '</span></div>' +
         '</div>';
       }).join('') +
-      '<div class="qr-note" style="margin-top:8px">They take the next seat that opens, ' +
-        'in order. Nobody has to be watching for it.</div>' +
-    '</div>';
+      '<div class="qr-note" style="margin-top:9px">They take the next seat that opens, ' +
+        'in order. Nobody has to be watching for it.</div>');
   }
 
   /* Rating is offered for the people you actually sat with, and only
@@ -70038,8 +71219,7 @@ async function reactComment(ev, id, btn){
     if (Date.now() - started < 3 * 60000) return '';
 
     var mine = (room && room.myRatings) || {};
-    return '<div class="qr-card">' +
-      '<div class="qr-h">How was it?</div>' +
+    return card('rate', 'How was it?', '',
       others.map(function (m){
         var v = mine[m.userId];
         return '<div class="qr-row">' +
@@ -70055,9 +71235,8 @@ async function reactComment(ev, id, btn){
           '</div>' +
         '</div>';
       }).join('') +
-      '<div class="qr-note" style="margin-top:8px">Only they never see who said what. ' +
-        'This is what the trust filters in the queue read from.</div>' +
-    '</div>';
+      '<div class="qr-note" style="margin-top:9px">They never see who said what. ' +
+        'This is what the trust filters in the queue read from.</div>');
   }
 
   /* A table split across two continents is worth saying out loud before
@@ -70081,53 +71260,135 @@ async function reactComment(ev, id, btn){
 
   function logCardHTML(){
     if (!log.length) return '';
-    return '<div class="qr-card">' +
-      '<div class="qr-h">Table log</div>' +
+    return card('log', 'Table log', String(log.length),
       '<div class="qr-log">' +
         log.slice(0, 12).map(function (e){
           return '<div class="qr-ev"><i>' + hhmm(e.t) + '</i><span>' + esc(e.text) + '</span></div>';
         }).join('') +
+      '</div>');
+  }
+
+  var ICO = {
+    mic:  '<svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><rect x="9" y="2" width="6" height="11" rx="3"/><path d="M5 11a7 7 0 0 0 14 0M12 18v4"/></svg>',
+    off:  '<svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M15 9V5a3 3 0 0 0-6 0v2M5 11a7 7 0 0 0 11 5.5M12 18v4M3 3l18 18"/></svg>',
+    cast: '<svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><rect x="2" y="4" width="20" height="13" rx="2"/><path d="M8 21h8"/></svg>',
+    tick: '<svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6L9 17l-5-5"/></svg>',
+    poll: '<svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M6 20V10M12 20V4M18 20v-6"/></svg>',
+    play: '<svg viewBox="0 0 24 24" width="15" height="15" fill="currentColor"><path d="M7 4l13 8-13 8z"/></svg>',
+    clip: '<svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="8"/><circle cx="12" cy="12" r="3" fill="currentColor" stroke="none"/></svg>',
+    lock: '<svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><rect x="4" y="10" width="16" height="10" rx="2"/><path d="M8 10V7a4 4 0 0 1 8 0v3"/></svg>',
+    plus: '<svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg>',
+    cal:  '<svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><rect x="3" y="5" width="18" height="16" rx="2"/><path d="M3 10h18M8 3v4M16 3v4"/></svg>',
+    home: '<svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 11l8-6 8 6v9a1 1 0 0 1-1 1h-4v-6H9v6H5a1 1 0 0 1-1-1z"/></svg>',
+    exit: '<svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4M16 17l5-5-5-5M21 12H9"/></svg>',
+  };
+
+  /* Grouped by what a press actually does. Eleven buttons of identical
+     weight meant nothing in the bar was findable at a glance: your own
+     audio is pressed constantly and by feel, the table's decisions are
+     pressed occasionally and read first, and leaving is pressed once and
+     should never be next to anything else. */
+  /* The table is reclaimed after twenty quiet minutes while it is short
+     of players. That rule was invisible: a table simply vanished. This
+     shows the clock on it, and only once it is close enough to matter --
+     a countdown running for the full twenty minutes is just an alarming
+     number sitting on the screen.
+
+     It is absent entirely while the table is in play, locked or full,
+     because none of those are reclaimed at all. */
+  var KEEP_SHOW_MS = 8 * 60 * 1000;
+
+  function timeoutHTML(){
+    if (!room || !room.idleAt) return '';
+    var left = new Date(room.idleAt).getTime() - Date.now();
+    if (left > KEEP_SHOW_MS) return '';
+    var low = left < 3 * 60000;
+    return '<div class="qr-timeout' + (low ? ' low' : '') + '">' +
+      '<div class="qr-timeout-t">' +
+        '<b id="qrIdle">' + clock(Math.max(0, left)) + '</b>' +
+        '<span>Table closes</span>' +
       '</div>' +
+      '<button class="qr-keep" onclick="window.qrKeep()">Keep waiting</button>' +
     '</div>';
   }
+
+  window.qrKeep = async function (){
+    if (!room || !room.queueId) return;
+    var r = await _api('/queue/' + room.queueId + '/keep', { method:'POST' })
+      .catch(function (){ return null; });
+    if (!r || r.error) return toast((r && r.error) || 'Could not do that', 'warn');
+    note('You told the table you are still waiting.');
+    toast('Another 20 minutes', 'success');
+    load();
+  };
 
   function barHTML(){
     var inR = V.inRoom();
     var muted = V.muted();
     var sharing = V.sharing();
-    if (!inR){
-      return '<div class="qr-bar">' +
-        '<button class="qr-b on" onclick="window.qrJoinVoice()">🎧 Join voice</button>' +
-        '<div class="gap"></div>' +
-        '<button class="qr-b" onclick="window.qConvertToLobby()">Make it a lobby</button>' +
-        '<button class="qr-b danger" onclick="window.qrLeave()">Leave table</button>' +
+
+    function b(cls, on, ico, label){
+      return '<button class="qr-b ' + cls + '" onclick="' + on + '">' +
+        ICO[ico] + '<span>' + label + '</span></button>';
+    }
+
+    /* Joining is the loud one and stays the loud one. Being in voice is
+       a state, not an action, so once you are in it the primary button
+       reports that state and mute becomes an ordinary option beside it
+       -- rather than the big button turning into a mute switch, which is
+       a different job wearing the same coat. */
+    var voice = inR
+      ? '<div class="qr-grp">' +
+          '<button class="qr-b live" onclick="window.qrLeaveVoice()" ' +
+            'title="Leave the voice room">' +
+            '<span class="qr-dot"></span><span>In voice</span></button>' +
+          '<button class="qr-b' + (muted ? ' danger' : '') + '" onclick="window.qrMute()">' +
+            ICO[muted ? 'off' : 'mic'] + '<span>' + (muted ? 'Unmute' : 'Mute') + '</span></button>' +
+          '<button class="qr-b' + (sharing ? ' on' : '') + '" onclick="window.qrShare()">' +
+            ICO.cast + '<span>' + (sharing ? 'Stop sharing' : 'Share screen') + '</span></button>' +
+          '<button class="qr-b' + (clipOn ? ' on' : '') + '" onclick="window.qrClip()" ' +
+            'title="Keeps the last 30 seconds on this machine">' +
+            ICO.clip + '<span>' + (clipOn ? 'Save 30s' : 'Clip') + '</span></button>' +
+        '</div>'
+      : '<div class="qr-grp">' +
+          '<button class="qr-b join" onclick="window.qrJoinVoice()">' +
+            ICO.mic + '<span>Join voice</span></button>' +
+        '</div>';
+
+    var table = '';
+    if (roomApi !== false || appId()){
+      table = '<div class="qr-grp">' +
+        (roomApi === false ? '' : b('', 'window.qrAsk(\'ready\')', 'tick', 'Ready check')) +
+        (roomApi === false ? '' : b('', 'window.qrAsk(\'custom\')', 'poll', 'Vote')) +
+        (appId() ? b('', 'window.qrLaunch()', 'play', 'Launch') : '') +
+        (roomApi === false ? '' :
+          '<button class="qr-b' + (room && room.inPlay ? ' live' : '') + '" ' +
+            'onclick="window.qrStart()" title="' + (room && room.inPlay
+              ? 'Playing, and the table is still open. Press to go back to waiting.'
+              : 'Start playing without closing the table \u2014 the free seats stay open') + '">' +
+            (room && room.inPlay
+              ? '<span class="qr-dot"></span><span>In play</span>'
+              : ICO.play + '<span>Start · keep open</span>') +
+          '</button>') +
+        (roomApi !== false && isLeader()
+          ? '<button class="qr-b' + (room && room.locked ? ' on' : '') + '" onclick="window.qrLock()">' +
+            ICO.lock + '<span>' + (room && room.locked ? 'Locked' : 'Lock') + '</span></button>'
+          : '') +
       '</div>';
     }
+
+    var after = '<div class="qr-grp">' +
+      (roomApi === false ? '' : b('', 'window.qrBefriend()', 'plus', 'Keep group')) +
+      (roomApi === false ? '' : b('', 'window.qrSchedule()', 'cal', 'Again later')) +
+      b('', 'window.qConvertToLobby()', 'home', 'Make a lobby') +
+    '</div>';
+
     return '<div class="qr-bar">' +
-      '<button class="qr-b' + (muted ? ' danger' : '') + '" onclick="window.qrMute()">' +
-        (muted ? '🔇 Unmute' : '🎤 Mute') + '</button>' +
-      '<button class="qr-b' + (sharing ? ' on' : '') + '" onclick="window.qrShare()">' +
-        (sharing ? '🖥 Stop sharing' : '🖥 Share screen') + '</button>' +
-      (roomApi === false ? '' :
-        '<button class="qr-b" onclick="window.qrAsk(\'ready\')">✔ Ready check</button>') +
-      (roomApi === false ? '' :
-        '<button class="qr-b" onclick="window.qrAsk(\'custom\')">📊 Vote</button>') +
-      (appId()
-        ? '<button class="qr-b" onclick="window.qrLaunch()">▶ Launch game</button>'
-        : '') +
-      '<button class="qr-b' + (clipOn ? ' on' : '') + '" onclick="window.qrClip()">' +
-        (clipOn ? '✂ Save last 30s' : '● Arm clip') + '</button>' +
-      (roomApi !== false && isLeader()
-        ? '<button class="qr-b' + (room && room.locked ? ' on' : '') + '" onclick="window.qrLock()">' +
-          (room && room.locked ? '🔒 Locked' : '🔓 Lock table') + '</button>'
-        : '') +
+      voice + table +
       '<div class="gap"></div>' +
-      (roomApi === false ? '' :
-        '<button class="qr-b" onclick="window.qrBefriend()">＋ Keep the group</button>') +
-      (roomApi === false ? '' :
-        '<button class="qr-b" onclick="window.qrSchedule()">🗓 Again later</button>') +
-      '<button class="qr-b" onclick="window.qConvertToLobby()">Make it a lobby</button>' +
-      '<button class="qr-b danger" onclick="window.qrLeave()">Leave table</button>' +
+      after +
+      '<button class="qr-b danger solo" onclick="window.qrLeave()">' +
+        ICO.exit + '<span>Leave</span></button>' +
     '</div>';
   }
 
@@ -70155,6 +71416,11 @@ async function reactComment(ev, id, btn){
     var pl = document.getElementById('qrPollLeft');
     if (p && pl) pl.textContent = clock(Math.max(0, new Date(p.closesAt) - Date.now()));
 
+    var idle = document.getElementById('qrIdle');
+    if (idle && room.idleAt){
+      idle.textContent = clock(Math.max(0, new Date(room.idleAt).getTime() - Date.now()));
+    }
+
     var me = ME();
     Array.prototype.forEach.call(document.querySelectorAll('#qRoom .qr-seat[data-uid]'), function (el){
       var uid = Number(el.getAttribute('data-uid'));
@@ -70171,18 +71437,57 @@ async function reactComment(ev, id, btn){
     var sharer = null;
     seated().forEach(function (m){ if (!sharer && V.streamFor(m.userId)) sharer = m; });
     var showing = !!document.getElementById('qrShareV');
-    if (!!sharer !== showing) paint();
+    if (!!sharer !== showing) paint(true);
   }
 
-  function paint(){
+  /* Everything the room's markup is derived from, in one string. The
+     paint rebuilds innerHTML, which restarts images, animations and the
+     share element -- doing that every three seconds is the flashing.
+     Now it only happens when something actually differs.
+
+     The clock, the vote countdown and the speaking rings are deliberately
+     NOT in here: they change constantly and are updated in place by the
+     light tick instead. */
+  function sig(){
+    var r = room || {};
+    return [
+      r.queueId, r.state, r.players, r.locked, r.inPlay, r.lobbyCode, r.lobbyNote,
+      /* Bucketed to the minute: the countdown itself ticks in place, and
+         only crossing a minute can change what the markup says. */
+      r.idleAt ? Math.floor((new Date(r.idleAt).getTime() - Date.now()) / 60000) : '',
+      (r.members || []).map(function (m){
+        return [m.userId, m.role, m.skill, m.pingMs, m.isOwner].join('.');
+      }).join(','),
+      (r.polls || []).map(function (x){
+        return [x.id, x.closed, x.votes, x.myChoice].join('.');
+      }).join(','),
+      (r.kicks || []).map(function (x){ return [x.targetId, x.votes].join('.'); }).join(','),
+      (r.waitlist || []).map(function (x){ return x.userId; }).join(','),
+      (r.chat || []).length, (r.chat || []).length ? r.chat[r.chat.length - 1].id : '',
+      JSON.stringify(r.myRatings || {}),
+      log.length, roomApi, codeEditing, clipOn, compose, friendQ,
+      JSON.stringify(folded),
+      V.inRoom(), V.muted(), V.sharing(),
+      seated().map(function (m){ return !!V.streamFor(m.userId); }).join(','),
+      (friends || []).length, JSON.stringify(invited),
+      gameName(), heroArt(),
+    ].join('|');
+  }
+  var painted = '';
+
+  function paint(force){
     var el = host();
     if (!el || !room) return;
     if (typing()) return;
+    var k = sig();
+    if (!force && k === painted && document.getElementById('qrClock')) return;
+    painted = k;
     wireMeters();
 
     var full = seated().length >= (room.players || 2);
-    var phase = room.lobbyCode ? 'In the game'
-              : (full ? 'Table is full' : 'Filling up');
+    var phase = room.inPlay ? (full ? 'Playing' : 'Playing · seat open')
+              : (room.lobbyCode ? 'In the game'
+              : (full ? 'Table is full' : 'Filling up'));
 
     /* The rank window widens on a schedule while a table is short. It is
        the one thing the old searching screen said that the room would
@@ -70198,31 +71503,46 @@ async function reactComment(ev, id, btn){
     }
     var started = room.startedAt ? new Date(room.startedAt).getTime() : Date.now();
 
+    /* The wash: the game's own art behind the room, and one colour out
+       of it driving every accent in it. */
+    var hero = heroArt();
+    var rgb = hero ? tintFor(hero) : null;
+    el.style.setProperty('--qa', rgb || '168,99,255');
+    el.style.setProperty('--qr-hero', hero ? 'url(\'' + hero + '\')' : 'none');
+    el.classList.toggle('lit', !!hero);
+
     el.innerHTML =
       '<div class="qr-top">' +
-        '<div class="qr-art" style="' + (gameArt() ? 'background-image:url(\'' + esc(gameArt()) + '\')' : '') + '"></div>' +
-        '<div class="qr-id">' +
-          '<div class="qr-name">' + esc(gameName()) + '</div>' +
-          '<div class="qr-sub">' +
-            '<span class="qr-phase' + (full ? ' live' : '') + '">' + phase + '</span>' +
-            '<span>' + seated().length + '/' + (room.players || 2) + ' seated</span>' +
-            (win ? '<span>· ' + win + '</span>' : '') +
-            (room.locked ? '<span>· Locked</span>' : '') +
+        '<div class="qr-top-art"></div>' +
+        '<div class="qr-top-in">' +
+          '<div class="qr-art" style="' + (gameArt() ? 'background-image:url(\'' + esc(gameArt()) + '\')' : '') + '"></div>' +
+          '<div class="qr-id">' +
+            '<div class="qr-name">' + esc(gameName()) + '</div>' +
+            '<div class="qr-sub">' +
+              '<span class="qr-phase' + (full ? ' live' : '') + '">' + phase + '</span>' +
+              '<span>' + seated().length + '/' + (room.players || 2) + ' seated</span>' +
+              (win ? '<span>· ' + win + '</span>' : '') +
+              (room.locked ? '<span>· Locked</span>' : '') +
+            '</div>' +
           '</div>' +
+          timeoutHTML() +
+          '<div class="qr-clock"><span id="qrClock">' + clock(Date.now() - started) +
+            '</span><span>' + (room.inPlay ? 'In play' : 'At the table') + '</span></div>' +
         '</div>' +
-        '<div class="qr-clock"><span id="qrClock">' + clock(Date.now() - started) +
-          '</span><span>At the table</span></div>' +
       '</div>' +
       '<div class="qr-main">' +
         (roomApi === false ? '' : chatHTML()) +
         '<div class="qr-stage">' + stageHTML() + '</div>' +
         '<div class="qr-side">' +
-          roleCardHTML() + codeCardHTML() + pollCardHTML() +
+          composeHTML() + roleCardHTML() + codeCardHTML() + pollCardHTML() +
           inviteCardHTML() + waitCardHTML() + rateCardHTML() + logCardHTML() +
           (roomApi === false ? degradedHTML() : '') +
         '</div>' +
       '</div>' +
       barHTML();
+
+    var comp = document.getElementById('qrComposeIn');
+    if (comp && document.activeElement !== comp) comp.focus();
 
     var ci = document.getElementById('qrChatIn');
     if (ci){
@@ -70247,8 +71567,9 @@ async function reactComment(ev, id, btn){
 
   /* ── Actions ──────────────────────────────────────────────────── */
   window.qrJoinVoice = function (){ V.join(); };
-  window.qrMute  = function (){ V.tapMute();  setTimeout(paint, 60); };
-  window.qrShare = function (){ V.tapShare(); setTimeout(paint, 400); };
+  window.qrLeaveVoice = function (){ V.leave(); setTimeout(function (){ paint(true); }, 60); };
+  window.qrMute  = function (){ V.tapMute();  setTimeout(function (){ paint(true); }, 60); };
+  window.qrShare = function (){ V.tapShare(); setTimeout(function (){ paint(true); }, 400); };
 
   /* Leaving is three separate things and it only used to do two: drop
      the voice room, tell the server your seat is free, and forget the
@@ -70355,13 +71676,12 @@ async function reactComment(ev, id, btn){
   /* Scheduling reuses the table you are already in: the game, the size
      and the people. Asking all of that again would be asking you to
      describe the room you are standing in. */
-  window.qrSchedule = async function (){
+  window.qrSchedule = async function (when){
     if (!room || !room.queueId) return;
-    var when = window.prompt(
-      'Same table, later. When?\n\nExamples: 20:00, tomorrow 21:30, +2h', '20:00');
-    if (!when) return;
+    if (!when){ compose = 'sched'; paint(true); return; }
     var at = parseWhen(when);
     if (!at) return toast('Could not read that time', 'warn');
+    compose = null;
 
     var r = await _api('/queue/schedule', {
       method:'POST', headers:{ 'Content-Type':'application/json' },
@@ -70472,6 +71792,22 @@ async function reactComment(ev, id, btn){
     clipRec = null; clipBuf = []; clipOn = false;
   }
 
+  /* Starting is not closing. A group that begins three-handed still
+     wants a fourth, and locking was the only way to say "we have
+     started" -- which slammed the door at the same time. */
+  window.qrStart = async function (){
+    if (!room || !room.queueId) return;
+    var on = !room.inPlay;
+    var r = await _api('/queue/' + room.queueId + (on ? '/start' : '/stop'), {
+      method:'POST', headers:{ 'Content-Type':'application/json' },
+      body: JSON.stringify({ keepOpen: true })
+    }).catch(function (){ return null; });
+    if (!r || r.error) return toast((r && r.error) || 'Could not do that', 'warn');
+    note(on ? 'Table is in play — the seat stays open.' : 'Back to waiting.');
+    if (on) toast('In play · the table stays open', 'success');
+    load();
+  };
+
   window.qrLock = async function (){
     if (!room) return;
     var next = !room.locked;
@@ -70484,7 +71820,7 @@ async function reactComment(ev, id, btn){
     load();
   };
 
-  window.qrEditCode = function (){ codeEditing = true; paint(); };
+  window.qrEditCode = function (){ codeEditing = true; paint(true); };
 
   window.qrPostCode = async function (){
     if (!room) return;
@@ -70511,17 +71847,19 @@ async function reactComment(ev, id, btn){
 
   /* Templates for the three things every group argues about, and a free
      question for everything else. */
-  window.qrAsk = async function (kind){
+  window.qrAsk = async function (kind, text){
     if (!room) return;
     var q, opts;
     if (kind === 'ready'){ q = 'Ready to start?'; opts = ['Ready', 'Two minutes']; }
     else if (kind === 'again'){ q = 'One more game?'; opts = ['One more', 'I am done']; }
     else if (kind === 'switch'){ q = 'Switch to something else?'; opts = ['Switch', 'Stay here']; }
     else {
-      q = window.prompt('Ask the table:', '');
-      if (!q) return;
-      opts = ['Yes', 'No'];
+      /* No window.prompt: Electron refuses it outright. The composer
+         opens in the rail and comes back here with the text. */
+      if (!text){ compose = 'ask'; paint(true); return; }
+      q = text; opts = ['Yes', 'No'];
     }
+    compose = null;
     var r = await _api('/queue/' + room.queueId + '/poll', {
       method:'POST', headers:{ 'Content-Type':'application/json' },
       body: JSON.stringify({ question: q, options: opts, kind: kind === 'ready' ? 'ready' : 'poll' })
@@ -70529,6 +71867,34 @@ async function reactComment(ev, id, btn){
     if (!r || r.error) return toast((r && r.error) || 'Could not open the vote', 'warn');
     load();
   };
+
+  window.qrComposeGo = function (){
+    var el = document.getElementById('qrComposeIn');
+    if (!el) return;
+    var v = el.value.trim();
+    if (!v) return;
+    if (compose === 'ask') window.qrAsk('custom', v);
+    else if (compose === 'sched') window.qrSchedule(v);
+  };
+  window.qrComposeOff = function (){ compose = null; paint(true); };
+
+  function composeHTML(){
+    if (!compose) return '';
+    var ask = compose === 'ask';
+    return card(compose, ask ? 'Ask the table' : 'Same table, later', '',
+      '<input class="qr-in" id="qrComposeIn" autofocus ' +
+        'placeholder="' + (ask ? 'What are we deciding?' : '20:00 · tomorrow 21:30 · +2h') + '" ' +
+        'onkeydown="if(event.key===\'Enter\'){event.preventDefault();window.qrComposeGo()}' +
+        'else if(event.key===\'Escape\'){window.qrComposeOff()}">' +
+      '<div class="qr-note">' + (ask
+        ? 'Everyone gets one vote. It carries on a majority of the table.'
+        : 'The game, the size and the people come from this table \u2014 you only pick the time.') +
+        '</div>' +
+      '<button class="qr-post" onclick="window.qrComposeGo()">' +
+        (ask ? 'Put it to the table' : 'Schedule it') + '</button>' +
+      '<button class="qr-quiet" onclick="window.qrComposeOff()">Cancel</button>',
+      'hot');
+  }
 
   window.qrVote = async function (pollId, choice){
     if (!room) return;
@@ -70587,7 +71953,7 @@ async function reactComment(ev, id, btn){
     if (el){ showKids(el.parentElement, true); el.remove(); }
     /* Display is never touched on the views themselves, only on their
        children, so nothing here has to guess what _qShowView wanted. */
-    meters = {}; room = null;
+    meters = {}; room = null; lastSharer = null;
   }
 
   /* Wrapping _qShowView was not enough: the table view is reached from

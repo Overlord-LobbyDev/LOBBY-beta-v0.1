@@ -4040,6 +4040,7 @@ async function _qExpireIfStale(sess) {
                  WHERE m.session_id = $1 AND m.left_at IS NULL) AS filled,
                GREATEST(
                  $2::timestamptz,
+                 COALESCE((SELECT kept_at FROM queue_sessions WHERE id = $1), $2::timestamptz),
                  COALESCE((SELECT MAX(joined_at) FROM queue_members
                             WHERE session_id = $1), $2::timestamptz),
                  COALESCE((SELECT MAX(created_at) FROM queue_messages
@@ -4052,7 +4053,11 @@ async function _qExpireIfStale(sess) {
       const row = r.rows[0] || {};
       const filled = row.filled || 0;
       const idle = Date.now() - new Date(row.last_at || sess.created_at).getTime();
-      if (filled < (sess.players || 2) && idle >= Q_SEARCH_IDLE_MS) {
+      // Playing counts as being there. Reclaiming a table because
+      // nobody typed for twenty minutes, while all of them are inside
+      // the match it exists for, is the worst possible time to do it.
+      if (!sess.started_at &&
+          filled < (sess.players || 2) && idle >= Q_SEARCH_IDLE_MS) {
         return _qExpire(sess);
       }
     } catch (e) {
@@ -4092,6 +4097,8 @@ function _qPayload(sess, members) {
     lobbyCode: sess.lobby_code || null,
     lobbyNote: sess.lobby_note || null,
     locked: !!sess.locked,
+    startedAt2: sess.started_at || null,
+    inPlay: !!sess.started_at,
     voiceRoom: "qt:" + sess.id,
   };
 }
@@ -4138,6 +4145,32 @@ async function _qRoom(sessionId, viewerId) {
     "SELECT target_id, score FROM queue_ratings WHERE session_id = $1 AND rater_id = $2",
     [sessionId, viewerId]);
 
+  // When this table would be reclaimed if nothing else happens.
+  // Null while it is full, in play, or locked -- none of those are
+  // reclaimed at all, and a countdown that never runs out is just
+  // an alarming number on the screen.
+  const idle = await pool.query(`
+    SELECT s.players, s.started_at, s.locked,
+           (SELECT COUNT(*)::int FROM queue_members m
+             WHERE m.session_id = s.id AND m.left_at IS NULL) AS filled,
+           GREATEST(
+             s.created_at,
+             COALESCE(s.kept_at, s.created_at),
+             COALESCE((SELECT MAX(joined_at) FROM queue_members j
+                        WHERE j.session_id = s.id), s.created_at),
+             COALESCE((SELECT MAX(created_at) FROM queue_messages c2
+                        WHERE c2.session_id = s.id), s.created_at),
+             COALESCE((SELECT MAX(created_at) FROM queue_polls p2
+                        WHERE p2.session_id = s.id), s.created_at)
+           ) AS last_at
+      FROM queue_sessions s WHERE s.id = $1
+  `, [sessionId]).catch(() => ({ rows: [] }));
+
+  const iw = idle.rows[0] || {};
+  const idleAt = (!iw.started_at && !iw.locked && (iw.filled || 0) < (iw.players || 2) && iw.last_at)
+    ? new Date(new Date(iw.last_at).getTime() + Q_SEARCH_IDLE_MS).toISOString()
+    : null;
+
   const chat = await pool.query(`
     SELECT c.id, c.body, c.created_at, c.user_id, u.username, u.avatar_url
       FROM queue_messages c LEFT JOIN users u ON u.id = c.user_id
@@ -4167,6 +4200,7 @@ async function _qRoom(sessionId, viewerId) {
       skill: x.skill, since: x.created_at,
     })),
     myRatings: rated.rows.reduce((a, x) => (a[x.target_id] = x.score, a), {}),
+    idleAt: idleAt,
     // Oldest first: a transcript is read downwards.
     chat: chat.rows.reverse().map(x => ({
       id: x.id, userId: x.user_id, username: x.username,
@@ -4457,7 +4491,7 @@ app.get("/queue/open", requireAuth, async (req, res) => {
     const r = await pool.query(`
       SELECT s.id, s.game, s.players, s.skill, s.mic, s.playstyle, s.mode, s.width,
              s.steam_only, s.min_age_days, s.verified_tier,
-             s.created_at,
+             s.created_at, s.started_at,
              EXTRACT(EPOCH FROM (NOW() - s.created_at)) * 1000 AS age_ms,
              (SELECT COUNT(*)::int FROM queue_members m
                WHERE m.session_id = s.id AND m.left_at IS NULL) AS filled,
@@ -4505,6 +4539,7 @@ app.get("/queue/open", requireAuth, async (req, res) => {
     res.json(r.rows
       .map(x => ({
         full: (x.filled || 0) >= x.players,
+        inPlay: !!x.started_at,
         id: x.id, game: x.game, players: x.players, filled: x.filled || 0,
         skill: x.skill, mic: x.mic, playstyle: x.playstyle, mode: x.mode,
         width: x.width, ageMs: Math.round(Number(x.age_ms) || 0),
@@ -4629,8 +4664,11 @@ app.get("/queue/pulse", async (req, res) => {
            OR (
              (SELECT COUNT(*) FROM queue_members m
                WHERE m.session_id = s.id AND m.left_at IS NULL) < s.players
-             AND COALESCE((SELECT MAX(joined_at) FROM queue_members j
-                            WHERE j.session_id = s.id), s.created_at)
+             AND s.started_at IS NULL
+             AND GREATEST(
+                   COALESCE(s.kept_at, s.created_at),
+                   COALESCE((SELECT MAX(joined_at) FROM queue_members j
+                              WHERE j.session_id = s.id), s.created_at))
                  < NOW() - ($2 || ' milliseconds')::interval
            )
          )
@@ -5323,6 +5361,62 @@ app.post("/queue/:id/role", requireAuth, async (req, res) => {
     console.error("[queue/role]", e.message);
     res.status(500).json({ error: "Could not claim that role" });
   }
+});
+
+// POST /queue/:id/keep -- we are still here.
+//
+// The idle rule exists to reclaim tables nobody is sitting at, and
+// the only evidence it accepts is somebody doing something. This is
+// that evidence, for a table where everyone is simply waiting.
+app.post("/queue/:id/keep", requireAuth, async (req, res) => {
+  try {
+    const seat = await pool.query(
+      "SELECT 1 FROM queue_members WHERE session_id = $1 AND user_id = $2 AND left_at IS NULL",
+      [req.params.id, req.userId]);
+    if (!seat.rowCount) return res.status(403).json({ error: "You are not at this table" });
+    await pool.query("UPDATE queue_sessions SET kept_at = NOW() WHERE id = $1", [req.params.id]);
+    res.json({ ok: true });
+  } catch (e) {
+    console.error("[queue/keep]", e.message);
+    res.status(500).json({ error: "Could not do that" });
+  }
+});
+
+// POST /queue/:id/start -- we are playing; keep the seat open.
+//
+// Locking already existed and does the opposite of what a group
+// usually wants at this moment: they are starting the game, and they
+// still want the fourth. This marks the table as in play WITHOUT
+// closing it, which also stops the idle sweep reclaiming a table
+// whose members are all busy inside a match and not typing.
+app.post("/queue/:id/start", requireAuth, async (req, res) => {
+  const keepOpen = (req.body || {}).keepOpen !== false;
+  try {
+    const seat = await pool.query(
+      "SELECT 1 FROM queue_members WHERE session_id = $1 AND user_id = $2 AND left_at IS NULL",
+      [req.params.id, req.userId]);
+    if (!seat.rowCount) return res.status(403).json({ error: "You are not at this table" });
+
+    await pool.query(`
+      UPDATE queue_sessions
+         SET started_at = COALESCE(started_at, NOW()),
+             locked = CASE WHEN $2 THEN locked ELSE TRUE END
+       WHERE id = $1
+    `, [req.params.id, keepOpen]);
+    res.json({ ok: true, inPlay: true, keepOpen });
+  } catch (e) {
+    console.error("[queue/start]", e.message);
+    res.status(500).json({ error: "Could not start the table" });
+  }
+});
+
+// POST /queue/:id/stop -- back to waiting, not playing.
+app.post("/queue/:id/stop", requireAuth, async (req, res) => {
+  try {
+    await pool.query("UPDATE queue_sessions SET started_at = NULL WHERE id = $1",
+                     [req.params.id]);
+    res.json({ ok: true, inPlay: false });
+  } catch (e) { res.status(500).json({ error: "Could not do that" }); }
 });
 
 // POST /queue/:id/lock -- stop the matcher sending anyone else.

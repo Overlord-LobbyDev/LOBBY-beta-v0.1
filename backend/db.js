@@ -902,6 +902,17 @@ async function initDb() {
     await pool.query(`ALTER TABLE queue_members ADD COLUMN IF NOT EXISTS ping_ms INTEGER DEFAULT NULL;`).catch(() => {});
     await pool.query(`ALTER TABLE queue_members ADD COLUMN IF NOT EXISTS region TEXT DEFAULT NULL;`).catch(() => {});
 
+    // Started, but not closed. A group that begins playing three-handed
+    // is still a group that wants a fourth -- locking was the only way
+    // to say "we have started", and it slammed the door at the same
+    // time. This separates the two.
+    await pool.query(`ALTER TABLE queue_sessions ADD COLUMN IF NOT EXISTS started_at TIMESTAMPTZ DEFAULT NULL;`).catch(() => {});
+
+    // "We are still here." The idle rule reclaims a quiet short-handed
+    // table after twenty minutes; this is how a table says it means to
+    // keep waiting, without having to type something to prove it.
+    await pool.query(`ALTER TABLE queue_sessions ADD COLUMN IF NOT EXISTS kept_at TIMESTAMPTZ DEFAULT NULL;`).catch(() => {});
+
     // Tournament Invites (for invite-only tournaments)
     await pool.query(`
       CREATE TABLE IF NOT EXISTS tournament_invites (
