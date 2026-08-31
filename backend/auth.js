@@ -3862,6 +3862,16 @@ function _qPlaylistIdOf(game) {
 const Q_TIERS = ["bronze","silver","gold","plat","diamond","master","pro"];
 const Q_SESSION_MAX_MS = 3 * 60 * 60 * 1000;   // the UI promises 3 hours
 
+// A short-handed table with nothing happening in it is not waiting for
+// anyone -- it is abandoned. Reclaiming it at twenty minutes rather
+// than three hours keeps the pool honest: every table listed is one
+// somebody is actually sitting at.
+//
+// Only ever applied to a table that is still SHORT. A full group can
+// sit in silence for an hour and still be a real group; the three-hour
+// cap is the only rule that touches them.
+const Q_SEARCH_IDLE_MS = 20 * 60 * 1000;
+
 function _qTierIdx(t) {
   const i = Q_TIERS.indexOf(String(t || "").toLowerCase());
   return i === -1 ? 3 : i;   // unknown sits mid-ladder rather than at an end
@@ -3974,7 +3984,7 @@ function _qPrefOk(a, b) {
 
 async function _qRoster(sessionId) {
   const r = await pool.query(`
-    SELECT m.user_id, m.skill, m.proof, m.joined_at,
+    SELECT m.user_id, m.skill, m.proof, m.joined_at, m.role, m.ping_ms, m.region,
            u.username, u.avatar_url,
            (s.owner_id = m.user_id) AS is_owner
     FROM queue_members m
@@ -3991,6 +4001,9 @@ async function _qRoster(sessionId) {
     skill: x.skill,
     proof: x.proof,
     isOwner: !!x.is_owner,
+    role: x.role || null,
+    pingMs: x.ping_ms == null ? null : Number(x.ping_ms),
+    region: x.region || null,
   }));
 }
 
@@ -4002,15 +4015,54 @@ async function _qSession(id) {
 // A session that has run past its cap is closed on read rather than by a
 // sweeper: there is no scheduler in this service, and a session nobody
 // looks at does no harm.
-async function _qExpireIfStale(sess) {
-  if (!sess || sess.ended_at) return sess;
-  const started = new Date(sess.matched_at || sess.created_at).getTime();
-  if (Date.now() - started < Q_SESSION_MAX_MS) return sess;
+async function _qExpire(sess) {
   await pool.query(
     "UPDATE queue_sessions SET state = 'expired', ended_at = NOW() WHERE id = $1",
     [sess.id]
   );
   return Object.assign({}, sess, { state: "expired" });
+}
+
+async function _qExpireIfStale(sess) {
+  if (!sess || sess.ended_at) return sess;
+  const started = new Date(sess.matched_at || sess.created_at).getTime();
+  if (Date.now() - started >= Q_SESSION_MAX_MS) return _qExpire(sess);
+
+  // The idle rule. Activity is anything a person did: arriving, saying
+  // something, or putting a question to the table. Polling for updates
+  // is not activity -- a client left open on a dead table would
+  // otherwise keep it alive forever, which is the exact failure this
+  // exists to stop.
+  if (sess.state === "searching") {
+    try {
+      const r = await pool.query(`
+        SELECT (SELECT COUNT(*)::int FROM queue_members m
+                 WHERE m.session_id = $1 AND m.left_at IS NULL) AS filled,
+               GREATEST(
+                 $2::timestamptz,
+                 COALESCE((SELECT MAX(joined_at) FROM queue_members
+                            WHERE session_id = $1), $2::timestamptz),
+                 COALESCE((SELECT MAX(created_at) FROM queue_messages
+                            WHERE session_id = $1), $2::timestamptz),
+                 COALESCE((SELECT MAX(created_at) FROM queue_polls
+                            WHERE session_id = $1), $2::timestamptz)
+               ) AS last_at
+      `, [sess.id, sess.created_at]);
+
+      const row = r.rows[0] || {};
+      const filled = row.filled || 0;
+      const idle = Date.now() - new Date(row.last_at || sess.created_at).getTime();
+      if (filled < (sess.players || 2) && idle >= Q_SEARCH_IDLE_MS) {
+        return _qExpire(sess);
+      }
+    } catch (e) {
+      // queue_messages / queue_polls arrived later than this table did.
+      // A database without them is not a reason to refuse to answer --
+      // the three-hour cap above still applies.
+      console.warn("[queue/idle]", e.message);
+    }
+  }
+  return sess;
 }
 
 function _qPayload(sess, members) {
@@ -4034,6 +4086,98 @@ function _qPayload(sess, members) {
       new Date(sess.matched_at || sess.created_at).getTime() + Q_SESSION_MAX_MS
     ).toISOString(),
     serverId: sess.server_id || null,
+    // The room half of the table. A client polling status should not
+    // need three more round trips to know what is being voted on and
+    // whether the game code has been posted yet.
+    lobbyCode: sess.lobby_code || null,
+    lobbyNote: sess.lobby_note || null,
+    locked: !!sess.locked,
+    voiceRoom: "qt:" + sess.id,
+  };
+}
+
+// Everything the table is currently deciding. Open polls with their
+// tallies, plus the standing kick votes -- which already existed but
+// were invisible, so a vote against you was cast in the dark.
+async function _qRoom(sessionId, viewerId) {
+  const polls = await pool.query(`
+    SELECT p.*, u.username AS author_name, t.username AS target_name
+      FROM queue_polls p
+      LEFT JOIN users u ON u.id = p.author_id
+      LEFT JOIN users t ON t.id = p.target_id
+     WHERE p.session_id = $1 AND p.created_at > NOW() - INTERVAL '20 minutes'
+     ORDER BY p.created_at DESC LIMIT 8
+  `, [sessionId]);
+
+  const ids = polls.rows.map(x => x.id);
+  let votes = { rows: [] };
+  if (ids.length) {
+    votes = await pool.query(
+      "SELECT poll_id, voter_id, choice FROM queue_poll_votes WHERE poll_id = ANY($1::int[])",
+      [ids]);
+  }
+
+  const kick = await pool.query(`
+    SELECT target_id, COUNT(*)::int AS votes,
+           BOOL_OR(voter_id = $2) AS mine
+      FROM queue_votes WHERE session_id = $1 GROUP BY target_id
+  `, [sessionId, viewerId]);
+
+  const seated = await pool.query(
+    "SELECT COUNT(*)::int AS n FROM queue_members WHERE session_id = $1 AND left_at IS NULL",
+    [sessionId]);
+  const n = (seated.rows[0] || {}).n || 1;
+
+  const wait = await pool.query(`
+    SELECT w.user_id, w.created_at, u.username, u.avatar_url, w.skill
+      FROM queue_waitlist w JOIN users u ON u.id = w.user_id
+     WHERE w.session_id = $1 ORDER BY w.created_at ASC
+  `, [sessionId]);
+
+  const rated = await pool.query(
+    "SELECT target_id, score FROM queue_ratings WHERE session_id = $1 AND rater_id = $2",
+    [sessionId, viewerId]);
+
+  const chat = await pool.query(`
+    SELECT c.id, c.body, c.created_at, c.user_id, u.username, u.avatar_url
+      FROM queue_messages c LEFT JOIN users u ON u.id = c.user_id
+     WHERE c.session_id = $1
+     ORDER BY c.created_at DESC LIMIT 60
+  `, [sessionId]);
+
+  return {
+    polls: polls.rows.map(x => {
+      const mine = votes.rows.filter(v => v.poll_id === x.id);
+      const opts = Array.isArray(x.options) ? x.options : [];
+      const tally = opts.map((_, i) => mine.filter(v => v.choice === i).length);
+      const own = mine.find(v => v.voter_id === viewerId);
+      return {
+        id: x.id, kind: x.kind, question: x.question, options: opts,
+        targetId: x.target_id || null, targetName: x.target_name || null,
+        author: x.author_name || null, authorId: x.author_id,
+        closesAt: x.closes_at, closed: !!x.closed, result: x.result || null,
+        tally, votes: mine.length,
+        myChoice: own ? own.choice : null,
+        // A majority of everyone seated, so an abstention is not a yes.
+        needed: Math.floor(n / 2) + 1,
+      };
+    }),
+    waitlist: wait.rows.map(x => ({
+      userId: x.user_id, username: x.username, avatar: x.avatar_url,
+      skill: x.skill, since: x.created_at,
+    })),
+    myRatings: rated.rows.reduce((a, x) => (a[x.target_id] = x.score, a), {}),
+    // Oldest first: a transcript is read downwards.
+    chat: chat.rows.reverse().map(x => ({
+      id: x.id, userId: x.user_id, username: x.username,
+      avatar: x.avatar_url, body: x.body, at: x.created_at,
+    })),
+    // Same denominator the kick endpoint enforces: everyone but the
+    // person on the end of it.
+    kicks: kick.rows.map(x => ({
+      targetId: x.target_id, votes: x.votes, mine: !!x.mine,
+      needed: Math.floor(Math.max(1, n - 1) / 2) + 1,
+    })),
   };
 }
 
@@ -4317,10 +4461,26 @@ app.get("/queue/open", requireAuth, async (req, res) => {
              EXTRACT(EPOCH FROM (NOW() - s.created_at)) * 1000 AS age_ms,
              (SELECT COUNT(*)::int FROM queue_members m
                WHERE m.session_id = s.id AND m.left_at IS NULL) AS filled,
-             u.username AS owner_name, u.avatar_url AS owner_avatar
+             u.username AS owner_name, u.avatar_url AS owner_avatar,
+             -- Who is already sitting there. A seat count tells you the
+             -- table is half full; the names tell you who you would be
+             -- sitting with, which is the part worth deciding on.
+             (SELECT COALESCE(json_agg(json_build_object(
+                       'name', mu.username, 'avatar', mu.avatar_url)
+                     ORDER BY m2.joined_at), '[]'::json)
+                FROM queue_members m2
+                JOIN users mu ON mu.id = m2.user_id
+               WHERE m2.session_id = s.id AND m2.left_at IS NULL) AS members
       FROM queue_sessions s
       LEFT JOIN users u ON u.id = s.owner_id
       WHERE s.state = 'searching'
+        -- Not shown once it has gone quiet: it is minutes from being
+        -- reclaimed, and walking up to one is a wasted press.
+        AND (s.created_at > NOW() - INTERVAL '20 minutes'
+             OR (SELECT COUNT(*) FROM queue_members f
+                  WHERE f.session_id = s.id AND f.left_at IS NULL) >= s.players
+             OR (SELECT MAX(joined_at) FROM queue_members g
+                  WHERE g.session_id = s.id) > NOW() - INTERVAL '20 minutes')
         AND NOT EXISTS (SELECT 1 FROM queue_members k
                          WHERE k.session_id = s.id AND k.user_id = $1 AND k.kicked)
         AND NOT EXISTS (SELECT 1 FROM queue_members me
@@ -4338,15 +4498,20 @@ app.get("/queue/open", requireAuth, async (req, res) => {
       LIMIT 60
     `, [req.userId]);
 
+    // Full tables are listed too, marked as full. They were filtered
+    // out entirely, which meant a popular table was invisible and the
+    // waiting line behind it was unreachable -- you cannot queue for a
+    // table you are never shown.
     res.json(r.rows
-      .filter(x => (x.filled || 0) < x.players)
       .map(x => ({
+        full: (x.filled || 0) >= x.players,
         id: x.id, game: x.game, players: x.players, filled: x.filled || 0,
         skill: x.skill, mic: x.mic, playstyle: x.playstyle, mode: x.mode,
         width: x.width, ageMs: Math.round(Number(x.age_ms) || 0),
         steamOnly: !!x.steam_only, minAgeDays: x.min_age_days || 0,
         verifiedTier: !!x.verified_tier,
         owner: x.owner_name || null, ownerAvatar: x.owner_avatar || null,
+        members: Array.isArray(x.members) ? x.members : [],
       })));
   } catch (e) {
     console.error("[queue/open]", e.message);
@@ -4449,6 +4614,28 @@ app.post("/queue/:id/join", requireAuth, async (req, res) => {
 // it, and the queue button wants to show a badge before anyone signs in.
 app.get("/queue/pulse", async (req, res) => {
   try {
+    // The sweep. Expiry on read only reaches tables somebody is still
+    // asking about, and an abandoned one is by definition the one nobody
+    // asks about -- so it sat in the pool forever. The pulse is polled by
+    // every client on the queue page, which makes it the cheapest place
+    // to reclaim them: one statement, no extra timer, and it self-heals
+    // as soon as a single person opens the page.
+    await pool.query(`
+      UPDATE queue_sessions s
+         SET state = 'expired', ended_at = NOW()
+       WHERE s.state = 'searching' AND s.ended_at IS NULL
+         AND (
+           s.created_at < NOW() - ($1 || ' milliseconds')::interval
+           OR (
+             (SELECT COUNT(*) FROM queue_members m
+               WHERE m.session_id = s.id AND m.left_at IS NULL) < s.players
+             AND COALESCE((SELECT MAX(joined_at) FROM queue_members j
+                            WHERE j.session_id = s.id), s.created_at)
+                 < NOW() - ($2 || ' milliseconds')::interval
+           )
+         )
+    `, [String(Q_SESSION_MAX_MS), String(Q_SEARCH_IDLE_MS)]).catch(() => {});
+
     const r = await pool.query(`
       SELECT s.game, s.players,
              COUNT(m.user_id)::int      AS waiting,
@@ -4614,6 +4801,552 @@ app.post("/queue/:id/vote-kick", requireAuth, async (req, res) => {
   } catch (e) {
     console.error("[queue/vote-kick]", e.message);
     res.status(500).json({ error: "Could not register the vote" });
+  }
+});
+
+// GET /queue/:id/room -- the table as a room: who is seated, what is
+// being voted on, and whether the game code has been posted.
+app.get("/queue/:id/room", requireAuth, async (req, res) => {
+  try {
+    const sess0 = await _qSession(req.params.id);
+    if (!sess0) return res.status(404).json({ error: "No such table" });
+    // A seat that came free while nobody was looking is filled here,
+    // before the room is described, so the answer is never one poll
+    // out of date.
+    await _qPromoteWaiting(sess0.id);
+    // The same staleness check /status runs. Without it a table could be
+    // reported as live here and expired there, and the client believed
+    // whichever it asked last.
+    let sess = await _qSession(req.params.id);
+    sess = await _qExpireIfStale(sess);
+    const roster = await _qRoster(sess.id);
+    const room = await _qRoom(sess.id, req.userId);
+    res.json(Object.assign(_qPayload(sess, roster), room));
+  } catch (e) {
+    console.error("[queue/room]", e.message);
+    res.status(500).json({ error: "Could not read the table" });
+  }
+});
+
+// POST /queue/:id/poll -- ask the table something.
+//
+// Anyone seated can ask. A table where only the leader may put a
+// question is not a table, it is an audience -- and the one power that
+// does need a majority (a kick) is already majority-gated below.
+app.post("/queue/:id/poll", requireAuth, async (req, res) => {
+  const b = req.body || {};
+  const question = String(b.question || "").trim().slice(0, 120);
+  const kind = ["poll", "ready", "kick"].includes(b.kind) ? b.kind : "poll";
+  let options = Array.isArray(b.options)
+    ? b.options.map(x => String(x || "").trim().slice(0, 48)).filter(Boolean).slice(0, 6)
+    : [];
+  if (!options.length) options = ["Yes", "No"];
+  if (!question) return res.status(400).json({ error: "Ask something" });
+
+  try {
+    const seat = await pool.query(
+      "SELECT 1 FROM queue_members WHERE session_id = $1 AND user_id = $2 AND left_at IS NULL",
+      [req.params.id, req.userId]);
+    if (!seat.rowCount) return res.status(403).json({ error: "You are not at this table" });
+
+    // One open question at a time. Two live polls means neither gets a
+    // majority, and the table stalls arguing about which to answer.
+    const live = await pool.query(`
+      SELECT COUNT(*)::int AS n FROM queue_polls
+       WHERE session_id = $1 AND closed = FALSE AND closes_at > NOW()
+    `, [req.params.id]);
+    if ((live.rows[0] || {}).n > 0) {
+      return res.status(409).json({ error: "A vote is already running" });
+    }
+
+    const secs = Math.max(15, Math.min(180, parseInt(b.seconds, 10) || 60));
+    const r = await pool.query(`
+      INSERT INTO queue_polls (session_id, author_id, kind, question, options, target_id, closes_at)
+      VALUES ($1,$2,$3,$4,$5::jsonb,$6, NOW() + ($7 || ' seconds')::interval)
+      RETURNING id
+    `, [req.params.id, req.userId, kind, question, JSON.stringify(options),
+        parseInt(b.targetUserId, 10) || null, String(secs)]);
+
+    res.json({ ok: true, pollId: r.rows[0].id });
+  } catch (e) {
+    console.error("[queue/poll]", e.message);
+    res.status(500).json({ error: "Could not open the vote" });
+  }
+});
+
+// POST /queue/:id/poll/:pollId/vote -- one voice each.
+app.post("/queue/:id/poll/:pollId/vote", requireAuth, async (req, res) => {
+  const choice = parseInt((req.body || {}).choice, 10);
+  if (!(choice >= 0)) return res.status(400).json({ error: "choice is required" });
+  try {
+    const seat = await pool.query(
+      "SELECT 1 FROM queue_members WHERE session_id = $1 AND user_id = $2 AND left_at IS NULL",
+      [req.params.id, req.userId]);
+    if (!seat.rowCount) return res.status(403).json({ error: "You are not at this table" });
+
+    const pr = await pool.query(
+      "SELECT * FROM queue_polls WHERE id = $1 AND session_id = $2",
+      [req.params.pollId, req.params.id]);
+    const poll = pr.rows[0];
+    if (!poll) return res.status(404).json({ error: "No such vote" });
+    if (poll.closed || new Date(poll.closes_at) < new Date()) {
+      return res.status(409).json({ error: "That vote has closed" });
+    }
+
+    // Changing your mind is allowed while the vote is open; voting
+    // twice is not. The UNIQUE plus an UPDATE on conflict is the
+    // difference between the two.
+    await pool.query(`
+      INSERT INTO queue_poll_votes (poll_id, voter_id, choice) VALUES ($1,$2,$3)
+      ON CONFLICT (poll_id, voter_id) DO UPDATE SET choice = EXCLUDED.choice
+    `, [poll.id, req.userId, choice]);
+
+    const seated = await pool.query(
+      "SELECT COUNT(*)::int AS n FROM queue_members WHERE session_id = $1 AND left_at IS NULL",
+      [req.params.id]);
+    const n = (seated.rows[0] || {}).n || 1;
+    const needed = Math.floor(n / 2) + 1;
+
+    const vr = await pool.query(
+      "SELECT choice, COUNT(*)::int AS c FROM queue_poll_votes WHERE poll_id = $1 GROUP BY choice",
+      [poll.id]);
+    const top = vr.rows.sort((a, b2) => b2.c - a.c)[0];
+
+    // Closed the moment it is decided rather than when the clock runs
+    // out: a question everyone has answered should not sit there
+    // pretending it is still open.
+    let result = null;
+    let acted = null;
+    if (top && top.c >= needed) {
+      const opts = Array.isArray(poll.options) ? poll.options : [];
+      result = opts[top.choice] != null ? String(opts[top.choice]) : String(top.choice);
+      await pool.query("UPDATE queue_polls SET closed = TRUE, result = $2 WHERE id = $1",
+                       [poll.id, result]);
+
+      // A ready check that passes closes the door behind it. Reporting
+      // "everyone is ready" and then waiting for the leader to press
+      // something else is half a decision, and the half it leaves out
+      // is the one that stops a stranger landing mid-countdown.
+      if (poll.kind === "ready" && top.choice === 0) {
+        await pool.query(`
+          UPDATE queue_sessions SET locked = TRUE, state = 'matched',
+                 matched_at = COALESCE(matched_at, NOW())
+           WHERE id = $1
+        `, [req.params.id]).catch(() => {});
+        acted = "locked";
+      }
+    }
+    res.json({ ok: true, needed, result, closed: !!result, acted });
+  } catch (e) {
+    console.error("[queue/poll/vote]", e.message);
+    res.status(500).json({ error: "Could not register the vote" });
+  }
+});
+
+// POST /queue/:id/code -- post the game's own invite code to the table.
+//
+// Owner-only, and deliberately so: this is the one thing that cannot be
+// undone by a vote, because everyone will have copied it by the time a
+// vote finished. It is also the least harmful power in the room -- a
+// wrong code wastes a minute, it does not remove anybody.
+app.post("/queue/:id/code", requireAuth, async (req, res) => {
+  const b = req.body || {};
+  const code = String(b.code == null ? "" : b.code).trim().slice(0, 64);
+  const note = String(b.note == null ? "" : b.note).trim().slice(0, 120);
+  try {
+    const sess = await _qSession(req.params.id);
+    if (!sess) return res.status(404).json({ error: "No such table" });
+    if (sess.owner_id !== req.userId) {
+      return res.status(403).json({ error: "Only the table leader can post the code" });
+    }
+    await pool.query(
+      "UPDATE queue_sessions SET lobby_code = $2, lobby_note = $3 WHERE id = $1",
+      [sess.id, code || null, note || null]);
+    res.json({ ok: true, lobbyCode: code || null, lobbyNote: note || null });
+  } catch (e) {
+    console.error("[queue/code]", e.message);
+    res.status(500).json({ error: "Could not post the code" });
+  }
+});
+
+// A free seat and somebody standing behind the table is a problem that
+// solves itself. Called wherever a seat count is read, so a waiter is
+// promoted the moment one opens rather than when someone refreshes.
+async function _qPromoteWaiting(sessionId) {
+  try {
+    const r = await pool.query(`
+      SELECT s.players,
+             (SELECT COUNT(*)::int FROM queue_members m
+               WHERE m.session_id = s.id AND m.left_at IS NULL) AS filled
+        FROM queue_sessions s WHERE s.id = $1 AND s.locked = FALSE
+    `, [sessionId]);
+    const row = r.rows[0];
+    if (!row) return;
+    let free = (row.players || 0) - (row.filled || 0);
+    while (free > 0) {
+      const w = await pool.query(
+        "SELECT * FROM queue_waitlist WHERE session_id = $1 ORDER BY created_at ASC LIMIT 1",
+        [sessionId]);
+      const next = w.rows[0];
+      if (!next) return;
+      await pool.query("DELETE FROM queue_waitlist WHERE id = $1", [next.id]);
+      await pool.query(`
+        INSERT INTO queue_members (session_id, user_id, skill) VALUES ($1,$2,$3)
+        ON CONFLICT (session_id, user_id)
+        DO UPDATE SET left_at = NULL, kicked = FALSE
+      `, [sessionId, next.user_id, next.skill]);
+      free--;
+    }
+  } catch (e) { console.error("[queue/promote]", e.message); }
+}
+
+// POST /queue/:id/waitlist -- stand behind a full table.
+app.post("/queue/:id/waitlist", requireAuth, async (req, res) => {
+  const on = (req.body || {}).waiting !== false;
+  try {
+    if (!on) {
+      await pool.query("DELETE FROM queue_waitlist WHERE session_id = $1 AND user_id = $2",
+                       [req.params.id, req.userId]);
+      return res.json({ ok: true, waiting: false });
+    }
+    const seat = await pool.query(
+      "SELECT 1 FROM queue_members WHERE session_id = $1 AND user_id = $2 AND left_at IS NULL",
+      [req.params.id, req.userId]);
+    if (seat.rowCount) return res.status(400).json({ error: "You already have a seat" });
+
+    await pool.query(`
+      INSERT INTO queue_waitlist (session_id, user_id, skill) VALUES ($1,$2,$3)
+      ON CONFLICT (session_id, user_id) DO NOTHING
+    `, [req.params.id, req.userId, (req.body || {}).skill || null]);
+    // A seat may already be free, in which case standing in line for it
+    // would be a strange thing to make someone do.
+    await _qPromoteWaiting(req.params.id);
+    res.json({ ok: true, waiting: true });
+  } catch (e) {
+    console.error("[queue/waitlist]", e.message);
+    res.status(500).json({ error: "Could not join the line" });
+  }
+});
+
+// POST /queue/:id/invite -- offer a specific seat to a specific person.
+app.post("/queue/:id/invite", requireAuth, async (req, res) => {
+  const to = parseInt((req.body || {}).userId, 10);
+  if (!to) return res.status(400).json({ error: "userId is required" });
+  try {
+    const seat = await pool.query(
+      "SELECT 1 FROM queue_members WHERE session_id = $1 AND user_id = $2 AND left_at IS NULL",
+      [req.params.id, req.userId]);
+    if (!seat.rowCount) return res.status(403).json({ error: "You are not at this table" });
+
+    // Blocked in either direction is still blocked. Inviting around a
+    // block would make the block worthless.
+    const blocked = await pool.query(`
+      SELECT 1 FROM user_blocks
+       WHERE (user_id = $1 AND blocked_id = $2) OR (user_id = $2 AND blocked_id = $1)
+    `, [req.userId, to]);
+    if (blocked.rowCount) return res.status(403).json({ error: "You cannot invite them" });
+
+    await pool.query(`
+      INSERT INTO queue_invites (session_id, from_id, to_id) VALUES ($1,$2,$3)
+      ON CONFLICT (session_id, to_id) DO UPDATE SET status = 'pending', created_at = NOW()
+    `, [req.params.id, req.userId, to]);
+    res.json({ ok: true });
+  } catch (e) {
+    console.error("[queue/invite]", e.message);
+    res.status(500).json({ error: "Could not send that invite" });
+  }
+});
+
+// GET /queue/invites -- tables you have been asked to sit at.
+app.get("/queue/invites", requireAuth, async (req, res) => {
+  try {
+    const r = await pool.query(`
+      SELECT i.id, i.session_id, i.created_at, u.username, u.avatar_url,
+             s.game, s.players, s.state,
+             (SELECT COUNT(*)::int FROM queue_members m
+               WHERE m.session_id = s.id AND m.left_at IS NULL) AS filled
+        FROM queue_invites i
+        JOIN users u ON u.id = i.from_id
+        JOIN queue_sessions s ON s.id = i.session_id
+       WHERE i.to_id = $1 AND i.status = 'pending'
+         AND s.state IN ('searching','matched')
+         AND i.created_at > NOW() - INTERVAL '30 minutes'
+       ORDER BY i.created_at DESC LIMIT 5
+    `, [req.userId]);
+    res.json(r.rows.map(x => ({
+      id: x.id, queueId: x.session_id, from: x.username, fromAvatar: x.avatar_url,
+      game: x.game, players: x.players, filled: x.filled, at: x.created_at,
+    })));
+  } catch (e) {
+    console.error("[queue/invites]", e.message);
+    res.status(500).json({ error: "Could not read your invites" });
+  }
+});
+
+// POST /queue/invite/:id/decline -- no thanks. (Accepting is just
+// joining the table, which /queue/:id/join already does properly,
+// rank window and all -- an invite does not buy a seat you would not
+// otherwise be allowed to take.)
+app.post("/queue/invite/:id/decline", requireAuth, async (req, res) => {
+  try {
+    await pool.query("UPDATE queue_invites SET status = 'declined' WHERE id = $1 AND to_id = $2",
+                     [req.params.id, req.userId]);
+    res.json({ ok: true });
+  } catch (e) { res.status(500).json({ error: "Could not decline" }); }
+});
+
+// POST /queue/:id/befriend -- keep the group.
+//
+// "Make it a lobby" is the heavy version of this and most good
+// sessions do not warrant a whole server. This is the light one:
+// friend requests to everyone who was there, in one press.
+app.post("/queue/:id/befriend", requireAuth, async (req, res) => {
+  try {
+    const roster = await _qRoster(req.params.id);
+    let sent = 0;
+    for (const m of roster) {
+      if (m.userId === req.userId) continue;
+      const r = await pool.query(`
+        INSERT INTO friends (user_id, friend_id, status) VALUES ($1,$2,'pending')
+        ON CONFLICT DO NOTHING
+      `, [req.userId, m.userId]).catch(() => null);
+      if (r && r.rowCount) sent++;
+    }
+    res.json({ ok: true, sent });
+  } catch (e) {
+    console.error("[queue/befriend]", e.message);
+    res.status(500).json({ error: "Could not send the requests" });
+  }
+});
+
+// POST /queue/:id/rate -- one score per person per table.
+app.post("/queue/:id/rate", requireAuth, async (req, res) => {
+  const target = parseInt((req.body || {}).targetUserId, 10);
+  const score = Math.max(-1, Math.min(1, parseInt((req.body || {}).score, 10) || 0));
+  if (!target || target === req.userId) return res.status(400).json({ error: "Invalid target" });
+  try {
+    const both = await pool.query(`
+      SELECT COUNT(*)::int AS n FROM queue_members
+       WHERE session_id = $1 AND user_id IN ($2,$3)
+    `, [req.params.id, req.userId, target]);
+    if ((both.rows[0] || {}).n < 2) {
+      return res.status(400).json({ error: "You did not play with them" });
+    }
+    await pool.query(`
+      INSERT INTO queue_ratings (session_id, rater_id, target_id, score) VALUES ($1,$2,$3,$4)
+      ON CONFLICT (session_id, rater_id, target_id) DO UPDATE SET score = EXCLUDED.score
+    `, [req.params.id, req.userId, target, score]);
+    res.json({ ok: true });
+  } catch (e) {
+    console.error("[queue/rate]", e.message);
+    res.status(500).json({ error: "Could not save that" });
+  }
+});
+
+// POST /queue/:id/net -- your own round trip, self-reported.
+app.post("/queue/:id/net", requireAuth, async (req, res) => {
+  const ping = Math.max(0, Math.min(5000, parseInt((req.body || {}).pingMs, 10) || 0));
+  const region = String((req.body || {}).region || "").trim().slice(0, 24) || null;
+  try {
+    await pool.query(`
+      UPDATE queue_members SET ping_ms = $3, region = COALESCE($4, region)
+       WHERE session_id = $1 AND user_id = $2
+    `, [req.params.id, req.userId, ping || null, region]);
+    res.json({ ok: true });
+  } catch (e) { res.status(500).json({ error: "Could not record that" }); }
+});
+
+// GET /queue/history -- the tables you sat at, most recent first.
+//
+// Most people play with the same handful of others, and making them
+// re-queue from nothing every night throws that away.
+app.get("/queue/history", requireAuth, async (req, res) => {
+  try {
+    const r = await pool.query(`
+      SELECT s.id, s.game, s.players, s.created_at,
+             (SELECT json_agg(json_build_object(
+                       'userId', u2.id, 'username', u2.username, 'avatar', u2.avatar_url))
+                FROM queue_members m2 JOIN users u2 ON u2.id = m2.user_id
+               WHERE m2.session_id = s.id AND m2.user_id <> $1) AS others
+        FROM queue_sessions s
+        JOIN queue_members m ON m.session_id = s.id AND m.user_id = $1
+       WHERE s.created_at > NOW() - INTERVAL '30 days'
+       ORDER BY s.created_at DESC LIMIT 12
+    `, [req.userId]);
+    res.json(r.rows
+      .map(x => ({
+        queueId: x.id, game: x.game, players: x.players, at: x.created_at,
+        others: (x.others || []).filter(Boolean),
+      }))
+      // A table you sat at alone is not a group worth offering back.
+      .filter(x => x.others.length));
+  } catch (e) {
+    console.error("[queue/history]", e.message);
+    res.status(500).json({ error: "Could not read your history" });
+  }
+});
+
+// POST /queue/schedule -- the same table, agreed for later.
+app.post("/queue/schedule", requireAuth, async (req, res) => {
+  const b = req.body || {};
+  const at = new Date(b.startsAt);
+  if (isNaN(at.getTime())) return res.status(400).json({ error: "When?" });
+  if (at.getTime() < Date.now() - 60000) {
+    return res.status(400).json({ error: "That time has passed" });
+  }
+  try {
+    const r = await pool.query(`
+      INSERT INTO queue_scheduled (owner_id, game, players, skill, starts_at, note)
+      VALUES ($1,$2,$3,$4,$5,$6) RETURNING id
+    `, [req.userId, String(b.game || "").slice(0, 64),
+        Math.max(2, Math.min(10, parseInt(b.players, 10) || 2)),
+        b.skill || null, at.toISOString(),
+        String(b.note || "").slice(0, 200) || null]);
+    const id = r.rows[0].id;
+
+    const invite = Array.isArray(b.userIds) ? b.userIds : [];
+    await pool.query("INSERT INTO queue_scheduled_members (scheduled_id, user_id, rsvp) VALUES ($1,$2,'going') ON CONFLICT DO NOTHING",
+                     [id, req.userId]).catch(() => {});
+    for (const uid of invite) {
+      const n = parseInt(uid, 10);
+      if (!n || n === req.userId) continue;
+      await pool.query(
+        "INSERT INTO queue_scheduled_members (scheduled_id, user_id) VALUES ($1,$2) ON CONFLICT DO NOTHING",
+        [id, n]).catch(() => {});
+    }
+    res.json({ ok: true, id });
+  } catch (e) {
+    console.error("[queue/schedule]", e.message);
+    res.status(500).json({ error: "Could not schedule that" });
+  }
+});
+
+// GET /queue/scheduled -- what is coming up, yours and the ones you
+// have been asked to.
+app.get("/queue/scheduled", requireAuth, async (req, res) => {
+  try {
+    const r = await pool.query(`
+      SELECT q.*, u.username AS owner_name,
+             (SELECT rsvp FROM queue_scheduled_members x
+               WHERE x.scheduled_id = q.id AND x.user_id = $1) AS my_rsvp,
+             (SELECT COUNT(*)::int FROM queue_scheduled_members y
+               WHERE y.scheduled_id = q.id AND y.rsvp = 'going') AS going
+        FROM queue_scheduled q
+        JOIN users u ON u.id = q.owner_id
+       WHERE q.starts_at > NOW() - INTERVAL '2 hours'
+         AND (q.owner_id = $1 OR EXISTS (SELECT 1 FROM queue_scheduled_members z
+                                          WHERE z.scheduled_id = q.id AND z.user_id = $1))
+       ORDER BY q.starts_at ASC LIMIT 10
+    `, [req.userId]);
+    res.json(r.rows.map(x => ({
+      id: x.id, game: x.game, players: x.players, skill: x.skill,
+      startsAt: x.starts_at, note: x.note, owner: x.owner_name,
+      isMine: x.owner_id === req.userId, myRsvp: x.my_rsvp || null, going: x.going,
+    })));
+  } catch (e) {
+    console.error("[queue/scheduled]", e.message);
+    res.status(500).json({ error: "Could not read your sessions" });
+  }
+});
+
+// POST /queue/scheduled/:id/rsvp
+app.post("/queue/scheduled/:id/rsvp", requireAuth, async (req, res) => {
+  const going = (req.body || {}).going !== false;
+  try {
+    await pool.query(`
+      INSERT INTO queue_scheduled_members (scheduled_id, user_id, rsvp) VALUES ($1,$2,$3)
+      ON CONFLICT (scheduled_id, user_id) DO UPDATE SET rsvp = EXCLUDED.rsvp
+    `, [req.params.id, req.userId, going ? 'going' : 'out']);
+    res.json({ ok: true });
+  } catch (e) { res.status(500).json({ error: "Could not RSVP" }); }
+});
+
+// DELETE /queue/scheduled/:id -- called off.
+app.delete("/queue/scheduled/:id", requireAuth, async (req, res) => {
+  try {
+    await pool.query("DELETE FROM queue_scheduled WHERE id = $1 AND owner_id = $2",
+                     [req.params.id, req.userId]);
+    res.json({ ok: true });
+  } catch (e) { res.status(500).json({ error: "Could not cancel that" }); }
+});
+
+// POST /queue/:id/chat -- say something at the table.
+//
+// Deliberately not the app's message system: this belongs to the
+// session and dies with it. A table is a conversation you are having
+// for twenty minutes, not a channel anyone will scroll back through.
+app.post("/queue/:id/chat", requireAuth, async (req, res) => {
+  const body = String((req.body || {}).body || "").trim().slice(0, 500);
+  if (!body) return res.status(400).json({ error: "Nothing to say" });
+  try {
+    const seat = await pool.query(
+      "SELECT 1 FROM queue_members WHERE session_id = $1 AND user_id = $2 AND left_at IS NULL",
+      [req.params.id, req.userId]);
+    if (!seat.rowCount) return res.status(403).json({ error: "You are not at this table" });
+
+    const r = await pool.query(`
+      INSERT INTO queue_messages (session_id, user_id, body) VALUES ($1,$2,$3)
+      RETURNING id, created_at
+    `, [req.params.id, req.userId, body]);
+    res.json({ ok: true, id: r.rows[0].id, at: r.rows[0].created_at });
+  } catch (e) {
+    console.error("[queue/chat]", e.message);
+    res.status(500).json({ error: "Could not send that" });
+  }
+});
+
+// POST /queue/:id/role -- claim a position.
+//
+// First come, first served, and one role per seat: a role two people
+// have both claimed is worse than no role at all, so taking one that
+// is held is refused rather than silently shared.
+app.post("/queue/:id/role", requireAuth, async (req, res) => {
+  const role = String((req.body || {}).role || "").trim().slice(0, 32) || null;
+  try {
+    const seat = await pool.query(
+      "SELECT 1 FROM queue_members WHERE session_id = $1 AND user_id = $2 AND left_at IS NULL",
+      [req.params.id, req.userId]);
+    if (!seat.rowCount) return res.status(403).json({ error: "You are not at this table" });
+
+    if (role) {
+      const taken = await pool.query(`
+        SELECT 1 FROM queue_members
+         WHERE session_id = $1 AND left_at IS NULL AND role = $2 AND user_id <> $3
+      `, [req.params.id, role, req.userId]);
+      if (taken.rowCount) return res.status(409).json({ error: "Someone already has that role" });
+    }
+    await pool.query(
+      "UPDATE queue_members SET role = $3 WHERE session_id = $1 AND user_id = $2",
+      [req.params.id, req.userId, role]);
+    res.json({ ok: true, role });
+  } catch (e) {
+    console.error("[queue/role]", e.message);
+    res.status(500).json({ error: "Could not claim that role" });
+  }
+});
+
+// POST /queue/:id/lock -- stop the matcher sending anyone else.
+//
+// A three-of-four table that is happy as it is should be able to say so
+// without leaving and re-queueing.
+app.post("/queue/:id/lock", requireAuth, async (req, res) => {
+  const on = (req.body || {}).locked !== false;
+  try {
+    const sess = await _qSession(req.params.id);
+    if (!sess) return res.status(404).json({ error: "No such table" });
+    if (sess.owner_id !== req.userId) {
+      return res.status(403).json({ error: "Only the table leader can lock the table" });
+    }
+    await pool.query(`
+      UPDATE queue_sessions SET locked = $2,
+             state = CASE WHEN $2 THEN 'matched' ELSE state END,
+             matched_at = CASE WHEN $2 AND matched_at IS NULL THEN NOW() ELSE matched_at END
+       WHERE id = $1
+    `, [sess.id, on]);
+    res.json({ ok: true, locked: on });
+  } catch (e) {
+    console.error("[queue/lock]", e.message);
+    res.status(500).json({ error: "Could not lock the table" });
   }
 });
 

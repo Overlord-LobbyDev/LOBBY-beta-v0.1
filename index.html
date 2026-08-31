@@ -29192,7 +29192,6 @@ let _qState = {
   // rule that two sides agree when either has not asked for anything.
   mic: null,         // true = mic required
   steamOnly: false,  // only players with a linked Steam account
-  minAgeDays: 0,     // 0 = any account age
   verifiedTier: false, // the ladder supplied the rank, not the player
   playstyle: null,   // 'casual' | 'comp'
   mode: null,        // 'pvp' | 'pve' — only offered for games that are both
@@ -29427,6 +29426,9 @@ async function _qLoadFriends() {
         <div class="q-friend-chip-name">${(f.username||'').replace(/</g,'&lt;')}</div>
       </div>`;
   }).join('');
+  // The picked row clones its chips from this list, so it can only be
+  // drawn once the list exists.
+  if (typeof window.qPaintFriendCount === 'function') window.qPaintFriendCount();
 }
 window.qToggleFriend = function(uid) {
   const idx = _qState.friends.indexOf(uid);
@@ -29435,6 +29437,9 @@ window.qToggleFriend = function(uid) {
   // Cap to (players - 1) so the math always works
   while (_qState.friends.length > Math.max(0, _qState.players - 1)) _qState.friends.pop();
   _qReflectSelectedChips();
+  // The count beside the picker is the only feedback that the cap above
+  // just dropped somebody, so it has to repaint with the chips.
+  if (typeof window.qPaintFriendCount === 'function') window.qPaintFriendCount();
 };
 // Repaint the "selected" state on BOTH chip lists (friends + recent)
 // so toggling from either keeps them visually in sync.
@@ -29549,7 +29554,6 @@ window.qBeginSearch = async function() {
         // its own would quietly exclude everyone who left it alone.
         mic:       _qState.mic,
         steamOnly:  _qState.steamOnly,
-        minAgeDays: _qState.minAgeDays,
         playstyle: _qState.playstyle,
         mode:      _qState.mode,
         width:     _qState.width,
@@ -65165,7 +65169,6 @@ async function reactComment(ev, id, btn){
 #qStage > #qDeck,
 #qStage > #qDots,
 #qStage > #qBar,
-#qStage > #qMorePanel,
 #qStage > #qFindList,
 #qStage > #qPools{
   max-width:2400px; margin-left:auto; margin-right:auto;
@@ -65175,13 +65178,17 @@ async function reactComment(ev, id, btn){
 #qStage > .qsec{ padding-top:56px; }
 /* The one thing that should NOT stretch: a row of controls 2000px wide
    puts the rank tiles a screen away from the stepper. */
-/* Hugs its contents. At a fixed width the controls sat as a small
-   island with ~340px of empty bar either side, which is what read as
-   off-centre -- the rank was within 3px of the middle the whole time,
-   it was the BOX that was too big for what was in it. Equal flanks
-   above keep the centring exact now that the width can move. */
+/* A fixed box, sized to the widest row that MATTERS. max-content made
+   the bar as wide as its longest row, so opening the drawer -- a label,
+   a field and seven friend chips -- stretched the whole control and
+   left the two rows above it floating in a box built for something
+   else. 980 fits rows one and two properly; row three wraps inside it. */
 #qStage > #qBar{
-  width:max-content; max-width:calc(1000px * var(--qk));
+  width:100%; max-width:1020px;
+  /* Its own padding, not the stage's. The shared rule above sets
+     clamp(28px, 3.4vw, 72px) each side, which took 144px out of the box
+     and left less room inside it than row one needs. */
+  padding-left:20px; padding-right:20px;
   margin-left:auto; margin-right:auto;
 }
 #qTrack{ position:relative; height:100%; z-index:1; }
@@ -65299,9 +65306,13 @@ async function reactComment(ev, id, btn){
    a box that hugs its contents. Without them the two 1fr tracks size to
    whatever each side happens to hold, the wider one wins, and the rank
    drifts by half the difference. */
+/* 190 flat, not 165 x --qk. Everything in this bar is a fixed size now,
+   so scaling the flanks only bought empty space -- at --qk 1.74 each
+   side reserved 287px for about 175px of controls. This is the width of
+   the wider flank and no more, which is all the centring needs. */
 .qbar-l, .qbar-r{
   display:flex; align-items:center; gap:11px;
-  min-width:calc(165px * var(--qk));
+  min-width:190px;
 }
 .qbar-l{ justify-self:end; justify-content:flex-end; }
 .qbar-c{ display:flex; align-items:center; justify-self:center; }
@@ -65312,16 +65323,61 @@ async function reactComment(ev, id, btn){
    the spacer matches More, so column three is dead centre whatever any
    of them contains -- and More sits as far right as the row goes. */
 .qbar-sub{
-  display:grid; grid-template-columns:auto 1fr auto 1fr auto;
-  align-items:center; gap:calc(14px * var(--qk));
-  padding-top:13px; border-top:1px solid rgba(255,255,255,.07);
+  /* 1fr / auto / 1fr: the four filters sit as one tight centred group
+     in the middle column, and More options takes the right column so it
+     lands on the bar's edge without stretching the group to reach it. */
+  display:grid; grid-template-columns:1fr auto 1fr;
+  align-items:center; gap:12px;
+  padding-top:14px; position:relative;
 }
-.qsub-l{ display:flex; align-items:center; gap:11px; justify-self:end; }
-.qsub-c{ display:flex; align-items:center; gap:11px; justify-self:center; }
-.qsub-r{ display:flex; align-items:center; gap:11px; justify-self:start; }
-#qMore, .qmore-spacer{ min-width:calc(96px * var(--qk)); }
-#qMore{ justify-self:end; text-align:right; }
-.qmore-spacer{ visibility:hidden; pointer-events:none; }
+.qsub-row{
+  display:flex; align-items:center; justify-content:center;
+  gap:26px; flex-wrap:wrap; grid-column:2;
+}
+.qsub{ display:flex; align-items:center; gap:9px; }
+#qMore{ grid-column:3; justify-self:end; }
+
+/* ── The commit ───────────────────────────────────────────────────
+   Last row of the bar, so the thing you press is where you finished
+   setting up rather than back at the top of the page. */
+.qbar-go{
+  display:flex; flex-direction:column; align-items:center; gap:7px;
+  padding-top:15px; margin-top:2px; position:relative;
+}
+.qbar-go::before{
+  content:''; position:absolute; left:0; right:0; top:0; height:1px;
+  background:linear-gradient(90deg,
+    transparent, rgba(255,255,255,.11) 16%,
+    rgba(255,255,255,.11) 84%, transparent);
+}
+#qGo{
+  display:inline-flex; align-items:center; justify-content:center;
+  height:42px; min-width:230px; padding:0 30px;
+  border:0; border-radius:12px; cursor:pointer;
+  font-family:'Archivo', var(--font), sans-serif;
+  font-size:12.5px; font-weight:900; letter-spacing:1.7px; text-transform:uppercase;
+  color:#0d0320; white-space:nowrap;
+  background:linear-gradient(180deg,
+    color-mix(in srgb, var(--hub-accent) 94%, white), var(--hub-accent));
+  box-shadow:0 12px 30px -10px color-mix(in srgb, var(--hub-accent) 55%, transparent),
+             inset 0 1px 0 rgba(255,255,255,.4);
+  transition:transform .18s cubic-bezier(.22,1,.36,1), filter .18s ease;
+}
+#qGo:hover:not(:disabled){ transform:translateY(-1px); filter:brightness(1.06); }
+/* Not disabled, dimmed: pressing it is how you learn what is missing,
+   and a dead button explains nothing. */
+#qGo.gated{ filter:saturate(.7) brightness(.9); }
+#qGo:disabled{
+  background:rgba(255,255,255,.06); color:var(--text-3);
+  box-shadow:none; cursor:not-allowed;
+}
+/* The criteria in a sentence, under the button that acts on them. */
+#qGoSum{
+  font-family:'JetBrains Mono', ui-monospace, monospace;
+  font-size:9.5px; font-weight:700; letter-spacing:1.1px; text-transform:uppercase;
+  color:var(--text-3); text-align:center; line-height:1.5;
+  max-width:640px;
+}
 .qbl{
   font-family:'JetBrains Mono', ui-monospace, monospace;
   font-size:9.5px; font-weight:700; letter-spacing:1.8px; text-transform:uppercase;
@@ -65393,7 +65449,7 @@ async function reactComment(ev, id, btn){
 /* What the app knows about your rank, in a line, above the field that
    asks you to prove it. */
 .qpn{
-  font-size:11.5px; line-height:1.5; color:var(--text-3); margin:0 0 9px;
+  font-size:11px; line-height:1.45; color:var(--text-3); margin:0 0 7px;
 }
 .qpn.ok{ color:#7fe0a3; }
 .qpn.warn{ color:color-mix(in srgb, var(--hub-accent) 62%, white); }
@@ -65439,45 +65495,273 @@ async function reactComment(ev, id, btn){
   font-family:'Archivo', var(--font), sans-serif;
   font-size:11.5px; font-weight:700; color:var(--text-3);
   background:none; border:0; cursor:pointer; padding:8px 6px;
+  /* Its column is only as wide as the label, so without this "Fewer
+     options" breaks across two lines and the second one hangs over the
+     row below it. */
+  white-space:nowrap;
 }
 #qMore:hover{ color:#fff; }
 /* The extra options live in #qMorePanel under the bar now, so nothing
    is revealed in place at the foot of the page any more. */
 
-/* ── More options ────────────────────────────────────────────────── */
+/* ── More options: row three ──────────────────────────────────────
+   Rows one and two are centred GROUPS of controls -- a mono label, then
+   the thing it names, sitting inline. Row three was a left-aligned form
+   with a label column, which is why it read as something else bolted on:
+   the labels wrapped in their 88px track, the field ran the width of the
+   bar, and a sentence sat under it in body text.
+   It is built the same way as the rows above it now. */
 #qMorePanel{
-  max-height:0; overflow:hidden; opacity:0; margin-top:0;
-  transition:max-height .34s cubic-bezier(.22,1,.36,1),
-             opacity .24s ease, margin-top .34s cubic-bezier(.22,1,.36,1);
+  max-height:0; overflow:hidden; opacity:0;
+  transition:max-height .34s cubic-bezier(.22,1,.36,1), opacity .24s ease;
 }
-#qMorePanel.on{ max-height:1200px; opacity:1; margin-top:14px; }
+#qMorePanel.on{ max-height:420px; opacity:1; }
+
 #qMorePanel .q-extra{
-  display:block !important;
-  max-width:calc(900px * var(--qk)); margin:0 auto;
-  padding:20px 24px 22px; border-radius:16px;
-  background:linear-gradient(160deg, rgba(255,255,255,.045), rgba(255,255,255,.015));
-  border:1px solid rgba(255,255,255,.08);
+  display:block !important; max-width:none; margin:0;
+  padding:14px 0 2px !important; position:relative;
+  background:none !important; border:0 !important; border-radius:0 !important;
 }
-/* It is no longer step 3 of anything -- it is the drawer behind a
-   button, so the numbered badge would be describing a flow that this
-   design does not have. */
-#qMorePanel .q-step-num{ display:none !important; }
-#qMorePanel .q-step-head{ margin-bottom:16px; }
-#qMorePanel .q-form-grid{ display:grid; gap:14px; }
+/* Both dividers fade out at the ends instead of running hard into the
+   card's rounded corners, where a full-width 1px line reads as a seam
+   between two boxes rather than a rule inside one. */
+.qbar-sub::before,
+#qMorePanel .q-extra::before{
+  content:''; position:absolute; left:0; right:0; top:0; height:1px;
+  background:linear-gradient(90deg,
+    transparent, rgba(255,255,255,.11) 16%,
+    rgba(255,255,255,.11) 84%, transparent);
+}
+#qMorePanel .q-step-head{ display:none !important; }
+#qMorePanel #qMoreRow{ display:none !important; }
+
+/* A label gutter with the controls on a shared left edge.
+   Rows one and two are single lines of controls, so centring each on
+   its own works. These two are not: one holds a field, the other holds
+   a filter and however many friend chips. Centred independently they
+   began at different x with nothing to line up against, and the label
+   of a two-line row floated against the middle of it.
+   A fixed gutter fixes both -- labels right-align into it, controls all
+   start at the same edge, and the block is centred as a whole. */
+#qMorePanel .q-form-grid{
+  display:flex !important; flex-direction:column;
+  gap:9px; margin:0 auto !important;
+  /* Sized to its widest row, not to a fixed 700px. A fixed box centres
+     the BOX, and the rows inside it were narrower than that, so they
+     sat left within it while the box itself was centred. */
+  width:max-content; max-width:100%;
+}
+#qMorePanel .q-card,
+#qMorePanel .q-card.q-card-wide{
+  display:grid !important;
+  /* A fixed control column, not 1fr. Auto-sized, each row was only as
+     wide as its own control -- 150px for Mode against 418 for Skill
+     proof -- so the stack had three different right edges and leaned
+     toward the widest one. Fixed and centred, the three share an axis. */
+  /* Auto, not a fixed 430. A fixed column with the control centred in
+     it put MODE's label 230px from its own control -- the two things
+     that belong together ended up the furthest apart on the row, while
+     rows one and two keep theirs touching. The column fits its content
+     and the whole block is centred instead. */
+  grid-template-columns:118px auto; column-gap:16px;
+  align-items:start; width:100% !important; grid-column:auto !important;
+  background:none !important; border:0 !important;
+  border-radius:0 !important; padding:0 !important; box-shadow:none !important;
+}
+/* The label sits against the gutter and on the first line of its row,
+   not halfway down a block of wrapped chips. */
+#qMorePanel .qrow-ctl{
+  display:flex; align-items:center; justify-content:flex-start;
+  flex-wrap:wrap; gap:8px; min-width:0;
+}
+/* nowrap is the fix for the two-line labels: they were being squeezed
+   into a fixed track rather than given the width of their own words. */
+#qMorePanel .q-card-label{
+  margin:0 !important; white-space:nowrap;
+  /* start, not center: on the friends row the controls wrap to two
+     lines and a centred label floats against the middle of them. This
+     pins it to the first line, level with the control beside it. */
+  justify-self:end; align-self:start; text-align:right;
+  min-height:34px; display:flex !important; align-items:center;
+  font-family:'JetBrains Mono', ui-monospace, monospace !important;
+  font-size:9.5px !important; font-weight:700 !important;
+  letter-spacing:1.8px !important; text-transform:uppercase;
+  color:var(--text-3) !important;
+}
+#qMorePanel .q-tag{ display:none !important; }
+#qMorePanel .q-card-sub{ display:none !important; }
+
+/* A field, not a banner. It was running the full width of the bar. */
+#qMorePanel .q-input{
+  width:280px !important; height:34px !important;
+  padding:0 13px !important; border-radius:10px !important;
+  background:rgba(0,0,0,.35) !important;
+  border:1px solid rgba(255,255,255,.07) !important;
+  font-size:11px !important;
+  transition:border-color .18s, background .18s;
+}
+#qMorePanel .q-input:focus{
+  border-color:color-mix(in srgb, var(--hub-accent) 45%, transparent) !important;
+  background:rgba(0,0,0,.5) !important; outline:0;
+}
+/* The friend filter is a short field beside the chips, not another
+   280px one -- it is narrowing a list, not taking a URL. */
+#qMorePanel #qFriendQ{
+  width:118px !important;
+  font-family:'JetBrains Mono', ui-monospace, monospace !important;
+  font-size:10px !important; letter-spacing:.5px;
+}
+
+/* The proof state as a chip, in the bar's own chip language, rather
+   than a sentence of body text hanging under the field. */
+#qMorePanel .qpn{
+  display:inline-flex; align-items:center; gap:6px;
+  height:34px; padding:0 12px; margin:0; border-radius:99px;
+  font-family:'JetBrains Mono', ui-monospace, monospace;
+  font-size:9px; font-weight:700; letter-spacing:1.2px; text-transform:uppercase;
+  white-space:nowrap;
+  /* The neutral state is a hint, not a status. Borderless and dim so it
+     sits behind the field it describes instead of competing with it --
+     the verified and required states below still get a border, because
+     those ARE statuses. */
+  color:var(--text-3); border:1px solid transparent; background:none;
+}
+#qMorePanel .qpn:empty{ display:none; }
+#qMorePanel .qpn.ok{
+  color:#7fe0a3; border-color:rgba(90,220,140,.3);
+  background:rgba(90,220,140,.08);
+}
+#qMorePanel .qpn.warn{
+  color:color-mix(in srgb, var(--hub-accent) 70%, white);
+  border-color:color-mix(in srgb, var(--hub-accent) 38%, transparent);
+  background:color-mix(in srgb, var(--hub-accent) 12%, transparent);
+}
+
+#qMorePanel .q-friend-picker{
+  display:flex; flex-wrap:wrap; gap:6px;
+  background:none !important; border:0 !important; padding:0 !important;
+  max-height:none !important;
+}
+#qMorePanel .q-friend-chip{
+  display:inline-flex; align-items:center; gap:6px;
+  height:34px; padding:0 12px 0 5px !important;
+  border-radius:99px !important;
+  background:rgba(0,0,0,.35) !important;
+  border:1px solid rgba(255,255,255,.07) !important;
+  cursor:pointer; transition:border-color .18s, background .18s;
+}
+#qMorePanel .q-friend-chip:hover{ border-color:rgba(255,255,255,.2) !important; }
+#qMorePanel .q-friend-chip.is-selected{
+  border-color:color-mix(in srgb, var(--hub-accent) 60%, transparent) !important;
+  background:color-mix(in srgb, var(--hub-accent) 15%, transparent) !important;
+}
+#qMorePanel .q-friend-chip-av{
+  width:24px !important; height:24px !important; border-radius:50%;
+  font-size:9.5px !important; flex:0 0 auto; overflow:hidden;
+}
+#qMorePanel .q-friend-chip-av img{ width:100%; height:100%; object-fit:cover; }
+#qMorePanel .q-friend-chip-name{
+  font-family:'JetBrains Mono', ui-monospace, monospace !important;
+  font-size:10px !important; letter-spacing:.4px;
+}
+/* A placeholder mid-load is noise in a row of controls. */
+#qMorePanel .q-empty{ display:none !important; }
+/* .lobby-overlay .q-card::after paints an accent-tinted "lit top edge"
+   on every card -- right when a card is a raised surface, wrong when it
+   is a flat row, where it reads as a purple rule between each one. */
+#qMorePanel .q-card::after,
+#qMorePanel .q-step-card::after{ display:none !important; }
+
+/* ── Bring friends: a button, and whoever is coming ───────────────
+   The full list is a popover. Seven name chips are wider than the row
+   and forty would bury every other control under them, so the row shows
+   the decision -- who is coming -- and the list is somewhere you go. */
+.qfr-wrap{ position:relative; display:inline-flex; }
+.qfr-add{
+  display:inline-flex; align-items:center; gap:7px;
+  height:34px; padding:0 14px; border-radius:10px; cursor:pointer;
+  background:rgba(0,0,0,.35); border:1px solid rgba(255,255,255,.09);
+  color:var(--text-2);
+  font-family:'JetBrains Mono', ui-monospace, monospace;
+  font-size:10px; font-weight:700; letter-spacing:1.2px; text-transform:uppercase;
+  transition:border-color .18s, background .18s, color .18s;
+}
+.qfr-add:hover{ color:#fff; border-color:rgba(255,255,255,.22); }
+.qfr-add.on{
+  color:#fff;
+  border-color:color-mix(in srgb, var(--hub-accent) 55%, transparent);
+  background:color-mix(in srgb, var(--hub-accent) 14%, transparent);
+}
+.qfr-plus{
+  font-size:13px; line-height:1; margin-top:-1px;
+  color:color-mix(in srgb, var(--hub-accent) 80%, white);
+}
+.qfr-pop{
+  position:absolute; top:calc(100% + 8px); left:0; z-index:60;
+  width:270px; max-height:260px; overflow:auto;
+  padding:10px; border-radius:12px;
+  background:#12151d; border:1px solid rgba(255,255,255,.1);
+  box-shadow:0 20px 50px -12px rgba(0,0,0,.75);
+  scrollbar-width:thin;
+}
+.qfr-pop[hidden]{ display:none !important; }
+#qMorePanel .qfr-pop #qFriendQ{
+  width:100% !important; margin-bottom:8px;
+}
+/* In the popover the list is vertical: one name per line reads far
+   faster than a wrapped block of pills when you are looking for one. */
+#qMorePanel .qfr-pop #qFormFriendPicker{
+  display:flex; flex-direction:column; gap:2px;
+}
+#qMorePanel .qfr-pop .q-friend-chip{
+  width:100%; height:34px; border-radius:8px !important;
+  border:0 !important; background:transparent !important;
+  padding:0 8px !important; justify-content:flex-start;
+}
+#qMorePanel .qfr-pop .q-friend-chip:hover{
+  background:rgba(255,255,255,.06) !important;
+}
+#qMorePanel .qfr-pop .q-friend-chip.is-selected{
+  background:color-mix(in srgb, var(--hub-accent) 16%, transparent) !important;
+}
+/* A tick, so a name already chosen reads as chosen in the list too. */
+#qMorePanel .qfr-pop .q-friend-chip.is-selected::after{
+  content:'✓'; margin-left:auto;
+  color:color-mix(in srgb, var(--hub-accent) 80%, white);
+  font-size:11px;
+}
+
+.qfr-picked{ display:flex; align-items:center; flex-wrap:wrap; gap:6px; }
+.qfr-chip{
+  display:inline-flex; align-items:center; gap:7px;
+  height:34px; padding:0 6px 0 5px; border-radius:99px;
+  background:color-mix(in srgb, var(--hub-accent) 13%, transparent);
+  border:1px solid color-mix(in srgb, var(--hub-accent) 40%, transparent);
+}
+.qfr-chip .q-friend-chip-av{
+  width:24px; height:24px; border-radius:50%; overflow:hidden;
+  display:flex; align-items:center; justify-content:center;
+  font-size:9.5px; flex:0 0 auto;
+}
+.qfr-chip .q-friend-chip-av img{ width:100%; height:100%; object-fit:cover; }
+.qfr-chip .q-friend-chip-name{
+  font-family:'JetBrains Mono', ui-monospace, monospace;
+  font-size:10px; letter-spacing:.4px; color:#fff;
+}
+.qfr-x{
+  width:20px; height:20px; border-radius:50%; border:0; cursor:pointer;
+  background:rgba(255,255,255,.09); color:var(--text-2);
+  font-size:13px; line-height:1; display:flex; align-items:center; justify-content:center;
+  transition:background .16s, color .16s;
+}
+.qfr-x:hover{ background:rgba(255,120,120,.24); color:#ffb4b4; }
+#qMorePanel #qRecentCard:has(.q-empty){ display:none !important; }
 #qMoreRow{
   display:flex; align-items:center; justify-content:center;
   gap:18px 26px; flex-wrap:wrap; margin:0 auto 20px;
   max-width:calc(900px * var(--qk));
 }
-/* A heading for the group, in the same mono voice as every other label
-   in the queue -- the panel used to open with "STACK YOUR STACK" in the
-   display face, which is a different product's typography. */
-.qmr-h{
-  flex:0 0 100%; text-align:center;
-  font-family:'JetBrains Mono', ui-monospace, monospace;
-  font-size:9px; font-weight:700; letter-spacing:2.2px; text-transform:uppercase;
-  color:var(--text-3); margin-bottom:2px;
-}
+#qMoreRow[hidden]{ display:none !important; }
 /* A count on the button, so filters living in the panel are still
    visible as SET from the bar. */
 .qmore-n{
@@ -65590,17 +65874,209 @@ async function reactComment(ev, id, btn){
   gap:14px; margin-top:28px;
 }
 .qpool{
-  display:flex; align-items:center; gap:12px;
-  padding:15px 17px; border-radius:14px; cursor:pointer;
+  display:block; padding:0; border-radius:14px; cursor:pointer;
   background:linear-gradient(160deg, rgba(255,255,255,.04), rgba(255,255,255,.012));
   border:1px solid rgba(255,255,255,.08);
   transition:border-color .18s, background .18s, transform .18s;
 }
-.qpool:hover{
+/* An open pool spans the row: its games need the width, and a card that
+   grew inside a 248px column would push the grid around it. */
+.qpool.open{
+  grid-column:1 / -1;
+  border-color:color-mix(in srgb, var(--hub-accent) 34%, transparent);
+}
+.qpool-h{
+  display:flex; align-items:center; gap:12px;
+  padding:15px 17px;
+}
+.qpool-t{ flex:1; min-width:0; }
+.qpool-x{
+  flex:0 0 auto; font-size:17px; line-height:1; color:var(--text-3);
+  transform:rotate(90deg); transition:transform .22s, color .18s;
+}
+.qpool-x.on{ transform:rotate(-90deg); color:#fff; }
+
+.qpool-b{ padding:0 17px 16px; }
+.qpool-l{
+  font-family:'JetBrains Mono', ui-monospace, monospace;
+  font-size:9px; font-weight:700; letter-spacing:1.8px; text-transform:uppercase;
+  color:var(--text-3); margin:2px 0 11px;
+}
+.qpool-g{
+  display:grid; grid-template-columns:repeat(auto-fill, minmax(168px, 1fr));
+  gap:8px; margin-bottom:13px;
+}
+/* A game chip: cover, name, nothing else. It is a shortlist, not a
+   second deck. */
+.qpg{
+  display:flex; align-items:center; gap:10px; text-align:left;
+  padding:6px 12px 6px 6px; border-radius:10px; cursor:pointer;
+  background:rgba(0,0,0,.32); border:1px solid rgba(255,255,255,.07);
+  transition:border-color .18s, background .18s, transform .18s;
+}
+.qpg:hover{
+  transform:translateY(-1px);
+  border-color:color-mix(in srgb, var(--hub-accent) 45%, transparent);
+  background:rgba(0,0,0,.45);
+}
+.qpg-art{
+  width:30px; height:40px; border-radius:6px; flex:0 0 auto;
+  background:#161a26 center/cover no-repeat;
+}
+.qpg-n{
+  font-family:'Archivo', var(--font), sans-serif;
+  font-size:12px; font-weight:700; color:#fff; line-height:1.25;
+  overflow:hidden; text-overflow:ellipsis; display:-webkit-box;
+  -webkit-line-clamp:2; line-clamp:2; -webkit-box-orient:vertical;
+}
+/* The pool itself is still one press away -- opening a card to read it
+   should not cost you the thing the card was for. */
+.qpool-j{
+  width:100%; height:36px; border-radius:10px; cursor:pointer;
+  background:rgba(255,255,255,.05); border:1px solid rgba(255,255,255,.1);
+  color:var(--text-2);
+  font-family:'JetBrains Mono', ui-monospace, monospace;
+  font-size:10px; font-weight:700; letter-spacing:1.4px; text-transform:uppercase;
+  transition:background .18s, color .18s, border-color .18s;
+}
+.qpool-j:hover{
+  color:#fff; border-color:color-mix(in srgb, var(--hub-accent) 50%, transparent);
+  background:color-mix(in srgb, var(--hub-accent) 14%, transparent);
+}
+
+/* A picked game reads as picked: the tables below belong to it, and
+   nothing should be ambiguous about which chip they came from. */
+.qpg.on{
+  border-color:color-mix(in srgb, var(--hub-accent) 62%, transparent);
+  background:color-mix(in srgb, var(--hub-accent) 15%, rgba(0,0,0,.45));
+}
+/* How many tables are sitting behind this chip. Printed on the chip
+   because it is the reason to press one chip rather than another. */
+.qpg-t{
+  flex:0 0 auto; margin-left:auto; min-width:19px; height:19px; padding:0 5px;
+  display:flex; align-items:center; justify-content:center; border-radius:6px;
+  font-family:'JetBrains Mono', ui-monospace, monospace;
+  font-size:10px; font-weight:800; color:#0d0320;
+  background:var(--hub-accent);
+}
+
+/* ── Tables for one game, inline ─────────────────────────────────── */
+.qpt{
+  margin:2px 0 13px; border-radius:12px; overflow:hidden;
+  background:rgba(0,0,0,.34);
+  border:1px solid color-mix(in srgb, var(--hub-accent) 26%, transparent);
+}
+.qpt-h{
+  display:flex; align-items:center; gap:12px;
+  padding:11px 14px; border-bottom:1px solid rgba(255,255,255,.07);
+  background:rgba(255,255,255,.028);
+}
+.qpt-n{
+  font-family:'Archivo', var(--font), sans-serif;
+  font-size:13px; font-weight:800; color:#fff; letter-spacing:.2px;
+}
+.qpt-c{
+  font-family:'JetBrains Mono', ui-monospace, monospace;
+  font-size:10px; font-weight:700; letter-spacing:1.2px; text-transform:uppercase;
+  color:var(--text-3);
+}
+.qpt-c b{ color:#fff; }
+.qpt-s{
+  margin-left:auto; flex:0 0 auto; padding:6px 13px; border-radius:8px;
+  cursor:pointer; color:var(--text-2);
+  background:rgba(255,255,255,.06); border:1px solid rgba(255,255,255,.1);
+  font-family:'JetBrains Mono', ui-monospace, monospace;
+  font-size:9px; font-weight:700; letter-spacing:1.3px; text-transform:uppercase;
+  transition:background .18s, color .18s, border-color .18s;
+}
+.qpt-s:hover{
+  color:#fff; border-color:color-mix(in srgb, var(--hub-accent) 50%, transparent);
+  background:color-mix(in srgb, var(--hub-accent) 14%, transparent);
+}
+.qpt-empty{
+  padding:20px 16px; text-align:center; max-width:520px; margin:0 auto;
+  font-size:12.5px; line-height:1.6; color:var(--text-3);
+}
+.qpt-r{
+  display:flex; align-items:center; gap:14px; width:100%; text-align:left;
+  padding:10px 14px; cursor:pointer; background:transparent; border:0;
+  border-top:1px solid rgba(255,255,255,.05);
+  transition:background .16s;
+}
+.qpt-r:first-of-type{ border-top:0; }
+.qpt-r:hover{ background:color-mix(in srgb, var(--hub-accent) 9%, transparent); }
+/* Full, but not dead: dimmed enough to sort by at a glance, live enough
+   to press. */
+.qpt-r.full{ opacity:.62; }
+.qpt-r.full:hover{ opacity:1; background:rgba(255,255,255,.05); }
+.qpt-r.full .qpt-j{
+  background:none; color:var(--text-2); border:1px solid rgba(255,255,255,.16);
+}
+.qpt-seats{ flex:0 0 auto; display:flex; gap:4px; }
+/* Filled seats carry a face; the empty ones are dashed, because an empty
+   seat is an invitation and should not look like a missing avatar. */
+.qseat{
+  width:24px; height:24px; border-radius:50%;
+  border:1px dashed rgba(255,255,255,.22); background:rgba(255,255,255,.03);
+}
+.qseat.on{
+  display:flex; align-items:center; justify-content:center;
+  border:1px solid color-mix(in srgb, var(--hub-accent) 55%, transparent);
+  background:#20142f center/cover no-repeat;
+  font-family:'Archivo', var(--font), sans-serif;
+  font-size:10px; font-weight:800; color:#fff;
+}
+.qpt-who{
+  flex:1 1 auto; min-width:0; display:flex; flex-direction:column; gap:2px;
+  font-family:'Archivo', var(--font), sans-serif;
+  font-size:12.5px; font-weight:700; color:#fff;
+  overflow:hidden; text-overflow:ellipsis; white-space:nowrap;
+}
+.qpt-who b{ color:var(--text-3); font-weight:700; }
+.qpt-free{
+  font-family:'JetBrains Mono', ui-monospace, monospace;
+  font-size:9px; font-weight:700; letter-spacing:1.1px; text-transform:uppercase;
+  color:color-mix(in srgb, var(--hub-accent) 78%, white);
+}
+.qpt-tags{ flex:0 0 auto; display:flex; gap:5px; }
+.qpt-g{
+  padding:3px 8px; border-radius:6px;
+  background:rgba(255,255,255,.05); border:1px solid rgba(255,255,255,.08);
+  font-family:'JetBrains Mono', ui-monospace, monospace;
+  font-size:9px; font-weight:700; letter-spacing:1px; text-transform:uppercase;
+  color:var(--text-2);
+}
+.qpt-g.v{
+  color:color-mix(in srgb, var(--hub-accent) 85%, white);
+  border-color:color-mix(in srgb, var(--hub-accent) 40%, transparent);
+}
+.qpt-a{
+  flex:0 0 44px; text-align:right;
+  font-family:'JetBrains Mono', ui-monospace, monospace;
+  font-size:10px; color:var(--text-3);
+}
+.qpt-j{
+  flex:0 0 auto; padding:7px 14px; border-radius:9px; color:#0d0320;
+  font-family:'JetBrains Mono', ui-monospace, monospace;
+  font-size:9px; font-weight:800; letter-spacing:1.2px; text-transform:uppercase;
+  background:linear-gradient(180deg,
+    color-mix(in srgb, var(--hub-accent) 94%, white), var(--hub-accent));
+  opacity:.62; transition:opacity .16s;
+}
+.qpt-r:hover .qpt-j{ opacity:1; }
+
+@media (max-width:900px){
+  .qpt-tags, .qpt-a{ display:none; }
+}
+/* Only lifts while closed. An open card is a surface you are reading
+   and reaching into, and having it rise and tint under the cursor makes
+   every chip inside it feel like part of one button. */
+.qpool:not(.open):hover{
   transform:translateY(-3px);
   border-color:color-mix(in srgb, var(--hub-accent) 50%, transparent);
   background:color-mix(in srgb, var(--hub-accent) 10%, transparent);
 }
+.qpool.open .qpool-h:hover .qpool-x{ color:#fff; }
 .qpool-n{ font-family:'Archivo', var(--font), sans-serif; font-size:13.5px; font-weight:800; color:#fff; }
 .qpool-s{
   font-family:'JetBrains Mono', ui-monospace, monospace;
@@ -66030,7 +66506,12 @@ async function reactComment(ev, id, btn){
        both -- offering PvP/PvE on Tekken is noise, and LobbyModes
        already knows which is which. */
     var modeRow = document.getElementById('qModeRow');
-    if (modeRow) modeRow.hidden = mPvx !== 'PvP · PvE';
+    var showMode = mPvx === 'PvP · PvE';
+    if (modeRow) modeRow.hidden = !showMode;
+    /* Mode is the row's only occupant now, so the row goes with it
+       rather than leaving a band of empty space above the proof card. */
+    var moreRow = document.getElementById('qMoreRow');
+    if (moreRow) moreRow.hidden = !showMode;
 
     /* The game changed, so what the ladder and Steam know changed too. */
     if (typeof window.qLoadVerified === 'function') window.qLoadVerified();
@@ -66727,6 +67208,127 @@ async function reactComment(ev, id, btn){
   }
   window.qLoadVerified = function (){ loadVerified(); };
 
+  /* Hides chips rather than rebuilding the list, so a selection made
+     before you started typing survives the filter. */
+  function filterFriends(q){
+    var lower = String(q || '').trim().toLowerCase();
+    var picker = document.getElementById('qFormFriendPicker');
+    if (!picker) return;
+    Array.prototype.forEach.call(picker.children, function (c){
+      var n = c.querySelector('.q-friend-chip-name');
+      var t = n ? String(n.textContent || '').toLowerCase() : '';
+      c.hidden = !!lower && t.indexOf(lower) === -1;
+    });
+  }
+
+  /* Whoever is actually coming, shown in the row. Cloned from the chip
+     in the popover so the avatar and name come from one place -- the
+     row is a view of the selection, not a second copy of the list. */
+  function paintPickedFriends(){
+    var host = document.getElementById('qFriendPicked');
+    var src = document.getElementById('qFormFriendPicker');
+    var st = S();
+    if (!host || !src || !st) return;
+    host.innerHTML = '';
+    (st.friends || []).forEach(function (uid){
+      var from = src.querySelector('[data-uid="' + uid + '"]');
+      if (!from) return;
+      var av = from.querySelector('.q-friend-chip-av');
+      var nm = from.querySelector('.q-friend-chip-name');
+      var chip = document.createElement('div');
+      chip.className = 'qfr-chip';
+      chip.innerHTML =
+        (av ? '<span class="q-friend-chip-av">' + av.innerHTML + '</span>' : '') +
+        '<span class="q-friend-chip-name">' + (nm ? nm.textContent : '') + '</span>';
+      var x = document.createElement('button');
+      x.type = 'button'; x.className = 'qfr-x';
+      x.setAttribute('aria-label', 'Remove');
+      x.textContent = '×';
+      x.onclick = function (e){ e.stopPropagation(); window.qToggleFriend(uid); };
+      chip.appendChild(x);
+      host.appendChild(chip);
+    });
+  }
+  window.qPaintPickedFriends = function (){ paintPickedFriends(); };
+
+  window.qPaintFriendCount = function (){
+    paintPickedFriends();
+    var el = document.getElementById('qFriendCount');
+    var st = S();
+    if (!el || !st) return;
+    var n = (st.friends || []).length;
+    /* Empty when none are picked, so :empty hides the chip entirely
+       rather than showing a nought. */
+    el.className = n ? 'qpn ok' : 'qpn';
+    el.textContent = n ? n + ' coming' : '';
+  };
+
+  function tierName(id){
+    try {
+      if (typeof Q_SKILL_TIERS !== 'undefined'){
+        var t = Q_SKILL_TIERS.find(function (x){ return x.id === id; });
+        if (t) return t.name;
+      }
+    } catch (e) {}
+    return String(id || '').replace(/^./, function (c){ return c.toUpperCase(); });
+  }
+
+  /* The criteria in a sentence. Every switch above says what it is set
+     to; none of them say what the SET of them adds up to, which is the
+     thing you are about to commit to. */
+  function ctaSummary(){
+    var st = S() || {};
+    var e = entry(st.game);
+    var bits = [];
+
+    bits.push((st.players || 2) + ' players');
+
+    var rank = tierName(st.skill);
+    if (st.width === 'any') rank = 'any rank';
+    else if (st.width === 'strict') rank += ' exactly';
+    else rank += ' ±1';
+    if (st.verifiedTier) rank += ' (verified)';
+    bits.push(rank);
+
+    if (st.mic) bits.push('mic required');
+    if (st.playstyle) bits.push(st.playstyle === 'comp' ? 'competitive' : 'casual');
+    if (st.mode) bits.push(st.mode === 'pvp' ? 'PvP' : 'PvE');
+    if (st.steamOnly) bits.push('Steam-linked only');
+    var fr = (st.friends || []).length;
+    if (fr) bits.push(fr + (fr === 1 ? ' friend' : ' friends'));
+
+    var game = st.playlist ? 'A pool'
+             : (e ? e.name : (st.game ? 'This game' : null));
+    return { game:game, bits:bits };
+  }
+
+  function paintQueueCta(){
+    var btn = document.getElementById('qGo');
+    var sum = document.getElementById('qGoSum');
+    if (!btn || !sum) return;
+    var st = S() || {};
+    var host = st.host === true;
+    var ready = !!st.game;
+    var gated = typeof _qNeedsProof === 'function'
+             && _qNeedsProof(st.skill) && !st.verifiedTier && !st.proof;
+
+    btn.textContent = !ready ? 'Pick a game first'
+                    : host   ? 'Open a table'
+                             : 'Find players';
+    btn.disabled = !ready;
+    btn.classList.toggle('gated', !!gated && ready);
+
+    var s = ctaSummary();
+    /* Host and find want different sentences: one describes who may sit
+       down at your table, the other what you will accept from someone
+       else's. */
+    var lead = !ready ? 'Step the deck above to choose one'
+             : host ? 'Others join you · ' + s.bits.join(' · ')
+                    : s.game + ' · ' + s.bits.join(' · ');
+    sum.textContent = lead;
+  }
+  window.qPaintQueueCta = function (){ paintQueueCta(); };
+
   window.qPaintProofRule = function (){ paintProofRule(); };
 
   function paintProofRule(){
@@ -66739,8 +67341,8 @@ async function reactComment(ev, id, btn){
     var el = document.getElementById('qFormProof');
     if (el){
       el.placeholder = need
-        ? 'Required for Master and Pro — tracker link, or a recent result'
-        : 'Tracker link, a recent result — optional';
+        ? 'Required — tracker link, or a recent result'
+        : 'Tracker link, tournament placing, rank screenshot…';
       el.classList.toggle('q-need', !!gated);
     }
     var b = document.getElementById('qFind');
@@ -66752,20 +67354,34 @@ async function reactComment(ev, id, btn){
     var note = document.getElementById('qProofNote');
     if (note){
       var auto = /^steam:(\d+)h$/.exec(String(st.proof || ''));
+      /* Chip-length, because it is a chip. The long-form versions read
+         as a paragraph parked under a field; these sit beside it like
+         every other piece of state in the bar. Empty when there is
+         nothing to say -- :empty hides it, so no chip appears rather
+         than one reading "optional". */
       if (st.verifiedTier){
         note.className = 'qpn ok';
-        note.textContent = 'Rank verified from your Lobby ladder rating for this game.';
+        note.title = 'Taken from your Lobby ladder rating for this game';
+        note.textContent = 'Rank verified';
       } else if (auto){
         note.className = 'qpn ok';
-        note.textContent = 'Proof from Steam — ' + auto[1] + 'h played in this game.';
+        note.title = 'Playtime read from your Steam account';
+        note.textContent = 'Steam · ' + auto[1] + 'h';
       } else if (need){
         note.className = 'qpn warn';
-        note.textContent = 'Master and Pro need proof. Play a ladder match, or add a link below.';
+        note.title = 'Master and Pro need proof — play a ladder match or add a link';
+        note.textContent = 'Proof required';
       } else {
+        /* Not blank: an empty slot beside a field tells you nothing
+           about why the field is there. This says what filling it buys
+           you, which is the only reason to bother. */
         note.className = 'qpn';
-        note.textContent = 'Optional, and it helps you match faster.';
+        note.title = 'Tables with a rank window tighter than yours will still take you';
+        note.textContent = 'Matches faster';
       }
     }
+    /* The button carries the same gate, so it repaints with the rule. */
+    paintQueueCta();
   }
 
   window.qClearSearch = function (){
@@ -66902,6 +67518,7 @@ async function reactComment(ev, id, btn){
     var s = S();
     if (s){ s.game = card.getAttribute('data-id'); s.playlist = null; }
     paintMarquee();
+    paintQueueCta();
   }
   window.qStep2 = function (d){
     var t = document.getElementById('qTrack');
@@ -66937,6 +67554,7 @@ async function reactComment(ev, id, btn){
           onPick(o.v);
           paintSeg(wrap, key);
           paintMoreCount();
+          paintQueueCta();
         };
         wrap.appendChild(b);
       });
@@ -66957,77 +67575,139 @@ async function reactComment(ev, id, btn){
     if (!panel){
       panel = document.createElement('div');
       panel.id = 'qMorePanel';
-      /* Found by its CONTENT, not its position. #qViewSetup and
-         .q-body-setup are the same element -- "#qViewSetup
-         .q-body-setup > .q-step-card" asked for a descendant of itself
-         and matched nothing, which is why this opened empty. */
-      /* Grouped by what each thing is FOR, not by which step of a flow
-         it used to belong to. "Stack your stack" and the numbered-step
-         voice went with the flow that no longer exists. */
-      var row = document.createElement('div');
-      row.id = 'qMoreRow';
-      row.appendChild(sectionTitle('Who can sit down'));
-      function sectionTitle(text){
-        var h = document.createElement('div');
-        h.className = 'qmr-h'; h.textContent = text;
-        return h;
-      }
-      function labelled(text, node, id){
-        var w = document.createElement('div');
-        w.className = 'qmr';
-        if (id) w.id = id;
-        var l = document.createElement('span');
-        l.className = 'qbl'; l.textContent = text;
-        w.appendChild(l); w.appendChild(node);
-        return w;
-      }
-      row.appendChild(labelled('Mode', seg('mode', [
-        { v:null,  t:'Any' },
-        { v:'pvp', t:'PvP' },
-        { v:'pve', t:'PvE' }
-      ], function (v){ var st = S(); if (st) st.mode = v; }), 'qModeRow'));
 
-      /* Safety sits with the other options rather than in a settings
-         page nobody opens: the moment you are deciding who to play with
-         is the moment these mean something. */
-      row.appendChild(labelled('Account', seg('steamOnly', [
-        { v:false, t:'Any',   title:'Anyone can join' },
-        { v:true,  t:'Steam', title:'Only players with a linked Steam account' }
-      ], function (v){ var st = S(); if (st) st.steamOnly = v; })));
-
-      row.appendChild(labelled('Age', seg('minAgeDays', [
-        { v:0,  t:'Any',  title:'Any account age' },
-        { v:7,  t:'7d+',  title:'No accounts younger than a week' },
-        { v:30, t:'30d+', title:'No accounts younger than a month' }
-      ], function (v){ var st = S(); if (st) st.minAgeDays = v; })));
-
-      panel.appendChild(row);
-
+      /* Found by its CONTENT, not its position: #qViewSetup and
+         .q-body-setup are the same element, so a descendant selector
+         between them matches nothing. */
       var proof = document.getElementById('qFormProof');
       var extra = proof && proof.closest ? proof.closest('.q-step-card') : null;
+      if (!extra){ panel.__nogo = true; }
+
       if (extra){
         extra.classList.add('q-extra');
-        /* Retitled. It was step three of a flow that no longer exists,
-           and "Stack your stack" described a numbered journey rather
-           than the thing on the card. */
-        var lbl = extra.querySelector('.q-step-label');
-        if (lbl) lbl.textContent = 'Proof and friends';
-        var sub = extra.querySelector('.q-step-sub');
-        if (sub) sub.textContent = 'Rank is verified from your ladder rating where you have one.';
-        var pc = extra.querySelector('.q-card-label');
+        var grid = extra.querySelector('.q-form-grid');
+
+        /* Every row in the drawer is built the same way: a label in the
+           gutter, its controls beside it. Rows can be added without
+           inventing another layout for each one. */
+        function panelRow(text, node, id){
+          var card = document.createElement('div');
+          card.className = 'q-card';
+          if (id) card.id = id;
+          var l = document.createElement('div');
+          l.className = 'q-card-label'; l.textContent = text;
+          var ctl = document.createElement('div');
+          ctl.className = 'qrow-ctl';
+          ctl.appendChild(node);
+          card.appendChild(l); card.appendChild(ctl);
+          return card;
+        }
+
+        /* MODE -- a real row now rather than a stray control above the
+           card, so it sits in the same gutter as everything else. */
+        var modeRow = panelRow('Mode', seg('mode', [
+          { v:null,  t:'Any' },
+          { v:'pvp', t:'PvP' },
+          { v:'pve', t:'PvE' }
+        ], function (v){ var st = S(); if (st) st.mode = v; }), 'qModeRow');
+        if (grid) grid.insertBefore(modeRow, grid.firstChild);
+
+        /* SKILL PROOF: state chip sits after the field, so the row reads
+           label, control, then the state of that control. */
+        /* The proof card's OWN label. querySelector on the whole card
+           returns the first one in the DOM, which -- now that the Mode
+           row is inserted above it -- was Mode's, so Mode ended up
+           labelled "Skill proof" and there were two of them. */
+        var pcard = proof && proof.closest ? proof.closest('.q-card') : null;
+        var pc = pcard && pcard.querySelector('.q-card-label');
         if (pc && pc.firstChild) pc.firstChild.textContent = 'Skill proof ';
         var note = document.createElement('div');
         note.id = 'qProofNote'; note.className = 'qpn';
-        if (proof && proof.parentNode) proof.parentNode.insertBefore(note, proof);
+        if (proof && proof.parentNode) proof.parentNode.insertBefore(note, proof.nextSibling);
+
+        /* BRING FRIENDS: an add button and whoever is already coming.
+           The full list is a popover -- seven name chips are wider than
+           the row, and forty would bury everything under them. */
+        var fp = document.getElementById('qFormFriendPicker');
+        if (fp && fp.parentNode){
+          var host = fp.parentNode;
+          var wrap = document.createElement('div');
+          wrap.className = 'qfr-wrap';
+
+          var add = document.createElement('button');
+          add.id = 'qFriendAdd'; add.type = 'button';
+          add.className = 'qfr-add';
+          add.setAttribute('aria-expanded', 'false');
+          add.innerHTML = '<span class="qfr-plus">+</span> Add friends';
+
+          var pop = document.createElement('div');
+          pop.id = 'qFriendPop'; pop.className = 'qfr-pop'; pop.hidden = true;
+
+          var fq = document.createElement('input');
+          fq.id = 'qFriendQ'; fq.type = 'text';
+          fq.className = 'q-input'; fq.autocomplete = 'off';
+          fq.placeholder = 'Filter friends…';
+          fq.addEventListener('input', function (){ filterFriends(fq.value); });
+
+          pop.appendChild(fq);
+          host.insertBefore(wrap, fp);
+          pop.appendChild(fp);                       // the full list lives in here
+          wrap.appendChild(add); wrap.appendChild(pop);
+
+          var picked = document.createElement('div');
+          picked.id = 'qFriendPicked'; picked.className = 'qfr-picked';
+          host.insertBefore(picked, wrap.nextSibling);
+
+          var cnt = document.createElement('span');
+          cnt.id = 'qFriendCount'; cnt.className = 'qpn';
+          host.insertBefore(cnt, picked.nextSibling);
+
+          add.onclick = function (e){
+            e.stopPropagation();
+            var open = pop.hidden;
+            pop.hidden = !open;
+            add.setAttribute('aria-expanded', open ? 'true' : 'false');
+            add.classList.toggle('on', open);
+            if (open) fq.focus();
+          };
+          /* Closes on anything outside it, which is what a popover has
+             to do or it becomes a panel you cannot get rid of. */
+          document.addEventListener('click', function (e){
+            if (pop.hidden) return;
+            if (wrap.contains(e.target)) return;
+            pop.hidden = true; add.classList.remove('on');
+            add.setAttribute('aria-expanded', 'false');
+          });
+          document.addEventListener('keydown', function (e){
+            if (e.key === 'Escape' && !pop.hidden){
+              pop.hidden = true; add.classList.remove('on');
+              add.setAttribute('aria-expanded', 'false');
+            }
+          });
+        }
+
+        /* Wrap each row's controls so the label can sit in the gutter
+           and every row starts its controls at the same x. */
+        Array.prototype.forEach.call(
+          extra.querySelectorAll('.q-card'), function (card){
+            if (card.querySelector(':scope > .qrow-ctl')) return;
+            var label = card.querySelector('.q-card-label');
+            var ctl = document.createElement('div');
+            ctl.className = 'qrow-ctl';
+            Array.prototype.slice.call(card.childNodes).forEach(function (n){
+              if (n !== label) ctl.appendChild(n);
+            });
+            card.appendChild(ctl);
+          });
+
+        var lbl = extra.querySelector('.q-step-label');
+        if (lbl) lbl.textContent = 'More options';
+        if (proof) proof.addEventListener('input', function (){
+          var st = S(); if (st) st.proof = proof.value.trim();
+          paintProofRule();
+        });
         panel.appendChild(extra);
       }
-      /* State was only read off this field at submit time, so the gate
-         could not tell whether it had been filled. */
-      if (proof) proof.addEventListener('input', function (){
-        var st = S(); if (st) st.proof = proof.value.trim();
-        paintProofRule();
-      });
-      bar.parentNode.insertBefore(panel, bar.nextSibling);
     }
 
     var more = document.createElement('button');
@@ -67072,6 +67752,14 @@ async function reactComment(ev, id, btn){
       { v:'comp',   t:'Comp',   title:'Playing to win' }
     ], function (v){ var st = S(); if (st) st.playstyle = v; });
 
+    /* Up from the panel: a linked Steam account is the cheapest guard
+       against a throwaway one, which makes it a matching decision
+       rather than an extra. */
+    var steamSeg = seg('steamOnly', [
+      { v:false, t:'Any',   title:'Anyone can join' },
+      { v:true,  t:'Steam', title:'Only players with a linked Steam account' }
+    ], function (v){ var st = S(); if (st) st.steamOnly = v; });
+
     /* Three columns, not a flex row. The rank grid is the thing the eye
        goes to and it has to sit on the CENTRE of the bar -- in a flex
        row it lands wherever the controls beside it happen to end, which
@@ -67111,32 +67799,47 @@ async function reactComment(ev, id, btn){
 
     row1.appendChild(gl); row1.appendChild(gc); row1.appendChild(gr);
 
-    /* Voice takes the centre column so it lands on the true middle of
-       the bar; Match and Style press inward from equal flanks either
-       side of it. More options is lifted out of the flow entirely and
-       pinned right, so its width cannot drag the trio off centre. */
-    var sl = document.createElement('div'); sl.className = 'qsub-l';
-    var sc = document.createElement('div'); sc.className = 'qsub-c';
-    var sr = document.createElement('div'); sr.className = 'qsub-r';
-    sl.appendChild(lb('Match')); sl.appendChild(widthSeg);
-    sc.appendChild(lb('Voice'));  sc.appendChild(micSeg);
-    sr.appendChild(lb('Style'));  sr.appendChild(playSeg);
-    /* A mirror of the More button on the far left, hidden. It is the
-       only way to keep Voice on the true centre AND have the bar hug
-       its contents: absolute positioning would take More out of flow,
-       and a box sized by max-content would then ignore it and let it
-       hang off the edge. The spacer balances the row instead. */
-    var spacer = document.createElement('span');
-    spacer.className = 'qmore-spacer';
-    spacer.setAttribute('aria-hidden', 'true');
-
-    row2.appendChild(spacer);
-    row2.appendChild(sl); row2.appendChild(sc); row2.appendChild(sr);
+    /* Four groups and the drawer, spread evenly across the row. The
+       centre column and its mirrored spacer are gone: they existed to
+       hold Voice on the middle of three groups, and with four there is
+       no middle for it to sit on. */
+    function grp(text, node){
+      var w = document.createElement('div'); w.className = 'qsub';
+      w.appendChild(lb(text)); w.appendChild(node);
+      return w;
+    }
+    /* The four in their own wrapper so they can be one centred group,
+       with More options in a column of its own on the right. Loose in
+       the grid they would each take a track and drift apart. */
+    var subRow = document.createElement('div'); subRow.className = 'qsub-row';
+    subRow.appendChild(grp('Match',   widthSeg));
+    subRow.appendChild(grp('Voice',   micSeg));
+    subRow.appendChild(grp('Account', steamSeg));
+    subRow.appendChild(grp('Style',   playSeg));
+    row2.appendChild(subRow);
     row2.appendChild(more);
 
+    /* The commit. Everything above sets criteria and there was nothing
+       here to act on them -- the only button lives in the band at the
+       top of the page, so finishing meant scrolling back past the whole
+       deck. It also reads the settings back, because a row of switches
+       does not tell you what you are about to search for. */
+    var go = document.createElement('div');
+    go.className = 'qbar-go';
+    var goBtn = document.createElement('button');
+    goBtn.id = 'qGo'; goBtn.type = 'button';
+    goBtn.onclick = function (){ if (window.qBeginSearch) window.qBeginSearch(); };
+    var goSum = document.createElement('div');
+    goSum.id = 'qGoSum';
+    go.appendChild(goBtn); go.appendChild(goSum);
+
     bar.appendChild(row1); bar.appendChild(row2);
+    if (panel) bar.appendChild(panel);
+    bar.appendChild(go);
     paintMoreCount();
     paintProofRule();
+    paintQueueCta();
+    if (window.qPaintFriendCount) window.qPaintFriendCount();
   }
 
   /* How many filters are away from their default. Shown on the More
@@ -67147,9 +67850,9 @@ async function reactComment(ev, id, btn){
      would be telling you twice. */
   function activeFilters(){
     var st = S() || {}, n = 0;
+    /* Account moved up to the bar and shows its own state there, so
+       only what the panel still holds is counted. */
     if (st.mode) n++;
-    if (st.steamOnly) n++;
-    if (st.minAgeDays) n++;
     return n;
   }
 
@@ -67279,13 +67982,36 @@ async function reactComment(ev, id, btn){
     paintFindList();
   };
 
+  /* The pools read the same rows: a table listed under a game is the
+     same table the find view lists, so there is one loader and one 10s
+     beat behind both. */
   async function loadFind(){
     var st = S();
-    if (!st || st.host) return;
+    if (!st) return;
     var r = await window.api('/queue/open').catch(function (){ return null; });
     findRows = Array.isArray(r) ? r : [];
     paintFindList();
+    paintPools();
   }
+
+  /* Standing behind a full table. You are not committed to anything --
+     the seat comes to you, in order, and leaving the line is one press. */
+  window.qWaitTable = async function (id){
+    var st = S(); if (!st) return;
+    var r = await window.api('/queue/' + id + '/waitlist', {
+      method:'POST', headers:{ 'Content-Type':'application/json' },
+      body: JSON.stringify({ waiting:true, skill: st.skill || 'plat' })
+    }).catch(function (){ return null; });
+    if (!r || r.error){
+      if (typeof showToast === 'function') showToast((r && r.error) || 'Could not join the line', 'warn');
+      return;
+    }
+    if (typeof showToast === 'function'){
+      showToast('You are in line — the next free seat is yours', 'success');
+    }
+    st.queueId = id;
+    loadFind();
+  };
 
   window.qJoinTable = async function (id, game, players){
     var st = S(); if (!st) return;
@@ -67310,19 +68036,259 @@ async function reactComment(ev, id, btn){
   };
 
   /* ── 3 · Pools ───────────────────────────────────────────────── */
+  /* Which pools are open. A pool is a category, and a category is a
+     shortlist -- so it can be read as one, not only dropped into. */
+  var poolOpen = {};
+
+  function poolGames(d){
+    if (!d || !d.games) return [];
+    return d.games.map(function (gid){
+      return GAMES().find(function (x){ return x.id === gid; }) || { id:gid, name:gid };
+    });
+  }
+
+  /* Which game inside a pool you are reading the tables of.
+     Picking a game is not the same as committing to a search: you should
+     be able to see who is already sitting there, and how many seats are
+     left, before you sit down. That is the whole difference between this
+     and the random drop-in the pool button gives you. */
+  var poolPick = {};
+
+  function tablesFor(gid){
+    return (findRows || []).filter(function (r){ return r.game === gid; });
+  }
+
+  /* A seat is a seat whether or not anyone is in it, so all of them are
+     drawn -- the empty ones are the offer. */
+  function seatPips(r){
+    var mem = r.members || [], out = '';
+    for (var k = 0; k < (r.players | 0); k++){
+      var m = mem[k];
+      if (m){
+        out += '<span class="qseat on"' +
+          (m.avatar ? ' style="background-image:' + url(m.avatar) + '"' : '') +
+          ' title="' + esc(m.name || '') + '">' +
+          (m.avatar ? '' : esc(String(m.name || '?').charAt(0).toUpperCase())) +
+          '</span>';
+      } else {
+        out += '<span class="qseat"></span>';
+      }
+    }
+    return out;
+  }
+
+  function whoAt(r){
+    var mem = (r.members || []).map(function (m){ return m && m.name; }).filter(Boolean);
+    if (!mem.length) return r.owner ? esc(r.owner) : 'Open table';
+    if (mem.length <= 2) return esc(mem.join(', '));
+    return esc(mem[0] + ', ' + mem[1]) + ' <b>+' + (mem.length - 2) + '</b>';
+  }
+
+  /* The tables for one game, inline under the pool that led you to it.
+     Sending you to another page for this would lose the pool, the other
+     games in it, and the reason you were looking. */
+  function poolTables(gid){
+    /* A pool game you have never launched is in no shelf, so the
+       catalogue is the fallback before the raw id is. */
+    var e = entry(gid) || GAMES().find(function (x){ return x.id === gid; });
+    var nm = e ? e.name : String(gid).replace(/^steam:/, 'App ');
+    var rows = tablesFor(gid);
+
+    var head =
+      '<div class="qpt-h">' +
+        '<span class="qpt-n">' + esc(nm) + '</span>' +
+        '<span class="qpt-c">' + (rows.length
+          ? '<b>' + rows.filter(function (x){ return !x.full; }).length + '</b> open · ' +
+            rows.length + ' table' + (rows.length === 1 ? '' : 's')
+          : 'No open tables') + '</span>' +
+        '<button class="qpt-s" type="button" onclick="window.qPoolSearch(' + jsStr(gid) + ')">' +
+          'Set up a search</button>' +
+      '</div>';
+
+    if (!rows.length){
+      return '<div class="qpt">' + head +
+        '<div class="qpt-empty">Nobody is sitting at a ' + esc(nm) +
+          ' table yet. Set up a search and yours becomes the first one ' +
+          'other people can walk up to.</div>' +
+      '</div>';
+    }
+
+    return '<div class="qpt">' + head +
+      rows.map(function (r){
+        var free = Math.max(0, (r.players | 0) - (r.filled | 0));
+        var tags = '';
+        if (r.skill) tags += '<span class="qpt-g">' + esc(String(r.skill).toUpperCase()) + '</span>';
+        if (r.mic) tags += '<span class="qpt-g">Mic</span>';
+        if (r.playstyle) tags += '<span class="qpt-g">' +
+          (r.playstyle === 'comp' ? 'Comp' : 'Casual') + '</span>';
+        if (r.mode) tags += '<span class="qpt-g">' + esc(String(r.mode).toUpperCase()) + '</span>';
+        if (r.verifiedTier) tags += '<span class="qpt-g v">Verified</span>';
+
+        /* A full table is still worth showing: you can stand behind it,
+           and the seat you are waiting for is usually minutes away. */
+        var act = r.full
+          ? 'window.qWaitTable(' + r.id + ')'
+          : 'window.qJoinTable(' + r.id + ',' + jsStr(r.game) + ',' + (r.players | 0) + ')';
+        return '<button class="qpt-r' + (r.full ? ' full' : '') + '" type="button" ' +
+            'onclick="' + act + '">' +
+          '<span class="qpt-seats">' + seatPips(r) + '</span>' +
+          '<span class="qpt-who">' + whoAt(r) +
+            '<span class="qpt-free">' + (r.full
+            ? 'Full · join the line'
+            : free + ' seat' + (free === 1 ? '' : 's') + ' left') + '</span>' +
+          '</span>' +
+          '<span class="qpt-tags">' + tags + '</span>' +
+          '<span class="qpt-a">' + ago(r.ageMs) + '</span>' +
+          '<span class="qpt-j">' + (r.full ? 'Wait for a seat' : 'Take a seat') + '</span>' +
+        '</button>';
+      }).join('') +
+    '</div>';
+  }
+
   function paintPools(){
     var row = document.getElementById('qPoolRow');
     if (!row) return;
     row.innerHTML = (pulse.definitions || []).map(function (d){
       var n = (pulse.playlists[d.id] || {}).waiting || 0;
-      return '<div class="qpool" onclick="window.qJoinPlaylist(' + jsStr(d.id) + ')">' +
-        '<div><div class="qpool-n">' + esc(d.name) + '</div>' +
-        '<div class="qpool-s">' + d.players + ' players · ' +
-          (d.games ? d.games.length + ' games' : 'any game') + '</div></div>' +
-        '<span class="qpool-c' + (n ? '' : ' cold') + '">' + (n ? n + ' waiting' : '—') + '</span>' +
-      '</div>';
+      var games = poolGames(d);
+      var open = !!poolOpen[d.id] && games.length > 0;
+      var pick = open ? poolPick[d.id] : null;
+
+      var head =
+        '<div class="qpool-h"' +
+          (games.length ? ' onclick="window.qTogglePool(' + jsStr(d.id) + ')"' : '') + '>' +
+          '<div class="qpool-t">' +
+            '<div class="qpool-n">' + esc(d.name) + '</div>' +
+            '<div class="qpool-s">' + d.players + ' players · ' +
+              (games.length ? games.length + ' games' : 'any game') + '</div>' +
+          '</div>' +
+          '<span class="qpool-c' + (n ? '' : ' cold') + '">' + (n ? n + ' waiting' : '—') + '</span>' +
+          (games.length ? '<span class="qpool-x' + (open ? ' on' : '') + '">›</span>' : '') +
+        '</div>';
+
+      /* Three ways in, in the order you would want them: read one game's
+         open tables and take a seat, take one game on your own terms, or
+         take the whole pool. */
+      var body = open
+        ? '<div class="qpool-b">' +
+            '<div class="qpool-l">Pick a game to see its tables, or take the whole pool</div>' +
+            '<div class="qpool-g">' +
+              games.map(function (g){
+                var t = tablesFor(g.id).filter(function (x){ return !x.full; }).length;
+                return '<button class="qpg' + (pick === g.id ? ' on' : '') + '" type="button" ' +
+                  'data-gid="' + esc(g.id) + '" ' +
+                  'onclick="window.qPickPoolGame(' + jsStr(d.id) + ',' + jsStr(g.id) + ')">' +
+                  '<span class="qpg-art" style="' +
+                    (g.cover ? 'background-image:' + url(g.cover) : '') + '"></span>' +
+                  '<span class="qpg-n">' + esc(g.name) + '</span>' +
+                  (t ? '<span class="qpg-t" title="open tables">' + t + '</span>' : '') +
+                '</button>';
+              }).join('') +
+            '</div>' +
+            (pick ? poolTables(pick) : '') +
+            '<button class="qpool-j" type="button" ' +
+              'onclick="window.qJoinPlaylist(' + jsStr(d.id) + ')">' +
+              'Join the whole pool</button>' +
+          '</div>'
+        : '';
+
+      return '<div class="qpool' + (open ? ' open' : '') + '"' +
+        (games.length ? '' : ' onclick="window.qJoinPlaylist(' + jsStr(d.id) + ')"') + '>' +
+        head + body + '</div>';
     }).join('');
+
+    /* Cover art for the chips, through the same resolver the deck uses
+       so a pool game is never the odd one out with no picture. */
+    Array.prototype.forEach.call(row.querySelectorAll('.qpg'), function (b){
+      upgradeArt(b.querySelector('.qpg-art'), b.getAttribute('data-gid'), 'mini',
+                 (b.querySelector('.qpg-n') || {}).textContent);
+    });
   }
+
+  window.qTogglePool = function (id){
+    poolOpen[id] = !poolOpen[id];
+    paintPools();
+  };
+
+  /* Picking one game out of a pool selects it as an EXACT-game search --
+     it clears the playlist, so the bar's criteria and the summary above
+     the button describe the game you chose rather than the category you
+     found it in -- and it opens that game's open tables underneath. You
+     are not scrolled away: the choice between taking a seat at a table
+     and setting up your own search is the one you came here to make. */
+  /* Selecting a game repaints the band at the top of the page -- the
+     logo swaps, the playtime stat comes or goes, the Mode row shows or
+     hides -- and every one of those changes the height of something
+     ABOVE the pools, which drags the page out from under you. The pick
+     itself is what you asked for; the trip back to the top is not, so
+     the scroll position is held across the repaint.
+
+     Both the window and the nearest scrolling ancestor are held: the app
+     shell scrolls its own pane on some routes, and restoring only the
+     window would leave the other one moved. */
+  function keepScroll(fn){
+    var box = null;
+    var el = document.getElementById('qPoolRow');
+    for (var n = el && el.parentElement; n && n !== document.body; n = n.parentElement){
+      var ov = getComputedStyle(n).overflowY;
+      if ((ov === 'auto' || ov === 'scroll') && n.scrollHeight > n.clientHeight){ box = n; break; }
+    }
+    var wy = window.scrollY || document.documentElement.scrollTop || 0;
+    var by = box ? box.scrollTop : 0;
+
+    fn();
+
+    /* Twice: once now for the synchronous reflow, once on the next frame
+       for the art and logo that finish loading a beat later. */
+    function restore(){
+      if (box && Math.abs(box.scrollTop - by) > 1) box.scrollTop = by;
+      var now = window.scrollY || document.documentElement.scrollTop || 0;
+      if (Math.abs(now - wy) > 1) window.scrollTo(0, wy);
+    }
+    restore();
+    requestAnimationFrame(restore);
+    /* The band's logo is an image: it lands after the frame and resizes
+       the header a third time. One late restore covers it -- abandoned
+       the moment you scroll yourself, so it can never fight you. */
+    var mine = true;
+    var stop = function (){ mine = false; };
+    window.addEventListener('wheel', stop, { once:true, passive:true });
+    window.addEventListener('touchstart', stop, { once:true, passive:true });
+    setTimeout(function (){
+      window.removeEventListener('wheel', stop);
+      window.removeEventListener('touchstart', stop);
+      if (mine) restore();
+    }, 320);
+  }
+
+  window.qPickPoolGame = function (pid, gid){
+    var st = S(); if (!st) return;
+    keepScroll(function (){
+      poolPick[pid] = (poolPick[pid] === gid) ? null : gid;
+      if (poolPick[pid]){
+        st.playlist = null;
+        st.game = gid;
+        var src = deckSource();
+        var at = src.findIndex(function (g){ return g.id === gid; });
+        if (at >= 0){ idx = at; commit(); }
+        else { paintMarquee(); paintQueueCta(); }
+      }
+      paintPools();
+    });
+  };
+
+  /* The other half of the choice: no table suits you, so make one. The
+     bar is where the filters live, so that is where this puts you. */
+  window.qPoolSearch = function (gid){
+    var st = S(); if (!st) return;
+    st.playlist = null; st.game = gid;
+    var src = deckSource();
+    var at = src.findIndex(function (g){ return g.id === gid; });
+    if (at >= 0){ idx = at; commit(); }
+    else { paintMarquee(); paintQueueCta(); }
+    var bar = document.getElementById('qBar');
+    if (bar && bar.scrollIntoView) bar.scrollIntoView({ behavior:'smooth', block:'center' });
+  };
 
   window.qJoinPlaylist = async function (id){
     var d = (pulse.definitions || []).find(function (x){ return x.id === id; });
@@ -67505,6 +68471,2183 @@ async function reactComment(ev, id, btn){
 
   if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', start);
   else start();
+})();
+</script>
+
+<!-- ═══ QUEUE · THE TABLE AS A ROOM ═══════════════════════════════════
+     The old in-call view was a roster and three buttons, because the
+     table used to end the moment it filled. It does not: filling up is
+     when the table starts. This is the room people actually sit in --
+     voice, screenshare, votes, and the handoff into the real game.
+
+     Every line of it is additive. The voice stack is the one the lounges
+     use, driven through its own public functions and its own buttons, so
+     nothing in that path is edited and nothing there can regress. ══ -->
+<style id="qBackCss">
+/* ═══ QUEUE · PICK UP WHERE YOU LEFT OFF ════════════════════════════
+   Three things the queue page never said: someone is asking you to sit
+   down, you agreed to play at nine, and you had a good game with these
+   four last night. All of them are reasons to press something other
+   than "find me a stranger". ══ */
+#qBack{ margin:44px auto 0; width:100%; max-width:1340px; padding:0 20px; }
+.qb-h{
+  display:flex; align-items:baseline; gap:10px; margin:0 0 14px;
+  font-family:'JetBrains Mono', ui-monospace, monospace;
+  font-size:9.5px; font-weight:700; letter-spacing:2px; text-transform:uppercase;
+  color:var(--text-3);
+}
+.qb-row{
+  display:grid; gap:12px;
+  grid-template-columns:repeat(auto-fill, minmax(300px, 1fr));
+}
+.qb-c{
+  display:flex; align-items:center; gap:12px; padding:13px 15px; border-radius:13px;
+  background:linear-gradient(160deg, rgba(255,255,255,.045), rgba(255,255,255,.012));
+  border:1px solid rgba(255,255,255,.08);
+  transition:border-color .18s, transform .18s, background .18s;
+}
+.qb-c:hover{
+  transform:translateY(-2px);
+  border-color:color-mix(in srgb, var(--hub-accent) 40%, transparent);
+}
+/* An invite is somebody waiting on an answer, so it does not look like
+   the rest of the furniture. */
+.qb-c.invite{
+  border-color:color-mix(in srgb, var(--hub-accent) 52%, transparent);
+  background:linear-gradient(160deg,
+    color-mix(in srgb, var(--hub-accent) 13%, transparent), rgba(255,255,255,.015));
+}
+.qb-art{
+  width:38px; height:50px; border-radius:7px; flex:0 0 auto;
+  background:#161a26 center/cover no-repeat;
+}
+.qb-b{ flex:1; min-width:0; }
+.qb-n{
+  font-family:'Archivo', var(--font), sans-serif;
+  font-size:13.5px; font-weight:700; color:#fff;
+  overflow:hidden; text-overflow:ellipsis; white-space:nowrap;
+}
+.qb-s{
+  margin-top:3px; font-size:11.5px; color:var(--text-3);
+  overflow:hidden; text-overflow:ellipsis; white-space:nowrap;
+}
+.qb-faces{ display:flex; margin-top:6px; }
+.qb-f{
+  width:22px; height:22px; border-radius:50%; margin-right:-6px;
+  border:2px solid var(--bg-1, #12131a);
+  background:#20142f center/cover no-repeat;
+  display:flex; align-items:center; justify-content:center;
+  font-family:'Archivo', var(--font), sans-serif;
+  font-size:9px; font-weight:800; color:#fff;
+}
+.qb-go{
+  flex:0 0 auto; padding:8px 13px; border-radius:9px; cursor:pointer;
+  color:var(--text-2);
+  background:rgba(255,255,255,.05); border:1px solid rgba(255,255,255,.1);
+  font-family:'JetBrains Mono', ui-monospace, monospace;
+  font-size:9px; font-weight:700; letter-spacing:1.2px; text-transform:uppercase;
+  transition:background .16s, color .16s, border-color .16s;
+}
+.qb-go:hover{
+  color:#fff; border-color:color-mix(in srgb, var(--hub-accent) 50%, transparent);
+  background:color-mix(in srgb, var(--hub-accent) 14%, transparent);
+}
+.qb-go.p{
+  color:#0d0320; border-color:transparent;
+  background:linear-gradient(180deg,
+    color-mix(in srgb, var(--hub-accent) 94%, white), var(--hub-accent));
+}
+.qb-x{
+  flex:0 0 auto; width:28px; height:28px; border-radius:8px; cursor:pointer;
+  background:transparent; border:1px solid rgba(255,255,255,.1); color:var(--text-3);
+  transition:color .16s, border-color .16s;
+}
+.qb-x:hover{ color:#ff8fa3; border-color:rgba(255,143,163,.4); }
+</style>
+<script>
+/* The other three ways into a table: an invite, a standing arrangement,
+   and the group you had a good night with. All of them beat matchmaking,
+   and none of them existed on this page. */
+(function () {
+  'use strict';
+
+  var invites = [], soon = [], past = [], at = 0, busy = false;
+
+  function S(){ try { return (typeof _qState !== 'undefined') ? _qState : null; } catch (e) { return null; } }
+  function ME(){ try { return (typeof me !== 'undefined') ? me : null; } catch (e) { return null; } }
+  function API(){
+    if (typeof window.api === 'function') return window.api;
+    try { return (typeof api === 'function') ? api : null; } catch (e) { return null; }
+  }
+  function _api(){
+    var f = API();
+    if (!f) return Promise.resolve(null);
+    return f.apply(null, arguments);
+  }
+  function esc(v){
+    return String(v == null ? '' : v).replace(/[&<>"']/g, function (c){
+      return { '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;' }[c];
+    });
+  }
+  function GAMES(){
+    try { return (typeof GT_GAMES !== 'undefined' && Array.isArray(GT_GAMES)) ? GT_GAMES : []; }
+    catch (e) { return []; }
+  }
+  function gname(id){
+    var g = GAMES().find(function (x){ return x.id === id; });
+    return g ? g.name : String(id || '').replace(/^steam:/, 'App ');
+  }
+  function gart(id){
+    var g = GAMES().find(function (x){ return x.id === id; });
+    return (g && (g.cover || g.header)) || '';
+  }
+  function faces(list){
+    return '<div class="qb-faces">' + (list || []).slice(0, 5).map(function (m){
+      return '<div class="qb-f"' +
+        (m.avatar ? ' style="background-image:url(\'' + esc(m.avatar) + '\')"' : '') + '>' +
+        (m.avatar ? '' : esc(String(m.username || '?').charAt(0).toUpperCase())) + '</div>';
+    }).join('') + '</div>';
+  }
+  function when(t){
+    var d = new Date(t), now = new Date();
+    var day = d.toDateString() === now.toDateString() ? 'Today'
+            : (d.getTime() - now.getTime() < 36e5 * 36 ? 'Tomorrow'
+            : d.toLocaleDateString([], { weekday:'long' }));
+    return day + ' ' + d.toLocaleTimeString([], { hour:'2-digit', minute:'2-digit' });
+  }
+  function ago(t){
+    var s = Math.max(0, (Date.now() - new Date(t).getTime()) / 1000);
+    if (s < 3600) return Math.round(s / 60) + 'm ago';
+    if (s < 86400) return Math.round(s / 3600) + 'h ago';
+    return Math.round(s / 86400) + 'd ago';
+  }
+
+  async function load(){
+    if (busy || Date.now() - at < 20000) return;
+    busy = true;
+    var r = await Promise.all([
+      _api('/queue/invites').catch(function (){ return null; }),
+      _api('/queue/scheduled').catch(function (){ return null; }),
+      _api('/queue/history').catch(function (){ return null; }),
+    ]);
+    busy = false; at = Date.now();
+    invites = Array.isArray(r[0]) ? r[0] : [];
+    soon    = Array.isArray(r[1]) ? r[1] : [];
+    past    = Array.isArray(r[2]) ? r[2] : [];
+    paint();
+  }
+
+  function host(){
+    var stage = document.getElementById('qStage');
+    if (!stage) return null;
+    var el = document.getElementById('qBack');
+    if (!el){
+      el = document.createElement('div');
+      el.id = 'qBack';
+      /* After the pools: this is the quieter half of the page, and the
+         loud half is what most people came for. */
+      stage.appendChild(el);
+    }
+    return el;
+  }
+
+  function paint(){
+    var el = host();
+    if (!el) return;
+    if (!invites.length && !soon.length && !past.length){ el.innerHTML = ''; return; }
+
+    var out = '';
+
+    if (invites.length){
+      out += '<div class="qb-h">Someone is asking you to sit down</div><div class="qb-row">' +
+        invites.map(function (v){
+          return '<div class="qb-c invite">' +
+            '<div class="qb-art" style="' +
+              (gart(v.game) ? 'background-image:url(\'' + esc(gart(v.game)) + '\')' : '') + '"></div>' +
+            '<div class="qb-b">' +
+              '<div class="qb-n">' + esc(v.from) + ' invited you</div>' +
+              '<div class="qb-s">' + esc(gname(v.game)) + ' · ' +
+                v.filled + '/' + v.players + ' seated · ' + ago(v.at) + '</div>' +
+            '</div>' +
+            '<button class="qb-go p" onclick="window.qbAccept(' + v.queueId + ',' +
+              JSON.stringify(String(v.game)).replace(/"/g, '&quot;') + ',' + (v.players | 0) + ')">Sit down</button>' +
+            '<button class="qb-x" onclick="window.qbDecline(' + v.id + ')" title="No thanks">✕</button>' +
+          '</div>';
+        }).join('') + '</div>';
+    }
+
+    if (soon.length){
+      out += '<div class="qb-h">Already arranged</div><div class="qb-row">' +
+        soon.map(function (x){
+          return '<div class="qb-c">' +
+            '<div class="qb-art" style="' +
+              (gart(x.game) ? 'background-image:url(\'' + esc(gart(x.game)) + '\')' : '') + '"></div>' +
+            '<div class="qb-b">' +
+              '<div class="qb-n">' + esc(gname(x.game)) + '</div>' +
+              '<div class="qb-s">' + when(x.startsAt) + ' · ' + x.going + ' going' +
+                (x.isMine ? ' · yours' : ' · ' + esc(x.owner)) + '</div>' +
+            '</div>' +
+            (x.myRsvp === 'going'
+              ? '<button class="qb-go" onclick="window.qbRsvp(' + x.id + ',false)">Going</button>'
+              : '<button class="qb-go p" onclick="window.qbRsvp(' + x.id + ',true)">Count me in</button>') +
+            (x.isMine ? '<button class="qb-x" onclick="window.qbCancel(' + x.id + ')" title="Call it off">✕</button>' : '') +
+          '</div>';
+        }).join('') + '</div>';
+    }
+
+    if (past.length){
+      out += '<div class="qb-h">Play with them again</div><div class="qb-row">' +
+        past.slice(0, 6).map(function (x){
+          var names = x.others.map(function (o){ return o.username; });
+          return '<div class="qb-c">' +
+            '<div class="qb-art" style="' +
+              (gart(x.game) ? 'background-image:url(\'' + esc(gart(x.game)) + '\')' : '') + '"></div>' +
+            '<div class="qb-b">' +
+              '<div class="qb-n">' + esc(names.slice(0, 2).join(', ')) +
+                (names.length > 2 ? ' +' + (names.length - 2) : '') + '</div>' +
+              '<div class="qb-s">' + esc(gname(x.game)) + ' · ' + ago(x.at) + '</div>' +
+              faces(x.others) +
+            '</div>' +
+            '<button class="qb-go" onclick="window.qbAgain(' +
+              JSON.stringify(String(x.game)).replace(/"/g, '&quot;') + ',' + (x.players | 0) + ',' +
+              JSON.stringify(x.others.map(function (o){ return o.userId; })).replace(/"/g, '&quot;') +
+              ')">Ask them</button>' +
+          '</div>';
+        }).join('') + '</div>';
+    }
+
+    el.innerHTML = out;
+  }
+
+  /* An invite does not buy a seat you would not otherwise be allowed to
+     take: this is the same join everyone else goes through. */
+  window.qbAccept = function (queueId, game, players){
+    if (typeof window.qJoinTable === 'function') window.qJoinTable(queueId, game, players);
+  };
+  window.qbDecline = async function (id){
+    await _api('/queue/invite/' + id + '/decline', { method:'POST' }).catch(function (){});
+    invites = invites.filter(function (v){ return v.id !== id; });
+    paint();
+  };
+  window.qbRsvp = async function (id, going){
+    await _api('/queue/scheduled/' + id + '/rsvp', {
+      method:'POST', headers:{ 'Content-Type':'application/json' },
+      body: JSON.stringify({ going: going })
+    }).catch(function (){});
+    at = 0; load();
+  };
+  window.qbCancel = async function (id){
+    if (!window.confirm('Call this session off?')) return;
+    await _api('/queue/scheduled/' + id, { method:'DELETE' }).catch(function (){});
+    at = 0; load();
+  };
+
+  /* "Ask them" opens the table you had, and invites the same people to
+     it -- the group is the thing worth keeping, not the session id. */
+  window.qbAgain = async function (game, players, userIds){
+    var st = S(); if (!st) return;
+    st.game = game; st.players = players || 2; st.playlist = null; st.host = true;
+    if (typeof window.qBeginSearch === 'function') await window.qBeginSearch();
+    var id = st.queueId;
+    if (!id) return;
+    for (var i = 0; i < userIds.length; i++){
+      await _api('/queue/' + id + '/invite', {
+        method:'POST', headers:{ 'Content-Type':'application/json' },
+        body: JSON.stringify({ userId: userIds[i] })
+      }).catch(function (){});
+    }
+    if (typeof showToast === 'function'){
+      showToast('Table opened · ' + userIds.length + ' invited', 'success');
+    }
+  };
+
+  /* Only while the setup view is up: this is a page about what to do
+     next, and inside a room you are already doing it. */
+  function tick(){
+    var s = S();
+    var el = document.getElementById('qBack');
+    var show = s && s.view === 'setup' && document.getElementById('qStage');
+    if (show){ load(); if (el) el.style.display = ''; }
+    else if (el) el.style.display = 'none';
+  }
+  setInterval(tick, 2000);
+  tick();
+
+  window.QBack = { reload: function (){ at = 0; load(); }, paint: paint };
+})();
+</script>
+<style id="qRoomCss">
+#qRoom{
+  display:flex; flex-direction:column; gap:16px;
+  color:var(--text-1);
+  /* The view it mounts into is a narrow centred column built for a
+     progress ring. A room is the widest thing on the page, so it takes
+     the width back rather than sitting in a letterbox. */
+  width:100%; padding:0 8px;
+  /* No max-width. The table is the page while you are sitting at it --
+     capping it at a column left two thirds of a 4K screen empty. */
+  min-height:min(760px, 82vh);
+}
+/* The searching view is a centring flex column, built to hold a single
+   progress ring: a flex child in it shrinks to its own content. The room
+   has to say it wants the row, or it sits in a narrow letterbox no
+   matter what max-width it asks for. */
+#queueOverlay #qRoom{ align-self:stretch; }
+#queueOverlay #qViewSearching:has(#qRoom){ padding:24px 34px !important; }
+
+/* ── Top: what this table is, and how long it has ─────────────── */
+.qr-top{
+  display:flex; align-items:center; gap:16px;
+  padding:16px 20px; border-radius:16px;
+  background:linear-gradient(160deg, rgba(255,255,255,.05), rgba(255,255,255,.015));
+  border:1px solid rgba(255,255,255,.08);
+}
+.qr-art{
+  width:54px; height:72px; border-radius:9px; flex:0 0 auto;
+  box-shadow:0 8px 22px -10px rgba(0,0,0,.9);
+  background:#161a26 center/cover no-repeat;
+}
+/* The view centres its text; a header line that drifts to the middle of
+   a 1900px bar reads as a title card, not as the identity of the room. */
+.qr-id{ min-width:0; flex:1; text-align:left; }
+.qr-top, .qr-bar, .qr-card, .qr-stage{ text-align:left; }
+.qr-name{
+  font-family:'Archivo', var(--font), sans-serif;
+  font-size:22px; font-weight:800; color:#fff; line-height:1.15;
+  letter-spacing:-.2px;
+  overflow:hidden; text-overflow:ellipsis; white-space:nowrap;
+}
+.qr-sub{
+  display:flex; align-items:center; gap:8px; margin-top:3px;
+  font-family:'JetBrains Mono', ui-monospace, monospace;
+  font-size:9.5px; font-weight:700; letter-spacing:1.3px; text-transform:uppercase;
+  color:var(--text-3);
+}
+/* The phase is the one thing that tells you what the room is FOR right
+   now, so it is the only coloured thing up here. */
+.qr-phase{
+  padding:3px 9px; border-radius:6px;
+  color:color-mix(in srgb, var(--hub-accent) 88%, white);
+  background:color-mix(in srgb, var(--hub-accent) 15%, transparent);
+  border:1px solid color-mix(in srgb, var(--hub-accent) 34%, transparent);
+}
+.qr-phase.live{
+  color:#0d0320; border-color:transparent;
+  background:linear-gradient(180deg,
+    color-mix(in srgb, var(--hub-accent) 94%, white), var(--hub-accent));
+}
+.qr-clock{
+  flex:0 0 auto; text-align:right;
+  font-family:'JetBrains Mono', ui-monospace, monospace;
+  font-size:19px; font-weight:800; color:#fff;
+}
+.qr-clock span{
+  display:block; font-size:8.5px; font-weight:700; letter-spacing:1.4px;
+  color:var(--text-3); margin-top:2px;
+}
+
+/* ── Body: stage on the left, the side rail on the right ──────── */
+.qr-main{
+  flex:1; min-height:0; display:grid; gap:16px;
+  grid-template-columns:320px minmax(0,1fr) 340px;
+}
+@media (max-width:1500px){ .qr-main{ grid-template-columns:280px minmax(0,1fr) 320px; } }
+@media (max-width:1200px){ .qr-main{ grid-template-columns:minmax(0,1fr) 320px; } .qr-chat{ display:none; } }
+@media (max-width:900px){ .qr-main{ grid-template-columns:minmax(0,1fr); } }
+
+.qr-stage{
+  min-height:440px; display:flex; flex-direction:column; gap:14px;
+  padding:22px; border-radius:16px;
+  background:
+    radial-gradient(680px 340px at 50% 0%, rgba(255,255,255,.045), transparent 70%),
+    rgba(0,0,0,.26);
+  border:1px solid rgba(255,255,255,.07);
+}
+
+/* Seats. A grid, not a ring: a ring looks like a waiting animation and
+   wastes the middle of the room, which is exactly where a shared screen
+   needs to go. */
+.qr-seats{
+  flex:1; min-height:0; display:flex; flex-wrap:wrap; gap:16px;
+  align-content:center; align-items:center; justify-content:center;
+}
+.qr-seats > *{ flex:0 1 250px; max-width:300px; min-width:200px; }
+.qr-seats.strip{
+  flex:0 0 auto; align-content:start; justify-content:flex-start; gap:10px;
+}
+.qr-seats.strip > *{ flex:0 0 108px; max-width:108px; }
+.qr-seat{
+  position:relative; display:flex; flex-direction:column; align-items:center;
+  gap:11px; padding:22px 14px; border-radius:16px; text-align:center;
+  background:linear-gradient(165deg, rgba(255,255,255,.045), rgba(255,255,255,.012));
+  border:1px solid rgba(255,255,255,.08);
+  transition:border-color .18s, background .18s;
+}
+.qr-seat.empty{
+  background:transparent; border-style:dashed;
+  border-color:rgba(255,255,255,.14);
+}
+.qr-seats.strip .qr-seat{ padding:9px 6px; gap:5px; }
+.qr-av{
+  width:92px; height:92px; border-radius:50%; position:relative;
+  background:#20142f center/cover no-repeat;
+  display:flex; align-items:center; justify-content:center;
+  font-family:'Archivo', var(--font), sans-serif;
+  font-size:26px; font-weight:800; color:#fff;
+  box-shadow:0 0 0 2px rgba(255,255,255,.08);
+  transition:box-shadow .12s;
+}
+.qr-seats.strip .qr-av{ width:34px; height:34px; font-size:13px; }
+/* Speaking is shown on the avatar itself rather than as a badge: it is
+   the only state that changes several times a second, and a ring reads
+   at a glance from across the room. */
+.qr-seat.talking .qr-av{
+  box-shadow:0 0 0 3px var(--hub-accent), 0 0 22px -4px var(--hub-accent);
+}
+.qr-seat.muted .qr-av{ opacity:.66; }
+.qr-nm{
+  font-family:'Archivo', var(--font), sans-serif;
+  font-size:14px; font-weight:700; color:#fff;
+  max-width:100%; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;
+}
+.qr-seats.strip .qr-nm{ font-size:10px; }
+/* One row. Wrapping a rank onto its own line under three others turned
+   a seat into a form. */
+.qr-tags{
+  display:flex; gap:5px; flex-wrap:nowrap; justify-content:center;
+  max-width:100%; overflow:hidden;
+}
+.qr-tag{
+  padding:2px 7px; border-radius:5px;
+  background:rgba(255,255,255,.06); border:1px solid rgba(255,255,255,.08);
+  font-family:'JetBrains Mono', ui-monospace, monospace;
+  font-size:8.5px; font-weight:700; letter-spacing:1px; text-transform:uppercase;
+  color:var(--text-2);
+}
+.qr-tag.lead{
+  color:#0d0320; border-color:transparent;
+  background:linear-gradient(180deg, #ffd66b, #f0b429);
+}
+.qr-tag.you{
+  color:color-mix(in srgb, var(--hub-accent) 88%, white);
+  border-color:color-mix(in srgb, var(--hub-accent) 40%, transparent);
+}
+.qr-tag.off{ color:#ff8fa3; border-color:rgba(255,143,163,.3); }
+.qr-seats.strip .qr-tags{ display:none; }
+/* The kick affordance is deliberately quiet and per-seat -- a row of
+   kick buttons across the room turns every table into a tribunal. */
+.qr-kick{
+  position:absolute; top:8px; right:8px; width:22px; height:22px;
+  border-radius:6px; cursor:pointer; opacity:0;
+  display:flex; align-items:center; justify-content:center;
+  background:rgba(0,0,0,.5); border:1px solid rgba(255,255,255,.12);
+  color:var(--text-2); font-size:12px; line-height:1;
+  transition:opacity .16s, color .16s, border-color .16s;
+}
+.qr-seat:hover .qr-kick{ opacity:1; }
+.qr-kick:hover{ color:#ff8fa3; border-color:rgba(255,143,163,.45); }
+.qr-kick.on{ opacity:1; color:#ff8fa3; border-color:rgba(255,143,163,.45); }
+.qr-seats.strip .qr-kick{ display:none; }
+
+/* The share. When someone shares, that IS the room -- it takes the
+   stage and the seats drop to a strip underneath. */
+.qr-share{
+  flex:1; min-height:0; border-radius:12px; overflow:hidden; position:relative;
+  background:#05070d; border:1px solid rgba(255,255,255,.1);
+}
+.qr-share video{ width:100%; height:100%; object-fit:contain; display:block; }
+/* An empty stage should say what would fill it. Silence plus a blank
+   rectangle reads as broken; one line reads as waiting. */
+/* Monospaced small-caps is a label style. This is a sentence, and set as
+   a label it read like fine print stamped across the room. */
+.qr-hint{
+  flex:0 0 auto; text-align:center; padding:4px 0 2px;
+  font-family:'Archivo', var(--font), sans-serif;
+  font-size:13.5px; font-weight:500; letter-spacing:0; text-transform:none;
+  color:var(--text-3);
+}
+.qr-hint b{ color:#fff; font-weight:700; }
+.qr-share-who{
+  position:absolute; left:10px; top:10px; padding:5px 10px; border-radius:7px;
+  background:rgba(0,0,0,.62); backdrop-filter:blur(6px);
+  font-family:'JetBrains Mono', ui-monospace, monospace;
+  font-size:9.5px; font-weight:700; letter-spacing:1.2px; text-transform:uppercase;
+  color:#fff;
+}
+
+/* ── Chat: the lane for things you cannot say out loud ────────── */
+.qr-chat{
+  min-height:0; display:flex; flex-direction:column;
+  border-radius:16px; overflow:hidden;
+  background:linear-gradient(160deg, rgba(255,255,255,.045), rgba(255,255,255,.012));
+  border:1px solid rgba(255,255,255,.08);
+}
+.qr-chat-h{
+  flex:0 0 auto; padding:13px 15px; border-bottom:1px solid rgba(255,255,255,.07);
+  font-family:'JetBrains Mono', ui-monospace, monospace;
+  font-size:9px; font-weight:700; letter-spacing:1.7px; text-transform:uppercase;
+  color:var(--text-3);
+}
+.qr-msgs{
+  flex:1; min-height:0; overflow-y:auto; padding:12px 15px;
+  display:flex; flex-direction:column; gap:11px;
+}
+.qr-m{ display:flex; gap:9px; }
+.qr-m-av{
+  width:26px; height:26px; border-radius:50%; flex:0 0 auto;
+  background:#20142f center/cover no-repeat;
+  display:flex; align-items:center; justify-content:center;
+  font-family:'Archivo', var(--font), sans-serif;
+  font-size:11px; font-weight:800; color:#fff;
+}
+.qr-m-b{ min-width:0; flex:1; }
+.qr-m-n{
+  font-family:'Archivo', var(--font), sans-serif;
+  font-size:11px; font-weight:700; color:var(--text-2); margin-bottom:2px;
+}
+.qr-m-n i{ font-style:normal; color:var(--text-3); font-size:9.5px; margin-left:6px; }
+.qr-m-t{
+  font-size:13px; line-height:1.5; color:#fff; word-break:break-word;
+}
+/* A code or a link is the main reason this lane exists, so it is set in
+   something you can read a character at a time. */
+.qr-m-t code{
+  font-family:'JetBrains Mono', ui-monospace, monospace;
+  font-size:12px; letter-spacing:.6px; padding:2px 6px; border-radius:5px;
+  background:rgba(0,0,0,.45); border:1px solid rgba(255,255,255,.1);
+  cursor:pointer;
+}
+.qr-chat-f{ flex:0 0 auto; padding:11px 13px; border-top:1px solid rgba(255,255,255,.07); }
+.qr-chat-i{
+  width:100%; padding:10px 12px; border-radius:9px; resize:none;
+  background:rgba(0,0,0,.4); border:1px solid rgba(255,255,255,.12); color:#fff;
+  font-family:'Archivo', var(--font), sans-serif; font-size:13px; line-height:1.4;
+}
+.qr-chat-i:focus{
+  outline:none; border-color:color-mix(in srgb, var(--hub-accent) 55%, transparent);
+}
+.qr-empty{
+  margin:auto; text-align:center; font-size:12.5px; line-height:1.6;
+  color:var(--text-3); padding:20px 10px;
+}
+
+/* ── Roles ────────────────────────────────────────────────────── */
+.qr-roles{ display:flex; flex-wrap:wrap; gap:6px; }
+.qr-role{
+  padding:8px 12px; border-radius:9px; cursor:pointer; color:var(--text-2);
+  background:rgba(0,0,0,.34); border:1px solid rgba(255,255,255,.09);
+  font-family:'Archivo', var(--font), sans-serif;
+  font-size:12px; font-weight:700;
+  transition:border-color .16s, background .16s, color .16s;
+}
+.qr-role:hover{
+  color:#fff; border-color:color-mix(in srgb, var(--hub-accent) 50%, transparent);
+}
+.qr-role.mine{
+  color:#0d0320; border-color:transparent;
+  background:linear-gradient(180deg,
+    color-mix(in srgb, var(--hub-accent) 94%, white), var(--hub-accent));
+}
+/* Taken by someone else: shown, not hidden, because knowing the lane is
+   gone is the point -- but it cannot be pressed. */
+.qr-role.taken{
+  opacity:.5; cursor:not-allowed; border-style:dashed;
+}
+.qr-role.taken:hover{ color:var(--text-2); border-color:rgba(255,255,255,.09); }
+.qr-role b{ display:block; font-size:9px; font-weight:700; color:inherit; opacity:.7; margin-top:2px; }
+.qr-tag.role{
+  color:color-mix(in srgb, var(--hub-accent) 88%, white);
+  border-color:color-mix(in srgb, var(--hub-accent) 38%, transparent);
+}
+
+/* ── Side rail: the code, the vote, the log ───────────────────── */
+.qr-side{
+  min-height:0; display:flex; flex-direction:column; gap:12px;
+  overflow-y:auto; padding-right:2px;
+}
+.qr-card{
+  padding:13px 14px; border-radius:13px;
+  background:linear-gradient(160deg, rgba(255,255,255,.045), rgba(255,255,255,.012));
+  border:1px solid rgba(255,255,255,.08);
+}
+.qr-card.hot{ border-color:color-mix(in srgb, var(--hub-accent) 40%, transparent); }
+.qr-h{
+  display:flex; align-items:center; gap:8px; margin-bottom:10px;
+  font-family:'JetBrains Mono', ui-monospace, monospace;
+  font-size:9px; font-weight:700; letter-spacing:1.7px; text-transform:uppercase;
+  color:var(--text-3);
+}
+.qr-h b{ color:#fff; font-weight:700; }
+.qr-h .sp{ margin-left:auto; }
+
+/* The game's own invite code. Big, monospaced and copyable, because it
+   is read off the screen and typed into another program. */
+.qr-code{
+  display:flex; align-items:center; gap:10px;
+  padding:11px 12px; border-radius:10px; cursor:pointer; width:100%;
+  background:rgba(0,0,0,.4); border:1px dashed rgba(255,255,255,.18);
+  transition:border-color .18s, background .18s;
+}
+.qr-code:hover{
+  border-color:color-mix(in srgb, var(--hub-accent) 55%, transparent);
+  background:rgba(0,0,0,.55);
+}
+.qr-code b{
+  flex:1; min-width:0; text-align:left; color:#fff;
+  font-family:'JetBrains Mono', ui-monospace, monospace;
+  font-size:15px; font-weight:800; letter-spacing:1.6px;
+  overflow:hidden; text-overflow:ellipsis; white-space:nowrap;
+}
+.qr-code span{
+  flex:0 0 auto;
+  font-family:'JetBrains Mono', ui-monospace, monospace;
+  font-size:9px; font-weight:700; letter-spacing:1.2px; text-transform:uppercase;
+  color:var(--text-3);
+}
+.qr-in{
+  width:100%; padding:9px 11px; border-radius:9px; margin-bottom:8px;
+  background:rgba(0,0,0,.42); border:1px solid rgba(255,255,255,.12); color:#fff;
+  font-family:'JetBrains Mono', ui-monospace, monospace;
+  font-size:12px; letter-spacing:1px;
+}
+.qr-in:focus{
+  outline:none;
+  border-color:color-mix(in srgb, var(--hub-accent) 60%, transparent);
+}
+.qr-note{ font-size:11.5px; line-height:1.55; color:var(--text-3); }
+
+/* ── The vote card ────────────────────────────────────────────── */
+.qr-q{
+  font-family:'Archivo', var(--font), sans-serif;
+  font-size:13.5px; font-weight:700; color:#fff; line-height:1.35;
+  margin-bottom:4px;
+}
+.qr-meta{
+  font-family:'JetBrains Mono', ui-monospace, monospace;
+  font-size:9px; font-weight:700; letter-spacing:1.1px; text-transform:uppercase;
+  color:var(--text-3); margin-bottom:10px;
+}
+.qr-opt{
+  position:relative; display:flex; align-items:center; gap:9px; width:100%;
+  padding:9px 11px; border-radius:9px; margin-bottom:6px; cursor:pointer;
+  overflow:hidden; text-align:left;
+  background:rgba(0,0,0,.34); border:1px solid rgba(255,255,255,.09);
+  transition:border-color .16s;
+}
+.qr-opt:hover{ border-color:color-mix(in srgb, var(--hub-accent) 45%, transparent); }
+.qr-opt.mine{ border-color:color-mix(in srgb, var(--hub-accent) 66%, transparent); }
+/* The tally is the row's own background filling up, so the result is
+   readable without reading any numbers. */
+.qr-fill{
+  position:absolute; inset:0 auto 0 0; z-index:0;
+  background:color-mix(in srgb, var(--hub-accent) 20%, transparent);
+  transition:width .35s cubic-bezier(.4,0,.2,1);
+}
+.qr-opt-t{
+  position:relative; z-index:1; flex:1; min-width:0; color:#fff;
+  font-family:'Archivo', var(--font), sans-serif;
+  font-size:12.5px; font-weight:700;
+  overflow:hidden; text-overflow:ellipsis; white-space:nowrap;
+}
+.qr-opt-n{
+  position:relative; z-index:1; flex:0 0 auto; color:var(--text-2);
+  font-family:'JetBrains Mono', ui-monospace, monospace;
+  font-size:11px; font-weight:800;
+}
+.qr-tpl{ display:flex; flex-wrap:wrap; gap:6px; }
+.qr-tpl button{
+  padding:6px 10px; border-radius:8px; cursor:pointer; color:var(--text-2);
+  background:rgba(255,255,255,.05); border:1px solid rgba(255,255,255,.1);
+  font-family:'JetBrains Mono', ui-monospace, monospace;
+  font-size:9px; font-weight:700; letter-spacing:1.1px; text-transform:uppercase;
+  transition:background .16s, color .16s, border-color .16s;
+}
+.qr-tpl button:hover{
+  color:#fff; border-color:color-mix(in srgb, var(--hub-accent) 50%, transparent);
+  background:color-mix(in srgb, var(--hub-accent) 14%, transparent);
+}
+
+/* ── People rows: invites, the waiting line, ratings ──────────── */
+.qr-row{
+  display:flex; align-items:center; gap:10px; padding:7px 0;
+}
+.qr-row + .qr-row{ border-top:1px solid rgba(255,255,255,.05); }
+.qr-row-av{
+  width:30px; height:30px; border-radius:50%; flex:0 0 auto;
+  background:#20142f center/cover no-repeat;
+  display:flex; align-items:center; justify-content:center;
+  font-family:'Archivo', var(--font), sans-serif;
+  font-size:12px; font-weight:800; color:#fff;
+}
+.qr-row-n{
+  flex:1; min-width:0; color:#fff;
+  font-family:'Archivo', var(--font), sans-serif;
+  font-size:12.5px; font-weight:700;
+  overflow:hidden; text-overflow:ellipsis; white-space:nowrap;
+}
+.qr-row-n span{
+  display:block; font-weight:500; color:var(--text-3); font-size:11px;
+}
+.qr-mini{
+  flex:0 0 auto; padding:6px 11px; border-radius:8px; cursor:pointer;
+  color:var(--text-2);
+  background:rgba(255,255,255,.05); border:1px solid rgba(255,255,255,.1);
+  font-family:'JetBrains Mono', ui-monospace, monospace;
+  font-size:9px; font-weight:700; letter-spacing:1.1px; text-transform:uppercase;
+  transition:background .16s, color .16s, border-color .16s;
+}
+.qr-mini:hover{
+  color:#fff; border-color:color-mix(in srgb, var(--hub-accent) 50%, transparent);
+  background:color-mix(in srgb, var(--hub-accent) 14%, transparent);
+}
+.qr-mini.sent{ opacity:.45; cursor:default; }
+.qr-mini.up.on{ color:#7ee2a8; border-color:rgba(126,226,168,.45); background:rgba(126,226,168,.12); }
+.qr-mini.down.on{ color:#ff8fa3; border-color:rgba(255,143,163,.45); background:rgba(255,60,90,.12); }
+.qr-rate{ display:flex; gap:6px; flex:0 0 auto; }
+
+/* Ping sits on the seat because it is a property of the person, and it
+   is the difference between a good session and a wasted evening. */
+.qr-tag.ping{ color:#7ee2a8; border-color:rgba(126,226,168,.28); }
+.qr-tag.ping.mid{ color:#ffd166; border-color:rgba(255,209,102,.28); }
+.qr-tag.ping.bad{ color:#ff8fa3; border-color:rgba(255,143,163,.32); }
+.qr-warn{
+  margin-top:9px; padding:9px 11px; border-radius:9px;
+  background:rgba(255,180,80,.09); border:1px solid rgba(255,180,80,.26);
+  color:#ffd39b; font-size:11.5px; line-height:1.5;
+}
+
+/* ── The log ──────────────────────────────────────────────────── */
+.qr-log{ display:flex; flex-direction:column; gap:7px; }
+.qr-ev{
+  display:flex; gap:8px; font-size:11.5px; line-height:1.45; color:var(--text-3);
+}
+.qr-ev b{ color:#fff; font-weight:700; }
+.qr-ev i{
+  flex:0 0 34px; font-style:normal; color:var(--text-3); opacity:.7;
+  font-family:'JetBrains Mono', ui-monospace, monospace; font-size:9px;
+}
+
+/* ── The control bar ──────────────────────────────────────────── */
+.qr-bar{
+  display:flex; align-items:center; gap:10px; flex-wrap:wrap;
+  padding:14px 18px; border-radius:16px;
+  background:linear-gradient(160deg, rgba(255,255,255,.05), rgba(255,255,255,.015));
+  border:1px solid rgba(255,255,255,.08);
+}
+.qr-b{
+  display:flex; align-items:center; gap:8px; padding:12px 18px; border-radius:11px;
+  cursor:pointer; color:var(--text-2);
+  background:rgba(255,255,255,.05); border:1px solid rgba(255,255,255,.1);
+  font-family:'JetBrains Mono', ui-monospace, monospace;
+  font-size:10px; font-weight:700; letter-spacing:1.2px; text-transform:uppercase;
+  transition:background .16s, color .16s, border-color .16s, transform .16s;
+}
+.qr-b:active{ transform:translateY(1px); }
+.qr-b:hover{
+  color:#fff; border-color:color-mix(in srgb, var(--hub-accent) 50%, transparent);
+  background:color-mix(in srgb, var(--hub-accent) 13%, transparent);
+}
+/* On means the thing is ACTIVE (you are sharing); danger means the thing
+   is OFF in a way that matters (your mic is muted). Two different states
+   that a single "active" colour would have conflated. */
+.qr-b.on{
+  color:#0d0320; border-color:transparent;
+  background:linear-gradient(180deg,
+    color-mix(in srgb, var(--hub-accent) 94%, white), var(--hub-accent));
+}
+.qr-b.danger{ color:#ff8fa3; border-color:rgba(255,143,163,.4); background:rgba(255,60,90,.1); }
+.qr-b.danger:hover{ background:rgba(255,60,90,.18); color:#ffb3c0; }
+.qr-b .sp{ margin-left:auto; }
+.qr-bar .gap{ flex:1; }
+.qr-b svg{ flex:0 0 auto; }
+</style>
+<script>
+/* ═══ The table, as a room ═══════════════════════════════════════════
+   Self-contained: it reads the voice stack's state and drives it
+   through the stack's own controls, and it owns nothing the lounges
+   also own. If this whole block were deleted, voice would still work
+   exactly as it does today. */
+(function () {
+  'use strict';
+
+  var POLL_MS = 3000;
+  var room = null;          // last /queue/:id/room payload
+  var timer = null, uiTimer = null;
+  var log = [];             // local, session-only: what happened while you sat here
+  var seen = {};            // userId -> true, so arrivals are logged once
+  var lastPoll = 0;         // poll id we announced
+  var codeEditing = false;
+  /* null = not asked yet, true = the server has /room, false = it does not
+     and the room is running on /status alone.
+
+     Latching this on the first failure was a mistake of exactly the kind
+     this project has hit before: one bad response downgraded the room
+     permanently, and the only way back was a reload. A missing endpoint
+     is a lasting condition, but a failed request is not -- so it takes
+     three misses in a row to conclude the first, and one success to
+     undo it. */
+  var roomApi = null, roomMiss = 0;
+  var ROOM_GIVE_UP = 3;
+  /* Once /room has answered for this table, the room keeps its full
+     shape for the rest of the sitting. A later failure is a blip, an
+     expired session or a restarting server -- none of which are reasons
+     to take the chat, the votes and the roles off the screen while
+     somebody is using them. Downgrading is only for a server that has
+     NEVER answered. */
+  var roomEver = false;
+  /* Which table the state in this module belongs to. Leaving and sitting
+     down again gives you a different session, and carrying the old one's
+     clock, log and endpoint verdict into it is how a fresh table came up
+     showing an hour on the clock and a downgrade it never earned. */
+  var forId = null;
+  var audioCtx = null, meters = {};   // userId -> analyser bundle
+
+  function S(){
+    try { return (typeof _qState !== 'undefined') ? _qState : null; } catch (e) { return null; }
+  }
+  function _qStateView(){ var s = S(); return s ? s.view : ''; }
+  function ME(){
+    try { return (typeof me !== 'undefined') ? me : null; } catch (e) { return null; }
+  }
+  function API(){
+    if (typeof window.api === 'function') return window.api;
+    try { return (typeof api === 'function') ? api : null; } catch (e) { return null; }
+  }
+  /* Named one at a time rather than through a lookup helper: each is a
+     specific binding this module depends on, and a missing one should be
+     obvious here rather than hidden behind a string. */
+  function vcId(){ try { return (typeof vcChannelId !== 'undefined') ? vcChannelId : null; } catch (e) { return null; } }
+  function vcMic(){ try { return (typeof vcStream !== 'undefined') ? vcStream : null; } catch (e) { return null; } }
+  function vcScreen(){ try { return (typeof vcScreenStream !== 'undefined') ? vcScreenStream : null; } catch (e) { return null; } }
+  function vcRoster(){ try { return (typeof vcChannelMembers !== 'undefined') ? vcChannelMembers : {}; } catch (e) { return {}; } }
+  function vcVideo(){ try { return (typeof vcVideoStreams !== 'undefined') ? vcVideoStreams : {}; } catch (e) { return {}; } }
+  function vcPeerMap(){ try { return (typeof vcPeers !== 'undefined') ? vcPeers : {}; } catch (e) { return {}; } }
+  function fn(name){
+    if (typeof window[name] === 'function') return window[name];
+    try {
+      /* eslint-disable no-new-func */
+      var f = new Function('try { return typeof ' + name + ' === "function" ? ' + name + ' : null; } catch (e) { return null; }');
+      return f();
+    } catch (e) { return null; }
+  }
+  function jsStr(v){
+    return JSON.stringify(String(v == null ? '' : v)).replace(/"/g, '&quot;');
+  }
+  function esc(v){
+    return String(v == null ? '' : v).replace(/[&<>"']/g, function (c){
+      return { '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;' }[c];
+    });
+  }
+  /* One place that knows how to reach the app's fetch wrapper. */
+  function _api(){
+    var f = API();
+    if (!f) return Promise.resolve(null);
+    return f.apply(null, arguments);
+  }
+
+  function toast(m, k){ if (typeof showToast === 'function') showToast(m, k || ''); }
+
+  function note(text){
+    log.unshift({ t: Date.now(), text: text });
+    if (log.length > 40) log.length = 40;
+  }
+  function clock(ms){
+    var s = Math.max(0, Math.round(ms / 1000));
+    var h = Math.floor(s / 3600), m = Math.floor((s % 3600) / 60);
+    return (h ? h + ':' + String(m).padStart(2, '0') : m) + ':' +
+           String(s % 60).padStart(2, '0');
+  }
+  function hhmm(t){
+    var d = new Date(t);
+    return String(d.getHours()).padStart(2, '0') + ':' +
+           String(d.getMinutes()).padStart(2, '0');
+  }
+
+  /* ── Voice: borrowed, never rewritten ──────────────────────────
+     Every one of these reads or presses something the lounge code
+     already owns. No branch of it is duplicated here, so a fix there
+     is a fix here too. */
+  var V = {
+    id: function (){ return room && room.queueId ? ('qt:' + room.queueId) : null; },
+    inRoom: function (){
+      var id = V.id();
+      return !!id && String(vcId()) === String(id);
+    },
+    muted: function (){
+      var st = vcMic();
+      var t = st && st.getAudioTracks && st.getAudioTracks()[0];
+      return !(t && t.enabled);
+    },
+    sharing: function (){ return !!vcScreen(); },
+    members: function (){ return vcRoster()[V.id()] || []; },
+    streamFor: function (uid){
+      var m = ME();
+      if (m && uid === m.id) return vcScreen();
+      return vcVideo()['u' + uid] || null;
+    },
+    /* joinVoiceChannel opens the VC panel on its way through. We let it
+       -- editing it would put every lounge call at risk for a cosmetic
+       gain -- and simply come back to the queue afterwards. */
+    join: async function (){
+      if (!room || V.inRoom()) return;
+      var join = fn('joinVoiceChannel');
+      if (!join) return;
+      var name = 'Table · ' + gameName();
+      try { await join(V.id(), name); } catch (e) { return; }
+      restoreQueueView();
+      note('You joined the voice room.');
+      paint();
+    },
+    leave: function (){
+      var f = fn('leaveVoiceChannel');
+      try { if (V.inRoom() && f) f(); } catch (e) {}
+    },
+    /* The stack's own buttons, pressed rather than reimplemented: this
+       is what keeps the screenshare quality menu, the PiP and the
+       hotbar in step with what the table shows. */
+    tapMute: function (){ var b = document.getElementById('vcMuteBtn'); if (b) b.click(); },
+    tapShare: function (){ var b = document.getElementById('vcScreenBtn'); if (b) b.click(); },
+  };
+
+  /* showVcPanel hides the queue on its way past. Putting it back is the
+     entire cost of not touching the voice module. */
+  function restoreQueueView(){
+    try {
+      var vc = document.getElementById('vcPanel');
+      if (vc) vc.classList.add('hidden');
+      var ov = document.getElementById('queueOverlay');
+      if (ov && typeof window.showOverlay === 'function' && !ov.classList.contains('open')){
+        window.showOverlay('queueOverlay');
+      }
+      var pip = fn('showVcPip');
+      if (pip && V.inRoom()) pip();
+    } catch (e) {}
+  }
+
+  /* ── Who is talking ───────────────────────────────────────────
+     Read from the audio itself. A "speaking" flag pushed over the
+     socket would be a lie by the time it arrived; an analyser is
+     truthful and costs nothing but a frame. */
+  function meterFor(uid, stream){
+    if (!stream) return null;
+    if (meters[uid] && meters[uid].stream === stream) return meters[uid];
+    try {
+      audioCtx = audioCtx || new (window.AudioContext || window.webkitAudioContext)();
+      var src = audioCtx.createMediaStreamSource(stream);
+      var an = audioCtx.createAnalyser();
+      an.fftSize = 512; an.smoothingTimeConstant = .7;
+      src.connect(an);
+      meters[uid] = { stream: stream, an: an, buf: new Uint8Array(an.frequencyBinCount) };
+      return meters[uid];
+    } catch (e) { return null; }
+  }
+  function talking(uid){
+    var m = meters[uid];
+    if (!m) return false;
+    m.an.getByteFrequencyData(m.buf);
+    var sum = 0;
+    for (var i = 0; i < m.buf.length; i++) sum += m.buf[i];
+    return (sum / m.buf.length) > 12;
+  }
+  function wireMeters(){
+    var me = ME();
+    try {
+      var mine = vcMic();
+      if (me && mine) meterFor(me.id, mine);
+      var pc = vcPeerMap();
+      Object.keys(pc).forEach(function (pid){
+        var uid = Number(String(pid).replace(/^u/, ''));
+        var rs = (pc[pid].getReceivers && pc[pid].getReceivers()) || [];
+        var tr = rs.map(function (r){ return r.track; })
+                   .filter(function (t){ return t && t.kind === 'audio'; });
+        if (tr.length) meterFor(uid, new MediaStream(tr));
+      });
+    } catch (e) {}
+  }
+
+  /* Positions, by the shape of the game rather than by title: five-lane
+     MOBAs, role shooters, and parties. A game with no meaningful roles
+     gets no role card at all -- offering "DPS" on Tekken is noise. */
+  var ROLES = {
+    moba: [['top','Top'],['jungle','Jungle'],['mid','Mid'],['bot','Bot'],['support','Support']],
+    hero: [['tank','Tank'],['dps','DPS'],['support','Support'],['flex','Flex']],
+    fps:  [['entry','Entry'],['igl','IGL'],['support','Support'],['awp','AWP'],['lurk','Lurk']],
+    party:[['tank','Tank'],['healer','Healer'],['dps','DPS'],['builder','Builder']],
+  };
+  var ROLE_OF = {
+    'lol':'moba','league':'moba','dota2':'moba','smite2':'moba','predecessor':'moba','wildrift':'moba',
+    'overwatch2':'hero','marvelrivals':'hero','valorant':'hero','apex':'hero','r6siege':'hero',
+    'cs2':'fps','cod-mw3':'fps','cod-bo6':'fps','pubg':'fps','finals':'fps','battlefield2042':'fps',
+    'destiny2':'party','ffxiv':'party','wow':'party','deeprock':'party','minecraft':'party',
+  };
+  function roleSet(){
+    var g = room && room.game;
+    return ROLES[ROLE_OF[g]] || null;
+  }
+  function roleName(id){
+    var set = roleSet() || [];
+    var hit = set.find(function (r){ return r[0] === id; });
+    return hit ? hit[1] : id;
+  }
+
+  /* Only the client can measure its own round trip, so it measures it
+     and reports it. Three samples, best of -- one unlucky request should
+     not label somebody as laggy for the rest of the session. */
+  var netT = null, myPing = null;
+  async function measurePing(){
+    var f = API(); if (!f) return null;
+    var best = null;
+    for (var i = 0; i < 3; i++){
+      var t0 = performance.now();
+      var ok = await f('/queue/pulse').then(function (){ return true; })
+                                      .catch(function (){ return false; });
+      if (!ok) continue;
+      var ms = Math.round(performance.now() - t0);
+      if (best == null || ms < best) best = ms;
+    }
+    return best;
+  }
+  function myRegion(){
+    try {
+      var tz = Intl.DateTimeFormat().resolvedOptions().timeZone || '';
+      return tz.split('/')[0] || null;      // Europe, America, Asia…
+    } catch (e) { return null; }
+  }
+  async function reportNet(){
+    if (!room || !room.queueId || roomApi === false) return;
+    var ms = await measurePing();
+    if (ms == null) return;
+    myPing = ms;
+    await _api('/queue/' + room.queueId + '/net', {
+      method:'POST', headers:{ 'Content-Type':'application/json' },
+      body: JSON.stringify({ pingMs: ms, region: myRegion() })
+    }).catch(function (){ return null; });
+  }
+  function pingClass(ms){ return ms < 60 ? '' : (ms < 120 ? ' mid' : ' bad'); }
+
+  /* ── Data ─────────────────────────────────────────────────────── */
+  function GAMES(){
+    try { return (typeof GT_GAMES !== 'undefined' && Array.isArray(GT_GAMES)) ? GT_GAMES : []; }
+    catch (er) { return []; }
+  }
+
+  function gameName(){
+    var s = S();
+    var g = room && room.game || (s && s.game) || '';
+    /* GT_GAMES is a const, so it is script-scoped like the rest -- it is
+       not on window either, and reading it there left the room showing
+       raw ids where the game name belongs. */
+    var all = GAMES();
+    var hit = all.find(function (x){ return x.id === g; });
+    if (hit) return hit.name;
+    if (room && room.playlist && room.playlist.name) return room.playlist.name;
+    return String(g).replace(/^steam:/, 'App ');
+  }
+  function gameArt(){
+    var g = GAMES().find(function (x){ return x.id === (room && room.game); });
+    return (g && (g.cover || g.header)) || '';
+  }
+  function seated(){ return (room && room.members) || []; }
+
+  /* Steam's own run protocol. The gap between "we agreed on a game" and
+     "we are actually in it" is where groups fall apart, and it is
+     usually just nobody wanting to be the one to alt-tab first. */
+  function appId(){
+    var g = String((room && room.game) || '');
+    if (/^\d+$/.test(g)) return g;
+    var m = g.match(/^steam:(\d+)$/);
+    if (m) return m[1];
+    var hit = GAMES().find(function (x){ return x.id === g; });
+    if (hit && hit.steamAppId) return String(hit.steamAppId);
+    var art = (hit && (hit.cover || hit.header)) || '';
+    var u = String(art).match(/\/apps\/(\d+)\//);
+    return u ? u[1] : '';
+  }
+  function isLeader(){
+    var me = ME();
+    return !!(me && room && room.ownerId === me.id);
+  }
+  function livePoll(){
+    var ps = (room && room.polls) || [];
+    return ps.find(function (p){ return !p.closed && new Date(p.closesAt) > new Date(); }) || null;
+  }
+  function kickOf(uid){
+    return ((room && room.kicks) || []).find(function (k){ return k.targetId === uid; }) || null;
+  }
+
+  /* What the client already knows about the table it just opened. Enough
+     to draw the room truthfully: your seat, the size, the game, the
+     clock. Everything else arrives on the first poll. */
+  function provisional(){
+    var s = S(), me = ME();
+    return {
+      queueId: s && s.queueId, state: 'searching',
+      game: s && s.game, players: (s && s.players) || 2,
+      ownerId: me && me.id,
+      startedAt: new Date((s && s.searchStarted) || Date.now()).toISOString(),
+      members: me ? [{
+        userId: me.id, id: me.id,
+        username: me.display_name || me.username,
+        avatar_url: me.avatarUrl || me.avatar_url,
+        skill: s && s.skill, isOwner: true,
+      }] : [],
+      polls: [], kicks: [], lobbyCode: null, lobbyNote: null, locked: false,
+    };
+  }
+
+  async function load(){
+    var s = S();
+    if (!s) return;
+
+    if (s.queueId !== forId){
+      forId = s.queueId;
+      room = null; log = []; seen = {}; lastPoll = 0;
+      roomApi = null; roomMiss = 0; roomEver = false; myPing = null;
+      invited = {};
+      if (forId) note('You sat down at the table.');
+    }
+    /* Something on screen from the first frame, rather than after a
+       round trip that might not even be answerable yet. */
+    if (!room){ room = provisional(); paint(); }
+    if (!s.queueId) return;
+
+    /* Asked every time, not just until the first failure: the endpoint
+       being briefly unreachable is not the same as it not existing. */
+    var r = await _api('/queue/' + s.queueId + '/room').catch(function (){ return null; });
+    if (r && !r.error){
+      roomApi = true;
+      roomEver = true;
+      roomMiss = 0;
+    }
+    /* Everything the seats need is in /status, so the room still opens on
+       the fallback -- it just cannot offer the parts that live behind the
+       newer endpoint. */
+    if (!r || r.error){
+      var st2 = await _api('/queue/' + s.queueId + '/status').catch(function (){ return null; });
+      /* If /status fails too then the table is gone or the network is,
+         and neither says anything about whether this server has /room.
+         Only a working /status beside a failing /room is evidence of a
+         server that predates it. */
+      if (!st2 || st2.error) return;
+      roomMiss++;
+      if (!roomEver && roomMiss >= ROOM_GIVE_UP) roomApi = false;
+      /* /status knows nothing about polls, chat or the lobby code, so a
+         blank one would erase the conversation from the screen. What was
+         last known stays on screen until something newer replaces it. */
+      if (room){
+        st2.chat = room.chat; st2.polls = room.polls; st2.kicks = room.kicks;
+        st2.waitlist = room.waitlist; st2.myRatings = room.myRatings;
+        st2.lobbyCode = room.lobbyCode; st2.lobbyNote = room.lobbyNote;
+        st2.locked = room.locked;
+      }
+      r = st2;
+      r.polls = []; r.kicks = [];
+      r.lobbyCode = null; r.lobbyNote = null; r.locked = false;
+    }
+
+    /* Arrivals and departures are worth a line in the log -- half of
+       what happens at a table is somebody appearing or vanishing. */
+    var now = {};
+    (r.members || []).forEach(function (m){
+      now[m.userId] = true;
+      if (!seen[m.userId]){
+        seen[m.userId] = m.username;
+        /* Your own arrival is already the first line of the log; saying
+           it again under your own username reads like a second person. */
+        var mine = ME() && m.userId === ME().id;
+        if (room && !mine) note(m.username + ' sat down.');
+      }
+    });
+    Object.keys(seen).forEach(function (uid){
+      if (!now[uid]){ note(seen[uid] + ' left the table.'); delete seen[uid]; }
+    });
+
+    var p = (r.polls || []).find(function (x){ return !x.closed; });
+    if (p && p.id !== lastPoll){ lastPoll = p.id; note((p.author || 'Someone') + ' asked: ' + p.question); }
+    (r.polls || []).forEach(function (x){
+      if (x.closed && x.result && !x.__logged && x.id <= lastPoll){}
+    });
+
+    /* A table that has ended is not a table. The room used to keep
+       rendering a cancelled or expired session -- seats, clock and all --
+       which is how a dead sitting was still counting up an hour later.
+       The server owns that verdict; this just obeys it. */
+    if (r.state === 'cancelled' || r.state === 'expired' || r.state === 'ended'){
+      var st3 = S();
+      if (st3){ st3.queueId = null; st3.searchStarted = 0; }
+      forId = null;
+      toast(r.state === 'expired' ? 'That table timed out' : 'That table has closed', '');
+      if (typeof window.qLeaveCall === 'function') window.qLeaveCall();
+      close();
+      return;
+    }
+
+    room = r;
+    paint();
+  }
+
+  /* ── Paint ────────────────────────────────────────────────────── */
+  /* Whichever of the two table views is currently on screen. Both are
+     the same table at different stages, so the room follows the one the
+     user is actually looking at instead of forcing a view of its own. */
+  function shown(el){
+    /* getClientRects is empty for anything not being rendered, which is
+       the question actually being asked -- unlike offsetParent, which
+       also comes back empty for perfectly visible children of a
+       fixed-position overlay, and that is what the queue panel is. */
+    return !!(el && el.getClientRects().length);
+  }
+  function activeView(){
+    /* The searching table builds #qTable into whichever view is live, so
+       its parent is the table's own answer to "where am I on screen". */
+    var t = document.getElementById('qTable');
+    if (t && t.parentElement && shown(t.parentElement)) return t.parentElement;
+    var ids = ['qViewInCall', 'qViewSearching'];
+    for (var i = 0; i < ids.length; i++){
+      var el = document.getElementById(ids[i]);
+      if (shown(el)) return el;
+    }
+    return null;
+  }
+
+  /* The original markup is hidden, never removed: window.qSearchAgain,
+     _qRenderRoster and the call timer all still look up their own nodes,
+     and breaking them to save a few hidden divs would be a poor trade. */
+  function showKids(v, on){
+    if (!v) return;
+    Array.prototype.forEach.call(v.children, function (c){
+      if (c.id === 'qRoom') return;
+      if (on) c.style.removeProperty('display');
+      else c.style.display = 'none';
+    });
+  }
+
+  function host(){
+    if (!room) return null;
+    var v = activeView();
+    if (!v) return null;
+
+    var el = document.getElementById('qRoom');
+    if (!el){
+      el = document.createElement('div');
+      el.id = 'qRoom';
+    }
+    /* Moving the node keeps the share <video> and its stream alive, so
+       forming -> seated does not blink the screenshare off. */
+    if (el.parentElement !== v){
+      showKids(el.parentElement, true);
+      v.appendChild(el);
+    }
+    showKids(v, false);
+    return el;
+  }
+
+  function seatHTML(m, i, strip){
+    var me = ME();
+    var mine = me && m && m.userId === me.id;
+    var vm = V.members().find(function (x){ return x.userId === (m && m.userId); });
+    /* Mute is only meaningful once there is a call to be muted in. */
+    var inCall = V.inRoom();
+    var muted = (m && inCall) ? (mine ? V.muted() : !!(vm && vm.muted)) : false;
+    var away = !!m && !inCall ? false : (!!m && !mine && !vm);
+    var speak = m ? talking(m.userId) : false;
+
+    if (!m){
+      return '<div class="qr-seat empty">' +
+        '<div class="qr-av" style="background:transparent;box-shadow:none;color:var(--text-3)">+</div>' +
+        '<div class="qr-nm" style="color:var(--text-3)">Open seat</div>' +
+      '</div>';
+    }
+    var k = kickOf(m.userId);
+    return '<div class="qr-seat' + (speak ? ' talking' : '') + (muted ? ' muted' : '') + '" ' +
+        'data-uid="' + m.userId + '">' +
+      (!mine && !strip
+        ? '<button class="qr-kick' + (k ? ' on' : '') + '" title="Vote to remove" ' +
+            'onclick="window.qrKick(' + m.userId + ')">' + (k ? k.votes + '/' + k.needed : '⋯') + '</button>'
+        : '') +
+      '<div class="qr-av"' + (m.avatar_url ? ' style="background-image:url(\'' + esc(m.avatar_url) + '\')"' : '') + '>' +
+        (m.avatar_url ? '' : esc(String(m.username || '?').charAt(0).toUpperCase())) +
+      '</div>' +
+      '<div class="qr-nm">' + esc(mine ? 'You' : (m.username || 'Player')) + '</div>' +
+      '<div class="qr-tags">' +
+        (m.isOwner ? '<span class="qr-tag lead">Leader</span>' : '') +
+        (mine ? '<span class="qr-tag you">You</span>' : '') +
+        (m.pingMs != null
+          ? '<span class="qr-tag ping' + pingClass(m.pingMs) + '">' + m.pingMs + 'ms</span>' : '') +
+        (m.role ? '<span class="qr-tag role">' + esc(roleName(m.role)) + '</span>' : '') +
+        (m.skill ? '<span class="qr-tag">' + esc(String(m.skill).toUpperCase()) + '</span>' : '') +
+        (muted ? '<span class="qr-tag off">Muted</span>' : '') +
+        (away ? '<span class="qr-tag">No voice</span>' : '') +
+      '</div>' +
+    '</div>';
+  }
+
+  function stageHTML(){
+    var size = Math.max(seated().length, (room && room.players) || 2);
+    var list = [];
+    for (var i = 0; i < size; i++) list.push(seated()[i] || null);
+
+    /* Whoever is sharing owns the middle of the room. */
+    var sharer = null;
+    seated().forEach(function (m){ if (!sharer && V.streamFor(m.userId)) sharer = m; });
+
+    var seats = '<div class="qr-seats' + (sharer ? ' strip' : '') + '">' +
+      list.map(function (m, i){ return seatHTML(m, i, !!sharer); }).join('') + '</div>';
+
+    var free = Math.max(0, ((room && room.players) || 2) - seated().length);
+    var hint = free
+      ? '<div class="qr-hint">Waiting for <b>' + free + ' more</b> · ' +
+        'you can talk and set up while the seat fills</div>'
+      : '<div class="qr-hint">Everyone is here · share your screen to show the lobby</div>';
+
+    if (!sharer) return seats + hint + netWarnHTML();
+
+    var me = ME();
+    return '<div class="qr-share">' +
+        '<video id="qrShareV" autoplay playsinline muted></video>' +
+        '<div class="qr-share-who">' +
+          esc((me && sharer.userId === me.id) ? 'You are sharing' : sharer.username + ' is sharing') +
+        '</div>' +
+      '</div>' + seats;
+  }
+
+  /* Said once, at the bottom of the rail, rather than repeated inside
+     every card it happens to affect. Two identical paragraphs stacked on
+     each other read as a fault in the page, not as one missing feature. */
+  function degradedHTML(){
+    return '<div class="qr-card">' +
+      '<div class="qr-h">Not yet available</div>' +
+      '<div class="qr-note">Table votes and the game lobby code arrive with ' +
+        'the next server update. Seats, voice and screenshare work now.</div>' +
+    '</div>';
+  }
+
+  function codeCardHTML(){
+    if (roomApi === false) return '';
+    var lead = isLeader();
+    var code = room && room.lobbyCode;
+
+    if (code && !codeEditing){
+      return '<div class="qr-card hot">' +
+        '<div class="qr-h">Game lobby' +
+          (lead ? '<button class="sp qr-tpl" style="all:unset;cursor:pointer;color:var(--text-3);' +
+                  'font-size:9px;letter-spacing:1.2px" onclick="window.qrEditCode()">CHANGE</button>' : '') +
+        '</div>' +
+        '<button class="qr-code" onclick="window.qrCopyCode()">' +
+          '<b>' + esc(code) + '</b><span>Copy</span>' +
+        '</button>' +
+        (room.lobbyNote ? '<div class="qr-note" style="margin-top:8px">' + esc(room.lobbyNote) + '</div>' : '') +
+      '</div>';
+    }
+    if (!lead){
+      return '<div class="qr-card">' +
+        '<div class="qr-h">Game lobby</div>' +
+        '<div class="qr-note">The leader has not posted a code yet. When they do it appears here for everyone.</div>' +
+      '</div>';
+    }
+    return '<div class="qr-card">' +
+      '<div class="qr-h">Game lobby</div>' +
+      '<input class="qr-in" id="qrCodeIn" placeholder="Invite code or link" ' +
+        'value="' + esc((room && room.lobbyCode) || '') + '" spellcheck="false">' +
+      '<input class="qr-in" id="qrNoteIn" placeholder="Anything else? (optional)" ' +
+        'value="' + esc((room && room.lobbyNote) || '') + '" maxlength="120">' +
+      '<button class="qr-b" style="width:100%;justify-content:center" onclick="window.qrPostCode()">' +
+        'Post to the table</button>' +
+    '</div>';
+  }
+
+  function pollCardHTML(){
+    if (roomApi === false) return '';
+    var p = livePoll();
+    if (p){
+      var left = Math.max(0, new Date(p.closesAt) - Date.now());
+      var total = Math.max(1, p.votes);
+      return '<div class="qr-card hot">' +
+        '<div class="qr-h">' + (p.kind === 'kick' ? 'Vote to remove' : 'Table vote') +
+          '<span class="sp" id="qrPollLeft">' + clock(left) + '</span></div>' +
+        '<div class="qr-q">' + esc(p.question) + '</div>' +
+        '<div class="qr-meta">' + esc(p.author || '') + ' asked · ' +
+          p.needed + ' of ' + Math.max(p.needed, seated().length) + ' to carry it</div>' +
+        p.options.map(function (o, i){
+          var n = p.tally[i] || 0;
+          return '<button class="qr-opt' + (p.myChoice === i ? ' mine' : '') + '" ' +
+            'onclick="window.qrVote(' + p.id + ',' + i + ')">' +
+            '<i class="qr-fill" style="width:' + Math.round((n / total) * 100) + '%"></i>' +
+            '<span class="qr-opt-t">' + esc(o) + '</span>' +
+            '<span class="qr-opt-n">' + n + '</span>' +
+          '</button>';
+        }).join('') +
+      '</div>';
+    }
+
+    var done = ((room && room.polls) || []).filter(function (x){ return x.closed && x.result; })[0];
+    return '<div class="qr-card">' +
+      '<div class="qr-h">Ask the table</div>' +
+      (done ? '<div class="qr-note" style="margin-bottom:10px">Last vote: <b style="color:#fff">' +
+              esc(done.question) + '</b> → ' + esc(done.result) + '</div>' : '') +
+      '<div class="qr-tpl">' +
+        '<button onclick="window.qrAsk(\'ready\')">Ready check</button>' +
+        '<button onclick="window.qrAsk(\'again\')">One more?</button>' +
+        '<button onclick="window.qrAsk(\'switch\')">Switch game</button>' +
+        '<button onclick="window.qrAsk(\'custom\')">Ask something…</button>' +
+      '</div>' +
+    '</div>';
+  }
+
+  function chatHTML(){
+    var msgs = (room && room.chat) || [];
+    var me = ME();
+    return '<div class="qr-chat">' +
+      '<div class="qr-chat-h">Table chat</div>' +
+      '<div class="qr-msgs" id="qrMsgs">' +
+        (msgs.length
+          ? msgs.map(function (m){
+              var mine = me && m.userId === me.id;
+              return '<div class="qr-m">' +
+                '<div class="qr-m-av"' +
+                  (m.avatar ? ' style="background-image:url(\'' + esc(m.avatar) + '\')"' : '') + '>' +
+                  (m.avatar ? '' : esc(String(m.username || '?').charAt(0).toUpperCase())) +
+                '</div>' +
+                '<div class="qr-m-b">' +
+                  '<div class="qr-m-n">' + esc(mine ? 'You' : (m.username || 'Player')) +
+                    '<i>' + hhmm(new Date(m.at).getTime()) + '</i></div>' +
+                  '<div class="qr-m-t">' + linkify(m.body) + '</div>' +
+                '</div>' +
+              '</div>';
+            }).join('')
+          : '<div class="qr-empty">Nothing said yet. Codes, links and names ' +
+            'are easier typed than spoken.</div>') +
+      '</div>' +
+      '<div class="qr-chat-f">' +
+        '<textarea class="qr-chat-i" id="qrChatIn" rows="2" ' +
+          'placeholder="Say something · Enter to send"></textarea>' +
+      '</div>' +
+    '</div>';
+  }
+
+  /* Anything that looks like a code or a link is worth one press rather
+     than a careful selection with the mouse. */
+  function linkify(t){
+    var out = esc(t);
+    out = out.replace(/(https?:\/\/[^\s]+)/g,
+      '<code onclick="window.qrCopy(this)">$1</code>');
+    out = out.replace(/\b([A-Z0-9]{4,8}(?:-[A-Z0-9]{3,6}){1,3})\b/g,
+      '<code onclick="window.qrCopy(this)">$1</code>');
+    return out;
+  }
+
+  function roleCardHTML(){
+    /* Claiming a role needs the endpoint that stores it; offering the
+       buttons without it would take a press and lose it. */
+    if (roomApi === false) return '';
+    var set = roleSet();
+    if (!set) return '';
+    var me = ME();
+    var mineRole = (seated().find(function (m){ return me && m.userId === me.id; }) || {}).role;
+    var takenBy = {};
+    seated().forEach(function (m){ if (m.role) takenBy[m.role] = m.username; });
+
+    return '<div class="qr-card">' +
+      '<div class="qr-h">Your role</div>' +
+      '<div class="qr-roles">' +
+        set.map(function (r){
+          var who = takenBy[r[0]];
+          var mine = mineRole === r[0];
+          var taken = who && !mine;
+          return '<button class="qr-role' + (mine ? ' mine' : '') + (taken ? ' taken' : '') + '" ' +
+            'type="button"' + (taken ? ' disabled' : '') +
+            ' onclick="window.qrRole(' + jsStr(r[0]) + ')">' + esc(r[1]) +
+            (who ? '<b>' + esc(mine ? 'You' : who) + '</b>' : '') +
+          '</button>';
+        }).join('') +
+      '</div>' +
+    '</div>';
+  }
+
+  /* Your friends, in the room, next to the seat they could fill. The
+     matcher can only send strangers; the likeliest person to take that
+     seat is someone you already know is online. */
+  var friends = null, friendsAt = 0, invited = {};
+  async function loadFriends(){
+    if (friends && Date.now() - friendsAt < 60000) return;
+    var r = await _api('/friends').catch(function (){ return null; });
+    if (!Array.isArray(r)) return;
+    friends = r.filter(function (f){ return f.status === 'accepted'; })
+               .map(function (f){
+                 return { id: f.other_id, name: f.username, avatar: f.avatar_url };
+               });
+    friendsAt = Date.now();
+    paint();
+  }
+
+  function inviteCardHTML(){
+    if (roomApi === false) return '';
+    var free = Math.max(0, ((room && room.players) || 2) - seated().length);
+    if (!free) return '';
+    if (!friends) { loadFriends(); return ''; }
+
+    var here = {};
+    seated().forEach(function (m){ here[m.userId] = true; });
+    var list = friends.filter(function (f){ return !here[f.id]; }).slice(0, 8);
+    if (!list.length) return '';
+
+    return '<div class="qr-card">' +
+      '<div class="qr-h">Invite a friend<span class="sp">' + free + ' free</span></div>' +
+      list.map(function (f){
+        var sent = invited[f.id];
+        return '<div class="qr-row">' +
+          '<div class="qr-row-av"' +
+            (f.avatar ? ' style="background-image:url(\'' + esc(f.avatar) + '\')"' : '') + '>' +
+            (f.avatar ? '' : esc(String(f.name || '?').charAt(0).toUpperCase())) + '</div>' +
+          '<div class="qr-row-n">' + esc(f.name) + '</div>' +
+          '<button class="qr-mini' + (sent ? ' sent' : '') + '"' + (sent ? ' disabled' : '') +
+            ' onclick="window.qrInvite(' + f.id + ')">' + (sent ? 'Asked' : 'Invite') + '</button>' +
+        '</div>';
+      }).join('') +
+    '</div>';
+  }
+
+  function waitCardHTML(){
+    var w = (room && room.waitlist) || [];
+    if (!w.length) return '';
+    return '<div class="qr-card">' +
+      '<div class="qr-h">Waiting for a seat<span class="sp">' + w.length + '</span></div>' +
+      w.slice(0, 6).map(function (x, i){
+        return '<div class="qr-row">' +
+          '<div class="qr-row-av"' +
+            (x.avatar ? ' style="background-image:url(\'' + esc(x.avatar) + '\')"' : '') + '>' +
+            (x.avatar ? '' : esc(String(x.username || '?').charAt(0).toUpperCase())) + '</div>' +
+          '<div class="qr-row-n">' + esc(x.username) +
+            '<span>' + (i === 0 ? 'Next in line' : '#' + (i + 1) + ' in line') + '</span></div>' +
+        '</div>';
+      }).join('') +
+      '<div class="qr-note" style="margin-top:8px">They take the next seat that opens, ' +
+        'in order. Nobody has to be watching for it.</div>' +
+    '</div>';
+  }
+
+  /* Rating is offered for the people you actually sat with, and only
+     once there is something to judge -- a thumbs-up thirty seconds in is
+     just noise in the trust score. */
+  function rateCardHTML(){
+    if (roomApi === false) return '';
+    var me = ME();
+    var others = seated().filter(function (m){ return !me || m.userId !== me.id; });
+    if (!others.length) return '';
+    var started = room.startedAt ? new Date(room.startedAt).getTime() : Date.now();
+    if (Date.now() - started < 3 * 60000) return '';
+
+    var mine = (room && room.myRatings) || {};
+    return '<div class="qr-card">' +
+      '<div class="qr-h">How was it?</div>' +
+      others.map(function (m){
+        var v = mine[m.userId];
+        return '<div class="qr-row">' +
+          '<div class="qr-row-av"' +
+            (m.avatar_url ? ' style="background-image:url(\'' + esc(m.avatar_url) + '\')"' : '') + '>' +
+            (m.avatar_url ? '' : esc(String(m.username || '?').charAt(0).toUpperCase())) + '</div>' +
+          '<div class="qr-row-n">' + esc(m.username) + '</div>' +
+          '<div class="qr-rate">' +
+            '<button class="qr-mini up' + (v === 1 ? ' on' : '') + '" ' +
+              'onclick="window.qrRate(' + m.userId + ',1)" title="Good to play with">▲</button>' +
+            '<button class="qr-mini down' + (v === -1 ? ' on' : '') + '" ' +
+              'onclick="window.qrRate(' + m.userId + ',-1)" title="Would rather not again">▼</button>' +
+          '</div>' +
+        '</div>';
+      }).join('') +
+      '<div class="qr-note" style="margin-top:8px">Only they never see who said what. ' +
+        'This is what the trust filters in the queue read from.</div>' +
+    '</div>';
+  }
+
+  /* A table split across two continents is worth saying out loud before
+     everyone has loaded in, which is while it still costs nothing. */
+  function netWarnHTML(){
+    var pings = seated().map(function (m){ return m.pingMs; })
+                        .filter(function (x){ return x != null; });
+    if (pings.length < 2) return '';
+    var regions = {};
+    seated().forEach(function (m){ if (m.region) regions[m.region] = true; });
+    var spread = Math.max.apply(null, pings) - Math.min.apply(null, pings);
+    var names = Object.keys(regions);
+    if (spread < 120 && names.length < 2) return '';
+    return '<div class="qr-warn">' +
+      (names.length > 1
+        ? 'This table spans ' + esc(names.join(' and ')) + '. '
+        : '') +
+      'Round trips differ by about ' + Math.round(spread) + 'ms — ' +
+      'someone here will feel it.</div>';
+  }
+
+  function logCardHTML(){
+    if (!log.length) return '';
+    return '<div class="qr-card">' +
+      '<div class="qr-h">Table log</div>' +
+      '<div class="qr-log">' +
+        log.slice(0, 12).map(function (e){
+          return '<div class="qr-ev"><i>' + hhmm(e.t) + '</i><span>' + esc(e.text) + '</span></div>';
+        }).join('') +
+      '</div>' +
+    '</div>';
+  }
+
+  function barHTML(){
+    var inR = V.inRoom();
+    var muted = V.muted();
+    var sharing = V.sharing();
+    if (!inR){
+      return '<div class="qr-bar">' +
+        '<button class="qr-b on" onclick="window.qrJoinVoice()">🎧 Join voice</button>' +
+        '<div class="gap"></div>' +
+        '<button class="qr-b" onclick="window.qConvertToLobby()">Make it a lobby</button>' +
+        '<button class="qr-b danger" onclick="window.qrLeave()">Leave table</button>' +
+      '</div>';
+    }
+    return '<div class="qr-bar">' +
+      '<button class="qr-b' + (muted ? ' danger' : '') + '" onclick="window.qrMute()">' +
+        (muted ? '🔇 Unmute' : '🎤 Mute') + '</button>' +
+      '<button class="qr-b' + (sharing ? ' on' : '') + '" onclick="window.qrShare()">' +
+        (sharing ? '🖥 Stop sharing' : '🖥 Share screen') + '</button>' +
+      (roomApi === false ? '' :
+        '<button class="qr-b" onclick="window.qrAsk(\'ready\')">✔ Ready check</button>') +
+      (roomApi === false ? '' :
+        '<button class="qr-b" onclick="window.qrAsk(\'custom\')">📊 Vote</button>') +
+      (appId()
+        ? '<button class="qr-b" onclick="window.qrLaunch()">▶ Launch game</button>'
+        : '') +
+      '<button class="qr-b' + (clipOn ? ' on' : '') + '" onclick="window.qrClip()">' +
+        (clipOn ? '✂ Save last 30s' : '● Arm clip') + '</button>' +
+      (roomApi !== false && isLeader()
+        ? '<button class="qr-b' + (room && room.locked ? ' on' : '') + '" onclick="window.qrLock()">' +
+          (room && room.locked ? '🔒 Locked' : '🔓 Lock table') + '</button>'
+        : '') +
+      '<div class="gap"></div>' +
+      (roomApi === false ? '' :
+        '<button class="qr-b" onclick="window.qrBefriend()">＋ Keep the group</button>') +
+      (roomApi === false ? '' :
+        '<button class="qr-b" onclick="window.qrSchedule()">🗓 Again later</button>') +
+      '<button class="qr-b" onclick="window.qConvertToLobby()">Make it a lobby</button>' +
+      '<button class="qr-b danger" onclick="window.qrLeave()">Leave table</button>' +
+    '</div>';
+  }
+
+  /* Rebuilding innerHTML costs you whatever you were typing and
+     restarts the share element, so a full paint is refused while the
+     caret is inside the room. The light tick below keeps the moving
+     parts honest in the meantime. */
+  function typing(){
+    var a = document.activeElement;
+    return !!(a && a.closest && a.closest('#qRoom') &&
+              (a.tagName === 'INPUT' || a.tagName === 'TEXTAREA'));
+  }
+
+  /* The clock, the countdown and the speaking rings change several times
+     a second. None of them need the DOM rebuilt to say so. */
+  function tickUI(){
+    if (!room) return;
+    wireMeters();
+
+    var started = room.startedAt ? new Date(room.startedAt).getTime() : Date.now();
+    var c = document.getElementById('qrClock');
+    if (c) c.textContent = clock(Date.now() - started);
+
+    var p = livePoll();
+    var pl = document.getElementById('qrPollLeft');
+    if (p && pl) pl.textContent = clock(Math.max(0, new Date(p.closesAt) - Date.now()));
+
+    var me = ME();
+    Array.prototype.forEach.call(document.querySelectorAll('#qRoom .qr-seat[data-uid]'), function (el){
+      var uid = Number(el.getAttribute('data-uid'));
+      el.classList.toggle('talking', talking(uid));
+      var vm = V.members().find(function (x){ return x.userId === uid; });
+      var muted = V.inRoom()
+        ? ((me && uid === me.id) ? V.muted() : !!(vm && vm.muted))
+        : false;
+      el.classList.toggle('muted', muted);
+    });
+
+    /* A share that started or stopped DOES need the room rebuilt -- the
+       stage changes shape -- so that is the one thing the tick escalates. */
+    var sharer = null;
+    seated().forEach(function (m){ if (!sharer && V.streamFor(m.userId)) sharer = m; });
+    var showing = !!document.getElementById('qrShareV');
+    if (!!sharer !== showing) paint();
+  }
+
+  function paint(){
+    var el = host();
+    if (!el || !room) return;
+    if (typing()) return;
+    wireMeters();
+
+    var full = seated().length >= (room.players || 2);
+    var phase = room.lobbyCode ? 'In the game'
+              : (full ? 'Table is full' : 'Filling up');
+
+    /* The rank window widens on a schedule while a table is short. It is
+       the one thing the old searching screen said that the room would
+       otherwise lose. */
+    var win = '';
+    if (!full && room.state === 'searching'){
+      var age = Math.floor((Date.now() - new Date(room.startedAt).getTime()) / 1000);
+      var steps = [[0,'Exact rank only'],[30,'One rank either way'],
+                   [90,'Two ranks either way'],[180,'Any rank at all']];
+      var cur = steps[0];
+      steps.forEach(function (x){ if (age >= x[0]) cur = x; });
+      win = cur[1];
+    }
+    var started = room.startedAt ? new Date(room.startedAt).getTime() : Date.now();
+
+    el.innerHTML =
+      '<div class="qr-top">' +
+        '<div class="qr-art" style="' + (gameArt() ? 'background-image:url(\'' + esc(gameArt()) + '\')' : '') + '"></div>' +
+        '<div class="qr-id">' +
+          '<div class="qr-name">' + esc(gameName()) + '</div>' +
+          '<div class="qr-sub">' +
+            '<span class="qr-phase' + (full ? ' live' : '') + '">' + phase + '</span>' +
+            '<span>' + seated().length + '/' + (room.players || 2) + ' seated</span>' +
+            (win ? '<span>· ' + win + '</span>' : '') +
+            (room.locked ? '<span>· Locked</span>' : '') +
+          '</div>' +
+        '</div>' +
+        '<div class="qr-clock"><span id="qrClock">' + clock(Date.now() - started) +
+          '</span><span>At the table</span></div>' +
+      '</div>' +
+      '<div class="qr-main">' +
+        (roomApi === false ? '' : chatHTML()) +
+        '<div class="qr-stage">' + stageHTML() + '</div>' +
+        '<div class="qr-side">' +
+          roleCardHTML() + codeCardHTML() + pollCardHTML() +
+          inviteCardHTML() + waitCardHTML() + rateCardHTML() + logCardHTML() +
+          (roomApi === false ? degradedHTML() : '') +
+        '</div>' +
+      '</div>' +
+      barHTML();
+
+    var ci = document.getElementById('qrChatIn');
+    if (ci){
+      ci.onkeydown = function (e){
+        if (e.key === 'Enter' && !e.shiftKey){ e.preventDefault(); window.qrSend(); }
+      };
+    }
+    /* Pinned to the newest line, which is where a conversation is. */
+    var ms = document.getElementById('qrMsgs');
+    if (ms) ms.scrollTop = ms.scrollHeight;
+
+    /* The share element is filled after the paint: a MediaStream cannot
+       survive being written into innerHTML. */
+    var v = document.getElementById('qrShareV');
+    if (v){
+      var sharer = null;
+      seated().forEach(function (m){ if (!sharer && V.streamFor(m.userId)) sharer = m; });
+      var st = sharer ? V.streamFor(sharer.userId) : null;
+      if (st && v.srcObject !== st) v.srcObject = st;
+    }
+  }
+
+  /* ── Actions ──────────────────────────────────────────────────── */
+  window.qrJoinVoice = function (){ V.join(); };
+  window.qrMute  = function (){ V.tapMute();  setTimeout(paint, 60); };
+  window.qrShare = function (){ V.tapShare(); setTimeout(paint, 400); };
+
+  /* Leaving is three separate things and it only used to do two: drop
+     the voice room, tell the server your seat is free, and forget the
+     session id. Skipping the last one left the room polling a table you
+     had walked away from -- which is why the clock kept climbing. */
+  window.qrLeave = async function (){
+    var st = S();
+    var id = st && st.queueId;
+    V.leave();
+    if (id) await _api('/queue/' + id + '/cancel', { method:'POST' }).catch(function (){});
+    if (st){ st.queueId = null; st.searchStarted = 0; }
+    forId = null;
+    if (typeof window.qLeaveCall === 'function') window.qLeaveCall();
+    else if (typeof window.qCancelSearch === 'function') window.qCancelSearch();
+    close();
+  };
+
+  /* Steam is asked to run it; the app cannot know whether it is
+     installed, so the honest thing is to offer the link and let Steam
+     answer that question itself. */
+  window.qrLaunch = function (){
+    var id = appId();
+    if (!id) return;
+    try { window.location.href = 'steam://run/' + id; }
+    catch (e) { toast('Could not reach Steam', 'warn'); }
+    note('You launched the game.');
+  };
+
+  window.qrCopy = function (el){
+    try {
+      navigator.clipboard.writeText(el.textContent || '');
+      toast('Copied', 'success');
+    } catch (e) {}
+  };
+
+  window.qrRole = async function (role){
+    if (!room || !room.queueId) return;
+    var me = ME();
+    var mine = (seated().find(function (m){ return me && m.userId === me.id; }) || {}).role;
+    var next = (mine === role) ? '' : role;     // pressing your own role drops it
+    var r = await _api('/queue/' + room.queueId + '/role', {
+      method:'POST', headers:{ 'Content-Type':'application/json' },
+      body: JSON.stringify({ role: next })
+    }).catch(function (){ return null; });
+    if (!r || r.error) return toast((r && r.error) || 'Could not claim that role', 'warn');
+    note(next ? 'You took ' + roleName(next) + '.' : 'You gave up your role.');
+    load();
+  };
+
+  window.qrSend = async function (){
+    var el = document.getElementById('qrChatIn');
+    if (!el || !room || !room.queueId) return;
+    var body = el.value.trim();
+    if (!body) return;
+    el.value = '';
+    var r = await _api('/queue/' + room.queueId + '/chat', {
+      method:'POST', headers:{ 'Content-Type':'application/json' },
+      body: JSON.stringify({ body: body })
+    }).catch(function (){ return null; });
+    if (!r || r.error){
+      el.value = body;                     // never eat what someone typed
+      return toast((r && r.error) || 'Could not send that', 'warn');
+    }
+    load();
+  };
+
+  window.qrInvite = async function (uid){
+    if (!room || !room.queueId) return;
+    invited[uid] = true; paint();
+    var r = await _api('/queue/' + room.queueId + '/invite', {
+      method:'POST', headers:{ 'Content-Type':'application/json' },
+      body: JSON.stringify({ userId: uid })
+    }).catch(function (){ return null; });
+    if (!r || r.error){
+      invited[uid] = false; paint();
+      return toast((r && r.error) || 'Could not send that invite', 'warn');
+    }
+    var f = (friends || []).find(function (x){ return x.id === uid; });
+    note('You invited ' + ((f && f.name) || 'a friend') + ' to the free seat.');
+    toast('Invite sent', 'success');
+  };
+
+  window.qrRate = async function (uid, score){
+    if (!room || !room.queueId) return;
+    var r = await _api('/queue/' + room.queueId + '/rate', {
+      method:'POST', headers:{ 'Content-Type':'application/json' },
+      body: JSON.stringify({ targetUserId: uid, score: score })
+    }).catch(function (){ return null; });
+    if (!r || r.error) return toast((r && r.error) || 'Could not save that', 'warn');
+    load();
+  };
+
+  window.qrBefriend = async function (){
+    if (!room || !room.queueId) return;
+    var r = await _api('/queue/' + room.queueId + '/befriend', { method:'POST' })
+      .catch(function (){ return null; });
+    if (!r || r.error) return toast((r && r.error) || 'Could not send the requests', 'warn');
+    toast(r.sent ? 'Friend request sent to ' + r.sent +
+                   (r.sent === 1 ? ' player' : ' players')
+                 : 'You already know everyone here', 'success');
+    note('You asked to keep the group.');
+  };
+
+  /* Scheduling reuses the table you are already in: the game, the size
+     and the people. Asking all of that again would be asking you to
+     describe the room you are standing in. */
+  window.qrSchedule = async function (){
+    if (!room || !room.queueId) return;
+    var when = window.prompt(
+      'Same table, later. When?\n\nExamples: 20:00, tomorrow 21:30, +2h', '20:00');
+    if (!when) return;
+    var at = parseWhen(when);
+    if (!at) return toast('Could not read that time', 'warn');
+
+    var r = await _api('/queue/schedule', {
+      method:'POST', headers:{ 'Content-Type':'application/json' },
+      body: JSON.stringify({
+        game: room.game, players: room.players, skill: (S() || {}).skill,
+        startsAt: at.toISOString(),
+        userIds: seated().map(function (m){ return m.userId; }),
+      })
+    }).catch(function (){ return null; });
+    if (!r || r.error) return toast((r && r.error) || 'Could not schedule that', 'warn');
+    toast('Scheduled for ' + at.toLocaleString([], {
+      weekday:'short', hour:'2-digit', minute:'2-digit' }), 'success');
+    note('You scheduled this table for ' + at.toLocaleString([], {
+      hour:'2-digit', minute:'2-digit' }) + '.');
+  };
+
+  /* Deliberately forgiving about how a time is written: people type what
+     they would say. */
+  function parseWhen(t){
+    t = String(t).trim().toLowerCase();
+    var rel = t.match(/^\+\s*(\d+)\s*(m|min|mins|h|hr|hrs|hour|hours)$/);
+    if (rel){
+      var n = parseInt(rel[1], 10);
+      var mins = /^m/.test(rel[2]) ? n : n * 60;
+      return new Date(Date.now() + mins * 60000);
+    }
+    var tom = /tomorrow|tmr/.test(t);
+    var hm = t.match(/(\d{1,2})[:.](\d{2})/) || t.match(/\b(\d{1,2})\s*(am|pm)\b/);
+    if (!hm) return null;
+    var h, m;
+    if (hm[2] === 'am' || hm[2] === 'pm'){
+      h = parseInt(hm[1], 10) % 12; m = 0;
+      if (hm[2] === 'pm') h += 12;
+    } else { h = parseInt(hm[1], 10); m = parseInt(hm[2], 10); }
+    if (isNaN(h) || isNaN(m) || h > 23 || m > 59) return null;
+    var d = new Date();
+    d.setSeconds(0, 0); d.setHours(h, m);
+    if (tom) d.setDate(d.getDate() + 1);
+    /* A time already gone today means tomorrow -- nobody schedules
+       something for four hours ago. */
+    else if (d.getTime() < Date.now()) d.setDate(d.getDate() + 1);
+    return d;
+  }
+
+  /* ── Clipping ─────────────────────────────────────────────────
+     Rolling, and armed by hand. Recording a call the moment it opens,
+     without anyone saying so, is not a feature -- it is a surprise. The
+     buffer never leaves this machine until you save it. */
+  var clipOn = false, clipRec = null, clipBuf = [];
+  var CLIP_MS = 30000;
+
+  function clipStream(){
+    var tracks = [];
+    var share = vcScreen();
+    if (share) share.getVideoTracks().forEach(function (t){ tracks.push(t); });
+    var mic = vcMic();
+    if (mic) mic.getAudioTracks().forEach(function (t){ tracks.push(t); });
+    var pc = vcPeerMap();
+    Object.keys(pc).forEach(function (id){
+      var rs = (pc[id].getReceivers && pc[id].getReceivers()) || [];
+      rs.forEach(function (r){ if (r.track && r.track.kind === 'audio') tracks.push(r.track); });
+    });
+    return tracks.length ? new MediaStream(tracks) : null;
+  }
+
+  window.qrClip = function (){
+    if (clipOn) return saveClip();
+    var st = clipStream();
+    if (!st) return toast('Join voice or start a share first', 'warn');
+    try {
+      clipRec = new MediaRecorder(st);
+      clipBuf = [];
+      clipRec.ondataavailable = function (e){
+        if (!e.data || !e.data.size) return;
+        clipBuf.push({ at: Date.now(), blob: e.data });
+        /* Only the last half minute is kept. A buffer that grew all
+           session would be a recording, which is not what was agreed. */
+        var cut = Date.now() - CLIP_MS - 1500;
+        while (clipBuf.length > 1 && clipBuf[0].at < cut) clipBuf.shift();
+      };
+      clipRec.start(1000);
+      clipOn = true;
+      note('Clipping armed — the last 30 seconds are kept on this machine.');
+      toast('Clip armed · the last 30s is kept locally', 'success');
+      paint();
+    } catch (e) { toast('This build cannot record', 'warn'); }
+  };
+
+  function saveClip(){
+    try {
+      var blob = new Blob(clipBuf.map(function (c){ return c.blob; }),
+                          { type: (clipRec && clipRec.mimeType) || 'video/webm' });
+      var url = URL.createObjectURL(blob);
+      var a = document.createElement('a');
+      a.href = url;
+      a.download = 'lobby-' + (gameName() || 'table').replace(/[^\w]+/g, '-').toLowerCase() +
+                   '-' + new Date().toISOString().slice(11, 19).replace(/:/g, '') + '.webm';
+      document.body.appendChild(a); a.click(); a.remove();
+      setTimeout(function (){ URL.revokeObjectURL(url); }, 4000);
+      note('You saved a clip.');
+      toast('Clip saved', 'success');
+    } catch (e) { toast('Could not save that clip', 'warn'); }
+    stopClip();
+    paint();
+  }
+  function stopClip(){
+    try { if (clipRec && clipRec.state !== 'inactive') clipRec.stop(); } catch (e) {}
+    clipRec = null; clipBuf = []; clipOn = false;
+  }
+
+  window.qrLock = async function (){
+    if (!room) return;
+    var next = !room.locked;
+    var r = await _api('/queue/' + room.queueId + '/lock', {
+      method:'POST', headers:{ 'Content-Type':'application/json' },
+      body: JSON.stringify({ locked: next })
+    }).catch(function (){ return null; });
+    if (!r || r.error) return toast((r && r.error) || 'Could not lock the table', 'warn');
+    note(next ? 'Table locked — no one else will be sent here.' : 'Table unlocked.');
+    load();
+  };
+
+  window.qrEditCode = function (){ codeEditing = true; paint(); };
+
+  window.qrPostCode = async function (){
+    if (!room) return;
+    var c = document.getElementById('qrCodeIn');
+    var n = document.getElementById('qrNoteIn');
+    var r = await _api('/queue/' + room.queueId + '/code', {
+      method:'POST', headers:{ 'Content-Type':'application/json' },
+      body: JSON.stringify({ code: c ? c.value : '', note: n ? n.value : '' })
+    }).catch(function (){ return null; });
+    if (!r || r.error) return toast((r && r.error) || 'Could not post the code', 'warn');
+    codeEditing = false;
+    note('You posted the game lobby code.');
+    toast('Code posted to the table', 'success');
+    load();
+  };
+
+  window.qrCopyCode = function (){
+    if (!room || !room.lobbyCode) return;
+    try {
+      navigator.clipboard.writeText(room.lobbyCode);
+      toast('Lobby code copied', 'success');
+    } catch (e) { toast('Copy failed — select it by hand', 'warn'); }
+  };
+
+  /* Templates for the three things every group argues about, and a free
+     question for everything else. */
+  window.qrAsk = async function (kind){
+    if (!room) return;
+    var q, opts;
+    if (kind === 'ready'){ q = 'Ready to start?'; opts = ['Ready', 'Two minutes']; }
+    else if (kind === 'again'){ q = 'One more game?'; opts = ['One more', 'I am done']; }
+    else if (kind === 'switch'){ q = 'Switch to something else?'; opts = ['Switch', 'Stay here']; }
+    else {
+      q = window.prompt('Ask the table:', '');
+      if (!q) return;
+      opts = ['Yes', 'No'];
+    }
+    var r = await _api('/queue/' + room.queueId + '/poll', {
+      method:'POST', headers:{ 'Content-Type':'application/json' },
+      body: JSON.stringify({ question: q, options: opts, kind: kind === 'ready' ? 'ready' : 'poll' })
+    }).catch(function (){ return null; });
+    if (!r || r.error) return toast((r && r.error) || 'Could not open the vote', 'warn');
+    load();
+  };
+
+  window.qrVote = async function (pollId, choice){
+    if (!room) return;
+    var r = await _api('/queue/' + room.queueId + '/poll/' + pollId + '/vote', {
+      method:'POST', headers:{ 'Content-Type':'application/json' },
+      body: JSON.stringify({ choice: choice })
+    }).catch(function (){ return null; });
+    if (!r || r.error) return toast((r && r.error) || 'Could not vote', 'warn');
+    if (r.result) note('The table decided: ' + r.result);
+    if (r.acted === 'locked') note('Everyone is ready — the table locked itself.');
+    load();
+  };
+
+  /* A kick is a vote like any other, and it says so out loud: the count
+     is on the seat, and the person it concerns can see it too. Removing
+     someone quietly is how a table becomes somebody's private club. */
+  window.qrKick = async function (uid){
+    if (!room) return;
+    var who = seated().find(function (m){ return m.userId === uid; });
+    if (!who) return;
+    if (!window.confirm('Vote to remove ' + who.username + ' from this table?')) return;
+    var r = await _api('/queue/' + room.queueId + '/vote-kick', {
+      method:'POST', headers:{ 'Content-Type':'application/json' },
+      body: JSON.stringify({ targetUserId: uid })
+    }).catch(function (){ return null; });
+    if (!r || r.error) return toast((r && r.error) || 'Could not register the vote', 'warn');
+    note(r.passed ? who.username + ' was removed by a majority.'
+                  : 'Vote to remove ' + who.username + ': ' + r.votes + ' of ' + r.needed + '.');
+    load();
+  };
+
+  /* ── Open / close ─────────────────────────────────────────────── */
+  function open(){
+    if (timer) return;
+    room = null; log = []; seen = {}; lastPoll = 0; codeEditing = false;
+    /* The opening line of the log is written when the session id is first
+       seen, not here -- open() runs again on every view change, and this
+       greeted you twice for one sitting. */
+    load();
+    timer = setInterval(load, POLL_MS);
+    reportNet();
+    netT = setInterval(reportNet, 60000);
+    /* The clock and the speaking rings move between polls, so the paint
+       runs on its own faster beat. */
+    uiTimer = setInterval(tickUI, 400);
+    /* Voice is offered, not forced: joining a call the instant a match
+       lands, with a live mic, is how people get caught mid-sentence. */
+  }
+  function close(){
+    if (!timer && !document.getElementById('qRoom')) return;
+    clearInterval(timer); clearInterval(uiTimer); clearInterval(netT);
+    timer = uiTimer = netT = null;
+    /* A rolling buffer must not outlive the room it was recording. */
+    stopClip();
+    var el = document.getElementById('qRoom');
+    if (el){ showKids(el.parentElement, true); el.remove(); }
+    /* Display is never touched on the views themselves, only on their
+       children, so nothing here has to guess what _qShowView wanted. */
+    meters = {}; room = null;
+  }
+
+  /* Wrapping _qShowView was not enough: the table view is reached from
+     several places (a match landing, taking a seat at a listed table,
+     reopening the panel mid-search) and not all of them go through it.
+     Watching the two conditions that actually define "you are at a
+     table" -- a queue id, and a table view on screen -- catches every
+     one of those routes, including ones added later. */
+  function watch(){
+    var s = S();
+    /* A queue id arrives a round trip after you sit down. Requiring one
+       to open the room meant the first seconds -- the ones you spend
+       looking at the screen -- still showed the old view. */
+    var at = !!s && (s.view === 'searching' || s.view === 'in-call') && !!activeView();
+    if (at) open();
+    else close();
+  }
+  setInterval(watch, 500);
+  watch();
+
+  /* Diagnostic, not decoration: when the room does not appear, this is
+     the difference between reading the code and knowing the answer. */
+  /* Shutting the window is the commonest way people leave, and it used
+     to tell the server nothing at all -- so a seat stayed occupied by
+     somebody who had gone home, and the table went on counting. keepalive
+     is what lets the request outlive the page that sent it. */
+  function leaveOnExit(){
+    var st = S();
+    var id = st && st.queueId;
+    if (!id) return;
+    try {
+      var base = (typeof AUTH_URL !== 'undefined') ? AUTH_URL : '';
+      /* authHeaders is the top-level one; the authH used elsewhere lives
+         inside another module and is not reachable from here. */
+      var h = (typeof authHeaders === 'function') ? authHeaders() : {};
+      fetch(base + '/queue/' + id + '/cancel', {
+        method: 'POST', headers: h, keepalive: true,
+      }).catch(function (){});
+    } catch (e) {}
+  }
+  window.addEventListener('beforeunload', leaveOnExit);
+  /* Electron can close without a beforeunload on some paths, and a tab
+     going to the background for good fires this one instead. */
+  window.addEventListener('pagehide', leaveOnExit);
+
+  window.QTable = {
+    open: open, close: close, paint: paint, reload: load,
+    why: function (){
+      var s = S();
+      return {
+        view: s && s.view, queueId: s && s.queueId,
+        mounted: !!document.getElementById('qRoom'),
+        mountedIn: (document.getElementById('qRoom') || {}).parentElement &&
+                   document.getElementById('qRoom').parentElement.id,
+        activeView: (activeView() || {}).id || null,
+        hasRoomApi: roomApi, hasData: !!room, ticking: !!timer,
+        voice: { in: V.inRoom(), id: V.id(), muted: V.muted(), sharing: V.sharing() },
+      };
+    },
+  };
 })();
 </script>
 

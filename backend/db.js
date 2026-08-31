@@ -762,6 +762,146 @@ async function initDb() {
       );
     `);
 
+    // A table decides things out loud. One row per question asked at a
+    // table -- "what are we playing", "ready?", "one more?" -- and one
+    // row per vote cast, with the UNIQUE doing the same job it does for
+    // kicks: you get one voice, not as many as you can click.
+    //
+    // kind separates a plain poll from one with consequences. A kick
+    // still runs through queue_votes, which already enforces the
+    // majority; a poll of kind 'kick' is the visible face of it, so
+    // nobody is removed by a mechanism the table cannot see.
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS queue_polls (
+        id         SERIAL PRIMARY KEY,
+        session_id INTEGER REFERENCES queue_sessions(id) ON DELETE CASCADE,
+        author_id  INTEGER REFERENCES users(id) ON DELETE CASCADE,
+        kind       TEXT NOT NULL DEFAULT 'poll',
+        question   TEXT NOT NULL,
+        options    JSONB NOT NULL DEFAULT '[]'::jsonb,
+        target_id  INTEGER REFERENCES users(id) ON DELETE CASCADE,
+        closes_at  TIMESTAMPTZ NOT NULL DEFAULT NOW() + INTERVAL '60 seconds',
+        closed     BOOLEAN DEFAULT FALSE,
+        result     TEXT DEFAULT NULL,
+        created_at TIMESTAMPTZ DEFAULT NOW()
+      );
+    `);
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS queue_poll_votes (
+        id         SERIAL PRIMARY KEY,
+        poll_id    INTEGER REFERENCES queue_polls(id) ON DELETE CASCADE,
+        voter_id   INTEGER REFERENCES users(id) ON DELETE CASCADE,
+        choice     INTEGER NOT NULL,
+        created_at TIMESTAMPTZ DEFAULT NOW(),
+        UNIQUE(poll_id, voter_id)
+      );
+    `);
+    await pool.query(`CREATE INDEX IF NOT EXISTS idx_queue_polls_session ON queue_polls(session_id);`).catch(() => {});
+
+    // The invite code for the actual game lobby, posted once and copied
+    // by everyone. It lives on the session so a member who arrives late,
+    // or reloads, gets it without asking anyone to paste it again.
+    // locked closes the door on a table that is short-handed but happy.
+    await pool.query(`ALTER TABLE queue_sessions ADD COLUMN IF NOT EXISTS lobby_code TEXT DEFAULT NULL;`).catch(() => {});
+    await pool.query(`ALTER TABLE queue_sessions ADD COLUMN IF NOT EXISTS lobby_note TEXT DEFAULT NULL;`).catch(() => {});
+    await pool.query(`ALTER TABLE queue_sessions ADD COLUMN IF NOT EXISTS locked BOOLEAN DEFAULT FALSE;`).catch(() => {});
+
+    // What was said at the table. Voice is the main channel, but a
+    // lobby code, a tracker link or a name is something you paste and
+    // read back -- reading a code out loud over a mic is the worst
+    // possible way to transmit it. Short-lived: the table is.
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS queue_messages (
+        id         SERIAL PRIMARY KEY,
+        session_id INTEGER REFERENCES queue_sessions(id) ON DELETE CASCADE,
+        user_id    INTEGER REFERENCES users(id) ON DELETE CASCADE,
+        body       TEXT NOT NULL,
+        created_at TIMESTAMPTZ DEFAULT NOW()
+      );
+    `);
+    await pool.query(`CREATE INDEX IF NOT EXISTS idx_queue_messages_session ON queue_messages(session_id, created_at);`).catch(() => {});
+
+    // Which position each player has claimed. Games with roles turn
+    // "who is playing what" from an argument into a glance, and a
+    // table that knows its unfilled role can eventually ask the
+    // matcher for that one specifically.
+    await pool.query(`ALTER TABLE queue_members ADD COLUMN IF NOT EXISTS role TEXT DEFAULT NULL;`).catch(() => {});
+
+    // An invite to a specific empty seat. Kept in the database rather
+    // than pushed and forgotten: the most likely person to fill a seat
+    // is a friend who is three minutes from looking at their screen.
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS queue_invites (
+        id         SERIAL PRIMARY KEY,
+        session_id INTEGER REFERENCES queue_sessions(id) ON DELETE CASCADE,
+        from_id    INTEGER REFERENCES users(id) ON DELETE CASCADE,
+        to_id      INTEGER REFERENCES users(id) ON DELETE CASCADE,
+        status     TEXT DEFAULT 'pending',
+        created_at TIMESTAMPTZ DEFAULT NOW(),
+        UNIQUE(session_id, to_id)
+      );
+    `);
+    await pool.query(`CREATE INDEX IF NOT EXISTS idx_queue_invites_to ON queue_invites(to_id, status);`).catch(() => {});
+
+    // Standing behind a full table. A popular table currently turns
+    // people away at the door with nothing they can do about it.
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS queue_waitlist (
+        id         SERIAL PRIMARY KEY,
+        session_id INTEGER REFERENCES queue_sessions(id) ON DELETE CASCADE,
+        user_id    INTEGER REFERENCES users(id) ON DELETE CASCADE,
+        skill      TEXT DEFAULT NULL,
+        created_at TIMESTAMPTZ DEFAULT NOW(),
+        UNIQUE(session_id, user_id)
+      );
+    `);
+
+    // One score per person per table. This is what makes the trust
+    // filters in the queue bar mean anything -- they were filtering on
+    // data almost nobody was generating.
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS queue_ratings (
+        id         SERIAL PRIMARY KEY,
+        session_id INTEGER REFERENCES queue_sessions(id) ON DELETE CASCADE,
+        rater_id   INTEGER REFERENCES users(id) ON DELETE CASCADE,
+        target_id  INTEGER REFERENCES users(id) ON DELETE CASCADE,
+        score      INTEGER NOT NULL,
+        created_at TIMESTAMPTZ DEFAULT NOW(),
+        UNIQUE(session_id, rater_id, target_id)
+      );
+    `);
+    await pool.query(`CREATE INDEX IF NOT EXISTS idx_queue_ratings_target ON queue_ratings(target_id);`).catch(() => {});
+
+    // The right four people at the wrong hour is the commonest way a
+    // group fails. A scheduled table is the same table, agreed early.
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS queue_scheduled (
+        id         SERIAL PRIMARY KEY,
+        owner_id   INTEGER REFERENCES users(id) ON DELETE CASCADE,
+        game       TEXT,
+        players    INTEGER DEFAULT 2,
+        skill      TEXT DEFAULT NULL,
+        starts_at  TIMESTAMPTZ NOT NULL,
+        note       TEXT DEFAULT NULL,
+        created_at TIMESTAMPTZ DEFAULT NOW()
+      );
+    `);
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS queue_scheduled_members (
+        id           SERIAL PRIMARY KEY,
+        scheduled_id INTEGER REFERENCES queue_scheduled(id) ON DELETE CASCADE,
+        user_id      INTEGER REFERENCES users(id) ON DELETE CASCADE,
+        rsvp         TEXT DEFAULT 'invited',
+        UNIQUE(scheduled_id, user_id)
+      );
+    `);
+
+    // Self-reported, because only the client can measure its own round
+    // trip. Shown so a table can see it straddles two regions BEFORE
+    // everyone has loaded in, which is when it still costs nothing.
+    await pool.query(`ALTER TABLE queue_members ADD COLUMN IF NOT EXISTS ping_ms INTEGER DEFAULT NULL;`).catch(() => {});
+    await pool.query(`ALTER TABLE queue_members ADD COLUMN IF NOT EXISTS region TEXT DEFAULT NULL;`).catch(() => {});
+
     // Tournament Invites (for invite-only tournaments)
     await pool.query(`
       CREATE TABLE IF NOT EXISTS tournament_invites (
