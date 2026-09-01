@@ -3465,6 +3465,19 @@ app.post("/tournaments/create", requireAuth, async (req, res) => {
   const resolvedJoinType = validJoinTypes.includes(joinType) ? joinType : 'open';
 
   try {
+    /* The cap is enforced HERE, not only in the page that opens the form.
+       It had lived entirely in openCreateTournament, so posting to this
+       route directly ignored it — which is how an account ends up with
+       eleven active tournaments against a free tier of three. */
+    const allow = await tournamentAllowance(req.userId);
+    if (!allow.mayCreate) {
+      return res.status(403).json({
+        error: "You are hosting " + allow.active + " of " + allow.cap +
+               " tournaments. Finish or cancel one, or unlock unlimited.",
+        cap: allow.cap, active: allow.active,
+      });
+    }
+
     /* Minted before the insert so the unique index is the thing that
        decides, and a collision fails the request rather than silently
        handing two tournaments the same code. */
@@ -5923,15 +5936,59 @@ app.get("/me/tournaments", requireAuth, async (req, res) => {
   }
 });
 
+// How many live tournaments a free account may host at once. The client
+// shows this; the server is what enforces it.
+const TOURNAMENT_FREE_CAP = Number(process.env.TOURNAMENT_FREE_CAP) || 3;
+
+/* The single answer to "may this person start another one", used by both
+   the counter the page shows and the route that creates. Returning the
+   REASON as well as the verdict is what lets the page say something
+   true — "unlimited, you are a dev" is a different message from "three
+   of three used". */
+async function tournamentAllowance(userId) {
+  const [{ isAdmin, isOverlord }, active, unlimited] = await Promise.all([
+    getUserFlags(userId),
+    pool.query(
+      `SELECT COUNT(*)::int AS n FROM tournaments
+        WHERE host_id = $1 AND status IN ('setup','registration','in-progress')`,
+      [userId]).then((r) => (r.rows[0] ? r.rows[0].n : 0)),
+    /* Ownership must come from the server's own record of what was
+       bought, never from the client, because the unlock is a paid
+       feature and a client that can claim it can have it for free.
+
+       There is NO purchase table on the server yet — cosmetics live only
+       in the client's `me.cosmetics`. So this resolves false for
+       everybody today, and the honest consequence is that the unlock
+       cannot currently be honoured server-side. That is the safe
+       direction to be wrong in: nobody is wrongly granted a paid
+       feature, and devs are exempt by flag regardless. When purchases
+       are recorded, this query is the one place to point at them. */
+    pool.query(
+      `SELECT 1 FROM user_cosmetics
+        WHERE user_id = $1 AND cosmetic_id = 'feature-tournaments-unlimited'
+        LIMIT 1`, [userId])
+      .then((r) => r.rows.length > 0)
+      .catch(() => false),   /* table does not exist yet -> not owned */
+  ]);
+
+  const dev = isAdmin || isOverlord;
+  const cap = (dev || unlimited) ? null : TOURNAMENT_FREE_CAP;
+  return {
+    active,
+    cap,
+    unlimited: cap === null,
+    reason: dev ? "dev" : unlimited ? "unlocked" : "free",
+    mayCreate: cap === null || active < cap,
+  };
+}
+
 // GET /me/tournaments/active-count — for the cap counter.
 app.get("/me/tournaments/active-count", requireAuth, async (req, res) => {
   try {
-    const r = await pool.query(
-      `SELECT COUNT(*)::int AS count FROM tournaments
-        WHERE host_id = $1 AND status IN ('setup','registration','in-progress')`,
-      [req.userId]
-    );
-    res.json({ count: r.rows[0] ? r.rows[0].count : 0 });
+    const a = await tournamentAllowance(req.userId);
+    /* `count` stays for older clients that only read that. */
+    res.json({ count: a.active, cap: a.cap, unlimited: a.unlimited,
+               reason: a.reason, mayCreate: a.mayCreate });
   } catch (e) {
     console.error("[me/tournaments/active-count]", e.message);
     res.json({ count: 0 });
