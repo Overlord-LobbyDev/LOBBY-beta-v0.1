@@ -82270,6 +82270,18 @@ body.q-max #queueOverlay{ padding:0 !important; }
 }
 /* Fullscreen paints the element itself, so it needs a ground of its own. */
 .tp-player:fullscreen{ max-width:none; max-height:none; border-radius:0; background:#000 }
+/* On a scheduled broadcast the poster is not clickable-looking on its
+   own, so it gets an affordance. */
+.tp-play{
+  position:absolute; top:50%; left:50%; transform:translate(-50%,-50%); z-index:2;
+  width:56px; height:56px; border-radius:50%; cursor:pointer; padding:0;
+  display:grid; place-content:center;
+  background:rgba(8,9,14,.72); border:1px solid rgba(255,255,255,.24); color:#fff;
+  transition:background .16s ease, transform .16s ease;
+}
+.tp-play:hover{ background:var(--tp); border-color:var(--tp); transform:translate(-50%,-50%) scale(1.06) }
+.tp-play:focus-visible{ outline:2px solid var(--tp); outline-offset:3px }
+@media (prefers-reduced-motion:reduce){ .tp-play{ transition:none } .tp-play:hover{ transform:translate(-50%,-50%) } }
 .tp-blank{ position:absolute; inset:0; display:grid; place-content:center; gap:8px; text-align:center; padding:24px }
 .tp-blank-i{
   width:46px; height:46px; border-radius:13px; display:grid; place-content:center; margin:0 auto;
@@ -82480,6 +82492,10 @@ body.q-max #queueOverlay{ padding:0 !important; }
     return m ? m[1] : null;
   }
   function embed(m){
+    /* A scheduled broadcast has no stream yet, and YouTube's player for
+       one spins forever rather than telling you so. Showing its poster
+       is instant and true; embedding it is neither. */
+    if (!m.live) return null;
     var mu = muted ? '1' : '0';
     var v = m.videoId || ytId(m.streamUrl) || ytId(m.url);
     if (v) return 'https://www.youtube.com/embed/' + v +
@@ -82521,7 +82537,11 @@ body.q-max #queueOverlay{ padding:0 !important; }
     host.innerHTML =
       (src ? '<iframe src="' + esc(src) + '" allow="autoplay; encrypted-media; picture-in-picture" ' +
              'allowfullscreen title="' + esc(m.name) + '"></iframe>'
-           : '<div class="tp-fill" style="background-image:url(\'' + esc(m.art || '') + '\')"></div>') +
+           : '<div class="tp-fill" style="background-image:url(\'' + esc(m.art || '') + '\')"></div>' +
+             '<button type="button" class="tp-play" onclick="window.tpPop()" ' +
+               'aria-label="Open on YouTube">' +
+               '<svg viewBox="0 0 24 24" width="22" height="22" fill="currentColor">' +
+               '<path d="M8 5v14l11-7z"/></svg></button>') +
       '<div class="tp-over">' +
         '<span class="tp-badge' + (m.live ? ' live' : '') + '">' +
           (m.live ? '<i></i>Live' : esc(m.tier || 'Next up')) + '</span>' +
@@ -82605,9 +82625,17 @@ body.q-max #queueOverlay{ padding:0 !important; }
     else if (el.requestFullscreen) el.requestFullscreen();
   };
 
+  /* Pops into its own always-on-top window, which is how a stream keeps
+     playing once this page stops rendering it. Falls back to the browser
+     when that bridge is not there. */
   window.tpPop = function (){
     var m = streams[idx];
     if (!m) return;
+    var vid = m.videoId || ytId(m.streamUrl) || ytId(m.url);
+    if (vid && window.electronAPI && window.electronAPI.streamPopOpen){
+      window.electronAPI.streamPopOpen(vid, m.name);
+      return;
+    }
     var href = m.url || m.streamUrl;
     if (!href) return;
     if (window.lobbyOpenExternal) window.lobbyOpenExternal(href);
@@ -82846,15 +82874,44 @@ body.q-max #queueOverlay{ padding:0 !important; }
     paintTop(); paintYours(); paintBrowse(); paintCal();
   }
 
+  /* Hiding an overlay does not stop an iframe inside it. Watch the
+     overlay's own class so this cannot be defeated by a call site that
+     forgets to tell us -- Escape, the hub manager cross-fade, and a
+     deep link all just change that class. */
+  function watchVisibility(){
+    var ov = $('tournamentsPage');
+    if (!ov || ov.__tpWatched) return;
+    ov.__tpWatched = true;
+    new MutationObserver(function (){
+      var open = ov.classList.contains('open');
+      if (open === !!ov.__tpOpen) return;   // only act on a real change
+      ov.__tpOpen = open;
+      if (open) { paintPlayer(); paintChannels(); }
+      else {
+        clearInterval(rot);
+        var host = $('tpPlayer');
+        /* Emptying the node is what actually stops the download. Setting
+           the src to about:blank leaves a frame behind; removing it does
+           not. */
+        if (host) host.innerHTML = '';
+      }
+    }).observe(ov, { attributes:true, attributeFilter:['class'] });
+  }
+
   window.openTournamentsPage = function (){
     if (typeof window.showOverlay !== 'function') return;
     window.showOverlay('tournamentsPage', function (){
       paintMake(); paintPlayer(); paintChannels(); paintYours(); paintBrowse(); paintCal(); paintTop();
     });
+    watchVisibility();
     load();
   };
   window.closeTournamentsPage = function (){
     clearInterval(rot);
+    /* Belt and braces with the observer: whichever runs first, the
+       player stops. */
+    var host = $('tpPlayer');
+    if (host) host.innerHTML = '';
     if (typeof window.hideOverlay === 'function') window.hideOverlay('tournamentsPage');
   };
 

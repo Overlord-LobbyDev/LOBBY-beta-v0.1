@@ -335,6 +335,56 @@ function savePipBounds() {
   }, 400);
 }
 
+// ── Stream pop-out ────────────────────────────────────────────────
+// The Tournaments page unmounts its player when you navigate away, so
+// nothing streams in the background. This is how you keep watching
+// anyway: the stream in its own always-on-top window.
+//
+// Deliberately bare webPreferences — it renders youtube.com and has no
+// business with a preload, node, or this app's session privileges.
+let streamPopWindow = null;
+
+ipcMain.handle("stream-pop-open", (event, { videoId, title }) => {
+  try {
+    /* Only ever a YouTube video id. Anything else and this becomes a
+       "open any URL in a chromeless always-on-top window" primitive,
+       which is not something to hand the renderer. */
+    if (!/^[\w-]{6,20}$/.test(String(videoId || ""))) return false;
+
+    if (streamPopWindow && !streamPopWindow.isDestroyed()) {
+      streamPopWindow.show();
+      streamPopWindow.focus();
+      streamPopWindow.loadURL("https://www.youtube.com/embed/" + videoId +
+        "?autoplay=1&playsinline=1&rel=0&modestbranding=1");
+      return true;
+    }
+
+    streamPopWindow = new BrowserWindow({
+      width: 480, height: 300,
+      minWidth: 280, minHeight: 180,
+      title: String(title || "Stream").slice(0, 90),
+      alwaysOnTop: true,
+      backgroundColor: "#000000",
+      autoHideMenuBar: true,
+      webPreferences: { contextIsolation: true, nodeIntegration: false },
+    });
+    streamPopWindow.setAspectRatio(16 / 9);
+    streamPopWindow.loadURL("https://www.youtube.com/embed/" + videoId +
+      "?autoplay=1&playsinline=1&rel=0&modestbranding=1");
+    streamPopWindow.on("closed", () => { streamPopWindow = null; });
+    return true;
+  } catch (e) {
+    console.error("[stream-pop-open]", e.message);
+    return false;
+  }
+});
+
+ipcMain.handle("stream-pop-close", () => {
+  if (streamPopWindow && !streamPopWindow.isDestroyed()) streamPopWindow.close();
+  streamPopWindow = null;
+  return true;
+});
+
 ipcMain.handle("vc-pip-open", (event, { channelName, width, height, from }) => {
   try {
   if (vcPipWindow && !vcPipWindow.isDestroyed()) {

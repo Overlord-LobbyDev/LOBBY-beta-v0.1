@@ -44,6 +44,11 @@ contextBridge.exposeInMainWorld("electronAPI", {
   closeVcPip: () => ipcRenderer.invoke("vc-pip-close"),
   updateVcPip: (data) => ipcRenderer.invoke("vc-pip-update", data),
   vcPipAction: (action) => ipcRenderer.invoke("vc-pip-action", action),
+  // Stream pop-out. Only a video id crosses the bridge; the main process
+  // builds the URL, so the renderer cannot ask for an arbitrary page in a
+  // chromeless always-on-top window.
+  streamPopOpen: (videoId, title) => ipcRenderer.invoke("stream-pop-open", { videoId, title }),
+  streamPopClose: () => ipcRenderer.invoke("stream-pop-close"),
   moveVcPipBy: (d) => ipcRenderer.send("vc-pip-move-by", d),
   vcPipExists: () => ipcRenderer.invoke("vc-pip-exists"),
   closeVcPipTo: (rect) => ipcRenderer.invoke("vc-pip-close-to", rect),
