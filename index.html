@@ -82148,7 +82148,15 @@ body.q-max #queueOverlay{ padding:0 !important; }
 
       <section class="tp-stage">
         <div class="tp-player" id="tpPlayer"></div>
-        <div class="tp-bar" id="tpBar"></div>
+        <div class="tp-now" id="tpBar"></div>
+        <div class="tp-find">
+          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+               stroke-width="2.4" stroke-linecap="round" aria-hidden="true">
+            <circle cx="11" cy="11" r="7"/><line x1="21" y1="21" x2="16.5" y2="16.5"/></svg>
+          <input id="tpFind" type="text" placeholder="Search what's on — game, event, organiser…"
+                 aria-label="Search streams" oninput="window.tpSearch(this.value)">
+          <button type="button" id="tpFindX" onclick="window.tpSearch('')" aria-label="Clear">&#10005;</button>
+        </div>
         <div class="tp-channels" id="tpChannels"></div>
       </section>
 
@@ -82230,20 +82238,24 @@ body.q-max #queueOverlay{ padding:0 !important; }
 /* The caption and controls live UNDER the player now. Drawing them over
    it put them exactly where YouTube draws its own, and one of the two
    always lost. */
-.tp-bar{
+/* .tp-now, NOT .tp-bar: that name was already the entrant progress bar
+   on a tournament card (height:3px, overflow:hidden, with .tp-bar span
+   painting a filled block). Reusing it meant the later rule won and
+   crushed this caption to three pixels with pink blocks inside it. */
+.tp-now{
   width:100%; max-width:900px; display:flex; align-items:center; gap:11px;
   padding:9px 12px; border-radius:10px;
   background:var(--tp-surf); border:1px solid var(--tp-line);
 }
-.tp-bar-b{ min-width:0; flex:1; display:grid; gap:2px }
-.tp-bar-t{
+.tp-now-b{ min-width:0; flex:1; display:grid; gap:2px }
+.tp-now-t{
   font-size:13px; font-weight:700; color:var(--text-1);
   overflow:hidden; text-overflow:ellipsis; white-space:nowrap;
 }
-.tp-bar-m{ font-size:11px; color:var(--text-3); display:flex; gap:6px; flex-wrap:wrap; align-items:center }
-.tp-bar-m b{ color:var(--text-2); font-weight:700 }
-.tp-bar-m i{ font-style:normal; opacity:.45 }
-@media (max-width:620px){ .tp-bar-m{ display:none } }
+.tp-now-m{ font-size:11px; color:var(--text-3); display:flex; gap:6px; flex-wrap:wrap; align-items:center }
+.tp-now-m b{ color:var(--text-2); font-weight:700 }
+.tp-now-m i{ font-style:normal; opacity:.45 }
+@media (max-width:620px){ .tp-now-m{ display:none } }
 .tp-badge{
   display:inline-flex; align-items:center; gap:5px; width:fit-content;
   flex:0 0 auto; padding:3px 8px;
@@ -82299,19 +82311,60 @@ body.q-max #queueOverlay{ padding:0 !important; }
 .tp-blank h3{ margin:0; font-size:15px; font-weight:800 }
 .tp-blank p{ margin:0; font-size:12px; color:var(--text-3); max-width:46ch; line-height:1.6 }
 
-.tp-channels{ display:flex; gap:8px; justify-content:center; flex-wrap:wrap; max-width:900px; width:100% }
-.tp-ch{
-  display:grid; grid-template-columns:52px minmax(0,1fr); gap:8px; align-items:center;
-  width:200px; padding:6px; border-radius:9px; cursor:pointer; text-align:left;
-  font-family:inherit; background:var(--tp-surf); border:1px solid var(--tp-line);
+/* Search ─────────────────────────────────────────────────────── */
+.tp-find{
+  position:relative; width:100%; max-width:900px; display:flex; align-items:center;
 }
-.tp-ch:hover{ background:rgba(255,255,255,.07) }
-.tp-ch.on{ border-color:var(--tp); background:var(--tp-dim) }
-.tp-ch-th{ width:52px; height:30px; border-radius:4px; background:#0d0e14 center/cover; position:relative }
-.tp-ch-th i{ position:absolute; left:3px; bottom:3px; width:5px; height:5px; border-radius:50%; background:var(--tp) }
-.tp-ch-b{ min-width:0; display:grid; gap:1px }
-.tp-ch-t{ font-size:11px; font-weight:700; color:var(--text-1); overflow:hidden; text-overflow:ellipsis; white-space:nowrap }
-.tp-ch-s{ font-size:9.5px; color:var(--text-3); overflow:hidden; text-overflow:ellipsis; white-space:nowrap }
+.tp-find svg{ position:absolute; left:11px; color:var(--text-3); pointer-events:none }
+.tp-find input{
+  width:100%; height:34px; border-radius:9px; padding:0 34px 0 32px;
+  background:var(--tp-surf); border:1px solid var(--tp-line);
+  color:var(--text-1); font-family:inherit; font-size:12.5px;
+}
+.tp-find input:focus{ outline:none; border-color:rgba(255,61,110,.55) }
+.tp-find button{
+  position:absolute; right:7px; width:22px; height:22px; border-radius:6px;
+  display:none; place-content:center; cursor:pointer; padding:0;
+  background:rgba(255,255,255,.07); border:1px solid var(--tp-line);
+  color:var(--text-2); font-size:10px; line-height:1;
+}
+.tp-find button:hover{ background:rgba(255,255,255,.14); color:var(--text-1) }
+
+/* Cards ──────────────────────────────────────────────────────── */
+.tp-channels{
+  width:100%; max-width:900px; display:grid; gap:9px;
+  grid-template-columns:repeat(auto-fill,minmax(164px,1fr));
+  max-height:246px; overflow-y:auto; padding:1px;
+  scrollbar-width:thin; scrollbar-color:rgba(255,255,255,.14) transparent;
+}
+.tp-channels::-webkit-scrollbar{ width:7px }
+.tp-channels::-webkit-scrollbar-thumb{ background:rgba(255,255,255,.14); border-radius:99px }
+.tp-card{
+  display:grid; grid-template-rows:auto auto; gap:0; padding:0; cursor:pointer;
+  text-align:left; font-family:inherit; overflow:hidden; border-radius:9px;
+  background:var(--tp-surf); border:1px solid var(--tp-line);
+  transition:border-color .15s ease, background .15s ease;
+}
+.tp-card:hover{ background:rgba(255,255,255,.07); border-color:rgba(255,255,255,.2) }
+.tp-card.on{ border-color:var(--tp); background:var(--tp-dim) }
+.tp-card:focus-visible{ outline:2px solid var(--tp); outline-offset:2px }
+@media (prefers-reduced-motion:reduce){ .tp-card{ transition:none } }
+.tp-card-th{
+  position:relative; aspect-ratio:16/9; background:#0d0e14 center/cover;
+  border-bottom:1px solid var(--tp-line);
+}
+.tp-card-live{
+  position:absolute; top:5px; left:5px; padding:2px 6px; border-radius:3px;
+  font-family:var(--font); font-size:7.5px; font-weight:900; letter-spacing:1px;
+  text-transform:uppercase; background:var(--tp); color:#fff;
+}
+.tp-card-b{ padding:7px 8px 8px; display:grid; gap:2px; min-width:0 }
+.tp-card-t{
+  font-size:11px; font-weight:700; color:var(--text-1); line-height:1.3;
+  display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical; overflow:hidden;
+}
+.tp-card-s{ font-size:9.5px; color:var(--text-2); overflow:hidden; text-overflow:ellipsis; white-space:nowrap }
+.tp-card-f{ font-size:9.5px; color:var(--text-3) }
 
 /* ── Columns ───────────────────────────────────────────────────── */
 .tp-cols{ display:grid; gap:20px; grid-template-columns:minmax(0,1fr) 300px; align-items:start }
@@ -82575,9 +82628,9 @@ body.q-max #queueOverlay{ padding:0 !important; }
     host.innerHTML =
       '<span class="tp-badge' + (m.live ? ' live' : '') + '">' +
         (m.live ? '<i></i>Live' : esc(m.tier || 'Next up')) + '</span>' +
-      '<span class="tp-bar-b">' +
-        '<span class="tp-bar-t">' + esc(m.name || '') + '</span>' +
-        (meta.length ? '<span class="tp-bar-m">' + meta.join('<i>\u00b7</i>') + '</span>' : '') +
+      '<span class="tp-now-b">' +
+        '<span class="tp-now-t">' + esc(m.name || '') + '</span>' +
+        (meta.length ? '<span class="tp-now-m">' + meta.join('<i>\u00b7</i>') + '</span>' : '') +
       '</span>' +
       '<span class="tp-ctl">' +
         (streams.length > 1
@@ -82597,22 +82650,57 @@ body.q-max #queueOverlay{ padding:0 !important; }
       '</span>';
   }
 
+  /* Everything that is on, as cards you can look through, rather than
+     the first four as a strip. Filtered by the search box above it. */
+  var findQ = '';
+
   function paintChannels(){
     var host = $('tpChannels');
     if (!host) return;
-    /* One stream needs no picker; two or more do. The arrows on the
-       player cover the same ground for people who never look down. */
-    if (streams.length < 2){ host.innerHTML = ''; return; }
-    host.innerHTML = streams.slice(0, 4).map(function (m, i){
-      var sub = m.live ? (m.viewers ? Number(m.viewers).toLocaleString() + ' watching' : 'Live')
-                       : (inText(m.startsAt) || m.game || 'Scheduled');
-      return '<button type="button" class="tp-ch' + (i === idx ? ' on' : '') + '" onclick="window.tpPick(' + i + ')">' +
-        '<span class="tp-ch-th" style="background-image:url(\'' + esc(m.art || '') + '\')">' +
-          (m.live ? '<i></i>' : '') + '</span>' +
-        '<span class="tp-ch-b"><span class="tp-ch-t">' + esc(m.name) + '</span>' +
-        '<span class="tp-ch-s">' + esc(sub) + '</span></span></button>';
+    var x = $('tpFindX');
+    if (x) x.style.display = findQ ? 'grid' : 'none';
+
+    var q = findQ.toLowerCase();
+    /* The index is carried on the card, because filtering changes
+       position and tpPick works on the real one. */
+    var rows = streams.map(function (m, i){ return { m:m, i:i }; }).filter(function (r){
+      if (!q) return true;
+      var hay = [r.m.name, r.m.game, r.m.organiser].join(' ').toLowerCase();
+      return hay.indexOf(q) >= 0;
+    });
+
+    if (!streams.length){ host.innerHTML = ''; return; }
+    if (!rows.length){
+      host.innerHTML = '<p class="tp-note" style="padding:6px 2px">Nothing on matches “' +
+        esc(findQ) + '”.</p>';
+      return;
+    }
+
+    host.innerHTML = rows.map(function (r){
+      var m = r.m;
+      var foot = m.live
+        ? (m.viewers ? Number(m.viewers).toLocaleString() + ' watching' : 'Live now')
+        : (inText(m.startsAt) || 'Scheduled');
+      var line = [m.game, m.organiser].filter(Boolean).join(' · ');
+      return '<button type="button" class="tp-card' + (r.i === idx ? ' on' : '') + '" ' +
+        'onclick="window.tpPick(' + r.i + ')" title="' + esc(m.name) + '">' +
+        '<span class="tp-card-th" style="background-image:url(\'' + esc(m.art || '') + '\')">' +
+          (m.live ? '<span class="tp-card-live">Live</span>' : '') +
+        '</span>' +
+        '<span class="tp-card-b">' +
+          '<span class="tp-card-t">' + esc(m.name) + '</span>' +
+          (line ? '<span class="tp-card-s">' + esc(line) + '</span>' : '') +
+          '<span class="tp-card-f">' + esc(foot) + '</span>' +
+        '</span></button>';
     }).join('');
   }
+
+  window.tpSearch = function (v){
+    findQ = String(v || '');
+    var el = $('tpFind');
+    if (el && el.value !== findQ) el.value = findQ;
+    paintChannels();
+  };
   var SPK_ON = '<svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" ' +
     'stroke-width="2" stroke-linecap="round" stroke-linejoin="round">' +
     '<path d="M11 5 6 9H2v6h4l5 4z"/><path d="M15.5 8.5a5 5 0 0 1 0 7"/>' +
