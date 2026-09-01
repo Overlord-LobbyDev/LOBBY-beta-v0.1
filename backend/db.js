@@ -539,6 +539,17 @@ async function initDb() {
       `CREATE INDEX IF NOT EXISTS idx_user_streams_user ON user_streams(user_id);`
     ).catch(() => {});
 
+    // The OAuth result. access_token / refresh_token are CREDENTIALS:
+    // never select them into anything a client reads, and never widen a
+    // query on this table to SELECT *. They are here so a link can be
+    // refreshed without sending the user back through consent.
+    for (const sql of [
+      "ALTER TABLE user_streams ADD COLUMN IF NOT EXISTS access_token     TEXT",
+      "ALTER TABLE user_streams ADD COLUMN IF NOT EXISTS refresh_token    TEXT",
+      "ALTER TABLE user_streams ADD COLUMN IF NOT EXISTS token_expires_at TIMESTAMPTZ",
+      "ALTER TABLE user_streams ADD COLUMN IF NOT EXISTS scope            TEXT",
+    ]) await pool.query(sql).catch(() => {});
+
     await pool.query(`
       CREATE TABLE IF NOT EXISTS major_follows (
         major_id   INTEGER REFERENCES majors(id) ON DELETE CASCADE,

@@ -6608,6 +6608,148 @@ app.post("/admin/stream-sources/poll", requireAuth, requireAdmin, async (req, re
   res.json({ ok: true });
 });
 
+// ══════════════════════════════════════════════════════════════════
+// SIGN IN WITH GOOGLE -> LINK YOUR YOUTUBE CHANNEL
+//
+// Needs GOOGLE_CLIENT_ID and GOOGLE_CLIENT_SECRET, and the callback
+// below registered as an authorised redirect URI on the Google Cloud
+// OAuth client. Without those the endpoints say so plainly rather than
+// bouncing the user to a broken consent screen.
+// ══════════════════════════════════════════════════════════════════
+const GOOGLE_CLIENT_ID     = process.env.GOOGLE_CLIENT_ID || "";
+const GOOGLE_CLIENT_SECRET = process.env.GOOGLE_CLIENT_SECRET || "";
+const PUBLIC_BASE_URL = (process.env.PUBLIC_BASE_URL ||
+  "https://lobby-auth-server.onrender.com").replace(/\/+$/, "");
+const YT_REDIRECT = PUBLIC_BASE_URL + "/youtube/callback";
+
+/* The page the browser tab lands on at the end. Plain, self-closing,
+   and it never echoes anything the caller supplied. */
+function _ytDone(title, detail, ok) {
+  const esc = (x) => String(x == null ? "" : x)
+    .replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+  return `<!doctype html><meta charset="utf-8"><title>${esc(title)}</title>` +
+    `<body style="background:#0d0a10;color:#fff;font-family:system-ui,sans-serif;` +
+    `display:grid;place-content:center;height:100vh;margin:0;text-align:center;gap:10px">` +
+    `<div style="font-size:34px">${ok ? "\u2713" : "\u2717"}</div>` +
+    `<h1 style="margin:0;font-size:19px">${esc(title)}</h1>` +
+    `<p style="margin:0;opacity:.7;font-size:13px;max-width:44ch">${esc(detail)}</p>` +
+    `<p style="margin:8px 0 0;opacity:.4;font-size:11px">You can close this window.</p>` +
+    `<script>setTimeout(function(){window.close()},${ok ? 2500 : 6000})<\/script>`;
+}
+
+// GET /youtube/auth?token=<jwt> — start the flow.
+//
+// The token comes in the query because this URL is opened in a browser,
+// which cannot set an Authorization header. It is verified immediately
+// and exchanged for a short-lived state; the long-lived token never
+// travels to Google.
+app.get("/youtube/auth", async (req, res) => {
+  if (!GOOGLE_CLIENT_ID || !GOOGLE_CLIENT_SECRET) {
+    return res.status(500).send(_ytDone("Not configured",
+      "GOOGLE_CLIENT_ID and GOOGLE_CLIENT_SECRET are not set on the server.", false));
+  }
+  let userId = null;
+  try {
+    const raw = String(req.query.token || "");
+    if (raw) userId = jwt.verify(raw, SECRET).id;
+  } catch (e) { userId = null; }
+  if (!userId) return res.status(401).send(_ytDone("Not signed in",
+    "Open this from the app so it knows who you are.", false));
+
+  /* Signed and short-lived. This is the whole defence against someone
+     forging a callback for an account that is not theirs. */
+  const state = jwt.sign({ id: userId, k: "yt" }, SECRET, { expiresIn: "5m" });
+
+  const url = "https://accounts.google.com/o/oauth2/v2/auth" +
+    "?client_id=" + encodeURIComponent(GOOGLE_CLIENT_ID) +
+    "&redirect_uri=" + encodeURIComponent(YT_REDIRECT) +
+    "&response_type=code" +
+    /* readonly: enough to read which channel this account owns, and
+       nothing that could post, delete or change anything. */
+    "&scope=" + encodeURIComponent("https://www.googleapis.com/auth/youtube.readonly") +
+    "&access_type=offline&include_granted_scopes=true&prompt=consent" +
+    "&state=" + encodeURIComponent(state);
+  res.redirect(url);
+});
+
+// GET /youtube/callback — Google comes back here.
+app.get("/youtube/callback", async (req, res) => {
+  const axios = require("axios");
+  try {
+    if (req.query.error) {
+      return res.send(_ytDone("Not linked", "You cancelled the Google sign-in.", false));
+    }
+    let userId = null;
+    try {
+      const st = jwt.verify(String(req.query.state || ""), SECRET);
+      if (st && st.k === "yt") userId = st.id;
+    } catch (e) { userId = null; }
+    if (!userId) {
+      return res.status(400).send(_ytDone("Link expired",
+        "That sign-in took too long or did not start here. Try again from the app.", false));
+    }
+
+    const code = String(req.query.code || "");
+    if (!code) return res.status(400).send(_ytDone("Not linked", "Google sent no code back.", false));
+
+    const tok = await axios.post("https://oauth2.googleapis.com/token", null, {
+      timeout: 12000,
+      params: {
+        code,
+        client_id: GOOGLE_CLIENT_ID,
+        client_secret: GOOGLE_CLIENT_SECRET,
+        redirect_uri: YT_REDIRECT,
+        grant_type: "authorization_code",
+      },
+    });
+    const access = tok.data && tok.data.access_token;
+    if (!access) return res.status(502).send(_ytDone("Not linked",
+      "Google did not return an access token.", false));
+
+    /* mine=true is the point of the whole flow: the channel is the one
+       the signed-in account actually owns, so the link is proof rather
+       than a claim. */
+    const ch = await axios.get("https://www.googleapis.com/youtube/v3/channels", {
+      timeout: 12000,
+      headers: { Authorization: "Bearer " + access },
+      params: { part: "snippet", mine: "true" },
+    });
+    const item = ch.data && ch.data.items && ch.data.items[0];
+    if (!item) {
+      return res.send(_ytDone("No channel on that account",
+        "That Google account does not have a YouTube channel yet. Create one, then link again.", false));
+    }
+
+    const channelId = item.id;
+    const handle = (item.snippet && (item.snippet.customUrl || item.snippet.title)) || channelId;
+    const expires = tok.data.expires_in
+      ? new Date(Date.now() + Number(tok.data.expires_in) * 1000) : null;
+
+    await pool.query(`
+      INSERT INTO user_streams (user_id, platform, channel_id, handle, url, verified,
+                                access_token, refresh_token, token_expires_at, scope)
+      VALUES ($1,'youtube',$2,$3,$4,TRUE,$5,$6,$7,$8)
+      ON CONFLICT (user_id, platform, channel_id) DO UPDATE SET
+        handle = EXCLUDED.handle, url = EXCLUDED.url, verified = TRUE,
+        access_token = EXCLUDED.access_token,
+        /* Google only returns a refresh token on the first consent, so a
+           re-link must not overwrite a stored one with null. */
+        refresh_token = COALESCE(EXCLUDED.refresh_token, user_streams.refresh_token),
+        token_expires_at = EXCLUDED.token_expires_at, scope = EXCLUDED.scope`,
+      [userId, channelId, handle,
+       "https://www.youtube.com/channel/" + channelId,
+       access, tok.data.refresh_token || null, expires,
+       tok.data.scope || null]);
+
+    res.send(_ytDone("YouTube linked",
+      "Linked " + handle + ". You can go back to Lobby.", true));
+  } catch (e) {
+    console.error("[youtube/callback]", e.response ? e.response.status : "", e.message);
+    res.status(500).send(_ytDone("Not linked",
+      "Something went wrong talking to Google. Try again.", false));
+  }
+});
+
 // ── A user's own channels ─────────────────────────────────────────
 // A link is a claim. `verified` stays false and nothing is granted on the
 // strength of it — no badge, no placement, no cosmetic. When a real
@@ -6617,6 +6759,9 @@ const _STREAM_PLATFORMS = ["youtube", "twitch", "kick"];
 
 app.get("/me/streams", requireAuth, async (req, res) => {
   try {
+    /* Columns named explicitly, and deliberately: access_token and
+       refresh_token live on this table, and a SELECT * here would put
+       Google credentials in a response the client can read. */
     const r = await pool.query(
       `SELECT id, platform, channel_id, handle, url, verified, created_at
          FROM user_streams WHERE user_id = $1 ORDER BY created_at`, [req.userId]);

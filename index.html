@@ -37149,6 +37149,7 @@ setTimeout(() => { updateMyStatusUI(); }, 100);
       <button class="sp-nav-btn" data-sp="security">🔒 Password</button>
       <button class="sp-nav-btn" data-sp="steam">🎮 Steam</button>
       <button class="sp-nav-btn" data-sp="chess">♟️ Chess</button>
+      <button class="sp-nav-btn" data-sp="youtube">▶️ YouTube</button>
       <div class="sp-nav-label" style="margin-top:10px">App Settings</div>
       <button class="sp-nav-btn" data-sp="audiovideo">🎙 Audio & Video</button>
       <button class="sp-nav-btn" data-sp="feed">📰 Feed</button>
@@ -37755,6 +37756,17 @@ setTimeout(() => { updateMyStatusUI(); }, 100);
       </div>
 
       <!-- ── Steam ── -->
+      <!-- YouTube. Signing in with Google proves which channel the
+           account owns, which is the difference between this and the
+           hand-typed link: one is verified, the other is a claim. -->
+      <div class="sp-section" id="sp-youtube">
+        <h2>YouTube</h2>
+        <p class="sp-subtitle">Sign in with Google to link the channel your account owns. Lobby only ever reads which channel that is &mdash; the permission asked for is read-only, and nothing can be posted, changed or deleted.</p>
+        <div class="sp-section-rule"></div>
+        <div id="spYtBody"></div>
+        <div id="spYtMsg" class="sp-msg"></div>
+      </div>
+
       <div class="sp-section" id="sp-steam">
         <h2>Steam Integration</h2>
         <p class="sp-subtitle">Link your Steam account to show recently played games on your profile and the home page.</p>
@@ -82712,5 +82724,168 @@ body.q-max #queueOverlay{ padding:0 !important; }
   else adopt();
 })();
 </script>
+<!-- ═══ SETTINGS · YOUTUBE LINK ═════════════════════════
+     The renderer has no origin a redirect can return to, so the round
+     trip is the same one Steam uses: open the backend in a browser, let
+     it talk to Google, poll until the link appears. -->
+<script>
+(function () {
+  'use strict';
+  var $ = function (id){ return document.getElementById(id); };
+  var esc = function (x){ return String(x == null ? '' : x)
+    .replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); };
+  var AUTH = 'https://lobby-auth-server.onrender.com';
+
+  /* The same two places the rest of the app looks. An earlier version of
+     this checked a 'token' key that does not exist and missed
+     sessionStorage entirely, so anyone signed in for the session only
+     would have been told they were not signed in. */
+  function tok(){
+    try {
+      return localStorage.getItem('vh_token') ||
+             sessionStorage.getItem('vh_token') || '';
+    } catch (e) { return ''; }
+  }
+  function say(msg, kind){
+    var el = $('spYtMsg');
+    if (!el) return;
+    el.textContent = msg || '';
+    el.className = 'sp-msg' + (kind ? ' ' + kind : '');
+  }
+
+  var polling = null;
+
+  async function load(){
+    var host = $('spYtBody');
+    if (!host) return;
+    var rows = [];
+    try {
+      var r = await window.api('/me/streams');
+      rows = Array.isArray(r) ? r : [];
+    } catch (e) { rows = []; }
+    var yt = rows.filter(function (x){ return x.platform === 'youtube'; });
+
+    if (!yt.length){
+      host.innerHTML =
+        '<div class="spyt-empty">' +
+          '<div class="spyt-mark" aria-hidden="true">' +
+            '<svg viewBox="0 0 24 24" width="26" height="26" fill="currentColor">' +
+            '<path d="M23 12s0-3.8-.5-5.6a2.9 2.9 0 0 0-2-2C18.7 4 12 4 12 4s-6.7 0-8.5.4a2.9 2.9 0 0 0-2 2C1 8.2 1 12 1 12s0 3.8.5 5.6a2.9 2.9 0 0 0 2 2C5.3 20 12 20 12 20s6.7 0 8.5-.4a2.9 2.9 0 0 0 2-2C23 15.8 23 12 23 12zM9.8 15.5v-7l6 3.5z"/>' +
+            '</svg></div>' +
+          '<div><div class="spyt-t">No channel linked</div>' +
+          '<div class="spyt-s">Sign in with Google and Lobby will link the channel that account owns.</div></div>' +
+          '<button class="spyt-btn" type="button" onclick="window.spLinkYouTube()">Sign in with Google</button>' +
+        '</div>';
+      return;
+    }
+
+    host.innerHTML = yt.map(function (c){
+      return '<div class="spyt-card">' +
+        '<div class="spyt-mark red" aria-hidden="true">' +
+          '<svg viewBox="0 0 24 24" width="24" height="24" fill="currentColor">' +
+          '<path d="M23 12s0-3.8-.5-5.6a2.9 2.9 0 0 0-2-2C18.7 4 12 4 12 4s-6.7 0-8.5.4a2.9 2.9 0 0 0-2 2C1 8.2 1 12 1 12s0 3.8.5 5.6a2.9 2.9 0 0 0 2 2C5.3 20 12 20 12 20s6.7 0 8.5-.4a2.9 2.9 0 0 0 2-2C23 15.8 23 12 23 12zM9.8 15.5v-7l6 3.5z"/>' +
+          '</svg></div>' +
+        '<div style="min-width:0">' +
+          '<div class="spyt-t">' + esc(c.handle || c.channelId) + '</div>' +
+          '<div class="spyt-s">' + esc(c.channelId) + '</div>' +
+        '</div>' +
+        (c.verified
+          ? '<span class="spyt-pill ok">● Verified</span>'
+          /* An unverified row is a hand-typed claim from POST /me/streams.
+             Saying so is the point: the two must not look alike. */
+          : '<span class="spyt-pill">Unverified</span>') +
+        '<button class="spyt-btn ghost" type="button" onclick="window.spUnlinkYouTube(' + c.id + ')">Unlink</button>' +
+      '</div>';
+    }).join('') +
+    '<button class="spyt-btn" style="margin-top:12px" type="button" ' +
+      'onclick="window.spLinkYouTube()">Link another channel</button>';
+  }
+
+  window.spLinkYouTube = function (){
+    var t = tok();
+    if (!t) return say('You are not signed in.', 'error');
+    var url = AUTH + '/youtube/auth?token=' + encodeURIComponent(t);
+    say('Opening Google sign-in…');
+    if (window.electronAPI && window.electronAPI.openSteamWindow) {
+      /* Same helper the Steam link uses — it opens an external window,
+         and the name is historical rather than Steam-specific. */
+      window.electronAPI.openSteamWindow(url);
+    } else {
+      window.open(url, 'Google Sign-in', 'width=520,height=680');
+    }
+
+    /* Poll until the link lands. The browser tab cannot talk back to a
+       file:// renderer, so asking the server is the only way to know. */
+    clearInterval(polling);
+    var tries = 0;
+    say('Waiting for Google…');
+    polling = setInterval(async function (){
+      tries++;
+      if (tries > 60){ clearInterval(polling); say('Timed out — try again.', 'error'); return; }
+      try {
+        var r = await window.api('/me/streams');
+        var got = Array.isArray(r) && r.some(function (x){ return x.platform === 'youtube' && x.verified; });
+        if (got){
+          clearInterval(polling);
+          say('Channel linked.', 'success');
+          load();
+        }
+      } catch (e) {}
+    }, 2000);
+  };
+
+  window.spUnlinkYouTube = async function (id){
+    if (!confirm('Unlink this channel?')) return;
+    try {
+      await window.api('/me/streams/' + id, { method: 'DELETE' });
+      say('Unlinked.', 'success');
+      load();
+    } catch (e) { say('Could not unlink that channel.', 'error'); }
+  };
+
+  /* The settings panel shows a section when its nav button is clicked;
+     this loads the content the first time that happens and on every
+     later visit, so a link made in another window shows up. */
+  document.addEventListener('click', function (e){
+    var b = e.target && e.target.closest && e.target.closest('.sp-nav-btn[data-sp="youtube"]');
+    if (b) setTimeout(load, 0);
+  });
+})();
+</script>
+
+<style>
+.spyt-card, .spyt-empty{
+  display:flex; align-items:center; gap:13px; padding:14px;
+  background:var(--bg-2); border:1px solid rgba(255,255,255,.08);
+  border-radius:12px; margin-bottom:10px;
+}
+.spyt-mark{
+  width:44px; height:44px; border-radius:10px; flex-shrink:0;
+  display:grid; place-content:center; color:var(--text-3);
+  background:rgba(255,255,255,.05);
+}
+.spyt-mark.red{ background:rgba(255,0,0,.12); color:#ff4d4d }
+.spyt-t{ font-size:15px; font-weight:700; color:var(--text-1); overflow:hidden; text-overflow:ellipsis; white-space:nowrap }
+.spyt-s{ font-size:11.5px; color:var(--text-3); margin-top:2px; line-height:1.45 }
+.spyt-pill{
+  margin-left:auto; flex-shrink:0; font-size:11px; font-weight:700;
+  padding:4px 10px; border-radius:99px;
+  background:rgba(255,255,255,.07); color:var(--text-3);
+}
+.spyt-pill.ok{ background:rgba(35,165,90,.15); color:#57f287 }
+.spyt-btn{
+  flex-shrink:0; height:36px; padding:0 16px; border-radius:9px; cursor:pointer;
+  border:none; background:var(--accent); color:#fff; font-family:var(--font);
+  font-size:12.5px; font-weight:700;
+}
+.spyt-btn:hover{ filter:brightness(1.1) }
+.spyt-btn.ghost{
+  background:var(--bg-3); border:1px solid rgba(255,255,255,.1); color:var(--text-2);
+  margin-left:8px; height:32px; padding:0 13px; font-size:12px;
+}
+.spyt-empty{ flex-wrap:wrap }
+.spyt-empty > div:nth-child(2){ flex:1; min-width:180px }
+</style>
+
 </body>
 </html>
