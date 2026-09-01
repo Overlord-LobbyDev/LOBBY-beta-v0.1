@@ -82740,10 +82740,11 @@ body.q-max #queueOverlay{ padding:0 !important; }
   else adopt();
 })();
 </script>
-<!-- ═══ SETTINGS · YOUTUBE LINK ═════════════════════════
-     The renderer has no origin a redirect can return to, so the round
-     trip is the same one Steam uses: open the backend in a browser, let
-     it talk to Google, poll until the link appears. -->
+<!-- ═══ SETTINGS · YOUTUBE LINK ════════════════════════
+     One button. The renderer has no origin a redirect can return to,
+     so the round trip is the one Steam already proved: open the backend
+     in a browser, it talks to Google, the app polls until the link
+     appears. -->
 <script>
 (function () {
   'use strict';
@@ -82751,11 +82752,8 @@ body.q-max #queueOverlay{ padding:0 !important; }
   var esc = function (x){ return String(x == null ? '' : x)
     .replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); };
   var AUTH = 'https://lobby-auth-server.onrender.com';
+  var polling = null;
 
-  /* The same two places the rest of the app looks. An earlier version of
-     this checked a 'token' key that does not exist and missed
-     sessionStorage entirely, so anyone signed in for the session only
-     would have been told they were not signed in. */
   function tok(){
     try {
       return localStorage.getItem('vh_token') ||
@@ -82769,7 +82767,16 @@ body.q-max #queueOverlay{ padding:0 !important; }
     el.className = 'sp-msg' + (kind ? ' ' + kind : '');
   }
 
-  var polling = null;
+  var YT_MARK = '<svg viewBox="0 0 24 24" width="24" height="24" fill="currentColor">' +
+    '<path d="M23 12s0-3.8-.5-5.6a2.9 2.9 0 0 0-2-2C18.7 4 12 4 12 4s-6.7 0-8.5.4a2.9 2.9 0 0 0-2 2C1 8.2 1 12 1 12s0 3.8.5 5.6a2.9 2.9 0 0 0 2 2C5.3 20 12 20 12 20s6.7 0 8.5-.4a2.9 2.9 0 0 0 2-2C23 15.8 23 12 23 12zM9.8 15.5v-7l6 3.5z"/></svg>';
+
+  /* The Google mark, so the button looks like every other
+     sign-in-with-Google button a person has used. */
+  var G_MARK = '<svg viewBox="0 0 18 18" width="17" height="17" aria-hidden="true">' +
+    '<path fill="#4285F4" d="M17.6 9.2c0-.6-.1-1.2-.2-1.8H9v3.5h4.8a4.1 4.1 0 0 1-1.8 2.7v2.2h2.9c1.7-1.6 2.7-3.9 2.7-6.6z"/>' +
+    '<path fill="#34A853" d="M9 18c2.4 0 4.5-.8 6-2.2l-2.9-2.2a5.4 5.4 0 0 1-8.1-2.8H1v2.3A9 9 0 0 0 9 18z"/>' +
+    '<path fill="#FBBC05" d="M3.99 10.7a5.4 5.4 0 0 1 0-3.4V5H1a9 9 0 0 0 0 8l3-2.3z"/>' +
+    '<path fill="#EA4335" d="M9 3.6c1.3 0 2.5.5 3.4 1.3L15 2.3A9 9 0 0 0 1 5l3 2.3A5.4 5.4 0 0 1 9 3.6z"/></svg>';
 
   async function load(){
     var host = $('spYtBody');
@@ -82784,137 +82791,61 @@ body.q-max #queueOverlay{ padding:0 !important; }
     if (!yt.length){
       host.innerHTML =
         '<div class="spyt-empty">' +
-          '<div class="spyt-mark" aria-hidden="true">' +
-            '<svg viewBox="0 0 24 24" width="26" height="26" fill="currentColor">' +
-            '<path d="M23 12s0-3.8-.5-5.6a2.9 2.9 0 0 0-2-2C18.7 4 12 4 12 4s-6.7 0-8.5.4a2.9 2.9 0 0 0-2 2C1 8.2 1 12 1 12s0 3.8.5 5.6a2.9 2.9 0 0 0 2 2C5.3 20 12 20 12 20s6.7 0 8.5-.4a2.9 2.9 0 0 0 2-2C23 15.8 23 12 23 12zM9.8 15.5v-7l6 3.5z"/>' +
-            '</svg></div>' +
+          '<div class="spyt-mark" aria-hidden="true">' + YT_MARK + '</div>' +
           '<div><div class="spyt-t">No channel linked</div>' +
-          '<div class="spyt-s">Paste your channel and prove it is yours with a one-time code.</div></div>' +
-        '</div>' +
-        '<div class="spyt-form">' +
-          '<input id="spYtChannel" type="text" placeholder="youtube.com/@yourname, @yourname, or UC…" ' +
-            'onkeydown="if(event.key===&quot;Enter&quot;)window.spYtStart()">' +
-          '<button class="spyt-btn" type="button" onclick="window.spYtStart()">Link channel</button>' +
-        '</div>' +
-        /* Second, and labelled honestly: until the app passes Google's
-           review this only works for accounts on the test-user list. */
-        '<p class="spyt-alt">Or <button type="button" class="spyt-link" ' +
-          'onclick="window.spLinkYouTube()">sign in with Google</button> ' +
-          '&mdash; one click, but only for accounts approved on the Google project.</p>';
+          '<div class="spyt-s">Sign in and Lobby links the channel your Google account owns.</div></div>' +
+          '<button class="spyt-google" type="button" onclick="window.spLinkYouTube()">' +
+            G_MARK + '<span>Link account</span></button>' +
+        '</div>';
       return;
     }
 
     host.innerHTML = yt.map(function (c){
       return '<div class="spyt-card">' +
-        '<div class="spyt-mark red" aria-hidden="true">' +
-          '<svg viewBox="0 0 24 24" width="24" height="24" fill="currentColor">' +
-          '<path d="M23 12s0-3.8-.5-5.6a2.9 2.9 0 0 0-2-2C18.7 4 12 4 12 4s-6.7 0-8.5.4a2.9 2.9 0 0 0-2 2C1 8.2 1 12 1 12s0 3.8.5 5.6a2.9 2.9 0 0 0 2 2C5.3 20 12 20 12 20s6.7 0 8.5-.4a2.9 2.9 0 0 0 2-2C23 15.8 23 12 23 12zM9.8 15.5v-7l6 3.5z"/>' +
-          '</svg></div>' +
+        '<div class="spyt-mark red" aria-hidden="true">' + YT_MARK + '</div>' +
         '<div style="min-width:0">' +
           '<div class="spyt-t">' + esc(c.handle || c.channelId) + '</div>' +
-          '<div class="spyt-s">' + esc(c.channelId) + '</div>' +
-        '</div>' +
-        (c.verified
-          ? '<span class="spyt-pill ok">● Verified</span>'
-          /* An unverified row is a hand-typed claim from POST /me/streams.
-             Saying so is the point: the two must not look alike. */
-          : '<span class="spyt-pill">Unverified</span>') +
+          '<div class="spyt-s">' + esc(c.channelId) + '</div></div>' +
+        (c.verified ? '<span class="spyt-pill ok">● Linked</span>'
+                    : '<span class="spyt-pill">Unverified</span>') +
         '<button class="spyt-btn ghost" type="button" onclick="window.spUnlinkYouTube(' + c.id + ')">Unlink</button>' +
       '</div>';
-    }).join('') +
-    '<button class="spyt-btn" style="margin-top:12px" type="button" ' +
-      'onclick="window.spLinkYouTube()">Link another channel</button>';
+    }).join('');
   }
-
-  /* Verifying by code is the path that works for every user, today,
-     with no Google review: put a one-time code in the channel
-     description, we read it back from public data. Signing in with
-     Google is offered second because youtube.readonly is a sensitive
-     scope — until the app passes Google verification it only works for
-     accounts on the test-user list. */
-  var pending = null;
-
-  window.spYtStart = async function (){
-    var input = $('spYtChannel');
-    var val = input && input.value.trim();
-    if (!val) return say('Paste your channel URL, @handle or UC… id.', 'error');
-    say('Looking that channel up…');
-    try {
-      var r = await window.api('/me/streams/youtube/start', {
-        method: 'POST', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ channel: val }) });
-      if (!r || r.error) return say((r && r.error) || 'Could not find that channel.', 'error');
-      pending = r;
-      say('');
-      renderPending();
-    } catch (e) { say('Could not look that channel up.', 'error'); }
-  };
-
-  function renderPending(){
-    var host = $('spYtBody');
-    if (!host || !pending) return;
-    host.innerHTML =
-      '<div class="spyt-card">' +
-        '<div class="spyt-mark red">' +
-          (pending.thumb ? '<img src="' + esc(pending.thumb) + '" alt="" ' +
-            'style="width:100%;height:100%;border-radius:10px;object-fit:cover">' : '▶') +
-        '</div>' +
-        '<div style="min-width:0"><div class="spyt-t">' + esc(pending.title) + '</div>' +
-        '<div class="spyt-s">' + esc(pending.channelId) + '</div></div>' +
-        '<span class="spyt-pill">Not yet verified</span>' +
-      '</div>' +
-      '<ol class="spyt-steps">' +
-        '<li>Copy this code:<div class="spyt-code"><code>' + esc(pending.code) + '</code>' +
-          '<button class="spyt-btn ghost" type="button" onclick="window.spYtCopy()">Copy</button></div></li>' +
-        '<li>Paste it anywhere in your channel <b>description</b> on YouTube, and save.</li>' +
-        '<li>Come back and check. You can delete the code afterwards — it is only needed once.</li>' +
-      '</ol>' +
-      '<div style="display:flex;gap:8px;margin-top:14px">' +
-        '<button class="spyt-btn" type="button" onclick="window.spYtCheck()">I have added it</button>' +
-        '<button class="spyt-btn ghost" type="button" onclick="window.spYtCancel()">Cancel</button>' +
-      '</div>';
-  }
-
-  window.spYtCopy = function (){
-    if (!pending) return;
-    try { navigator.clipboard.writeText(pending.code); say('Code copied.', 'success'); }
-    catch (e) { say('Code: ' + pending.code); }
-  };
-  window.spYtCancel = function (){ pending = null; load(); };
-
-  window.spYtCheck = async function (){
-    say('Checking your channel description…');
-    try {
-      var r = await window.api('/me/streams/youtube/check', { method: 'POST' });
-      if (r && r.verified){
-        pending = null;
-        say('Channel verified.', 'success');
-        load();
-        return;
-      }
-      say((r && r.error) || 'Not found yet — give YouTube a minute and try again.', 'error');
-    } catch (e) { say('Could not check that channel.', 'error'); }
-  };
 
   window.spLinkYouTube = function (){
     var t = tok();
-    if (!t) return say('You are not signed in.', 'error');
+    if (!t) return say('You are not signed in to Lobby.', 'error');
     var url = AUTH + '/youtube/auth?token=' + encodeURIComponent(t);
-    say('Opening Google sign-in…');
+
     if (window.electronAPI && window.electronAPI.openSteamWindow) {
+      /* The helper opens an external window. Its name is historical
+         rather than Steam-specific. */
       window.electronAPI.openSteamWindow(url);
     } else {
       window.open(url, 'Google Sign-in', 'width=520,height=680');
     }
+
+    /* The browser window cannot talk back to a file:// renderer, so the
+       only way to learn the outcome is to ask the server. */
     clearInterval(polling);
     var tries = 0;
+    say('Waiting for Google…');
     polling = setInterval(async function (){
       tries++;
-      if (tries > 60){ clearInterval(polling); return; }
+      if (tries > 90){
+        clearInterval(polling);
+        say('Nothing came back. If the window said the app is not ' +
+            'configured or your account is not approved, that is a setting ' +
+            'on the Google project rather than something to retry.', 'error');
+        return;
+      }
       try {
         var r = await window.api('/me/streams');
-        if (Array.isArray(r) && r.some(function (x){ return x.platform === 'youtube' && x.verified; })){
-          clearInterval(polling); say('Channel linked.', 'success'); load();
+        if (Array.isArray(r) && r.some(function (x){ return x.platform === 'youtube'; })){
+          clearInterval(polling);
+          say('Channel linked.', 'success');
+          load();
         }
       } catch (e) {}
     }, 2000);
@@ -82929,9 +82860,6 @@ body.q-max #queueOverlay{ padding:0 !important; }
     } catch (e) { say('Could not unlink that channel.', 'error'); }
   };
 
-  /* The settings panel shows a section when its nav button is clicked;
-     this loads the content the first time that happens and on every
-     later visit, so a link made in another window shows up. */
   document.addEventListener('click', function (e){
     var b = e.target && e.target.closest && e.target.closest('.sp-nav-btn[data-sp="youtube"]');
     if (b) setTimeout(load, 0);
@@ -82970,29 +82898,19 @@ body.q-max #queueOverlay{ padding:0 !important; }
   margin-left:8px; height:32px; padding:0 13px; font-size:12px;
 }
 .spyt-empty{ flex-wrap:wrap }
+/* Google's own guidance: their mark on a light button, never redrawn
+   or recoloured. It also makes the control instantly recognisable. */
+.spyt-google{
+  flex-shrink:0; display:inline-flex; align-items:center; gap:10px;
+  height:40px; padding:0 18px; border-radius:9px; cursor:pointer;
+  background:#fff; color:#1f1f1f; border:1px solid rgba(0,0,0,.12);
+  font-family:var(--font); font-size:13.5px; font-weight:700;
+}
+.spyt-google:hover{ background:#f2f2f2 }
+.spyt-google:focus-visible{ outline:2px solid var(--accent); outline-offset:2px }
+
 .spyt-empty > div:nth-child(2){ flex:1; min-width:180px }
-.spyt-form{ display:flex; gap:8px; margin-bottom:10px }
-.spyt-form input{
-  flex:1; min-width:0; height:38px; border-radius:9px; padding:0 12px;
-  background:var(--bg-2); border:1px solid rgba(255,255,255,.1);
-  color:var(--text-1); font-family:inherit; font-size:13px;
-}
-.spyt-form input:focus{ outline:none; border-color:var(--accent) }
-.spyt-alt{ font-size:12px; color:var(--text-3); margin:0; line-height:1.5 }
-.spyt-link{
-  background:none; border:none; padding:0; cursor:pointer;
-  color:var(--accent); font-family:inherit; font-size:12px; font-weight:700;
-  text-decoration:underline;
-}
-.spyt-steps{ margin:14px 0 0; padding-left:20px; display:grid; gap:10px }
-.spyt-steps li{ font-size:13px; color:var(--text-2); line-height:1.55 }
-.spyt-steps b{ color:var(--text-1) }
-.spyt-code{ display:flex; align-items:center; gap:8px; margin-top:7px }
-.spyt-code code{
-  font-family:"JetBrains Mono",ui-monospace,monospace; font-size:14px; font-weight:700;
-  letter-spacing:1.4px; color:var(--text-1); background:var(--bg-3);
-  border:1px solid rgba(255,255,255,.1); border-radius:8px; padding:8px 12px;
-}
+
 </style>
 
 <!-- ═══ SETTINGS · LINKED ACCOUNTS ═════════════════════ -->
