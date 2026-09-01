@@ -37147,9 +37147,15 @@ setTimeout(() => { updateMyStatusUI(); }, 100);
       <button class="sp-nav-btn" data-sp="appearance">🎨 Appearance</button>
       <button class="sp-nav-btn" data-sp="themes">🖌 Themes</button>
       <button class="sp-nav-btn" data-sp="security">🔒 Password</button>
-      <button class="sp-nav-btn" data-sp="steam">🎮 Steam</button>
-      <button class="sp-nav-btn" data-sp="chess">♟️ Chess</button>
-      <button class="sp-nav-btn" data-sp="youtube">▶️ YouTube</button>
+      <button class="sp-nav-btn" data-sp="linked">🔗 Linked accounts</button>
+      <!-- Still in the DOM and still wired: the cards in Linked accounts
+           activate these by clicking them, so loadSteamSection() and the
+           chess loader run exactly as they always did. Hidden rather than
+           removed, because rebuilding two working screens to tidy a menu
+           is a bad trade. -->
+      <button class="sp-nav-btn sp-nav-hidden" data-sp="steam">🎮 Steam</button>
+      <button class="sp-nav-btn sp-nav-hidden" data-sp="chess">♟️ Chess</button>
+      <button class="sp-nav-btn sp-nav-hidden" data-sp="youtube">▶️ YouTube</button>
       <div class="sp-nav-label" style="margin-top:10px">App Settings</div>
       <button class="sp-nav-btn" data-sp="audiovideo">🎙 Audio & Video</button>
       <button class="sp-nav-btn" data-sp="feed">📰 Feed</button>
@@ -37759,7 +37765,15 @@ setTimeout(() => { updateMyStatusUI(); }, 100);
       <!-- YouTube. Signing in with Google proves which channel the
            account owns, which is the difference between this and the
            hand-typed link: one is verified, the other is a claim. -->
+      <div class="sp-section" id="sp-linked">
+        <h2>Linked accounts</h2>
+        <p class="sp-subtitle">Connect the places you play and the places you stream. Lobby uses these to show your games, verify ranks, and put your channel next to your name.</p>
+        <div class="sp-section-rule"></div>
+        <div id="spLinkedBody"></div>
+      </div>
+
       <div class="sp-section" id="sp-youtube">
+        <button class="sp-back" type="button" onclick="window.spBackToLinked()">&larr; Linked accounts</button>
         <h2>YouTube</h2>
         <p class="sp-subtitle">Sign in with Google to link the channel your account owns. Lobby only ever reads which channel that is &mdash; the permission asked for is read-only, and nothing can be posted, changed or deleted.</p>
         <div class="sp-section-rule"></div>
@@ -37768,6 +37782,7 @@ setTimeout(() => { updateMyStatusUI(); }, 100);
       </div>
 
       <div class="sp-section" id="sp-steam">
+        <button class="sp-back" type="button" onclick="window.spBackToLinked()">&larr; Linked accounts</button>
         <h2>Steam Integration</h2>
         <p class="sp-subtitle">Link your Steam account to show recently played games on your profile and the home page.</p>
         <div class="sp-section-rule"></div>
@@ -37811,6 +37826,7 @@ setTimeout(() => { updateMyStatusUI(); }, 100);
 
       <!-- ── Chess ── -->
       <div class="sp-section" id="sp-chess">
+        <button class="sp-back" type="button" onclick="window.spBackToLinked()">&larr; Linked accounts</button>
         <h2>Chess Accounts</h2>
         <p class="sp-subtitle">Link your Chess.com and Lichess accounts so tournaments can automatically fetch match results.</p>
         <div class="sp-section-rule"></div>
@@ -82885,6 +82901,177 @@ body.q-max #queueOverlay{ padding:0 !important; }
 }
 .spyt-empty{ flex-wrap:wrap }
 .spyt-empty > div:nth-child(2){ flex:1; min-width:180px }
+</style>
+
+<!-- ═══ SETTINGS · LINKED ACCOUNTS ═════════════════════ -->
+<script>
+(function () {
+  'use strict';
+  var $ = function (id){ return document.getElementById(id); };
+  var esc = function (x){ return String(x == null ? '' : x)
+    .replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); };
+
+  function go(tab){
+    var b = document.querySelector('.sp-nav-btn[data-sp="' + tab + '"]');
+    if (b) b.click();
+  }
+  window.spOpenLinkedTab = go;
+  window.spBackToLinked = function (){ go('linked'); };
+
+  /* Each row is the same shape whatever it connects to, so the list
+     reads as one thing rather than three integrations that grew
+     separately. */
+  function row(o){
+    return '<div class="spl-row">' +
+      '<span class="spl-ico" style="background:' + o.bg + ';color:' + o.fg + '">' + o.icon + '</span>' +
+      '<span class="spl-b"><span class="spl-t">' + esc(o.name) + '</span>' +
+      '<span class="spl-s">' + o.sub + '</span></span>' +
+      (o.state === 'on'
+        ? '<span class="spl-pill ok">● Connected</span>'
+        : o.state === 'claim'
+          /* A self-declared handle is not the same as a verified one and
+             must not be dressed as if it were. */
+          ? '<span class="spl-pill">Unverified</span>'
+          : '<span class="spl-pill off">Not connected</span>') +
+      '<button class="spl-btn' + (o.state === 'off' ? '' : ' ghost') + '" type="button" ' +
+        'onclick="' + o.action + '">' + esc(o.cta) + '</button>' +
+    '</div>';
+  }
+
+  var YT_ICON = '<svg viewBox="0 0 24 24" width="20" height="20" fill="currentColor">' +
+    '<path d="M23 12s0-3.8-.5-5.6a2.9 2.9 0 0 0-2-2C18.7 4 12 4 12 4s-6.7 0-8.5.4a2.9 2.9 0 0 0-2 2C1 8.2 1 12 1 12s0 3.8.5 5.6a2.9 2.9 0 0 0 2 2C5.3 20 12 20 12 20s6.7 0 8.5-.4a2.9 2.9 0 0 0 2-2C23 15.8 23 12 23 12zM9.8 15.5v-7l6 3.5z"/></svg>';
+
+  async function render(){
+    var host = $('spLinkedBody');
+    if (!host) return;
+
+    var me = null, streams = [];
+    try { me = await window.api('/me'); } catch (e) {}
+    try {
+      var r = await window.api('/me/streams');
+      streams = Array.isArray(r) ? r : [];
+    } catch (e) {}
+    var byPlat = {};
+    streams.forEach(function (c){ if (!byPlat[c.platform]) byPlat[c.platform] = c; });
+
+    var chess = (me && (me.chess_username || me.lichess_username)) || '';
+
+    var games = [
+      row({ name:'Steam', icon:'🎮', bg:'#171a21', fg:'#66c0f4',
+        state: (me && me.steam_id) ? 'on' : 'off',
+        sub: (me && me.steam_id)
+          ? esc(me.steam_name || 'Linked') + ' · library and recent games'
+          : 'Show your library and what you have been playing.',
+        cta: (me && me.steam_id) ? 'Manage' : 'Connect',
+        action: "window.spOpenLinkedTab('steam')" }),
+      row({ name:'Chess', icon:'♟', bg:'rgba(255,255,255,.06)', fg:'#e9eaf2',
+        state: chess ? 'on' : 'off',
+        sub: chess ? esc(chess) + ' · rating verified for queue'
+                   : 'Chess.com or Lichess, so ranked queue knows your rating.',
+        cta: chess ? 'Manage' : 'Connect',
+        action: "window.spOpenLinkedTab('chess')" }),
+    ].join('');
+
+    var yt = byPlat.youtube;
+    var socials = [
+      row({ name:'YouTube', icon:YT_ICON, bg:'rgba(255,0,0,.12)', fg:'#ff4d4d',
+        state: yt ? (yt.verified ? 'on' : 'claim') : 'off',
+        sub: yt ? esc(yt.handle || yt.channelId) +
+                  (yt.verified ? ' · verified through Google' : ' · typed in, not verified')
+                : 'Sign in with Google to link the channel you own.',
+        cta: yt ? 'Manage' : 'Connect',
+        action: "window.spOpenLinkedTab('youtube')" }),
+      row({ name:'Twitch', icon:'🟪', bg:'rgba(145,70,255,.14)', fg:'#a970ff',
+        state: byPlat.twitch ? 'claim' : 'off',
+        sub: byPlat.twitch ? esc(byPlat.twitch.handle) + ' · typed in, not verified'
+          /* Honest about the limit rather than offering a button that
+             cannot do what the YouTube one does. */
+          : 'Add your channel name. Twitch sign-in is not available yet, so this stays unverified.',
+        cta: byPlat.twitch ? 'Remove' : 'Add',
+        action: byPlat.twitch
+          ? "window.splUnlink(" + byPlat.twitch.id + ")"
+          : "window.splAdd('twitch')" }),
+      row({ name:'Kick', icon:'🟩', bg:'rgba(83,252,24,.12)', fg:'#53fc18',
+        state: byPlat.kick ? 'claim' : 'off',
+        sub: byPlat.kick ? esc(byPlat.kick.handle) + ' · typed in, not verified'
+                         : 'Add your channel name. Unverified.',
+        cta: byPlat.kick ? 'Remove' : 'Add',
+        action: byPlat.kick
+          ? "window.splUnlink(" + byPlat.kick.id + ")"
+          : "window.splAdd('kick')" }),
+    ].join('');
+
+    host.innerHTML =
+      '<p class="spl-group">Games</p>' + games +
+      '<p class="spl-group">Streaming</p>' + socials;
+  }
+
+  window.splAdd = async function (platform){
+    var name = prompt('Your ' + platform + ' channel name');
+    if (!name) return;
+    try {
+      await window.api('/me/streams', { method:'POST',
+        headers:{ 'Content-Type':'application/json' },
+        body: JSON.stringify({ platform: platform, channelId: name.trim(), handle: name.trim() }) });
+      render();
+    } catch (e) {
+      if (window.showToast) window.showToast('Could not link that channel', 'error');
+    }
+  };
+  window.splUnlink = async function (id){
+    if (!confirm('Remove this channel?')) return;
+    try { await window.api('/me/streams/' + id, { method:'DELETE' }); render(); }
+    catch (e) { if (window.showToast) window.showToast('Could not remove that', 'error'); }
+  };
+
+  document.addEventListener('click', function (e){
+    var b = e.target && e.target.closest && e.target.closest('.sp-nav-btn[data-sp="linked"]');
+    if (b) setTimeout(render, 0);
+  });
+})();
+</script>
+
+<style>
+.sp-nav-hidden{ display:none !important; }
+.sp-back{
+  display:inline-flex; align-items:center; gap:6px; margin-bottom:14px;
+  background:none; border:none; cursor:pointer; padding:0;
+  color:var(--text-3); font-family:var(--font); font-size:12px; font-weight:700;
+}
+.sp-back:hover{ color:var(--text-1) }
+.spl-group{
+  font-family:var(--font); font-size:10px; font-weight:800; letter-spacing:1.6px;
+  text-transform:uppercase; color:var(--text-3); margin:22px 0 10px;
+}
+.spl-group:first-child{ margin-top:4px }
+.spl-row{
+  display:flex; align-items:center; gap:13px; padding:13px 14px; margin-bottom:9px;
+  background:var(--bg-2); border:1px solid rgba(255,255,255,.08); border-radius:12px;
+}
+.spl-ico{
+  width:42px; height:42px; border-radius:10px; flex-shrink:0;
+  display:grid; place-content:center; font-size:19px;
+}
+.spl-b{ min-width:0; flex:1; display:grid; gap:2px }
+.spl-t{ font-size:14.5px; font-weight:700; color:var(--text-1) }
+.spl-s{ font-size:11.5px; color:var(--text-3); line-height:1.45 }
+.spl-pill{
+  flex-shrink:0; font-size:11px; font-weight:700; padding:4px 10px; border-radius:99px;
+  background:rgba(255,255,255,.07); color:var(--text-3);
+}
+.spl-pill.ok{ background:rgba(35,165,90,.15); color:#57f287 }
+.spl-pill.off{ background:transparent; color:var(--text-3); opacity:.7 }
+.spl-btn{
+  flex-shrink:0; height:34px; padding:0 15px; border-radius:9px; cursor:pointer;
+  border:none; background:var(--accent); color:#fff;
+  font-family:var(--font); font-size:12.5px; font-weight:700;
+}
+.spl-btn:hover{ filter:brightness(1.1) }
+.spl-btn.ghost{ background:var(--bg-3); border:1px solid rgba(255,255,255,.1); color:var(--text-2) }
+@media (max-width:620px){
+  .spl-row{ flex-wrap:wrap }
+  .spl-b{ flex:1 1 100%; order:2 }
+}
 </style>
 
 </body>
