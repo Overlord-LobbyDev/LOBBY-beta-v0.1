@@ -81677,7 +81677,14 @@ body.q-max #queueOverlay{ padding:0 !important; }
 #globalTournamentsOverlay #gtGameGrid,
 #globalTournamentsOverlay #gtListHead,
 #globalTournamentsOverlay #gtStatusRail,
-#globalTournamentsOverlay #gtTournamentList{ display:none !important; }
+#globalTournamentsOverlay #gtTournamentList,
+/* The LobbyHub instance: its own tab row, its own section headings and
+   its own empty state, all drawing the same tournaments this page draws.
+   Two renderers for one list is what made the page look like two
+   designs. Hidden rather than unhooked, because it loads on its own
+   schedule and tearing it out would mean owning that too. */
+#globalTournamentsOverlay #gtHubFilters,
+#globalTournamentsOverlay #gtHubStage{ display:none !important; }
 
 #globalTournamentsOverlay{
   --ar:#ff3d6e;
@@ -81687,6 +81694,11 @@ body.q-max #queueOverlay{ padding:0 !important; }
 }
 #gtDeskGrid{ flex:1; min-height:0; display:block; }
 #globalTournamentsOverlay #gtScroller{ padding:0 0 56px !important; }
+/* A measure. Without one the page ran the full width of the display,
+   which put five tournament rows across with a sixth orphaned beneath
+   and left the agenda marooned against the right edge. Everything below
+   sits in this column. */
+#gtStage, #gtCols, #gtBrowse{ max-width:1480px; margin-left:auto; margin-right:auto; width:100% }
 
 /* ── Identity bar ──────────────────────────────────────────────── */
 #gtTop{
@@ -81735,7 +81747,13 @@ body.q-max #queueOverlay{ padding:0 !important; }
 #gtStage{ padding:20px 26px 6px; display:grid; justify-items:center; gap:12px }
 .ar-live{
   position:relative; width:100%; max-width:880px; aspect-ratio:16/9; max-height:340px;
-  border-radius:14px; overflow:hidden; background:#06070b;
+  border-radius:14px; overflow:hidden;
+  /* Not a black rectangle. This is the first thing on the page and it is
+     empty until channels are watched, so the empty state has to look
+     intended rather than broken. */
+  background:
+    radial-gradient(120% 130% at 50% -30%, rgba(255,61,110,.16) 0%, transparent 62%),
+    linear-gradient(165deg,#14101a 0%,#0a0810 60%,#07060b 100%);
   border:1px solid rgba(255,255,255,.1);
   box-shadow:0 26px 60px -28px rgba(0,0,0,.9);
 }
@@ -81764,6 +81782,12 @@ body.q-max #queueOverlay{ padding:0 !important; }
 .ar-live-meta b{ color:#fff; font-weight:700 }
 .ar-live-empty{ position:absolute; inset:0; display:grid; place-content:center; gap:7px; text-align:center; padding:24px }
 .ar-live-empty h3{ margin:0; font-size:15px; font-weight:800 }
+.ar-live-glyph{
+  width:46px; height:46px; border-radius:12px; display:grid; place-content:center;
+  margin:0 auto 4px; color:rgba(255,255,255,.42);
+  background:rgba(255,255,255,.04); border:1px solid rgba(255,255,255,.08);
+}
+.ar-live-glyph svg{ width:22px; height:22px }
 .ar-live-empty p{ margin:0; font-size:12px; color:var(--text-3); max-width:44ch; line-height:1.6 }
 
 /* The switcher: every other thing that is on, centred under the player,
@@ -82088,9 +82112,16 @@ body.q-max #queueOverlay{ padding:0 !important; }
     if (!host) return;
     if (!stage.length){
       host.innerHTML =
-        '<div class="ar-live-empty"><h3>Nothing on right now</h3>' +
-        '<p>The moment a watched channel goes live it plays here, and when none ' +
-        'is, whatever starts next takes the stage.</p></div>';
+        '<div class="ar-live-empty">' +
+          '<span class="ar-live-glyph" aria-hidden="true">' +
+            '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" ' +
+              'stroke-linecap="round" stroke-linejoin="round">' +
+              '<rect x="2" y="5" width="20" height="14" rx="2.5"/>' +
+              '<path d="M10 10.2v3.6l3.2-1.8z" fill="currentColor" stroke="none"/>' +
+            '</svg></span>' +
+          '<h3>Nothing on right now</h3>' +
+          '<p>The moment a watched channel goes live it plays here, and when ' +
+          'none is, whatever starts next takes the stage.</p></div>';
       return;
     }
     if (idx >= stage.length) idx = 0;
