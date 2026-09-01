@@ -471,6 +471,74 @@ async function initDb() {
          ON majors(is_published, starts_at);`
     ).catch(() => {});
 
+    // ── Stream discovery ───────────────────────────────────────────
+    // A source is a CHANNEL, not an event. Nobody should have to type in
+    // that ESL is running a StarCraft final tonight -- the channel is
+    // known, so what is on it can be discovered.
+    //
+    // Deliberately platform-tagged rather than YouTube-only: Twitch
+    // cannot be embedded from a file:// renderer today, but a Twitch row
+    // is still worth storing so it can be linked out to, and so nothing
+    // has to be migrated when the renderer gets a real origin.
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS stream_sources (
+        id         SERIAL PRIMARY KEY,
+        platform   TEXT NOT NULL DEFAULT 'youtube',
+        channel_id TEXT NOT NULL,
+        name       TEXT,
+        game       TEXT,
+        organiser  TEXT,
+        weight     INTEGER DEFAULT 0,
+        is_enabled BOOLEAN DEFAULT TRUE,
+        last_checked_at TIMESTAMPTZ,
+        last_error TEXT,
+        created_at TIMESTAMPTZ DEFAULT NOW(),
+        UNIQUE (platform, channel_id)
+      );
+    `).catch((e) => console.error("[stream_sources]", e.message));
+
+    // What the poller last saw. In the database, not in memory: a restart
+    // must not blank the page, and two instances must not disagree about
+    // what is live.
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS stream_cache (
+        source_id    INTEGER REFERENCES stream_sources(id) ON DELETE CASCADE,
+        video_id     TEXT NOT NULL,
+        title        TEXT,
+        thumb_url    TEXT,
+        state        TEXT,               -- live | upcoming
+        scheduled_at TIMESTAMPTZ,
+        viewers      INTEGER,
+        fetched_at   TIMESTAMPTZ DEFAULT NOW(),
+        PRIMARY KEY (source_id, video_id)
+      );
+    `).catch((e) => console.error("[stream_cache]", e.message));
+    await pool.query(
+      `CREATE INDEX IF NOT EXISTS idx_stream_cache_state
+         ON stream_cache(state, scheduled_at);`
+    ).catch(() => {});
+
+    // ── A user's own channels ──────────────────────────────────────
+    // Linking is a claim, not proof. `verified` stays FALSE until a real
+    // check exists, and nothing is granted on the strength of it -- the
+    // column is there so a later verification flow has somewhere to write.
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS user_streams (
+        id         SERIAL PRIMARY KEY,
+        user_id    INTEGER REFERENCES users(id) ON DELETE CASCADE,
+        platform   TEXT NOT NULL,
+        channel_id TEXT NOT NULL,
+        handle     TEXT,
+        url        TEXT,
+        verified   BOOLEAN DEFAULT FALSE,
+        created_at TIMESTAMPTZ DEFAULT NOW(),
+        UNIQUE (user_id, platform, channel_id)
+      );
+    `).catch((e) => console.error("[user_streams]", e.message));
+    await pool.query(
+      `CREATE INDEX IF NOT EXISTS idx_user_streams_user ON user_streams(user_id);`
+    ).catch(() => {});
+
     await pool.query(`
       CREATE TABLE IF NOT EXISTS major_follows (
         major_id   INTEGER REFERENCES majors(id) ON DELETE CASCADE,

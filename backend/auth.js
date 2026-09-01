@@ -6277,6 +6277,345 @@ app.get("/admin/majors", requireAuth, requireAdmin, async (req, res) => {
   }
 });
 
+// ══════════════════════════════════════════════════════════════════
+// STREAM DISCOVERY
+//
+// Finds what is actually live across the channels worth watching, and
+// what is scheduled next when nothing is. See the notes on quota in the
+// poller: RSS is free and does the finding, videos.list costs 1 unit a
+// call and does the confirming.
+// ══════════════════════════════════════════════════════════════════
+const YT_KEY = process.env.YOUTUBE_API_KEY || "";
+const _POLL_EVERY_MS = 5 * 60 * 1000;
+let _pollTimer = null;
+let _pollRunning = false;
+
+/* Pull recent video ids off a channel's public feed. Free, unauthenticated,
+   and no quota — which is the whole reason the poller can run at all. */
+async function _ytRecentIds(channelId) {
+  const axios = require("axios");
+  const url = "https://www.youtube.com/feeds/videos.xml?channel_id=" +
+              encodeURIComponent(channelId);
+  const r = await axios.get(url, { timeout: 8000, responseType: "text" });
+  const ids = [];
+  const re = /<yt:videoId>([\w-]{6,})<\/yt:videoId>/g;
+  let m;
+  while ((m = re.exec(r.data)) && ids.length < 15) ids.push(m[1]);
+  return ids;
+}
+
+/* One call, up to fifty ids, one quota unit. Returns only the ones that
+   are live or scheduled — a finished upload is not something to show. */
+async function _ytLiveInfo(ids) {
+  if (!ids.length || !YT_KEY) return [];
+  const axios = require("axios");
+  const out = [];
+  for (let i = 0; i < ids.length; i += 50) {
+    const chunk = ids.slice(i, i + 50);
+    const r = await axios.get("https://www.googleapis.com/youtube/v3/videos", {
+      timeout: 10000,
+      params: {
+        part: "snippet,liveStreamingDetails",
+        id: chunk.join(","),
+        key: YT_KEY,
+      },
+    });
+    for (const v of (r.data && r.data.items) || []) {
+      const state = v.snippet && v.snippet.liveBroadcastContent;
+      if (state !== "live" && state !== "upcoming") continue;
+      const d = v.liveStreamingDetails || {};
+      const th = (v.snippet.thumbnails || {});
+      out.push({
+        videoId: v.id,
+        channelId: v.snippet.channelId,
+        title: v.snippet.title,
+        thumb: (th.maxres || th.standard || th.high || th.medium || th.default || {}).url || null,
+        state,
+        scheduledAt: d.scheduledStartTime || d.actualStartTime || null,
+        viewers: d.concurrentViewers ? Number(d.concurrentViewers) : null,
+      });
+    }
+  }
+  return out;
+}
+
+async function pollStreamSources() {
+  if (!YT_KEY || _pollRunning) return;
+  _pollRunning = true;
+  try {
+    const src = await pool.query(
+      `SELECT id, channel_id FROM stream_sources
+         WHERE is_enabled = TRUE AND platform = 'youtube'`);
+    if (!src.rows.length) return;
+
+    const byChannel = new Map();
+    const allIds = [];
+    for (const row of src.rows) {
+      byChannel.set(row.channel_id, row.id);
+      try {
+        const ids = await _ytRecentIds(row.channel_id);
+        allIds.push(...ids);
+        await pool.query(
+          "UPDATE stream_sources SET last_checked_at = NOW(), last_error = NULL WHERE id = $1",
+          [row.id]);
+      } catch (e) {
+        /* One dead channel must not stop the cycle, but it should be
+           visible in the admin screen rather than silently skipped. */
+        await pool.query(
+          "UPDATE stream_sources SET last_checked_at = NOW(), last_error = $2 WHERE id = $1",
+          [row.id, String(e.message || e).slice(0, 200)]).catch(() => {});
+      }
+    }
+
+    const found = await _ytLiveInfo(allIds);
+
+    /* Replace rather than merge: a stream that has ENDED simply stops
+       appearing in the feed, so anything not in this pass is over. */
+    await pool.query("DELETE FROM stream_cache");
+    for (const f of found) {
+      const sid = byChannel.get(f.channelId);
+      if (!sid) continue;
+      await pool.query(`
+        INSERT INTO stream_cache (source_id, video_id, title, thumb_url, state, scheduled_at, viewers, fetched_at)
+        VALUES ($1,$2,$3,$4,$5,$6,$7,NOW())
+        ON CONFLICT (source_id, video_id) DO UPDATE SET
+          title = EXCLUDED.title, thumb_url = EXCLUDED.thumb_url,
+          state = EXCLUDED.state, scheduled_at = EXCLUDED.scheduled_at,
+          viewers = EXCLUDED.viewers, fetched_at = NOW()`,
+        [sid, f.videoId, f.title, f.thumb, f.state,
+         f.scheduledAt ? new Date(f.scheduledAt) : null, f.viewers]).catch(() => {});
+    }
+    console.log("[streams] polled " + src.rows.length + " sources, " +
+                found.length + " live/upcoming");
+  } catch (e) {
+    console.error("[streams/poll]", e.message);
+  } finally {
+    _pollRunning = false;
+  }
+}
+
+if (YT_KEY) {
+  /* A short delay so a cold boot serves requests before it starts
+     fetching thirty feeds. */
+  setTimeout(pollStreamSources, 15000);
+  _pollTimer = setInterval(pollStreamSources, _POLL_EVERY_MS);
+} else {
+  console.log("[streams] YOUTUBE_API_KEY not set — discovery is off, " +
+              "the stage falls back to curated majors");
+}
+
+// GET /arena/stage — what to play, in the order to play it.
+//
+// One endpoint so the client does not have to merge two feeds and pick a
+// winner. Live first, ordered by audience; then whatever is scheduled
+// soonest, which is the "if nothing is live, show the next one up" rule.
+// Discovered streams and curated majors are the same shape here, tagged
+// with `kind` so the page can say which it is.
+app.get("/arena/stage", async (req, res) => {
+  try {
+    const out = [];
+
+    const disc = await pool.query(`
+      SELECT c.*, s.name AS source_name, s.game, s.organiser, s.weight, s.platform
+      FROM stream_cache c JOIN stream_sources s ON s.id = c.source_id
+      WHERE s.is_enabled = TRUE
+      ORDER BY (c.state = 'live') DESC, c.viewers DESC NULLS LAST,
+               c.scheduled_at ASC NULLS LAST
+      LIMIT 20`).catch(() => ({ rows: [] }));
+
+    for (const r of disc.rows) {
+      out.push({
+        kind: "stream",
+        id: "yt:" + r.video_id,
+        live: r.state === "live",
+        name: r.title,
+        game: r.game || null,
+        organiser: r.organiser || r.source_name || null,
+        platform: r.platform || "youtube",
+        videoId: r.video_id,
+        art: r.thumb_url || null,
+        startsAt: r.scheduled_at || null,
+        viewers: r.viewers || null,
+        url: "https://www.youtube.com/watch?v=" + r.video_id,
+        weight: r.weight || 0,
+      });
+    }
+
+    /* Curated majors sit alongside, not underneath: a hand-entered event
+       that is on right now outranks a discovered stream that is not. */
+    const maj = await pool.query(`
+      SELECT m.*,
+        (SELECT COUNT(*)::int FROM major_follows f WHERE f.major_id = m.id) AS followers,
+        (m.starts_at IS NOT NULL AND m.starts_at <= NOW()
+          AND COALESCE(m.ends_at, m.starts_at + INTERVAL '1 day') >= NOW()) AS is_live
+      FROM majors m
+      WHERE m.is_published = TRUE
+        AND COALESCE(m.ends_at, m.starts_at, NOW()) >= NOW() - INTERVAL '1 day'
+      ORDER BY is_live DESC, m.sort_order DESC, m.starts_at ASC NULLS LAST
+      LIMIT 12`).catch(() => ({ rows: [] }));
+
+    for (const r of maj.rows) {
+      out.push(Object.assign(_majorCard(r), {
+        kind: "major",
+        live: !!r.is_live,
+        videoId: null,
+        weight: r.sort_order || 0,
+      }));
+    }
+
+    /* One ordering over both. Live wins; among the live, editorial weight
+       then audience; among the rest, soonest first — and anything with no
+       date at all goes last rather than being treated as imminent. */
+    out.sort((a, b) => {
+      if (a.live !== b.live) return a.live ? -1 : 1;
+      if (a.live) {
+        if ((b.weight || 0) !== (a.weight || 0)) return (b.weight || 0) - (a.weight || 0);
+        return (b.viewers || 0) - (a.viewers || 0);
+      }
+      const ta = a.startsAt ? new Date(a.startsAt).getTime() : Infinity;
+      const tb = b.startsAt ? new Date(b.startsAt).getTime() : Infinity;
+      return ta - tb;
+    });
+
+    res.json(out.slice(0, 16));
+  } catch (e) {
+    console.error("[arena/stage]", e.message);
+    res.json([]);
+  }
+});
+
+// ── Admin: the channels being watched ─────────────────────────────
+app.get("/admin/stream-sources", requireAuth, requireAdmin, async (req, res) => {
+  try {
+    const r = await pool.query(`
+      SELECT s.*,
+        (SELECT COUNT(*)::int FROM stream_cache c
+           WHERE c.source_id = s.id AND c.state = 'live') AS live_now
+      FROM stream_sources s ORDER BY s.weight DESC, s.name ASC`);
+    res.json(r.rows.map((x) => ({
+      id: x.id, platform: x.platform, channelId: x.channel_id,
+      name: x.name, game: x.game, organiser: x.organiser,
+      weight: x.weight || 0, enabled: !!x.is_enabled,
+      lastCheckedAt: x.last_checked_at, lastError: x.last_error,
+      liveNow: x.live_now || 0,
+    })));
+  } catch (e) {
+    console.error("[admin/stream-sources]", e.message);
+    res.status(500).json({ error: "Could not load the sources" });
+  }
+});
+
+app.post("/admin/stream-sources", requireAuth, requireAdmin, async (req, res) => {
+  try {
+    const b = req.body || {};
+    const channelId = String(b.channelId || "").trim();
+    /* A YouTube channel id is UC + 22 characters. Rejecting a handle here
+       rather than storing it saves a source that silently never polls. */
+    if (!/^UC[\w-]{20,24}$/.test(channelId)) {
+      return res.status(400).json({
+        error: "That is not a YouTube channel id. It starts UC… — find it on the channel's About page.",
+      });
+    }
+    const r = await pool.query(`
+      INSERT INTO stream_sources (platform, channel_id, name, game, organiser, weight, is_enabled)
+      VALUES ('youtube',$1,$2,$3,$4,$5,$6)
+      ON CONFLICT (platform, channel_id) DO UPDATE SET
+        name = EXCLUDED.name, game = EXCLUDED.game,
+        organiser = EXCLUDED.organiser, weight = EXCLUDED.weight,
+        is_enabled = EXCLUDED.is_enabled
+      RETURNING *`,
+      [channelId, b.name || null, b.game || null, b.organiser || null,
+       Number(b.weight) || 0, b.enabled !== false]);
+    /* Poll straight away so a source added now shows something now,
+       rather than at the top of the next five-minute cycle. */
+    setTimeout(pollStreamSources, 500);
+    res.status(201).json({ id: r.rows[0].id });
+  } catch (e) {
+    console.error("[admin/stream-sources/create]", e.message);
+    res.status(500).json({ error: "Could not save that source" });
+  }
+});
+
+app.delete("/admin/stream-sources/:id", requireAuth, requireAdmin, async (req, res) => {
+  try {
+    await pool.query("DELETE FROM stream_sources WHERE id = $1", [req.params.id]);
+    res.json({ ok: true });
+  } catch (e) {
+    res.status(500).json({ error: "Could not delete that source" });
+  }
+});
+
+app.post("/admin/stream-sources/poll", requireAuth, requireAdmin, async (req, res) => {
+  if (!YT_KEY) return res.status(400).json({ error: "YOUTUBE_API_KEY is not set on the server" });
+  await pollStreamSources();
+  res.json({ ok: true });
+});
+
+// ── A user's own channels ─────────────────────────────────────────
+// A link is a claim. `verified` stays false and nothing is granted on the
+// strength of it — no badge, no placement, no cosmetic. When a real
+// verification exists it writes to that column and the rules can change
+// then; until it does, this is contact information, not proof.
+const _STREAM_PLATFORMS = ["youtube", "twitch", "kick"];
+
+app.get("/me/streams", requireAuth, async (req, res) => {
+  try {
+    const r = await pool.query(
+      `SELECT id, platform, channel_id, handle, url, verified, created_at
+         FROM user_streams WHERE user_id = $1 ORDER BY created_at`, [req.userId]);
+    res.json(r.rows.map((x) => ({
+      id: x.id, platform: x.platform, channelId: x.channel_id,
+      handle: x.handle, url: x.url, verified: !!x.verified,
+    })));
+  } catch (e) {
+    console.error("[me/streams]", e.message);
+    res.json([]);
+  }
+});
+
+app.post("/me/streams", requireAuth, async (req, res) => {
+  try {
+    const b = req.body || {};
+    const platform = String(b.platform || "").toLowerCase();
+    if (!_STREAM_PLATFORMS.includes(platform)) {
+      return res.status(400).json({ error: "Unsupported platform" });
+    }
+    const channelId = String(b.channelId || b.handle || "").trim();
+    if (!channelId) return res.status(400).json({ error: "Which channel?" });
+    if (channelId.length > 120) return res.status(400).json({ error: "That is not a channel" });
+
+    /* The URL is built here rather than accepted from the client: a
+       free-text url on a public profile is somewhere to put a link to
+       anywhere at all. */
+    const url = platform === "youtube"
+      ? (/^UC[\w-]{20,24}$/.test(channelId)
+          ? "https://www.youtube.com/channel/" + channelId
+          : "https://www.youtube.com/@" + channelId.replace(/^@/, ""))
+      : platform === "twitch" ? "https://www.twitch.tv/" + channelId.replace(/^@/, "")
+      : "https://kick.com/" + channelId.replace(/^@/, "");
+
+    const r = await pool.query(`
+      INSERT INTO user_streams (user_id, platform, channel_id, handle, url)
+      VALUES ($1,$2,$3,$4,$5)
+      ON CONFLICT (user_id, platform, channel_id) DO UPDATE SET handle = EXCLUDED.handle
+      RETURNING id`, [req.userId, platform, channelId, b.handle || channelId, url]);
+    res.status(201).json({ id: r.rows[0].id, platform, channelId, url, verified: false });
+  } catch (e) {
+    console.error("[me/streams/create]", e.message);
+    res.status(500).json({ error: "Could not link that channel" });
+  }
+});
+
+app.delete("/me/streams/:id", requireAuth, async (req, res) => {
+  try {
+    await pool.query("DELETE FROM user_streams WHERE id = $1 AND user_id = $2",
+      [req.params.id, req.userId]);
+    res.json({ ok: true });
+  } catch (e) {
+    res.status(500).json({ error: "Could not unlink that channel" });
+  }
+});
+
 // ── Admin: entering the events ────────────────────────────────────
 // Rows are created unpublished, so a half-entered event cannot appear
 // on the rail. Publishing is a deliberate second step.

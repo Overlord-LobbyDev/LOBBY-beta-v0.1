@@ -28334,7 +28334,8 @@ window.HUB_CLOSERS = {
   speedrunOverlay:          'closeSpeedrunHub',
   storeOverlay:             'closeStorePanel',
   queueOverlay:             'closeQueuePanel',
-  discoverOverlay:          'closeDiscoverPanel'
+  discoverOverlay:          'closeDiscoverPanel',
+  createTournamentOverlay:  'closeCreateTournamentPage'
 };
 
 /* Runs a hub's own close without going back through the manager, which
@@ -81655,44 +81656,211 @@ body.q-max #queueOverlay{ padding:0 !important; }
 </script>
 
 
-<!-- ═══ TOURNAMENTS · THE DESK ════════════════════════════════════
-     Three standing columns over the existing hub. The rail owns the
-     filters, the stage owns the majors marquee and the shelves, and
-     the desk owns whatever YOU are in -- next match, countdown, and a
-     bracket you can read without entering the tournament.
+<!-- ═══ TOURNAMENTS · THE ARENA ══════════════════════════════════════
+     Rebuilt to the brief: a live major playing the moment you arrive, a
+     calendar you can open, what you are entered in and how far it has
+     got, and a create route that is impossible to miss.
+
+     The old page is switched off here rather than restyled. Its hero
+     was the "very AI" centred landing block, its game grid duplicated
+     Discover, and _wireOverlayShrinkOnScroll collapsed the hero mid
+     scroll -- which is the scrolling bug: the page jumped because the
+     thing above the scroller changed height while you were moving.
      ══════════════════════════════════════════════════════════════ -->
 <style>
-/* ── The three columns ─────────────────────────────────────────── */
+/* ── Switch off the old page ───────────────────────────────────── */
+/* Kept in the DOM, not deleted: renderGtTournaments and friends still
+   write into gtStat*, gtGameGrid and gtGamesHead, and a missing node
+   would throw inside code this rebuild does not own. */
+#globalTournamentsOverlay .gt-hero,
+#globalTournamentsOverlay #gtFeaturedHost,
+#globalTournamentsOverlay #gtGamesHead,
+#globalTournamentsOverlay #gtGameGrid{ display:none !important; }
+
+#globalTournamentsOverlay{ --arena:#ff4d6d; }
+
+/* ── Shell ─────────────────────────────────────────────────────── */
 #gtDeskGrid{
-  flex:1; min-height:0; display:grid; gap:0;
-  grid-template-columns:236px minmax(0,1fr) 336px;
+  flex:1; min-height:0; display:grid;
+  grid-template-columns:224px minmax(0,1fr);
 }
-#gtRail, #gtDesk{
-  min-height:0; overflow-y:auto; overflow-x:hidden;
-  padding:14px 16px 40px;
-  /* Firefox first, then the WebKit pseudo-elements. Setting
-     scrollbar-width alone disables ::-webkit-scrollbar in Chromium and
-     you get the platform bar back, which is the bug this page had. */
+#gtRail{
+  min-height:0; overflow-y:auto; overflow-x:hidden; padding:16px 14px 40px;
+  border-right:1px solid rgba(255,255,255,.06);
   scrollbar-width:thin; scrollbar-color:rgba(255,255,255,.14) transparent;
 }
-#gtRail::-webkit-scrollbar, #gtDesk::-webkit-scrollbar{ width:8px }
-#gtRail::-webkit-scrollbar-thumb, #gtDesk::-webkit-scrollbar-thumb{
-  background:rgba(255,255,255,.14); border-radius:99px;
-}
-#gtRail::-webkit-scrollbar-track, #gtDesk::-webkit-scrollbar-track{ background:transparent }
-#gtRail{ border-right:1px solid rgba(255,255,255,.06) }
-#gtDesk{ border-left:1px solid rgba(255,255,255,.06) }
-#globalTournamentsOverlay #gtScroller{ padding:14px 26px 56px !important }
+#gtRail::-webkit-scrollbar{ width:8px }
+#gtRail::-webkit-scrollbar-thumb{ background:rgba(255,255,255,.14); border-radius:99px }
+#gtRail::-webkit-scrollbar-track{ background:transparent }
+#globalTournamentsOverlay #gtScroller{ padding:0 0 60px !important; }
 
-/* The hero was the "everything is centred" problem. It keeps every
-   control and every stat -- it just stops being a landing page. */
-#globalTournamentsOverlay .gt-hero{ padding:16px 26px 12px !important }
-#globalTournamentsOverlay .gt-hero-title{ font-size:clamp(20px,2.2vw,30px) !important; margin:0 0 10px !important }
-#globalTournamentsOverlay .gt-hero-inner{ gap:20px !important; align-items:center }
-#globalTournamentsOverlay .gt-hero-eyebrow{ display:none }
+/* ── The stage: a live major, and the calendar beside it ───────── */
+#gtStage{
+  display:grid; gap:16px; padding:16px 22px 22px;
+  grid-template-columns:minmax(0,1fr) 316px;
+  border-bottom:1px solid rgba(255,255,255,.06);
+}
+.ar-live{
+  position:relative; border-radius:14px; overflow:hidden;
+  background:#07080d; border:1px solid rgba(255,255,255,.09);
+  aspect-ratio:16/9; min-height:280px;
+}
+.ar-live iframe{ position:absolute; inset:0; width:100%; height:100%; border:0 }
+.ar-live-fill{
+  position:absolute; inset:0; background-size:cover; background-position:center;
+}
+.ar-live-fill::after{
+  content:""; position:absolute; inset:0;
+  background:linear-gradient(0deg,rgba(6,7,11,.94) 0%,rgba(6,7,11,.25) 55%,transparent 100%);
+}
+.ar-live-over{
+  position:absolute; left:0; right:0; bottom:0; z-index:2;
+  padding:16px 18px; display:grid; gap:9px;
+  background:linear-gradient(0deg,rgba(6,7,11,.92) 0%,transparent 100%);
+  pointer-events:none;
+}
+.ar-live-over > *{ pointer-events:auto }
+.ar-chip{
+  display:inline-flex; align-items:center; gap:6px; width:fit-content;
+  padding:4px 9px; border-radius:5px; font-family:var(--font);
+  font-size:9px; font-weight:900; letter-spacing:1.5px; text-transform:uppercase;
+  background:rgba(255,255,255,.12); color:#fff;
+}
+.ar-chip.live{ background:var(--arena); color:#fff }
+.ar-chip.live i{
+  width:6px; height:6px; border-radius:50%; background:#fff;
+  animation:arPulse 1.6s ease-in-out infinite;
+}
+@keyframes arPulse{ 0%,100%{opacity:1} 50%{opacity:.35} }
+.ar-live-name{
+  font-family:var(--font); font-size:clamp(19px,2.1vw,27px); font-weight:900;
+  letter-spacing:-.4px; line-height:1.06; margin:0; color:#fff;
+}
+.ar-live-meta{ display:flex; flex-wrap:wrap; gap:12px; font-size:12px; color:rgba(255,255,255,.72) }
+.ar-live-meta b{ color:#fff; font-weight:700 }
+.ar-live-btns{ display:flex; flex-wrap:wrap; gap:8px; align-items:center }
+.ar-btn{
+  height:31px; padding:0 13px; border-radius:8px; cursor:pointer;
+  border:1px solid rgba(255,255,255,.22); background:rgba(255,255,255,.1);
+  color:#fff; font-family:var(--font); font-size:9.5px; font-weight:900;
+  letter-spacing:1.2px; text-transform:uppercase;
+}
+.ar-btn:hover{ background:rgba(255,255,255,.18) }
+.ar-btn.solid{ background:var(--arena); border-color:var(--arena) }
+.ar-rot{ margin-left:auto; display:flex; gap:5px }
+.ar-rot button{
+  width:16px; height:3px; border-radius:3px; padding:0; border:none; cursor:pointer;
+  background:rgba(255,255,255,.24);
+}
+.ar-rot button.on{ width:28px; background:#fff }
+
+/* The empty case is a real state, not a fault: no major is on. */
+.ar-live-empty{
+  position:absolute; inset:0; display:grid; place-content:center; gap:9px;
+  text-align:center; padding:28px;
+}
+.ar-live-empty h3{ margin:0; font-size:16px; font-weight:800 }
+.ar-live-empty p{ margin:0; font-size:12.5px; color:var(--text-3); max-width:44ch; line-height:1.6 }
+
+/* ── Calendar ──────────────────────────────────────────────────── */
+.ar-cal{
+  border:1px solid rgba(255,255,255,.09); border-radius:14px;
+  background:rgba(255,255,255,.028); padding:13px 14px 14px;
+  display:grid; gap:10px; align-content:start;
+}
+.ar-cal-head{ display:flex; align-items:center; gap:8px }
+.ar-cal-title{
+  font-family:var(--font); font-size:11px; font-weight:900; letter-spacing:1.4px;
+  text-transform:uppercase; margin:0; flex:1;
+}
+.ar-cal-nav{
+  width:22px; height:22px; border-radius:6px; cursor:pointer; padding:0;
+  background:rgba(255,255,255,.06); border:1px solid rgba(255,255,255,.1);
+  color:var(--text-2); font-size:12px; line-height:1;
+}
+.ar-cal-nav:hover{ background:rgba(255,255,255,.12); color:var(--text-1) }
+.ar-cal-grid{ display:grid; grid-template-columns:repeat(7,1fr); gap:3px }
+.ar-dow{
+  font-family:var(--font); font-size:8.5px; font-weight:800; letter-spacing:.8px;
+  text-transform:uppercase; color:var(--text-3); text-align:center; padding-bottom:2px;
+}
+.ar-day{
+  aspect-ratio:1; border-radius:6px; border:1px solid transparent; cursor:default;
+  background:rgba(255,255,255,.02); color:var(--text-3);
+  font-size:10.5px; font-variant-numeric:tabular-nums;
+  display:grid; place-content:center; position:relative; padding:0;
+}
+.ar-day.out{ opacity:.28 }
+.ar-day.today{ border-color:rgba(255,255,255,.28); color:var(--text-1); font-weight:800 }
+.ar-day.has{ cursor:pointer; color:var(--text-1); background:rgba(255,77,109,.14); border-color:rgba(255,77,109,.34) }
+.ar-day.has:hover{ background:rgba(255,77,109,.26) }
+.ar-day.has::after{
+  content:''; position:absolute; bottom:3px; left:50%; transform:translateX(-50%);
+  width:4px; height:4px; border-radius:50%; background:var(--arena);
+}
+.ar-day.sel{ outline:2px solid var(--arena); outline-offset:-2px }
+.ar-cal-list{ display:grid; gap:6px; margin-top:2px }
+.ar-ev{
+  display:grid; gap:2px; padding:7px 9px; border-radius:8px; cursor:pointer;
+  background:rgba(255,255,255,.035); border:1px solid rgba(255,255,255,.07);
+  text-align:left; font-family:inherit;
+}
+.ar-ev:hover{ background:rgba(255,255,255,.07) }
+.ar-ev b{ font-size:11.5px; font-weight:700; color:var(--text-1) }
+.ar-ev span{ font-size:10px; color:var(--text-3) }
+.ar-ev.tourney b::before{ content:'\25C6  '; color:var(--arena) }
+.ar-cal-empty{ font-size:11px; color:var(--text-3); line-height:1.55; margin:2px 0 0 }
+
+/* ── Your tournaments, and how far they have got ───────────────── */
+#gtYours{ padding:18px 22px 4px; display:grid; gap:11px }
+.ar-h{
+  display:flex; align-items:baseline; gap:10px; margin:0;
+}
+.ar-h h2{
+  font-family:var(--font); font-size:12px; font-weight:900; letter-spacing:1.6px;
+  text-transform:uppercase; margin:0;
+}
+.ar-h span{ font-size:11px; color:var(--text-3) }
+.ar-mine{ display:grid; gap:9px; grid-template-columns:repeat(auto-fill,minmax(268px,1fr)) }
+.ar-m{
+  display:grid; gap:8px; padding:12px 13px; border-radius:11px; text-align:left;
+  background:rgba(255,255,255,.03); border:1px solid rgba(255,255,255,.08);
+  cursor:pointer; font-family:inherit;
+}
+.ar-m:hover{ background:rgba(255,255,255,.06); border-color:rgba(255,255,255,.16) }
+.ar-m-top{ display:flex; align-items:center; gap:8px }
+.ar-m-name{ font-size:13.5px; font-weight:800; flex:1; min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap }
+.ar-stage{
+  font-family:var(--font); font-size:8.5px; font-weight:900; letter-spacing:1.2px;
+  text-transform:uppercase; padding:3px 7px; border-radius:4px; flex:0 0 auto;
+  background:rgba(255,255,255,.08); color:var(--text-2);
+}
+.ar-stage.live{ background:rgba(255,77,109,.2); color:#ff97ab }
+.ar-stage.reg{ background:rgba(240,180,41,.18); color:#f0b429 }
+.ar-stage.done{ background:rgba(255,255,255,.06); color:var(--text-3) }
+/* The progress rail is the "what stage is it at" question answered as a
+   picture: filled pips are rounds played, the lit one is where it is. */
+.ar-pips{ display:flex; gap:3px; align-items:center }
+.ar-pip{ height:4px; flex:1; border-radius:99px; background:rgba(255,255,255,.09) }
+.ar-pip.done{ background:rgba(255,255,255,.34) }
+.ar-pip.now{ background:var(--arena) }
+.ar-m-sub{ font-size:11px; color:var(--text-3); display:flex; gap:9px; flex-wrap:wrap }
 
 /* ── Rail ──────────────────────────────────────────────────────── */
-.gtr-group{ margin-bottom:20px }
+.ar-create{
+  display:grid; gap:7px; padding:13px; border-radius:12px; margin-bottom:18px;
+  background:linear-gradient(160deg, rgba(255,77,109,.22), rgba(255,77,109,.06));
+  border:1px solid rgba(255,77,109,.38);
+}
+.ar-create h3{ margin:0; font-size:13px; font-weight:900; letter-spacing:-.1px }
+.ar-create p{ margin:0; font-size:11px; color:var(--text-2); line-height:1.5 }
+.ar-create button{
+  margin-top:4px; height:36px; border-radius:9px; border:none; cursor:pointer;
+  background:var(--arena); color:#fff; font-family:var(--font);
+  font-size:10.5px; font-weight:900; letter-spacing:1.3px; text-transform:uppercase;
+}
+.ar-create button:hover{ filter:brightness(1.1) }
+.gtr-group{ margin-bottom:18px }
 .gtr-head{
   font-family:var(--font); font-size:9.5px; font-weight:800; letter-spacing:1.6px;
   text-transform:uppercase; color:var(--text-3); margin:0 0 8px; padding:0 4px;
@@ -81702,200 +81870,60 @@ body.q-max #queueOverlay{ padding:0 !important; }
   padding:7px 9px; border-radius:8px; border:1px solid transparent;
   background:transparent; color:var(--text-2); cursor:pointer; text-align:left;
   font-family:var(--font); font-size:12.5px; font-weight:600;
-  transition:background .14s ease, color .14s ease, border-color .14s ease;
 }
 .gtr-item:hover{ background:rgba(255,255,255,.05); color:var(--text-1) }
-.gtr-item.on{
-  background:color-mix(in srgb, var(--accent) 16%, transparent);
-  border-color:color-mix(in srgb, var(--accent) 38%, transparent);
-  color:var(--text-1);
-}
+.gtr-item.on{ background:rgba(255,77,109,.16); border-color:rgba(255,77,109,.38); color:var(--text-1) }
 .gtr-dot{ width:6px; height:6px; border-radius:50%; background:currentColor; opacity:.55; flex:0 0 auto }
-.gtr-item.on .gtr-dot{ opacity:1; background:var(--accent) }
+.gtr-item.on .gtr-dot{ opacity:1; background:var(--arena) }
 .gtr-n{ margin-left:auto; font-size:10.5px; font-weight:800; color:var(--text-3); font-variant-numeric:tabular-nums }
-.gtr-item.on .gtr-n{ color:var(--accent) }
-
-.gtr-cta{
-  display:flex; align-items:center; justify-content:center; gap:7px; width:100%;
-  height:36px; border-radius:9px; border:none; cursor:pointer;
-  background:linear-gradient(135deg,var(--accent),color-mix(in srgb,var(--accent) 60%,#000));
-  color:#fff; font-family:var(--font); font-size:10.5px; font-weight:900;
-  letter-spacing:1.3px; text-transform:uppercase;
-  box-shadow:0 8px 22px -10px color-mix(in srgb,var(--accent) 70%,transparent);
-}
-.gtr-cta:hover{ filter:brightness(1.08) }
-
-/* Join by code. Its own shape -- four letters then four digits -- so a
-   lobby invite or a queue code pasted here fails cleanly instead of
-   half-matching something else in the app. */
-.gtr-code{ display:flex; gap:6px; margin-top:8px }
+.gtr-code{ display:flex; gap:6px }
 .gtr-code input{
-  flex:1; min-width:0; height:34px; border-radius:8px;
+  flex:1; min-width:0; height:33px; border-radius:8px;
   background:rgba(255,255,255,.04); border:1px solid rgba(255,255,255,.1);
   color:var(--text-1); padding:0 10px;
   font-family:"JetBrains Mono",ui-monospace,monospace; font-size:12px;
-  font-weight:700; letter-spacing:2.4px; text-transform:uppercase;
+  font-weight:700; letter-spacing:2.2px; text-transform:uppercase;
 }
-.gtr-code input::placeholder{ letter-spacing:2px; color:var(--text-3); font-weight:400 }
-.gtr-code input:focus{ outline:none; border-color:color-mix(in srgb,var(--accent) 55%,transparent) }
+.gtr-code input:focus{ outline:none; border-color:rgba(255,77,109,.6) }
 .gtr-code button{
-  height:34px; padding:0 12px; border-radius:8px; cursor:pointer;
+  height:33px; padding:0 12px; border-radius:8px; cursor:pointer;
   background:rgba(255,255,255,.06); border:1px solid rgba(255,255,255,.12);
-  color:var(--text-1); font-family:var(--font); font-size:10px; font-weight:800;
+  color:var(--text-1); font-family:var(--font); font-size:9.5px; font-weight:800;
   letter-spacing:1.2px; text-transform:uppercase;
 }
-.gtr-code button:hover{ background:rgba(255,255,255,.1) }
 .gtr-note{ font-size:10.5px; color:var(--text-3); margin:7px 4px 0; line-height:1.5 }
 .gtr-note.err{ color:#ff8a8a }
 
-/* ── Majors marquee ────────────────────────────────────────────── */
-#gtMajors{ margin:0 0 22px; display:none }
-#gtMajors.on{ display:block }
-.gtm-stage{
-  position:relative; border-radius:14px; overflow:hidden; min-height:172px;
-  border:1px solid rgba(255,255,255,.08);
-  display:grid; align-content:space-between; padding:18px 20px;
-  background:
-    radial-gradient(120% 150% at 82% -25%, rgba(139,107,255,.42) 0%, transparent 62%),
-    linear-gradient(115deg,#160f28 0%,#241038 46%,#0d0a15 100%);
-}
-.gtm-art{ position:absolute; inset:0; background-size:cover; background-position:center; opacity:.34 }
-.gtm-art::after{ content:""; position:absolute; inset:0; background:linear-gradient(90deg,rgba(11,12,18,.94) 30%,transparent 100%) }
-.gtm-in{ position:relative; z-index:1; display:grid; gap:10px }
-.gtm-tag{
-  display:inline-flex; align-items:center; gap:6px; width:fit-content;
-  padding:4px 9px; border-radius:5px;
-  font-family:var(--font); font-size:9px; font-weight:900; letter-spacing:1.5px;
-  text-transform:uppercase; background:rgba(139,107,255,.9); color:#fff;
-}
-.gtm-tag.live{ background:#ed4245 }
-.gtm-name{ font-family:var(--font); font-size:clamp(22px,2.6vw,34px); font-weight:900; letter-spacing:-.5px; line-height:1.04; margin:0 }
-.gtm-meta{ display:flex; flex-wrap:wrap; gap:14px; font-size:12px; color:rgba(255,255,255,.72) }
-.gtm-meta b{ color:#fff; font-weight:700 }
-.gtm-foot{ position:relative; z-index:1; display:flex; align-items:center; gap:10px; margin-top:14px }
-.gtm-btn{
-  height:32px; padding:0 14px; border-radius:8px; cursor:pointer;
-  border:1px solid rgba(255,255,255,.24); background:rgba(255,255,255,.08);
-  color:#fff; font-family:var(--font); font-size:10px; font-weight:800;
-  letter-spacing:1.2px; text-transform:uppercase;
-}
-.gtm-btn:hover{ background:rgba(255,255,255,.15) }
-.gtm-btn.on{ background:#fff; color:#16101f; border-color:#fff }
-.gtm-pager{ margin-left:auto; display:flex; gap:5px }
-.gtm-bar{ width:18px; height:3px; border-radius:3px; background:rgba(255,255,255,.22); cursor:pointer; border:none; padding:0 }
-.gtm-bar.on{ width:30px; background:#c9b6ff }
-.gtm-cd{ font-family:"JetBrains Mono",ui-monospace,monospace; font-size:13px; font-weight:700; color:#fff; font-variant-numeric:tabular-nums }
-
-/* ── Cards, not rows ───────────────────────────────────────────── */
-/* The art pipeline resolves a header for every one of these and the
-   old full-width row showed it as a 96px strip down the left. */
+/* ── Shelves ───────────────────────────────────────────────────── */
+#globalTournamentsOverlay #gtListHead,
+#globalTournamentsOverlay #gtStatusRail,
+#globalTournamentsOverlay #gtTournamentList{ padding-left:22px; padding-right:22px }
 #globalTournamentsOverlay #gtTournamentList{
   display:grid !important;
-  grid-template-columns:repeat(auto-fill,minmax(228px,1fr));
-  gap:14px !important;
+  grid-template-columns:repeat(auto-fill,minmax(214px,1fr));
+  gap:13px !important;
 }
 #globalTournamentsOverlay .gt-tournament-row{
   display:flex !important; flex-direction:column !important;
   align-items:stretch !important; gap:0 !important;
-  padding:0 !important; overflow:hidden; border-radius:12px;
-  min-height:0; height:auto;
+  padding:0 !important; overflow:hidden; border-radius:11px; height:auto;
 }
 #globalTournamentsOverlay .gt-row-art{
-  width:100% !important; height:104px !important; flex:0 0 104px !important;
-  border-radius:0 !important;
+  width:100% !important; height:96px !important; flex:0 0 96px !important; border-radius:0 !important;
 }
 #globalTournamentsOverlay .gt-row-body{
   flex-direction:column !important; align-items:stretch !important;
-  gap:9px !important; padding:11px 12px 12px !important;
+  gap:8px !important; padding:10px 11px 11px !important;
 }
-#globalTournamentsOverlay .gt-row-title{
-  font-size:14px !important; white-space:normal !important;
-  display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical;
-  overflow:hidden;
-}
+#globalTournamentsOverlay .gt-row-title{ font-size:13.5px !important; white-space:normal !important }
 #globalTournamentsOverlay .gt-row-chips{ flex-wrap:wrap !important }
-/* The chevron pointed right because the row was a list item. A card is
-   not, and the status badge is the thing worth keeping. */
 #globalTournamentsOverlay .gt-row-chev{ display:none !important }
-#globalTournamentsOverlay .gt-row-status{ align-self:flex-start }
 
-/* ── Desk ──────────────────────────────────────────────────────── */
-.gtd-card{
-  border:1px solid rgba(255,255,255,.08); border-radius:12px;
-  background:rgba(255,255,255,.028); padding:13px 14px; margin-bottom:12px;
+@media (max-width:1240px){
+  #gtStage{ grid-template-columns:minmax(0,1fr) }
+  .ar-cal{ order:-1 }
 }
-.gtd-card.you{
-  border-color:color-mix(in srgb,var(--accent) 34%, transparent);
-  background:linear-gradient(180deg, color-mix(in srgb,var(--accent) 9%, transparent), rgba(255,255,255,.02));
-}
-.gtd-head{
-  font-family:var(--font); font-size:9.5px; font-weight:800; letter-spacing:1.6px;
-  text-transform:uppercase; color:var(--text-3); margin:0 0 10px;
-}
-.gtd-head.accent{ color:var(--accent) }
-.gtd-name{ font-size:15px; font-weight:800; letter-spacing:-.2px; margin:0 0 3px; line-height:1.2 }
-.gtd-sub{ font-size:11.5px; color:var(--text-3); margin:0 }
-.gtd-cd{
-  font-family:"JetBrains Mono",ui-monospace,monospace;
-  font-size:26px; font-weight:700; letter-spacing:-.5px; margin:10px 0 2px;
-  font-variant-numeric:tabular-nums; color:var(--text-1);
-}
-.gtd-cd.soon{ color:#ffd36b }
-.gtd-cd.now{ color:#ff7b7b }
-.gtd-vs{ display:flex; align-items:center; gap:8px; margin:11px 0 12px }
-.gtd-av{
-  width:26px; height:26px; border-radius:50%; flex:0 0 26px;
-  background:rgba(255,255,255,.08); border:1px solid rgba(255,255,255,.12);
-  display:flex; align-items:center; justify-content:center;
-  font-size:11px; font-weight:800; color:var(--text-2); overflow:hidden;
-}
-.gtd-av img{ width:100%; height:100%; object-fit:cover }
-.gtd-vs-x{ font-family:var(--font); font-size:9px; font-weight:900; letter-spacing:1.4px; color:var(--accent) }
-.gtd-who{ font-size:12px; font-weight:700; min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap }
-.gtd-btn{
-  display:block; width:100%; height:34px; border-radius:9px; border:none; cursor:pointer;
-  background:var(--accent); color:#fff; font-family:var(--font);
-  font-size:10px; font-weight:900; letter-spacing:1.3px; text-transform:uppercase;
-}
-.gtd-btn.ghost{ background:rgba(255,255,255,.06); border:1px solid rgba(255,255,255,.12); color:var(--text-1); margin-top:7px }
-.gtd-btn:hover{ filter:brightness(1.1) }
-
-/* The bracket. Real structure -- rounds as columns, the live match lit
-   -- because a picture of the standings is the thing that saves you
-   opening the tournament to find out where you are. */
-.gtb{ display:flex; gap:0; align-items:stretch; overflow-x:auto; padding-bottom:4px }
-.gtb::-webkit-scrollbar{ height:6px }
-.gtb::-webkit-scrollbar-thumb{ background:rgba(255,255,255,.14); border-radius:99px }
-.gtb-col{ display:flex; flex-direction:column; justify-content:space-around; gap:6px; flex:0 0 auto }
-.gtb-r{
-  font-family:var(--font); font-size:8.5px; font-weight:800; letter-spacing:1.3px;
-  text-transform:uppercase; color:var(--text-3); margin:0 0 6px; text-align:center;
-}
-.gtb-m{ display:grid; gap:2px; margin:5px 0 }
-.gtb-s{
-  display:flex; align-items:center; gap:6px; width:112px; height:21px;
-  padding:0 7px; border-radius:5px;
-  background:rgba(255,255,255,.035); border:1px solid rgba(255,255,255,.08);
-  font-size:10.5px; color:var(--text-2);
-}
-.gtb-s .nm{ flex:1; min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap }
-.gtb-s .sc{ font-family:"JetBrains Mono",ui-monospace,monospace; font-size:10px; font-variant-numeric:tabular-nums; color:var(--text-3) }
-.gtb-s.won{ border-color:color-mix(in srgb,var(--accent) 55%,transparent); background:color-mix(in srgb,var(--accent) 13%,transparent); color:var(--text-1); font-weight:700 }
-.gtb-s.live{ border-color:rgba(237,66,69,.6); background:rgba(237,66,69,.12); color:#ffb3b3 }
-.gtb-s.me{ box-shadow:0 0 0 1px color-mix(in srgb,var(--accent) 45%,transparent) }
-.gtb-link{ width:12px; flex:0 0 12px; border-top:1px solid rgba(255,255,255,.12); align-self:center }
-
-.gtd-empty{ font-size:12px; color:var(--text-3); line-height:1.6; margin:0 }
-
-/* ── Narrow windows ────────────────────────────────────────────── */
-/* One breakpoint, one rule each way. The desk goes first because it is
-   the most easily replaced -- its content is reachable by opening the
-   tournament -- and the rail second. */
-@media (max-width:1380px){
-  #gtDeskGrid{ grid-template-columns:220px minmax(0,1fr) }
-  #gtDesk{ display:none }
-}
-@media (max-width:1040px){
+@media (max-width:980px){
   #gtDeskGrid{ grid-template-columns:minmax(0,1fr) }
   #gtRail{ display:none }
 }
@@ -81916,116 +81944,177 @@ body.q-max #queueOverlay{ padding:0 !important; }
     return Promise.reject(new Error('api not ready'));
   }
 
-  /* ══ Structure ════════════════════════════════════════════════
-     Moves the EXISTING scroller into a three-column grid rather than
-     rebuilding it. Every id the current renderers write into keeps its
-     node and its contents; only its parent changes. Idempotent, so
-     re-opening the page cannot build a second grid. */
-  function ensureDesk(){
+  /* ══ Structure ════════════════════════════════════════════════ */
+  function ensureArena(){
     var ov = $('globalTournamentsOverlay');
     var sc = $('gtScroller');
     if (!ov || !sc) return false;
-    if ($('gtDeskGrid')) return true;
 
-    var grid = document.createElement('div');
-    grid.id = 'gtDeskGrid';
+    /* The previous build left a right-hand column. It is gone: one panel
+       repeating what the cards already say is not worth a third of the
+       width. */
+    var oldDesk = $('gtDesk');
+    if (oldDesk) oldDesk.remove();
 
-    var rail = document.createElement('aside');
-    rail.id = 'gtRail';
-    var desk = document.createElement('aside');
-    desk.id = 'gtDesk';
+    if (!$('gtDeskGrid')) {
+      var grid = document.createElement('div');
+      grid.id = 'gtDeskGrid';
+      var rail = document.createElement('aside');
+      rail.id = 'gtRail';
+      sc.parentNode.insertBefore(grid, sc);
+      grid.appendChild(rail);
+      grid.appendChild(sc);
+    }
+    if (!$('gtStage')) {
+      var stage = document.createElement('section');
+      stage.id = 'gtStage';
+      stage.innerHTML =
+        '<div class="ar-live" id="gtLive"></div>' +
+        '<aside class="ar-cal" id="gtCal"></aside>';
+      sc.insertBefore(stage, sc.firstChild);
+    }
+    if (!$('gtYours')) {
+      var yours = document.createElement('section');
+      yours.id = 'gtYours';
+      sc.insertBefore(yours, $('gtStage').nextSibling);
+    }
 
-    /* insertBefore against the scroller's own parent, so the grid lands
-       exactly where the scroller was however the page is nested. */
-    sc.parentNode.insertBefore(grid, sc);
-    grid.appendChild(rail);
-    grid.appendChild(sc);          // moves it; contents come along
-    grid.appendChild(desk);
-
-    var majors = document.createElement('div');
-    majors.id = 'gtMajors';
-    sc.insertBefore(majors, sc.firstChild);
+    /* Shrink-on-scroll collapses the hero while you scroll, which is the
+       jumping. The hero is switched off here, so the behaviour has
+       nothing left to do but change the scroller's height mid-gesture. */
+    if (sc._shrinkWired && ov.classList) {
+      ov.classList.remove('is-shrunk');
+      if (ov._resetShrink) ov._resetShrink();
+    }
     return true;
   }
 
-  /* ══ Majors ═══════════════════════════════════════════════════ */
-  var majors = [], following = [], mIdx = 0, mTimer = null;
+  /* ══ The live stage ═══════════════════════════════════════════
+     A major playing the moment the page opens, muted, the way a
+     directory of live things should behave.
 
-  function fmtWindow(a, b){
-    if (!a) return '';
-    var d = new Date(a), o = { day:'numeric', month:'short' };
-    var out = d.toLocaleDateString(undefined, o);
-    if (b){
-      var e = new Date(b);
-      if (e.toDateString() !== d.toDateString()) out += ' — ' + e.toLocaleDateString(undefined, o);
-    }
-    return out;
+     What can actually be embedded matters here. The app is loaded with
+     BrowserWindow.loadFile, so the page's origin is file:// — it has no
+     hostname. Twitch's player REQUIRES a `parent` parameter matching the
+     embedding page's domain and refuses to load without one, so a Twitch
+     stream cannot play inline until the renderer is served from a real
+     origin. YouTube has no such requirement and plays. So: YouTube
+     embeds inline, everything else shows the event on its key art with a
+     way out to the stream. Nothing here pretends a stream is playing
+     when it is not. */
+  var majors = [], liveIdx = 0, liveTimer = null;
+
+  function ytId(url){
+    var m = String(url || '').match(
+      /(?:youtube\.com\/(?:watch\?v=|live\/|embed\/)|youtu\.be\/)([\w-]{6,})/);
+    return m ? m[1] : null;
   }
-  function untilText(iso){
-    if (!iso) return '';
-    var ms = new Date(iso).getTime() - Date.now();
-    if (ms <= 0) return '';
-    var d = Math.floor(ms / 86400000);
-    if (d >= 1) return d + (d === 1 ? ' day' : ' days') + ' away';
-    var h = Math.floor(ms / 3600000), m = Math.floor((ms % 3600000) / 60000);
-    return h ? h + 'h ' + m + 'm away' : m + 'm away';
+  function ytChannel(url){
+    var m = String(url || '').match(/youtube\.com\/(?:channel\/)(UC[\w-]+)/);
+    return m ? m[1] : null;
+  }
+  function isTwitch(url){ return /twitch\.tv/i.test(String(url || '')); }
+
+  /* The server decides what is live and in what order — it is the only
+     side that can, because liveness for a discovered stream comes from
+     YouTube and not from a date range. `live` arrives on the item. */
+  function liveNow(list){
+    return list.filter(function (m){ return !!m.live; });
   }
 
-  function paintMajors(){
-    var host = $('gtMajors');
+  function paintLive(){
+    var host = $('gtLive');
     if (!host) return;
-    /* No events entered yet is not an error and not an empty state to
-       apologise for -- the rail simply is not there. */
-    if (!majors.length){ host.classList.remove('on'); host.innerHTML = ''; return; }
-    host.classList.add('on');
 
-    if (mIdx >= majors.length) mIdx = 0;
-    var m = majors[mIdx];
-    var isFollowing = following.indexOf(m.id) >= 0;
-    var bits = [];
-    if (m.game)     bits.push('<span><b>' + esc(m.game) + '</b></span>');
-    if (m.location) bits.push('<span>' + esc(m.location) + '</span>');
-    var when = fmtWindow(m.startsAt, m.endsAt);
-    if (when)       bits.push('<span>' + esc(when) + '</span>');
-    if (m.followers) bits.push('<span>' + m.followers + ' following</span>');
+    var on = liveNow(majors);
+    /* Nothing live: show the next one up. The server has already sorted
+       the not-live ones by how soon they start, so the front of the list
+       IS the next one — no client-side date arithmetic that could
+       disagree with the ordering the calendar uses. */
+    var pool = on.length ? on : majors.slice(0, 1);
+    if (!pool.length){
+      host.innerHTML =
+        '<div class="ar-live-empty">' +
+          '<h3>Nothing on right now</h3>' +
+          '<p>The moment a watched channel goes live it plays here, and ' +
+             'when none is, whatever starts next takes the stage. Add ' +
+             'channels and events in the admin screen &mdash; nothing is ' +
+             'invented, so an empty schedule looks empty.</p>' +
+        '</div>';
+      return;
+    }
+    if (liveIdx >= pool.length) liveIdx = 0;
+    var m = pool[liveIdx];
+    var isLive = on.length > 0;
 
-    var until = m.live ? '' : untilText(m.startsAt);
+    /* A discovered stream arrives with its video id already resolved;
+       a curated major has to have one parsed out of whatever URL was
+       entered for it. */
+    var vid = m.videoId || ytId(m.streamUrl) || ytId(m.url);
+    var ch  = ytChannel(m.streamUrl) || ytChannel(m.url);
+    var src = vid ? ('https://www.youtube.com/embed/' + vid +
+                     '?autoplay=1&mute=1&playsinline=1&rel=0&modestbranding=1')
+            : ch  ? ('https://www.youtube.com/embed/live_stream?channel=' + ch +
+                     '&autoplay=1&mute=1&playsinline=1')
+            : null;
+
+    var meta = [];
+    if (m.game) meta.push('<span><b>' + esc(m.game) + '</b></span>');
+    if (m.location) meta.push('<span>' + esc(m.location) + '</span>');
+    if (m.organiser) meta.push('<span>' + esc(m.organiser) + '</span>');
+    if (m.viewers) meta.push('<span><b>' + Number(m.viewers).toLocaleString() + '</b> watching</span>');
+    if (m.followers) meta.push('<span>' + m.followers + ' following</span>');
+    if (!isLive && m.startsAt) {
+      var mins = Math.round((new Date(m.startsAt) - Date.now()) / 60000);
+      if (mins > 0) {
+        meta.push('<span>starts in ' + (mins < 60 ? mins + 'm'
+          : mins < 1440 ? Math.round(mins / 60) + 'h'
+          : Math.round(mins / 1440) + 'd') + '</span>');
+      }
+    }
 
     host.innerHTML =
-      '<div class="gtm-stage">' +
-        (m.art ? '<div class="gtm-art" style="background-image:url(\'' + esc(m.art) + '\')"></div>' : '') +
-        '<div class="gtm-in">' +
-          '<span class="gtm-tag' + (m.live ? ' live' : '') + '">' +
-            (m.live ? '● Live now' : esc(m.tier || 'Major')) + '</span>' +
-          '<h2 class="gtm-name">' + esc(m.name) + '</h2>' +
-          '<div class="gtm-meta">' + bits.join('') + '</div>' +
-        '</div>' +
-        '<div class="gtm-foot">' +
-          '<button class="gtm-btn' + (isFollowing ? ' on' : '') + '" type="button" ' +
-            'onclick="window.gtToggleMajor(' + m.id + ')">' +
-            (isFollowing ? 'Following' : 'Follow') + '</button>' +
-          (m.streamUrl ? '<button class="gtm-btn" type="button" onclick="window.gtOpenMajor(' + m.id + ',1)">Watch</button>' : '') +
-          (m.url ? '<button class="gtm-btn" type="button" onclick="window.gtOpenMajor(' + m.id + ',0)">Event page</button>' : '') +
-          (until ? '<span class="gtm-cd">' + esc(until) + '</span>' : '') +
-          (majors.length > 1 ? '<span class="gtm-pager">' + majors.map(function (_, i){
-            return '<button class="gtm-bar' + (i === mIdx ? ' on' : '') + '" type="button" ' +
-                   'aria-label="Event ' + (i + 1) + '" onclick="window.gtMajorAt(' + i + ')"></button>';
-          }).join('') + '</span>' : '') +
+      (src
+        ? '<iframe src="' + esc(src) + '" allow="autoplay; encrypted-media; picture-in-picture" ' +
+          'allowfullscreen title="' + esc(m.name) + '"></iframe>'
+        : '<div class="ar-live-fill" style="background-image:url(\'' + esc(m.art || '') + '\')"></div>') +
+      '<div class="ar-live-over">' +
+        '<span class="ar-chip' + (isLive ? ' live' : '') + '">' +
+          (isLive ? '<i></i>Live now' : esc(m.tier || 'Next up')) + '</span>' +
+        '<h2 class="ar-live-name">' + esc(m.name) + '</h2>' +
+        (meta.length ? '<div class="ar-live-meta">' + meta.join('') + '</div>' : '') +
+        '<div class="ar-live-btns">' +
+          (m.streamUrl && !src
+            ? '<button class="ar-btn solid" type="button" onclick="window.arOpen(' + m.id + ',1)">' +
+              (isTwitch(m.streamUrl) ? 'Watch on Twitch' : 'Watch stream') + '</button>' : '') +
+          (m.url ? '<button class="ar-btn" type="button" onclick="window.arOpen(' + m.id + ',0)">Event page</button>' : '') +
+          (m.kind === 'major'
+            ? '<button class="ar-btn" type="button" onclick="window.arFollow(' + m.id + ')">Follow</button>'
+            : '') +
+          (pool.length > 1
+            ? '<span class="ar-rot">' + pool.map(function (_, i){
+                return '<button type="button" aria-label="Event ' + (i+1) + '" ' +
+                  'class="' + (i === liveIdx ? 'on' : '') + '" ' +
+                  'onclick="window.arLiveAt(' + i + ')"></button>';
+              }).join('') + '</span>' : '') +
         '</div>' +
       '</div>';
   }
 
-  function rotate(){
-    clearInterval(mTimer);
-    if (majors.length < 2) return;
-    mTimer = setInterval(function (){
-      if (!document.body.contains($('gtMajors'))) { clearInterval(mTimer); return; }
-      mIdx = (mIdx + 1) % majors.length;
-      paintMajors();
-    }, 8000);
+  /* Rotation only when more than one is genuinely live, and slow: an
+     embedded player restarting every few seconds is worse than no
+     rotation at all. */
+  function rotateLive(){
+    clearInterval(liveTimer);
+    if (liveNow(majors).length < 2) return;
+    liveTimer = setInterval(function (){
+      if (!document.body.contains($('gtLive'))) { clearInterval(liveTimer); return; }
+      liveIdx++;
+      paintLive();
+    }, 45000);
   }
-  window.gtMajorAt = function (i){ mIdx = i; paintMajors(); rotate(); };
-  window.gtOpenMajor = function (id, stream){
+  window.arLiveAt = function (i){ liveIdx = i; paintLive(); rotateLive(); };
+  window.arOpen = function (id, stream){
     var m = majors.find(function (x){ return x.id === id; });
     if (!m) return;
     var href = stream ? (m.streamUrl || m.url) : (m.url || m.streamUrl);
@@ -82033,92 +82122,175 @@ body.q-max #queueOverlay{ padding:0 !important; }
     if (window.lobbyOpenExternal) window.lobbyOpenExternal(href);
     else window.open(href, '_blank', 'noopener');
   };
-  window.gtToggleMajor = function (id){
-    var on = following.indexOf(id) >= 0;
-    /* Optimistic, then reconciled: the button is the whole interaction,
-       so it has to respond now. A failure puts it back. */
-    if (on) following = following.filter(function (x){ return x !== id; });
-    else following = following.concat([id]);
-    paintMajors();
-    api('/majors/' + id + '/follow', { method: on ? 'DELETE' : 'POST' })
-      .catch(function (){
-        if (on) following = following.concat([id]);
-        else following = following.filter(function (x){ return x !== id; });
-        paintMajors();
-        if (window.showToast) window.showToast('Could not save that', 'error');
-      });
+  window.arFollow = function (id){
+    api('/majors/' + id + '/follow', { method: 'POST' })
+      .then(function (){ if (window.showToast) window.showToast('Following — you will be reminded', 'success'); })
+      .catch(function (){ if (window.showToast) window.showToast('Could not follow that', 'error'); });
   };
 
-  async function loadMajors(){
-    try {
-      var r = await api('/majors').catch(function (){ return null; });
-      majors = Array.isArray(r) ? r : [];
-    } catch (e) { majors = []; }
-    try {
-      var f = await api('/majors/following').catch(function (){ return null; });
-      following = Array.isArray(f) ? f : [];
-    } catch (e) { following = []; }
-    mIdx = 0; paintMajors(); rotate();
+  /* ══ Calendar ═════════════════════════════════════════════════
+     Majors and tournaments on the same grid, because "what is on" is
+     one question. Tournaments are marked so the two never blur. */
+  var calMonth = null, calSel = null;
+
+  function dayKey(d){ return d.getFullYear() + '-' + (d.getMonth()+1) + '-' + d.getDate(); }
+
+  function calEvents(){
+    var out = {};
+    function add(when, item){
+      if (!when) return;
+      var d = new Date(when);
+      if (isNaN(d)) return;
+      (out[dayKey(d)] = out[dayKey(d)] || []).push(item);
+    }
+    majors.forEach(function (m){
+      /* A stream that is already live has no future date to sit on, and
+         putting it on today's cell would say it starts later. */
+      if (m.live) return;
+      add(m.startsAt, { kind:'major', id:m.id, name:m.name,
+                        sub:m.game || m.location || m.organiser || 'Event' });
+    });
+    (rowsNow() || []).forEach(function (t){
+      add(t.startTime, { kind:'tourney', id:t.id, name:t.name, sub:(t.format || 'Tournament') });
+    });
+    return out;
+  }
+
+  function paintCal(){
+    var host = $('gtCal');
+    if (!host) return;
+    var now = new Date();
+    if (!calMonth) calMonth = new Date(now.getFullYear(), now.getMonth(), 1);
+
+    var evs = calEvents();
+    var first = new Date(calMonth.getFullYear(), calMonth.getMonth(), 1);
+    /* Monday-first, which is what a European calendar looks like and what
+       the rest of this app's dates assume. */
+    var lead = (first.getDay() + 6) % 7;
+    var start = new Date(first); start.setDate(1 - lead);
+
+    var cells = '';
+    for (var i = 0; i < 42; i++){
+      var d = new Date(start); d.setDate(start.getDate() + i);
+      var key = dayKey(d);
+      var has = !!evs[key];
+      var cls = ['ar-day'];
+      if (d.getMonth() !== calMonth.getMonth()) cls.push('out');
+      if (dayKey(d) === dayKey(now)) cls.push('today');
+      if (has) cls.push('has');
+      if (calSel === key) cls.push('sel');
+      cells += '<button type="button" class="' + cls.join(' ') + '"' +
+        (has ? ' onclick="window.arCalPick(\'' + key + '\')"' : ' disabled') +
+        ' aria-label="' + d.toDateString() + '">' + d.getDate() + '</button>';
+    }
+
+    var sel = calSel && evs[calSel] ? evs[calSel] : null;
+    var monthName = calMonth.toLocaleDateString(undefined, { month:'long', year:'numeric' });
+
+    host.innerHTML =
+      '<div class="ar-cal-head">' +
+        '<h3 class="ar-cal-title">' + esc(monthName) + '</h3>' +
+        '<button class="ar-cal-nav" type="button" onclick="window.arCalMove(-1)" aria-label="Previous month">&lsaquo;</button>' +
+        '<button class="ar-cal-nav" type="button" onclick="window.arCalMove(1)" aria-label="Next month">&rsaquo;</button>' +
+      '</div>' +
+      '<div class="ar-cal-grid">' +
+        ['M','T','W','T','F','S','S'].map(function (d){ return '<span class="ar-dow">' + d + '</span>'; }).join('') +
+        cells +
+      '</div>' +
+      '<div class="ar-cal-list">' +
+        (sel
+          ? sel.map(function (e){
+              return '<button type="button" class="ar-ev ' + e.kind + '" ' +
+                'onclick="window.arCalOpen(\'' + e.kind + '\',\'' + esc(e.id) + '\')">' +
+                '<b>' + esc(e.name) + '</b><span>' + esc(e.sub) + '</span></button>';
+            }).join('')
+          : '<p class="ar-cal-empty">Days with something on are marked. ' +
+            'Majors and tournaments both show here.</p>') +
+      '</div>';
+  }
+
+  window.arCalMove = function (n){
+    calMonth = new Date(calMonth.getFullYear(), calMonth.getMonth() + n, 1);
+    calSel = null; paintCal();
+  };
+  window.arCalPick = function (key){ calSel = (calSel === key ? null : key); paintCal(); };
+  window.arCalOpen = function (kind, id){
+    if (kind === 'tourney') { if (window.gtJoin) window.gtJoin(String(id)); return; }
+    window.arOpen(Number(id), 0);
+  };
+
+  /* ══ Yours, and how far it has got ════════════════════════════ */
+  var mine = [];
+
+  /* The stage a bracket is at, as a label and a position. Rounds are
+     derived from the entrant count because a single-elimination bracket
+     of N needs ceil(log2 N) of them — so this can say "Round 2 of 4"
+     without the bracket having been fetched. */
+  function stageOf(t){
+    var st = String(t.status || '').toUpperCase();
+    if (st === 'DONE' || st === 'COMPLETED') return { key:'done', label:'Finished', at:1, of:1 };
+    if (st === 'OPEN' || st === 'REGISTRATION') return { key:'reg', label:'Registration', at:0, of:1 };
+    if (st === 'STARTING') return { key:'reg', label:'Starting', at:0, of:1 };
+    var n = Math.max(2, Number(t.entrants) || 2);
+    var of = Math.max(1, Math.ceil(Math.log(n) / Math.log(2)));
+    var at = Math.min(of, Number(t.round) || 1);
+    var label = (at >= of) ? 'Final' : (at === of - 1 ? 'Semi-final' : 'Round ' + at);
+    return { key:'live', label:label, at:at, of:of };
+  }
+
+  function paintYours(){
+    var host = $('gtYours');
+    if (!host) return;
+    if (!mine.length){
+      host.innerHTML =
+        '<div class="ar-h"><h2>Your tournaments</h2><span>nothing yet</span></div>' +
+        '<p class="ar-cal-empty" style="padding:2px 0 6px">Enter one below, or start your own ' +
+        '&mdash; public, or private with a code you hand out.</p>';
+      return;
+    }
+    host.innerHTML =
+      '<div class="ar-h"><h2>Your tournaments</h2><span>' + mine.length +
+        (mine.length === 1 ? ' entered' : ' entered') + '</span></div>' +
+      '<div class="ar-mine">' + mine.map(function (t){
+        var s = stageOf(t);
+        var pips = '';
+        for (var i = 1; i <= s.of; i++){
+          pips += '<i class="ar-pip' + (i < s.at ? ' done' : i === s.at ? ' now' : '') + '"></i>';
+        }
+        var sub = [];
+        if (t.entrants) sub.push(t.entrants + ' entrants');
+        if (t.format) sub.push(esc(t.format));
+        if (t.isHost) sub.push('You host');
+        if (t.joinCode) sub.push('Code ' + esc(t.joinCode));
+        return '<button type="button" class="ar-m" onclick="window.gtJoin(\'' + esc(t.id) + '\')">' +
+          '<div class="ar-m-top">' +
+            '<span class="ar-m-name">' + esc(t.name || 'Tournament') + '</span>' +
+            '<span class="ar-stage ' + s.key + '">' + esc(s.label) + '</span>' +
+          '</div>' +
+          (s.of > 1 ? '<div class="ar-pips">' + pips + '</div>' : '') +
+          '<div class="ar-m-sub">' + sub.join('<span>&middot;</span>') + '</div>' +
+        '</button>';
+      }).join('') + '</div>';
   }
 
   /* ══ Rail ═════════════════════════════════════════════════════ */
-  var fmtFilter = 'all';
-
-  /* _gtRowsCache and _gtSelectedGame are top-level `let` declarations
-     (see ~28279). A top-level let never becomes a window property, but
-     it is reachable as a bare identifier from another classic script in
-     the same document — so these read the identifier and keep the
-     window lookup only as a fallback. Reading them off window, which is
-     the obvious-looking thing to write, silently yields undefined. */
   function rowsNow(){
     try { if (typeof _gtRowsCache !== 'undefined' && Array.isArray(_gtRowsCache)) return _gtRowsCache; }
     catch (e) {}
     return Array.isArray(window._gtRowsCache) ? window._gtRowsCache : [];
-  }
-  function selectedGame(){
-    try { if (typeof _gtSelectedGame !== 'undefined') return _gtSelectedGame || null; }
-    catch (e) {}
-    return window._gtSelectedGame || null;
   }
   function statusNow(){
     try { if (typeof _gtStatus !== 'undefined') return _gtStatus || 'all'; }
     catch (e) {}
     return 'all';
   }
-  function fmtOf(r){ return String(r && r.format || '').toLowerCase(); }
-
-  window.gtSetFormat = function (id){
-    fmtFilter = (fmtFilter === id && id !== 'all') ? 'all' : id;
-    paintRail();
-    applyFormat();
-  };
-
-  /* The format filter is applied by hiding cards rather than by
-     re-rendering the list. _gtPaintList owns that markup and owns the
-     status and game filters; a second renderer writing the same node
-     would be two sources of truth for one list. */
-  function applyFormat(){
-    var list = $('gtTournamentList');
-    if (!list) return;
-    var rows = rowsNow(), byId = {};
-    rows.forEach(function (r){ byId[String(r.id)] = r; });
-    Array.prototype.forEach.call(list.children, function (el){
-      var oc = el.getAttribute('onclick') || '';
-      var m = oc.match(/gtJoin\(\'([^\']+)\'\)/);
-      var r = m ? byId[m[1]] : null;
-      var show = fmtFilter === 'all' || (r && fmtOf(r).indexOf(fmtFilter) >= 0);
-      el.style.display = show ? '' : 'none';
-    });
-  }
 
   function paintRail(){
     var rail = $('gtRail');
     if (!rail) return;
     var rows = rowsNow();
-    var st = function (r){
-      return String(r && r.status || 'OPEN').toUpperCase();
-    };
-    var counts = {
+    var st = function (r){ return String(r && r.status || 'OPEN').toUpperCase(); };
+    var c = {
       all: rows.length,
       live: rows.filter(function (r){ return st(r) === 'LIVE'; }).length,
       soon: rows.filter(function (r){ return st(r) === 'STARTING'; }).length,
@@ -82126,337 +82298,114 @@ body.q-max #queueOverlay{ padding:0 !important; }
       done: rows.filter(function (r){ var x = st(r); return x === 'DONE' || x === 'COMPLETED'; }).length
     };
     var cur = statusNow();
-
-    function item(id, label, n, active, handler){
-      return '<button class="gtr-item' + (active ? ' on' : '') + '" type="button" ' +
-        'onclick="' + handler + '(\'' + id + '\')">' +
-        '<i class="gtr-dot"></i><span>' + esc(label) + '</span>' +
-        (n == null ? '' : '<span class="gtr-n">' + n + '</span>') + '</button>';
+    function item(id, label, n){
+      return '<button class="gtr-item' + (cur === id ? ' on' : '') + '" type="button" ' +
+        'onclick="window.arStatus(\'' + id + '\')"><i class="gtr-dot"></i><span>' + esc(label) +
+        '</span><span class="gtr-n">' + n + '</span></button>';
     }
-
-    /* Games come from what is actually on, not a fixed list -- a rail
-       full of games with no brackets in them is a rail of dead ends. */
-    var games = {};
-    rows.forEach(function (r){ if (r.game) games[r.game] = (games[r.game] || 0) + 1; });
-    var gameIds = Object.keys(games).sort(function (a, b){ return games[b] - games[a]; }).slice(0, 8);
-    var selGame = selectedGame();
-
-    var fmts = [['single','Single elim'],['double','Double elim'],['round','Round robin']];
-
     rail.innerHTML =
+      '<div class="ar-create">' +
+        '<h3>Run your own</h3>' +
+        '<p>Pick a game, a format and a size. Public, or private with a code.</p>' +
+        '<button type="button" onclick="window.openCreateTournament()">Create tournament</button>' +
+      '</div>' +
       '<div class="gtr-group">' +
-        '<p class="gtr-head">Start or join</p>' +
-        '<button class="gtr-cta" type="button" onclick="window.openCreateTournament()">Create tournament</button>' +
+        '<p class="gtr-head">Have a code?</p>' +
         '<div class="gtr-code">' +
-          '<input id="gtCodeInput" maxlength="9" placeholder="ABCD1234" ' +
-            'aria-label="Tournament code" ' +
+          '<input id="gtCodeInput" maxlength="9" placeholder="ABCD1234" aria-label="Tournament code" ' +
             'onkeydown="if(event.key===\'Enter\')window.gtJoinByCode()">' +
           '<button type="button" onclick="window.gtJoinByCode()">Join</button>' +
         '</div>' +
-        '<p class="gtr-note" id="gtCodeNote">Four letters, four digits. Private tournaments only.</p>' +
+        '<p class="gtr-note" id="gtCodeNote">Four letters, four digits.</p>' +
       '</div>' +
-
       '<div class="gtr-group">' +
-        '<p class="gtr-head">Status</p>' +
-        item('all','All',counts.all,cur==='all','window.gtRailStatus') +
-        item('live','Live now',counts.live,cur==='live','window.gtRailStatus') +
-        item('soon','Starting',counts.soon,cur==='soon','window.gtRailStatus') +
-        item('open','Open',counts.open,cur==='open','window.gtRailStatus') +
-        item('done','Finished',counts.done,cur==='done','window.gtRailStatus') +
-      '</div>' +
-
-      (gameIds.length ?
-      '<div class="gtr-group">' +
-        '<p class="gtr-head">Game</p>' +
-        item('','Any game',null,!selGame,'window.gtRailGame') +
-        gameIds.map(function (g){
-          var meta = (typeof window._gtGame === 'function') ? window._gtGame(g) : null;
-          return item(g, (meta && meta.name) || g, games[g], selGame === g, 'window.gtRailGame');
-        }).join('') +
-      '</div>' : '') +
-
-      '<div class="gtr-group">' +
-        '<p class="gtr-head">Format</p>' +
-        item('all','Any format',null,fmtFilter==='all','window.gtSetFormat') +
-        fmts.map(function (f){
-          var n = rows.filter(function (r){ return fmtOf(r).indexOf(f[0]) >= 0; }).length;
-          return item(f[0], f[1], n, fmtFilter === f[0], 'window.gtSetFormat');
-        }).join('') +
+        '<p class="gtr-head">Browse</p>' +
+        item('all','All',c.all) + item('live','Live now',c.live) +
+        item('soon','Starting',c.soon) + item('open','Open',c.open) +
+        item('done','Finished',c.done) +
       '</div>';
   }
 
-  window.gtRailStatus = function (id){
-    /* gtSetStatus owns the toggle — including the 'clicking the active
-       one clears it' rule. Keeping a second copy of that state here is
-       how the rail and the list end up disagreeing about what is
-       selected, so the rail reads it back instead of tracking it. */
+  window.arStatus = function (id){
     if (typeof window.gtSetStatus === 'function') window.gtSetStatus(id);
     paintRail();
-    setTimeout(applyFormat, 0);
-  };
-  window.gtRailGame = function (g){
-    /* gtSelectGame repaints the list itself, so there is nothing to
-       call after it. (An earlier draft also called a _gtRepaint that
-       does not exist — typeof-guarded, so it was a silent no-op.) */
-    if (typeof window.gtSelectGame === 'function') window.gtSelectGame(g || null);
-    paintRail();
-    setTimeout(applyFormat, 0);
   };
 
-  /* ══ Join by code ═════════════════════════════════════════════ */
   window.gtJoinByCode = async function (){
     var input = $('gtCodeInput'), note = $('gtCodeNote');
     if (!input) return;
     var raw = String(input.value || '').toUpperCase().replace(/[^A-Z0-9]/g, '');
-    function fail(msg){
-      if (note){ note.textContent = msg; note.classList.add('err'); }
-    }
-    function ok(msg){
-      if (note){ note.textContent = msg; note.classList.remove('err'); }
-    }
-    /* Checked here as well as on the server, so a typo is a message
-       under the box rather than a round trip and a 404. */
-    if (!/^[A-Z]{4}[0-9]{4}$/.test(raw)){
-      return fail('That is not a tournament code — four letters, then four digits.');
-    }
-    ok('Looking…');
+    var say = function (msg, err){
+      if (!note) return;
+      note.textContent = msg;
+      note.classList.toggle('err', !!err);
+    };
+    if (!/^[A-Z]{4}[0-9]{4}$/.test(raw)) return say('Four letters, then four digits.', true);
+    say('Looking…');
     var r = await api('/tournaments/code/' + raw).catch(function (){ return null; });
-    if (!r || !r.id || r.error){
-      return fail('No tournament with that code.');
-    }
-    ok('Opening ' + (r.name || 'tournament') + '…');
+    if (!r || !r.id || r.error) return say('No tournament with that code.', true);
+    say('Opening …');
     input.value = '';
     if (typeof window.gtJoin === 'function') window.gtJoin(String(r.id));
   };
 
-  /* ══ Desk — what you are in ═══════════════════════════════════ */
-  var mine = [], deskTimer = null;
-
-  function initials(n){ return String(n || '?').trim().charAt(0).toUpperCase() || '?'; }
-  function avatar(name, url){
-    return '<span class="gtd-av">' +
-      (url ? '<img src="' + esc(url) + '" alt="">' : esc(initials(name))) + '</span>';
-  }
-
-  function cdParts(iso){
-    var ms = new Date(iso).getTime() - Date.now();
-    if (!isFinite(ms)) return null;
-    var late = ms <= 0;
-    var a = Math.abs(ms);
-    var h = Math.floor(a / 3600000);
-    var m = Math.floor((a % 3600000) / 60000);
-    var sec = Math.floor((a % 60000) / 1000);
-    var pad = function (x){ return (x < 10 ? '0' : '') + x; };
-    return { late: late, text: pad(h) + ':' + pad(m) + ':' + pad(sec), ms: ms };
-  }
-
-  function paintDesk(){
-    var desk = $('gtDesk');
-    if (!desk) return;
-
-    var live = mine.filter(function (t){ return String(t.status).toUpperCase() === 'LIVE'; });
-    var soon = mine.filter(function (t){
-      var s = String(t.status).toUpperCase();
-      return s === 'STARTING' || s === 'OPEN' || s === 'REGISTRATION';
-    }).sort(function (a, b){
-      return new Date(a.startTime || 0) - new Date(b.startTime || 0);
-    });
-    var focus = live[0] || soon[0] || null;
-
-    if (!focus){
-      desk.innerHTML =
-        '<div class="gtd-card">' +
-          '<p class="gtd-head">Your tournaments</p>' +
-          '<p class="gtd-empty">You are not in a bracket yet. Enter one from the shelves, ' +
-            'or start your own — public, or private with a code you hand out.</p>' +
-          '<button class="gtd-btn" type="button" style="margin-top:12px" ' +
-            'onclick="window.openCreateTournament()">Create tournament</button>' +
-        '</div>';
-      return;
+  /* ══ Loading ══════════════════════════════════════════════════ */
+  /* One request, already ordered. Falls back to the curated majors alone
+     if the stage endpoint is not there yet — an older server should show
+     a smaller page, not a broken one. */
+  async function loadMajors(){
+    var r = await api('/arena/stage').catch(function (){ return null; });
+    if (!Array.isArray(r) || !r.length) {
+      var m = await api('/majors').catch(function (){ return null; });
+      r = Array.isArray(m) ? m.map(function (x){
+        return Object.assign({ kind: 'major' }, x);
+      }) : [];
     }
-
-    var when = focus.startTime ? cdParts(focus.startTime) : null;
-    var isLive = String(focus.status).toUpperCase() === 'LIVE';
-    var cdCls = isLive ? 'now' : (when && when.ms < 3600000 ? 'soon' : '');
-    var cdText = isLive ? 'Live' : (when ? (when.late ? 'Starting' : when.text) : '—');
-
-    var faces = (focus.faces || []).slice(0, 2);
-    var vs = faces.length >= 2
-      ? avatar(faces[0].name, faces[0].avatar) +
-        '<span class="gtd-who">' + esc(faces[0].name || '') + '</span>' +
-        '<span class="gtd-vs-x">VS</span>' +
-        avatar(faces[1].name, faces[1].avatar) +
-        '<span class="gtd-who">' + esc(faces[1].name || '') + '</span>'
-      : '';
-
-    desk.innerHTML =
-      '<div class="gtd-card you">' +
-        '<p class="gtd-head accent">' + (isLive ? '● You\'re in' : 'Up next') + '</p>' +
-        '<h3 class="gtd-name">' + esc(focus.name || 'Tournament') + '</h3>' +
-        '<p class="gtd-sub">' + esc([focus.format, focus.entrants ? focus.entrants + ' entrants' : '']
-            .filter(Boolean).join(' · ')) + '</p>' +
-        '<div class="gtd-cd ' + cdCls + '" id="gtDeskCd" data-at="' + esc(focus.startTime || '') + '">' +
-          esc(cdText) + '</div>' +
-        '<p class="gtd-sub">' + (isLive ? 'Bracket in progress' : 'until it starts') + '</p>' +
-        (vs ? '<div class="gtd-vs">' + vs + '</div>' : '<div style="height:10px"></div>') +
-        '<button class="gtd-btn" type="button" onclick="window.gtJoin(\'' + esc(focus.id) + '\')">' +
-          (isLive ? 'Go to bracket' : 'Open tournament') + '</button>' +
-        (focus.joinCode ?
-          '<button class="gtd-btn ghost" type="button" onclick="window.gtCopyCode(\'' + esc(focus.joinCode) + '\')">' +
-          'Copy code · ' + esc(focus.joinCode) + '</button>' : '') +
-      '</div>' +
-      '<div class="gtd-card">' +
-        '<p class="gtd-head">Standings</p>' +
-        '<div id="gtDeskBracket"><p class="gtd-empty">Loading the bracket…</p></div>' +
-      '</div>' +
-      (mine.length > 1 ?
-      '<div class="gtd-card">' +
-        '<p class="gtd-head">Also entered</p>' +
-        mine.filter(function (t){ return t.id !== focus.id; }).slice(0, 4).map(function (t){
-          return '<button class="gtd-btn ghost" style="margin-top:6px;text-transform:none;' +
-            'letter-spacing:0;font-size:11.5px;font-weight:700" type="button" ' +
-            'onclick="window.gtJoin(\'' + esc(t.id) + '\')">' + esc(t.name || 'Tournament') + '</button>';
-        }).join('') +
-      '</div>' : '');
-
-    loadBracket(focus.id);
-    tickDesk();
+    majors = r;
+    liveIdx = 0;
+    paintLive(); rotateLive(); paintCal();
   }
-
-  /* The countdown is the only thing on the desk that changes every
-     second, so it is the only thing rewritten every second. */
-  function tickDesk(){
-    clearInterval(deskTimer);
-    deskTimer = setInterval(function (){
-      var el = $('gtDeskCd');
-      if (!el || !document.body.contains(el)){ clearInterval(deskTimer); return; }
-      var at = el.getAttribute('data-at');
-      if (!at) return;
-      var c = cdParts(at);
-      if (!c) return;
-      if (c.late){ el.textContent = 'Starting'; el.className = 'gtd-cd now'; return; }
-      el.textContent = c.text;
-      el.className = 'gtd-cd' + (c.ms < 3600000 ? ' soon' : '');
-    }, 1000);
-  }
-
-  window.gtCopyCode = function (code){
-    try {
-      navigator.clipboard.writeText(code);
-      if (window.showToast) window.showToast('Code copied — ' + code, 'success');
-    } catch (e) {
-      if (window.showToast) window.showToast('Code: ' + code, 'info');
-    }
-  };
-
-  /* ══ The bracket preview ══════════════════════════════════════
-     Read-only, and deliberately tolerant: tournaments in this app come
-     back in more than one shape depending on which endpoint filled
-     them, so this reads what it can find and says so plainly when the
-     bracket has not been drawn yet, rather than rendering an empty
-     frame that looks like a fault. */
-  async function loadBracket(id){
-    var host = $('gtDeskBracket');
-    if (!host) return;
-    var t = await api('/tournaments/' + encodeURIComponent(id)).catch(function (){ return null; });
-    if (!$('gtDeskBracket')) return;   // the desk repainted while we waited
-    host = $('gtDeskBracket');
-
-    var matches = (t && (t.matches || t.bracket || (t.tournament && t.tournament.matches))) || [];
-    if (!Array.isArray(matches) || !matches.length){
-      host.innerHTML = '<p class="gtd-empty">The bracket has not been drawn yet. ' +
-        'It appears here as soon as the host seeds it.</p>';
-      return;
-    }
-
-    var rounds = {};
-    matches.forEach(function (m){
-      var r = Number(m.round || m.round_number || 1);
-      (rounds[r] = rounds[r] || []).push(m);
-    });
-    var keys = Object.keys(rounds).map(Number).sort(function (a, b){ return a - b; });
-
-    var meId = (window.me && window.me.id) != null ? String(window.me.id) : null;
-
-    function side(m, n){
-      var name  = m['player' + n + '_name'] || m['p' + n + '_name'] ||
-                  (m['player' + n] && m['player' + n].username) || m['player' + n] || '';
-      var pid   = m['player' + n + '_id'] != null ? String(m['player' + n + '_id']) : null;
-      var score = m['player' + n + '_score'];
-      var won   = m.winner_id != null && pid != null && String(m.winner_id) === pid;
-      var live  = !m.winner_id && (m.status === 'in-progress' || m.status === 'live');
-      var cls = ['gtb-s'];
-      if (won) cls.push('won');
-      else if (live) cls.push('live');
-      if (meId && pid === meId) cls.push('me');
-      return '<span class="' + cls.join(' ') + '">' +
-        '<span class="nm">' + esc(name || 'TBD') + '</span>' +
-        (score == null ? '' : '<span class="sc">' + esc(score) + '</span>') +
-      '</span>';
-    }
-
-    host.innerHTML = '<div class="gtb">' + keys.map(function (k, i){
-      var last = i === keys.length - 1;
-      return '<div class="gtb-col">' +
-        '<p class="gtb-r">' + (last ? 'Final' : 'R' + k) + '</p>' +
-        rounds[k].map(function (m){
-          return '<div class="gtb-m">' + side(m, 1) + side(m, 2) + '</div>';
-        }).join('') +
-      '</div>' + (last ? '' : '<span class="gtb-link"></span>');
-    }).join('') + '</div>';
-  }
-
   async function loadMine(){
     var r = await api('/me/tournaments').catch(function (){ return null; });
     mine = Array.isArray(r) ? r : [];
-    paintDesk();
+    paintYours(); paintCal();
   }
 
-  /* ══ Wiring ═══════════════════════════════════════════════════
-     Wraps the page's own open and its own list render, so the Desk
-     refreshes exactly when the data behind it does rather than on a
-     timer of its own. */
   function refresh(){
-    if (!ensureDesk()) return;
-    paintRail();
-    applyFormat();
-    loadMajors();
-    loadMine();
+    if (!ensureArena()) return;
+    paintRail(); paintYours(); paintCal();
+    loadMajors(); loadMine();
   }
 
   function start(){
     if (typeof window.api !== 'function'){ setTimeout(start, 300); return; }
 
     var o = window.openGlobalTournaments;
-    if (typeof o === 'function' && !o.__desk){
-      var w = function (){
-        var out = o.apply(this, arguments);
-        setTimeout(refresh, 30);
-        return out;
-      };
-      w.__desk = true;
+    if (typeof o === 'function' && !o.__arena){
+      var w = function (){ var out = o.apply(this, arguments); setTimeout(refresh, 30); return out; };
+      w.__arena = true;
       window.openGlobalTournaments = w;
     }
 
-    /* renderGtTournaments is what refills _gtRowsCache and repaints the
-       list, so the rail's counts and the format filter are re-derived
-       from the same pass rather than from a copy that can drift. */
-    var g = window.renderGtTournaments;
-    if (typeof g === 'function' && !g.__desk){
-      var wg = async function (){
-        var out = await g.apply(this, arguments);
-        if (ensureDesk()){ paintRail(); applyFormat(); }
-        return out;
-      };
-      wg.__desk = true;
-      window.renderGtTournaments = wg;
+    /* The list is repainted by code that calls renderGtTournaments as a
+       BARE identifier, so wrapping window.renderGtTournaments never runs
+       — which is why the rail's counts sat at zero while the shelves
+       below showed eleven brackets. Watching the node the renderer
+       writes into cannot be bypassed that way. */
+    var list = $('gtTournamentList');
+    if (list && !list.__arenaWatched){
+      list.__arenaWatched = true;
+      var queued = false;
+      new MutationObserver(function (){
+        if (queued) return;
+        queued = true;
+        requestAnimationFrame(function (){ queued = false; paintRail(); paintCal(); });
+      }).observe(list, { childList: true });
     }
 
-    if (document.getElementById('globalTournamentsOverlay') &&
-        document.getElementById('globalTournamentsOverlay').classList.contains('open')){
-      refresh();
-    }
-    console.log('[tournaments] desk ready — rail, majors, standings');
+    var ov = $('globalTournamentsOverlay');
+    if (ov && ov.classList.contains('open')) refresh();
+    console.log('[tournaments] arena ready — live stage, calendar, your brackets');
   }
 
   if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', start);
@@ -82464,5 +82413,426 @@ body.q-max #queueOverlay{ padding:0 !important; }
 })();
 </script>
 
+<!-- ═══ CREATE A TOURNAMENT · ITS OWN PAGE ═══════════════════════════
+     The modal asked eight questions in a box the size of a dialog, with
+     no sense of what you were making. This is a page: the choices on the
+     left, and the card you are actually building on the right, updating
+     as you type. Same overlay machinery as every other hub page, so the
+     top bar stays and Escape works.
+     ══════════════════════════════════════════════════════════════ -->
+<div id="createTournamentOverlay" class="lobby-overlay"
+     style="background:radial-gradient(1100px 520px at 82% -12%, rgba(255,77,109,.20) 0%, transparent 62%), linear-gradient(160deg,var(--bg-0) 0%,var(--bg-1) 100%)">
+  <div class="ct2-wrap">
+    <header class="ct2-head">
+      <div>
+        <p class="ct2-eyebrow">Tournaments</p>
+        <h1 class="ct2-title">Run your own</h1>
+      </div>
+      <button class="ct2-x" type="button" onclick="window.closeCreateTournamentPage()" aria-label="Close">&#10005;</button>
+    </header>
+
+    <div class="ct2-body">
+      <div class="ct2-form">
+
+        <section class="ct2-sec">
+          <h2 class="ct2-h">What is it called</h2>
+          <input id="ct2Name" class="ct2-in" type="text" maxlength="60"
+                 placeholder="Friday Night TEKKEN" oninput="window.ct2Sync()">
+        </section>
+
+        <section class="ct2-sec">
+          <h2 class="ct2-h">Game</h2>
+          <div class="ct2-search">
+            <input id="ct2GameSearch" class="ct2-in" type="text"
+                   placeholder="Search games…" oninput="window.ct2Games(this.value)">
+          </div>
+          <div class="ct2-games" id="ct2GameGrid"></div>
+        </section>
+
+        <section class="ct2-sec">
+          <h2 class="ct2-h">Format</h2>
+          <div class="ct2-opts" id="ct2Formats"></div>
+        </section>
+
+        <section class="ct2-sec">
+          <h2 class="ct2-h">Bracket size</h2>
+          <div class="ct2-sizes" id="ct2Sizes"></div>
+          <p class="ct2-note" id="ct2SizeNote"></p>
+        </section>
+
+        <section class="ct2-sec">
+          <h2 class="ct2-h">When</h2>
+          <div class="ct2-row2">
+            <label class="ct2-f"><span>Starts</span>
+              <input id="ct2Starts" class="ct2-in" type="datetime-local" oninput="window.ct2Sync()"></label>
+            <label class="ct2-f"><span>Prize <i>optional</i></span>
+              <input id="ct2Prize" class="ct2-in" type="text" maxlength="40"
+                     placeholder="&pound;50, bragging rights…" oninput="window.ct2Sync()"></label>
+          </div>
+        </section>
+
+        <section class="ct2-sec">
+          <h2 class="ct2-h">Who can find it</h2>
+          <div class="ct2-opts">
+            <button type="button" class="ct2-opt on" data-vis="public" onclick="window.ct2Vis('public')">
+              <b>Public</b><i>Listed on the Tournaments page. Anyone can enter.</i></button>
+            <button type="button" class="ct2-opt" data-vis="code" onclick="window.ct2Vis('code')">
+              <b>Private &middot; code</b><i>Unlisted. Only people you give the code to can find it.</i></button>
+          </div>
+        </section>
+
+        <section class="ct2-sec">
+          <h2 class="ct2-h">Rules <i class="ct2-opt-lbl">optional</i></h2>
+          <textarea id="ct2Rules" class="ct2-in ct2-ta" maxlength="1200" rows="4"
+                    placeholder="Best of 3 until the semis, best of 5 after. No mirror matches."></textarea>
+        </section>
+      </div>
+
+      <aside class="ct2-side">
+        <p class="ct2-h">How it will look</p>
+        <div class="ct2-card" id="ct2Card"></div>
+        <div class="ct2-summary" id="ct2Summary"></div>
+        <button class="ct2-go" type="button" id="ct2Go" onclick="window.ct2Create()">Create tournament</button>
+        <p class="ct2-note" id="ct2Err"></p>
+      </aside>
+    </div>
+  </div>
+</div>
+
+<style>
+#createTournamentOverlay{ overflow-y:auto }
+.ct2-wrap{ width:100%; max-width:1180px; margin:0 auto; padding:26px 28px 70px }
+.ct2-head{ display:flex; align-items:flex-start; gap:16px; margin-bottom:22px }
+.ct2-eyebrow{
+  font-family:var(--font); font-size:9.5px; font-weight:800; letter-spacing:1.8px;
+  text-transform:uppercase; color:#ff4d6d; margin:0 0 6px;
+}
+.ct2-title{ font-family:var(--font); font-size:clamp(26px,3.4vw,40px); font-weight:900; letter-spacing:-.8px; margin:0 }
+.ct2-x{
+  margin-left:auto; width:34px; height:34px; border-radius:9px; cursor:pointer;
+  background:rgba(255,255,255,.06); border:1px solid rgba(255,255,255,.12);
+  color:var(--text-2); font-size:14px;
+}
+.ct2-x:hover{ background:rgba(255,255,255,.12); color:var(--text-1) }
+
+.ct2-body{ display:grid; gap:26px; grid-template-columns:minmax(0,1fr) 330px; align-items:start }
+.ct2-form{ display:grid; gap:24px; min-width:0 }
+.ct2-sec{ display:grid; gap:9px }
+.ct2-h{
+  font-family:var(--font); font-size:10px; font-weight:900; letter-spacing:1.6px;
+  text-transform:uppercase; color:var(--text-3); margin:0;
+}
+.ct2-h .ct2-opt-lbl{ font-style:normal; color:var(--text-3); opacity:.7 }
+.ct2-in{
+  width:100%; padding:11px 13px; border-radius:9px;
+  background:rgba(255,255,255,.04); border:1px solid rgba(255,255,255,.1);
+  color:var(--text-1); font-family:inherit; font-size:14px;
+}
+.ct2-in:focus{ outline:none; border-color:rgba(255,77,109,.6) }
+.ct2-ta{ resize:vertical; line-height:1.55; font-size:13px }
+.ct2-row2{ display:grid; grid-template-columns:1fr 1fr; gap:12px }
+.ct2-f{ display:grid; gap:5px }
+.ct2-f > span{ font-size:11px; color:var(--text-3); font-weight:700 }
+.ct2-f i{ font-style:normal; opacity:.65 }
+
+.ct2-games{
+  display:grid; grid-template-columns:repeat(auto-fill,minmax(96px,1fr));
+  gap:9px; max-height:264px; overflow-y:auto; padding:2px;
+  scrollbar-width:thin; scrollbar-color:rgba(255,255,255,.14) transparent;
+}
+.ct2-games::-webkit-scrollbar{ width:8px }
+.ct2-games::-webkit-scrollbar-thumb{ background:rgba(255,255,255,.14); border-radius:99px }
+.ct2-g{
+  position:relative; aspect-ratio:2/3; border-radius:9px; overflow:hidden; cursor:pointer;
+  border:1px solid rgba(255,255,255,.1); background:var(--bg-3); padding:0;
+}
+.ct2-g img{ width:100%; height:100%; object-fit:cover; display:block }
+.ct2-g-fb{
+  position:absolute; inset:0; display:grid; place-content:center;
+  font-family:var(--font); font-size:20px; font-weight:900; color:rgba(255,255,255,.7);
+}
+.ct2-g-nm{
+  position:absolute; left:0; right:0; bottom:0; padding:14px 6px 5px;
+  background:linear-gradient(0deg,rgba(0,0,0,.9),transparent);
+  font-size:9.5px; font-weight:700; line-height:1.2;
+  display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical; overflow:hidden;
+}
+.ct2-g.on{ border-color:#ff4d6d; box-shadow:0 0 0 2px rgba(255,77,109,.4) }
+
+.ct2-opts{ display:grid; gap:9px }
+.ct2-opt{
+  display:grid; gap:3px; text-align:left; padding:11px 13px; border-radius:10px; cursor:pointer;
+  background:rgba(255,255,255,.03); border:1px solid rgba(255,255,255,.1); font-family:inherit;
+}
+.ct2-opt:hover{ background:rgba(255,255,255,.06) }
+.ct2-opt.on{ border-color:rgba(255,77,109,.6); background:rgba(255,77,109,.12) }
+.ct2-opt b{ font-size:13px; font-weight:700; color:var(--text-1) }
+.ct2-opt i{ font-style:normal; font-size:11.5px; color:var(--text-3); line-height:1.45 }
+
+.ct2-sizes{ display:flex; flex-wrap:wrap; gap:8px }
+.ct2-size{
+  min-width:56px; padding:9px 14px; border-radius:9px; cursor:pointer;
+  background:rgba(255,255,255,.03); border:1px solid rgba(255,255,255,.1);
+  color:var(--text-2); font-family:"JetBrains Mono",ui-monospace,monospace;
+  font-size:13px; font-weight:700;
+}
+.ct2-size.on{ border-color:#ff4d6d; background:rgba(255,77,109,.16); color:var(--text-1) }
+.ct2-note{ font-size:11.5px; color:var(--text-3); margin:0; line-height:1.5 }
+.ct2-note.err{ color:#ff8a8a }
+
+.ct2-side{ position:sticky; top:16px; display:grid; gap:12px }
+.ct2-card{
+  border-radius:12px; overflow:hidden; border:1px solid rgba(255,255,255,.1);
+  background:rgba(255,255,255,.03);
+}
+.ct2-card-art{ height:118px; background-size:cover; background-position:center; position:relative }
+.ct2-card-art::after{ content:''; position:absolute; inset:0; background:linear-gradient(0deg,rgba(10,11,17,.85),transparent 65%) }
+.ct2-card-b{ padding:11px 12px 13px; display:grid; gap:7px }
+.ct2-card-t{ font-size:14px; font-weight:800; line-height:1.25 }
+.ct2-card-c{ display:flex; flex-wrap:wrap; gap:5px }
+.ct2-tag{
+  font-family:var(--font); font-size:8.5px; font-weight:800; letter-spacing:1px;
+  text-transform:uppercase; padding:3px 7px; border-radius:4px;
+  background:rgba(255,255,255,.08); color:var(--text-2);
+}
+.ct2-tag.pink{ background:rgba(255,77,109,.2); color:#ff97ab }
+.ct2-summary{ display:grid; gap:5px; font-size:11.5px; color:var(--text-3); line-height:1.5 }
+.ct2-summary b{ color:var(--text-2); font-weight:700 }
+.ct2-go{
+  height:44px; border-radius:10px; border:none; cursor:pointer;
+  background:#ff4d6d; color:#fff; font-family:var(--font);
+  font-size:11px; font-weight:900; letter-spacing:1.4px; text-transform:uppercase;
+}
+.ct2-go:hover{ filter:brightness(1.1) }
+.ct2-go:disabled{ opacity:.5; cursor:not-allowed }
+
+@media (max-width:960px){
+  .ct2-body{ grid-template-columns:minmax(0,1fr) }
+  .ct2-side{ position:static }
+}
+</style>
+
+<script>
+(function () {
+  'use strict';
+  var esc = function (x) {
+    return String(x == null ? '' : x)
+      .replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+  };
+  var $ = function (id){ return document.getElementById(id); };
+
+  var FORMATS = [
+    ['single', 'Single elimination', 'One loss and you are out. Fastest to run.'],
+    ['double', 'Double elimination', 'A losers bracket, so one bad set is not the end.'],
+    ['round-robin', 'Round robin', 'Everyone plays everyone. Best for small, fair fields.']
+  ];
+  /* The server validates against exactly these, so offering anything else
+     would be offering a rejection. */
+  var SIZES = [4, 8, 16, 32, 64, 128];
+
+  var st = { game:'', format:'single', size:16, vis:'public' };
+
+  function games(){
+    try { if (typeof GT_GAMES !== 'undefined' && Array.isArray(GT_GAMES)) return GT_GAMES; }
+    catch (e) {}
+    return Array.isArray(window.GT_GAMES) ? window.GT_GAMES : [];
+  }
+  function gameById(id){ return games().find(function (g){ return g.id === id; }) || null; }
+
+  window.ct2Games = function (q){
+    var grid = $('ct2GameGrid');
+    if (!grid) return;
+    q = String(q || '').toLowerCase().trim();
+    var list = games().filter(function (g){
+      if (g.id === 'other') return false;
+      if (!q) return true;
+      return (g.name || '').toLowerCase().indexOf(q) >= 0 ||
+             (g.short || '').toLowerCase().indexOf(q) >= 0;
+    });
+    if (!list.length){
+      grid.innerHTML = '<p class="ct2-note">Nothing matches that.</p>';
+      return;
+    }
+    grid.innerHTML = list.map(function (g){
+      var art = g.cover || g.header;
+      return '<button type="button" class="ct2-g' + (st.game === g.id ? ' on' : '') + '" ' +
+        'onclick="window.ct2Pick(\'' + esc(g.id) + '\')" title="' + esc(g.name) + '">' +
+        (art ? '<img src="' + esc(art) + '" alt="" loading="lazy" ' +
+               'onerror="this.style.display=\'none\'">'
+             : '<span class="ct2-g-fb">' + esc(g.initial || g.short || '?') + '</span>') +
+        '<span class="ct2-g-nm">' + esc(g.name) + '</span>' +
+      '</button>';
+    }).join('');
+  };
+  window.ct2Pick = function (id){
+    st.game = (st.game === id) ? '' : id;
+    window.ct2Games($('ct2GameSearch') ? $('ct2GameSearch').value : '');
+    window.ct2Sync();
+  };
+  window.ct2Vis = function (v){
+    st.vis = v;
+    document.querySelectorAll('#createTournamentOverlay .ct2-opt[data-vis]').forEach(function (b){
+      b.classList.toggle('on', b.getAttribute('data-vis') === v);
+    });
+    window.ct2Sync();
+  };
+
+  function paintChoices(){
+    var f = $('ct2Formats');
+    if (f) f.innerHTML = FORMATS.map(function (x){
+      return '<button type="button" class="ct2-opt' + (st.format === x[0] ? ' on' : '') + '" ' +
+        'onclick="window.ct2Fmt(\'' + x[0] + '\')"><b>' + esc(x[1]) + '</b><i>' + esc(x[2]) + '</i></button>';
+    }).join('');
+    var z = $('ct2Sizes');
+    if (z) z.innerHTML = SIZES.map(function (n){
+      return '<button type="button" class="ct2-size' + (st.size === n ? ' on' : '') + '" ' +
+        'onclick="window.ct2Size(' + n + ')">' + n + '</button>';
+    }).join('');
+  }
+  window.ct2Fmt = function (v){ st.format = v; paintChoices(); window.ct2Sync(); };
+  window.ct2Size = function (n){ st.size = n; paintChoices(); window.ct2Sync(); };
+
+  window.ct2Sync = function (){
+    var g = gameById(st.game);
+    var name = ($('ct2Name') && $('ct2Name').value.trim()) || '';
+    var prize = ($('ct2Prize') && $('ct2Prize').value.trim()) || '';
+    var starts = ($('ct2Starts') && $('ct2Starts').value) || '';
+
+    var card = $('ct2Card');
+    if (card){
+      var art = g ? (g.header || g.cover) : '';
+      card.innerHTML =
+        '<div class="ct2-card-art" style="background-image:url(\'' + esc(art) + '\');' +
+          (art ? '' : 'background:var(--bg-3)') + '"></div>' +
+        '<div class="ct2-card-b">' +
+          '<div class="ct2-card-t">' + esc(name || 'Untitled tournament') + '</div>' +
+          '<div class="ct2-card-c">' +
+            (g ? '<span class="ct2-tag pink">' + esc(g.name) + '</span>' : '') +
+            '<span class="ct2-tag">' + esc(st.format) + '</span>' +
+            '<span class="ct2-tag">' + st.size + ' cap</span>' +
+            (prize ? '<span class="ct2-tag">' + esc(prize) + '</span>' : '') +
+            (st.vis === 'code' ? '<span class="ct2-tag">Private</span>' : '') +
+          '</div>' +
+        '</div>';
+    }
+
+    /* Rounds are a fact about the size, so say it rather than leaving the
+       host to work out what a 32 bracket commits them to. */
+    var rounds = Math.ceil(Math.log(st.size) / Math.log(2));
+    var sn = $('ct2SizeNote');
+    if (sn) sn.textContent = st.format === 'round-robin'
+      ? st.size + ' entrants means ' + (st.size * (st.size - 1) / 2) + ' matches in total.'
+      : rounds + ' rounds to a winner' + (st.format === 'double' ? ', plus the losers bracket.' : '.');
+
+    var sum = $('ct2Summary');
+    if (sum) sum.innerHTML =
+      '<div><b>' + (starts ? new Date(starts).toLocaleString() : 'No start time set') + '</b></div>' +
+      '<div>' + (st.vis === 'code'
+        ? 'A code is generated when you create it &mdash; four letters, four digits.'
+        : 'Anyone browsing Tournaments will see it.') + '</div>';
+
+    var go = $('ct2Go');
+    if (go) go.disabled = !name;
+  };
+
+  window.openCreateTournamentPage = function (gameId){
+    if (typeof window.showOverlay !== 'function') return;
+    if (gameId) st.game = gameId;
+    window.showOverlay('createTournamentOverlay', function (){
+      paintChoices();
+      window.ct2Games('');
+      window.ct2Vis(st.vis);
+      window.ct2Sync();
+    });
+  };
+  window.closeCreateTournamentPage = function (){
+    if (typeof window.hideOverlay === 'function') window.hideOverlay('createTournamentOverlay');
+  };
+
+  window.ct2Create = async function (){
+    var err = $('ct2Err');
+    var say = function (m, isErr){ if (err){ err.textContent = m || ''; err.classList.toggle('err', !!isErr); } };
+    var name = ($('ct2Name') && $('ct2Name').value.trim()) || '';
+    if (!name) return say('Give it a name first.', true);
+
+    var starts = ($('ct2Starts') && $('ct2Starts').value) || '';
+    var go = $('ct2Go');
+    if (go) go.disabled = true;
+    say('Creating…');
+
+    var body = {
+      scope: 'global',
+      visibility: st.vis,
+      name: name,
+      format: st.format,
+      playerCount: st.size,
+      prize: ($('ct2Prize') && $('ct2Prize').value.trim()) || null,
+      startTime: starts ? new Date(starts).toISOString() : null,
+      rules: ($('ct2Rules') && $('ct2Rules').value.trim()) || null,
+      description: null,
+      game: st.game || null,
+    };
+
+    var r = null;
+    try {
+      r = await window.api('/tournaments/create', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(body),
+      });
+    } catch (e) { r = null; }
+    if (go) go.disabled = false;
+
+    /* api() resolves with the parsed body on an error status too, so the
+       response has to be inspected — a call that did not throw has not
+       necessarily worked. */
+    if (!r || r.error || !r.tournament){
+      return say((r && r.error) || 'Could not create that tournament.', true);
+    }
+
+    if (r.joinCode){
+      say('Created. Code ' + r.joinCode + ' — copied to your clipboard.');
+      try { await navigator.clipboard.writeText(r.joinCode); } catch (e) {}
+      if (window.showToast) window.showToast('Created "' + name + '" — code ' + r.joinCode, 'success');
+    } else {
+      say('Created.');
+      if (window.showToast) window.showToast('Created "' + name + '" — open registration.', 'success');
+    }
+
+    ['ct2Name','ct2Prize','ct2Starts','ct2Rules'].forEach(function (id){
+      var el = $(id); if (el) el.value = '';
+    });
+    st.game = '';
+    window.closeCreateTournamentPage();
+    if (typeof window.openGlobalTournaments === 'function') window.openGlobalTournaments();
+  };
+
+  /* The old modal is retired. Every existing call site -- the rail, the
+     per-game page, the keyboard shortcut, the empty states -- goes to the
+     page instead, keeping the server-side cap check that used to guard
+     the modal. */
+  var origOpen = window.openCreateTournament;
+  window.openCreateTournament = async function (gameId){
+    try {
+      var cnt = await window.api('/me/tournaments/active-count').catch(function (){ return null; });
+      var active = (cnt && typeof cnt.count === 'number') ? cnt.count : 0;
+      var me_ = (typeof window.me === 'object' && window.me) ? window.me : null;
+      var owned = (me_ && Array.isArray(me_.cosmetics)) ? me_.cosmetics : [];
+      var cap = (typeof window.TOURNAMENT_FREE_CAP === 'number') ? window.TOURNAMENT_FREE_CAP : 3;
+      if (!owned.includes('feature-tournaments-unlimited') && active >= cap){
+        if (window.showToast) {
+          window.showToast('Free tier: ' + cap + ' active tournaments max. Manage existing or unlock unlimited.', 'warn');
+        }
+        if (typeof window.openMyTournaments === 'function') window.openMyTournaments();
+        return;
+      }
+    } catch (e) {}
+    window.openCreateTournamentPage(gameId);
+  };
+  window.openCreateTournament.__page = true;
+  /* Kept reachable in case anything still wants the dialog. */
+  window.openCreateTournamentModal = origOpen;
+})();
+</script>
 </body>
 </html>

@@ -294,6 +294,7 @@
     <button class="nav-item" data-view="transactions"><span class="icon">🧾</span> Transactions</button>
     <button class="nav-item" data-view="featured"><span class="icon">✨</span> Featured Curation</button>
     <button class="nav-item" data-view="majors"><span class="icon">🏆</span> Majors</button>
+    <button class="nav-item" data-view="streams"><span class="icon">📺</span> Stream Sources</button>
   </div>
   <div class="sidebar-bottom">
     <div class="admin-avatar" id="sidebarAvatar">A</div>
@@ -620,6 +621,43 @@
 .mj-pill.pub{ background:rgba(93,219,160,.16); color:#5ddba0 }
 @media (max-width:900px){ .mj-grid{ grid-template-columns:1fr } .mj-f.mj-wide{ grid-column:auto } }
 </style>
+
+    <!-- Stream sources. A source is a CHANNEL, not an event: the server
+         polls each one and works out what is live or scheduled, so nobody
+         has to enter that ESL are running a StarCraft final tonight. -->
+    <div id="view-streams" style="display:none">
+      <div class="fin-section">
+        <div class="fin-section-head">
+          <h3>Watch a channel</h3>
+          <div class="fin-section-sub">Whatever these channels put live shows on the Tournaments
+            page, and when nothing is live the soonest scheduled broadcast takes the stage.
+            Any game &mdash; fighting games, CS, StarCraft, LoL, chess, Call of Duty.</div>
+        </div>
+        <div id="ssKeyWarn"></div>
+        <div class="mj-grid">
+          <label class="mj-f mj-wide"><span>YouTube channel ID</span>
+            <input id="ssChannel" type="text" placeholder="UC&hellip; (channel About page &rarr; Share)"></label>
+          <label class="mj-f"><span>Name</span>
+            <input id="ssName" type="text" placeholder="ESL StarCraft"></label>
+          <label class="mj-f"><span>Game</span>
+            <input id="ssGame" type="text" placeholder="StarCraft II"></label>
+          <label class="mj-f"><span>Organiser</span>
+            <input id="ssOrg" type="text" placeholder="ESL"></label>
+          <label class="mj-f"><span>Weight</span>
+            <input id="ssWeight" type="number" value="0" title="Higher wins the stage among things live together"></label>
+        </div>
+        <div class="mj-actions">
+          <button class="btn btn-blue" onclick="saveStreamSource()">Add channel</button>
+          <button class="btn btn-grey" onclick="pollStreamsNow()">Check now</button>
+          <span id="ssNote" class="mj-note"></span>
+        </div>
+      </div>
+      <div class="fin-section">
+        <div class="fin-section-head"><h3>Watched channels</h3>
+          <div class="fin-section-sub">Checked every five minutes.</div></div>
+        <div id="ssList" class="mj-list"></div>
+      </div>
+    </div>
 
 <div id="view-majors" style="display:none">
       <div class="fin-section">
@@ -985,6 +1023,105 @@ function mjWhen(m) {
   return a === b ? a : `${a} — ${b}`;
 }
 
+// ---------------------------------------------------------------------
+// STREAM SOURCES
+// The channels the server polls. Discovery needs YOUTUBE_API_KEY set on
+// the backend; without it the poller stays off and the Arena falls back
+// to the curated Majors list, which the banner below says plainly rather
+// than leaving an empty list to be interpreted.
+// ---------------------------------------------------------------------
+function ssNote(msg, kind) {
+  const el = document.getElementById("ssNote");
+  if (!el) return;
+  el.textContent = msg || "";
+  el.className = "mj-note" + (kind ? " " + kind : "");
+}
+
+async function saveStreamSource() {
+  const channelId = document.getElementById("ssChannel").value.trim();
+  if (!channelId) return ssNote("Paste a channel ID.", "err");
+  try {
+    const res = await fetch(AUTH_URL + "/admin/stream-sources", {
+      method: "POST", headers: auth(), body: JSON.stringify({
+        channelId,
+        name:      document.getElementById("ssName").value.trim() || null,
+        game:      document.getElementById("ssGame").value.trim() || null,
+        organiser: document.getElementById("ssOrg").value.trim() || null,
+        weight:    Number(document.getElementById("ssWeight").value) || 0,
+      }) });
+    const out = await res.json().catch(() => null);
+    if (!res.ok) throw new Error((out && out.error) || "Save failed");
+    ssNote("Added - checking it now.", "ok");
+    ["ssChannel","ssName","ssGame","ssOrg"].forEach(id => {
+      document.getElementById(id).value = "";
+    });
+    setTimeout(loadStreamSources, 1500);
+  } catch (e) { ssNote(e.message, "err"); }
+}
+
+async function deleteStreamSource(id) {
+  if (!confirm("Stop watching this channel?")) return;
+  try {
+    await fetch(AUTH_URL + "/admin/stream-sources/" + id, { method: "DELETE", headers: auth() });
+    showToast("Removed");
+    loadStreamSources();
+  } catch { showToast("Could not remove that", "error"); }
+}
+
+async function pollStreamsNow() {
+  ssNote("Checking every channel...");
+  try {
+    const res = await fetch(AUTH_URL + "/admin/stream-sources/poll", { method: "POST", headers: auth() });
+    const out = await res.json().catch(() => null);
+    if (!res.ok) throw new Error((out && out.error) || "Check failed");
+    ssNote("Checked.", "ok");
+    loadStreamSources();
+  } catch (e) { ssNote(e.message, "err"); }
+}
+
+async function loadStreamSources() {
+  const list = document.getElementById("ssList");
+  if (!list) return;
+  list.innerHTML = "<p style='color:var(--text-3);font-size:13px'>Loading...</p>";
+  let rows = [];
+  try {
+    const res = await fetch(AUTH_URL + "/admin/stream-sources", { headers: auth() });
+    rows = res.ok ? await res.json() : [];
+  } catch { rows = []; }
+
+  const warn = document.getElementById("ssKeyWarn");
+  if (warn) {
+    const stale = rows.length && rows.every(r => !r.lastCheckedAt);
+    warn.innerHTML = stale
+      ? "<div class='finance-lock-banner' style='margin-bottom:14px'>" +
+        "<div class='flb-icon'>!</div><div style='flex:1'>" +
+        "<div class='flb-title'>Nothing has been checked yet</div>" +
+        "<div class='flb-sub'>Discovery needs YOUTUBE_API_KEY set on the backend. " +
+        "Until it is, the Arena falls back to the curated Majors list.</div></div></div>"
+      : "";
+  }
+
+  if (!rows.length) {
+    list.innerHTML = "<p style='color:var(--text-3);font-size:13px;line-height:1.6'>" +
+      "No channels watched yet. Add the ones that broadcast the events worth showing.</p>";
+    return;
+  }
+  const esc = (x) => String(x == null ? "" : x)
+    .replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;");
+  list.innerHTML = rows.map(r => {
+    const pill = r.liveNow ? "<span class='mj-pill live'>Live</span>"
+      : r.lastError ? "<span class='mj-pill draft'>Error</span>"
+      : "<span class='mj-pill pub'>Watching</span>";
+    const bits = [r.game, r.organiser, r.channelId].filter(Boolean).map(esc).join(" &middot; ");
+    const when = r.lastCheckedAt ? new Date(r.lastCheckedAt).toLocaleTimeString() : "never checked";
+    return "<div class='mj-row'>" + pill +
+      "<div class='mj-main'><h4>" + esc(r.name || r.channelId) + "</h4>" +
+      "<p>" + bits + " &middot; " + esc(when) +
+      (r.lastError ? " &middot; " + esc(r.lastError) : "") + "</p></div>" +
+      "<button class='btn btn-danger' onclick='deleteStreamSource(" + r.id + ")'>Delete</button></div>";
+  }).join("");
+}
+
 async function loadMajors() {
   const list = document.getElementById("mjList");
   if (!list) return;
@@ -1137,6 +1274,7 @@ document.querySelectorAll(".nav-item[data-view]").forEach(btn => {
       transactions: "🧾 Transactions",
       featured: "✨ Featured Curation",
       majors: "🏆 Majors · real-world events",
+      streams: "📺 Stream Sources · what plays on the Arena",
     };
     const filters = { all:"all", banned:"banned", admin:"admin" };
     document.getElementById("viewTitle").textContent = titles[view] || view;
@@ -1167,6 +1305,9 @@ document.querySelectorAll(".nav-item[data-view]").forEach(btn => {
     } else if (view === "majors") {
       showPanelView("view-majors");
       loadMajors();
+    } else if (view === "streams") {
+      showPanelView("view-streams");
+      loadStreamSources();
     } else {
       showUserTableView();
       if (filters[view]) document.getElementById("filterSelect").value = filters[view];
