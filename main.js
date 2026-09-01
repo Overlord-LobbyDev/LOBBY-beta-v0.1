@@ -107,6 +107,11 @@ function createWindow() {
       preload: path.join(__dirname, "preload.js"),
       contextIsolation: true,
       nodeIntegration: false,
+      // The Tournaments stage autoplays a muted stream. Muted autoplay is
+      // usually allowed, but the policy shifts with engagement heuristics
+      // and platform, and a player stuck at 0:00 is what a block looks
+      // like. Saying it outright removes the ambiguity.
+      autoplayPolicy: "no-user-gesture-required",
     }
   });
 
@@ -123,19 +128,26 @@ function createWindow() {
   // cannot tell who is embedding it. Referer is a forbidden header, so no
   // amount of renderer code can set it — only the main process can.
   //
-  // Scoped to YouTube's own hosts so nothing else in the app is touched,
-  // and it names the domain this app genuinely belongs to rather than
-  // impersonating another site.
-  const YT_HOSTS = /^https:\/\/([\w-]+\.)*(youtube\.com|youtube-nocookie\.com|ytimg\.com|googlevideo\.com)\//i;
+  // TWO THINGS THIS DELIBERATELY DOES NOT DO, both of which broke
+  // playback when an earlier version did them:
+  //
+  //   It does not set Origin. Origin is a CORS header with meaning: the
+  //   server answers it with an Access-Control-Allow-Origin that has to
+  //   match. Inventing one on requests that were not CORS requests made
+  //   googlevideo answer with a mismatch, the browser dropped the
+  //   response, and the player sat at 0:00 with a manifest and no media.
+  //
+  //   It does not touch the media hosts. googlevideo URLs are signed and
+  //   need no Referer; only the EMBED has to say who is embedding it.
+  //   Rewriting headers on the media path could never help.
+  const YT_EMBED_HOSTS = /^https:\/\/([\w-]+\.)*(youtube\.com|youtube-nocookie\.com)\//i;
   const APP_ORIGIN = "https://lobby-auth-server.onrender.com";
   session.defaultSession.webRequest.onBeforeSendHeaders(
     { urls: ["https://*.youtube.com/*", "https://youtube.com/*",
-             "https://*.youtube-nocookie.com/*",
-             "https://*.ytimg.com/*", "https://*.googlevideo.com/*"] },
+             "https://*.youtube-nocookie.com/*"] },
     (details, callback) => {
-      if (YT_HOSTS.test(details.url)) {
+      if (YT_EMBED_HOSTS.test(details.url)) {
         details.requestHeaders["Referer"] = APP_ORIGIN + "/";
-        details.requestHeaders["Origin"]  = APP_ORIGIN;
       }
       callback({ requestHeaders: details.requestHeaders });
     }
