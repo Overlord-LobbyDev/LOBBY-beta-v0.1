@@ -629,14 +629,16 @@
       <div class="fin-section">
         <div class="fin-section-head">
           <h3>Watch a channel</h3>
-          <div class="fin-section-sub">Whatever these channels put live shows on the Tournaments
+          <div class="fin-section-sub">Paste a channel URL, an @handle or a UC id &mdash; the server resolves it.
+            Whatever these channels put live shows on the Tournaments
             page, and when nothing is live the soonest scheduled broadcast takes the stage.
             Any game &mdash; fighting games, CS, StarCraft, LoL, chess, Call of Duty.</div>
         </div>
         <div id="ssKeyWarn"></div>
         <div class="mj-grid">
-          <label class="mj-f mj-wide"><span>YouTube channel ID</span>
-            <input id="ssChannel" type="text" placeholder="UC&hellip; (channel About page &rarr; Share)"></label>
+          <label class="mj-f mj-wide"><span>Channel</span>
+            <input id="ssChannel" type="text"
+                   placeholder="youtube.com/@ESLCS &nbsp;&middot;&nbsp; @ESLCS &nbsp;&middot;&nbsp; UC&hellip;"></label>
           <label class="mj-f"><span>Name</span>
             <input id="ssName" type="text" placeholder="ESL StarCraft"></label>
           <label class="mj-f"><span>Game</span>
@@ -1051,7 +1053,8 @@ async function saveStreamSource() {
       }) });
     const out = await res.json().catch(() => null);
     if (!res.ok) throw new Error((out && out.error) || "Save failed");
-    ssNote("Added - checking it now.", "ok");
+    ssNote("Added " + (out && (out.title || out.name) ? "“" + (out.title || out.name) + "”" : "") +
+           " - checking it now.", "ok");
     ["ssChannel","ssName","ssGame","ssOrg"].forEach(id => {
       document.getElementById(id).value = "";
     });

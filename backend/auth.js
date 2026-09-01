@@ -6565,14 +6565,29 @@ app.get("/admin/stream-sources", requireAuth, requireAdmin, async (req, res) => 
 app.post("/admin/stream-sources", requireAuth, requireAdmin, async (req, res) => {
   try {
     const b = req.body || {};
-    const channelId = String(b.channelId || "").trim();
-    /* A YouTube channel id is UC + 22 characters. Rejecting a handle here
-       rather than storing it saves a source that silently never polls. */
-    if (!/^UC[\w-]{20,24}$/.test(channelId)) {
-      return res.status(400).json({
-        error: "That is not a YouTube channel id. It starts UC… — find it on the channel's About page.",
+    const given = String(b.channel || b.channelId || "").trim();
+    if (!given) return res.status(400).json({ error: "Paste a channel URL, @handle or ID." });
+
+    /* Resolved rather than demanded. A UC id passes straight through, a
+       URL or @handle is looked up — one quota unit either way. Storing
+       an unresolved handle would create a source that silently never
+       polls, which is the failure this replaces. */
+    let found = null;
+    try {
+      found = await _ytLookupChannel(given);
+    } catch (e) {
+      return res.status(500).json({
+        error: String(e.message || "").indexOf("YOUTUBE_API_KEY") >= 0
+          ? "YOUTUBE_API_KEY is not set on the server, so channels cannot be looked up."
+          : "Could not reach YouTube to look that channel up.",
       });
     }
+    if (!found) {
+      return res.status(404).json({
+        error: "No channel found for that. Paste the channel URL, its @handle, or its UC… id.",
+      });
+    }
+    const channelId = found.channelId;
     const r = await pool.query(`
       INSERT INTO stream_sources (platform, channel_id, name, game, organiser, weight, is_enabled)
       VALUES ('youtube',$1,$2,$3,$4,$5,$6)
@@ -6581,12 +6596,15 @@ app.post("/admin/stream-sources", requireAuth, requireAdmin, async (req, res) =>
         organiser = EXCLUDED.organiser, weight = EXCLUDED.weight,
         is_enabled = EXCLUDED.is_enabled
       RETURNING *`,
-      [channelId, b.name || null, b.game || null, b.organiser || null,
-       Number(b.weight) || 0, b.enabled !== false]);
+      [channelId, (b.name || found.title || null), b.game || null,
+       b.organiser || null, Number(b.weight) || 0, b.enabled !== false]);
     /* Poll straight away so a source added now shows something now,
        rather than at the top of the next five-minute cycle. */
     setTimeout(pollStreamSources, 500);
-    res.status(201).json({ id: r.rows[0].id });
+    res.status(201).json({
+      id: r.rows[0].id, channelId, name: r.rows[0].name,
+      title: found.title, thumb: found.thumb,
+    });
   } catch (e) {
     console.error("[admin/stream-sources/create]", e.message);
     res.status(500).json({ error: "Could not save that source" });
