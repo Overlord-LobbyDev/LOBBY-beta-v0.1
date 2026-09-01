@@ -293,6 +293,7 @@
     <button class="nav-item" data-view="store"><span class="icon">🎁</span> Store &amp; Cosmetics</button>
     <button class="nav-item" data-view="transactions"><span class="icon">🧾</span> Transactions</button>
     <button class="nav-item" data-view="featured"><span class="icon">✨</span> Featured Curation</button>
+    <button class="nav-item" data-view="majors"><span class="icon">🏆</span> Majors</button>
   </div>
   <div class="sidebar-bottom">
     <div class="admin-avatar" id="sidebarAvatar">A</div>
@@ -579,6 +580,102 @@
     </div>
 
     <!-- Featured Curation View -->
+    <!-- ── Majors: the real-world events the Tournaments rail shows ──
+         Read-only on the client: no bracket, no entrants, no joining.
+         What the app can honestly offer for an event it does not run is
+         "this is on, here is when, here is where to watch", plus a
+         follow so it can remind people. Nothing seeds this table. -->
+    <style>
+.mj-grid{ display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:14px 16px }
+.mj-f{ display:grid; gap:5px; min-width:0 }
+.mj-f.mj-wide{ grid-column:span 3 }
+.mj-f > span{ font-size:11px; color:var(--text-3); font-weight:700; letter-spacing:.5px; text-transform:uppercase }
+.mj-f input, .mj-f select{
+  width:100%; padding:8px 12px; background:var(--bg-2);
+  border:1px solid rgba(255,255,255,.1); border-radius:8px;
+  color:var(--text-1); font-size:13px; font-family:inherit;
+}
+.mj-f input:focus, .mj-f select:focus{ outline:none; border-color:#5865f2 }
+.mj-f.mj-check{ align-content:start }
+.mj-f.mj-check input{ width:auto; justify-self:start }
+.mj-f.mj-check i{ font-style:normal; font-size:11px; color:var(--text-3); line-height:1.4 }
+.mj-actions{ display:flex; align-items:center; gap:10px; margin-top:16px }
+.mj-note{ font-size:12px; color:var(--text-3) }
+.mj-note.err{ color:#ff8a8a }
+.mj-note.ok{ color:#5ddba0 }
+.mj-list{ display:grid; gap:10px }
+.mj-row{
+  display:flex; align-items:center; gap:14px; padding:12px 14px;
+  background:var(--bg-2); border:1px solid rgba(255,255,255,.08); border-radius:10px;
+}
+.mj-row .mj-main{ flex:1; min-width:0 }
+.mj-row h4{ margin:0 0 3px; font-size:14px; font-weight:700 }
+.mj-row p{ margin:0; font-size:12px; color:var(--text-3) }
+.mj-pill{
+  font-size:10px; font-weight:800; letter-spacing:.6px; text-transform:uppercase;
+  padding:3px 8px; border-radius:5px; flex:0 0 auto;
+}
+.mj-pill.live{ background:rgba(237,66,69,.18); color:#ff9b9b }
+.mj-pill.draft{ background:rgba(255,255,255,.08); color:var(--text-3) }
+.mj-pill.pub{ background:rgba(93,219,160,.16); color:#5ddba0 }
+@media (max-width:900px){ .mj-grid{ grid-template-columns:1fr } .mj-f.mj-wide{ grid-column:auto } }
+</style>
+
+<div id="view-majors" style="display:none">
+      <div class="fin-section">
+        <div class="fin-section-head">
+          <h3 id="mjFormTitle">Add an event</h3>
+          <div class="fin-section-sub">Evo, CEO, ECW, championship finals. Published events appear on the
+            Tournaments page as a followable countdown — live ones take the stage, and several rotate.</div>
+        </div>
+        <div class="mj-grid">
+          <label class="mj-f mj-wide"><span>Name</span>
+            <input id="mjName" type="text" maxlength="80" placeholder="Evo 2026"></label>
+          <label class="mj-f"><span>Game</span>
+            <input id="mjGame" type="text" maxlength="60" placeholder="Street Fighter 6"></label>
+          <label class="mj-f"><span>Organiser</span>
+            <input id="mjOrganiser" type="text" maxlength="60" placeholder="Evo"></label>
+          <label class="mj-f"><span>Location</span>
+            <input id="mjLocation" type="text" maxlength="80" placeholder="Las Vegas, NV"></label>
+          <label class="mj-f"><span>Tier</span>
+            <select id="mjTier">
+              <option value="major">Major</option>
+              <option value="championship">Championship</option>
+              <option value="qualifier">Qualifier</option>
+              <option value="showcase">Showcase</option>
+            </select></label>
+          <label class="mj-f"><span>Starts</span>
+            <input id="mjStarts" type="datetime-local"></label>
+          <label class="mj-f"><span>Ends</span>
+            <input id="mjEnds" type="datetime-local"></label>
+          <label class="mj-f mj-wide"><span>Event page URL</span>
+            <input id="mjUrl" type="url" placeholder="https://…"></label>
+          <label class="mj-f mj-wide"><span>Stream URL</span>
+            <input id="mjStream" type="url" placeholder="https://twitch.tv/…"></label>
+          <label class="mj-f mj-wide"><span>Key art URL</span>
+            <input id="mjArt" type="url" placeholder="https://… (sits behind the marquee)"></label>
+          <label class="mj-f"><span>Sort weight</span>
+            <input id="mjSort" type="number" value="0" title="Higher sorts first among events that are not live"></label>
+          <label class="mj-f mj-check"><span>Published</span>
+            <input id="mjPublished" type="checkbox">
+            <i>Unpublished events are never served to the app.</i></label>
+        </div>
+        <div class="mj-actions">
+          <button class="btn btn-blue" onclick="saveMajor()" id="mjSaveBtn">Save event</button>
+          <button class="btn btn-grey" onclick="resetMajorForm()">Clear</button>
+          <span id="mjFormNote" class="mj-note"></span>
+        </div>
+      </div>
+
+      <div class="fin-section">
+        <div class="fin-section-head">
+          <h3>Events</h3>
+          <div class="fin-section-sub">The app shows published events from now until a day after they end.</div>
+        </div>
+        <div id="mjList" class="mj-list"></div>
+      </div>
+    </div>
+
     <div id="view-featured" style="display:none">
       <div class="finance-lock-banner" id="featuredLockBanner">
         <div class="flb-icon">🔐</div>
@@ -746,6 +843,194 @@ function connectAdminWS() {
 
 function auth() { return { Authorization: `Bearer ${token}`, "Content-Type": "application/json" }; }
 
+// ─────────────────────────────────────────────────────────────────────
+// MAJORS — the real-world events the Tournaments page shows.
+//
+// These are not run here: no bracket, no entrants, no joining. The app
+// shows what is on, when, and where to watch, and lets people follow it.
+// Everything in the list comes from this screen; nothing is seeded.
+// ─────────────────────────────────────────────────────────────────────
+let _majors = [];
+let _mjEditing = null;      // id being edited, or null for a new event
+
+function mjNote(msg, kind) {
+  const el = document.getElementById("mjFormNote");
+  if (!el) return;
+  el.textContent = msg || "";
+  el.className = "mj-note" + (kind ? " " + kind : "");
+}
+
+// <input type="datetime-local"> wants local wall-clock with no zone, and
+// toISOString() gives UTC — feeding it that shifts every time by the
+// offset. Subtract the offset first so what is typed is what comes back.
+function mjToLocalInput(iso) {
+  if (!iso) return "";
+  const d = new Date(iso);
+  if (isNaN(d)) return "";
+  return new Date(d.getTime() - d.getTimezoneOffset() * 60000)
+    .toISOString().slice(0, 16);
+}
+
+function resetMajorForm() {
+  _mjEditing = null;
+  ["mjName","mjGame","mjOrganiser","mjLocation","mjStarts","mjEnds",
+   "mjUrl","mjStream","mjArt"].forEach(id => {
+    const el = document.getElementById(id); if (el) el.value = "";
+  });
+  document.getElementById("mjTier").value = "major";
+  document.getElementById("mjSort").value = "0";
+  document.getElementById("mjPublished").checked = false;
+  document.getElementById("mjFormTitle").textContent = "Add an event";
+  document.getElementById("mjSaveBtn").textContent = "Save event";
+  mjNote("");
+}
+
+function editMajor(id) {
+  const m = _majors.find(x => x.id === id);
+  if (!m) return;
+  _mjEditing = id;
+  document.getElementById("mjName").value      = m.name || "";
+  document.getElementById("mjGame").value      = m.game || "";
+  document.getElementById("mjOrganiser").value = m.organiser || "";
+  document.getElementById("mjLocation").value  = m.location || "";
+  document.getElementById("mjStarts").value    = mjToLocalInput(m.startsAt);
+  document.getElementById("mjEnds").value      = mjToLocalInput(m.endsAt);
+  document.getElementById("mjUrl").value       = m.url || "";
+  document.getElementById("mjStream").value    = m.streamUrl || "";
+  document.getElementById("mjArt").value       = m.art || "";
+  document.getElementById("mjTier").value      = m.tier || "major";
+  document.getElementById("mjSort").value      = m.sortOrder || 0;
+  document.getElementById("mjPublished").checked = !!m.published;
+  document.getElementById("mjFormTitle").textContent = "Edit · " + (m.name || "event");
+  document.getElementById("mjSaveBtn").textContent = "Save changes";
+  mjNote("");
+  document.getElementById("view-majors").scrollIntoView({ block: "start", behavior: "smooth" });
+}
+
+async function saveMajor() {
+  const name = document.getElementById("mjName").value.trim();
+  if (!name) return mjNote("An event needs a name.", "err");
+
+  const starts = document.getElementById("mjStarts").value;
+  const ends   = document.getElementById("mjEnds").value;
+  // Caught here rather than stored and shown as a negative countdown.
+  if (starts && ends && new Date(ends) < new Date(starts)) {
+    return mjNote("The end is before the start.", "err");
+  }
+  if (document.getElementById("mjPublished").checked && !starts) {
+    return mjNote("A published event needs a start date — the rail counts down to it.", "err");
+  }
+
+  const body = {
+    name,
+    game:      document.getElementById("mjGame").value.trim() || null,
+    organiser: document.getElementById("mjOrganiser").value.trim() || null,
+    location:  document.getElementById("mjLocation").value.trim() || null,
+    startsAt:  starts ? new Date(starts).toISOString() : null,
+    endsAt:    ends ? new Date(ends).toISOString() : null,
+    url:       document.getElementById("mjUrl").value.trim() || null,
+    streamUrl: document.getElementById("mjStream").value.trim() || null,
+    art:       document.getElementById("mjArt").value.trim() || null,
+    tier:      document.getElementById("mjTier").value,
+    sortOrder: Number(document.getElementById("mjSort").value) || 0,
+    isPublished: document.getElementById("mjPublished").checked,
+  };
+
+  const btn = document.getElementById("mjSaveBtn");
+  btn.disabled = true;
+  try {
+    const res = await fetch(
+      `${AUTH_URL}/majors` + (_mjEditing ? `/${_mjEditing}` : ""),
+      { method: _mjEditing ? "PATCH" : "POST", headers: auth(), body: JSON.stringify(body) });
+    const out = await res.json().catch(() => null);
+    if (!res.ok) throw new Error((out && out.error) || "Save failed");
+    mjNote(_mjEditing ? "Saved." : "Added.", "ok");
+    resetMajorForm();
+    await loadMajors();
+  } catch (e) {
+    mjNote(e.message || "Could not save that event.", "err");
+  } finally {
+    btn.disabled = false;
+  }
+}
+
+async function deleteMajor(id) {
+  const m = _majors.find(x => x.id === id);
+  if (!confirm(`Delete "${m ? m.name : "this event"}"? People following it lose the reminder.`)) return;
+  try {
+    const res = await fetch(`${AUTH_URL}/majors/${id}`, { method: "DELETE", headers: auth() });
+    if (!res.ok) throw new Error("Delete failed");
+    showToast("Event deleted");
+    if (_mjEditing === id) resetMajorForm();
+    await loadMajors();
+  } catch { showToast("Could not delete that event", "error"); }
+}
+
+async function toggleMajorPublished(id, next) {
+  try {
+    const res = await fetch(`${AUTH_URL}/majors/${id}`, {
+      method: "PATCH", headers: auth(), body: JSON.stringify({ isPublished: next }) });
+    if (!res.ok) throw new Error();
+    showToast(next ? "Published — it is on the Tournaments page now" : "Unpublished");
+    await loadMajors();
+  } catch { showToast("Could not change that", "error"); }
+}
+
+function mjWhen(m) {
+  if (!m.startsAt) return "No date set";
+  const o = { day: "numeric", month: "short", year: "numeric" };
+  const a = new Date(m.startsAt).toLocaleDateString(undefined, o);
+  if (!m.endsAt) return a;
+  const b = new Date(m.endsAt).toLocaleDateString(undefined, o);
+  return a === b ? a : `${a} — ${b}`;
+}
+
+async function loadMajors() {
+  const list = document.getElementById("mjList");
+  if (!list) return;
+  list.innerHTML = `<p style="color:var(--text-3);font-size:13px">Loading…</p>`;
+  try {
+    // /majors serves only PUBLISHED events, because that is what the app
+    // should see. This screen has to show drafts too, so it asks the
+    // admin listing instead.
+    const res = await fetch(`${AUTH_URL}/admin/majors`, { headers: auth() });
+    _majors = res.ok ? await res.json() : [];
+  } catch { _majors = []; }
+
+  if (!_majors.length) {
+    list.innerHTML = `<p style="color:var(--text-3);font-size:13px;line-height:1.6">
+      No events yet. Until one is added and published, the majors rail on the
+      Tournaments page stays hidden — it does not show a placeholder.</p>`;
+    return;
+  }
+
+  const esc = (x) => String(x == null ? "" : x)
+    .replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
+
+  list.innerHTML = _majors.map(m => {
+    const now = Date.now();
+    const live = m.startsAt && new Date(m.startsAt) <= now &&
+      new Date(m.endsAt || m.startsAt).getTime() + 864e5 >= now;
+    const pill = live ? `<span class="mj-pill live">● Live</span>`
+      : m.published ? `<span class="mj-pill pub">Published</span>`
+      : `<span class="mj-pill draft">Draft</span>`;
+    const bits = [m.game, m.location, mjWhen(m)].filter(Boolean).map(esc).join(" · ");
+    return `
+      <div class="mj-row">
+        ${pill}
+        <div class="mj-main">
+          <h4>${esc(m.name)}</h4>
+          <p>${bits}${m.followers ? " · " + m.followers + " following" : ""}</p>
+        </div>
+        <button class="btn btn-grey" onclick="editMajor(${m.id})">Edit</button>
+        <button class="btn ${m.published ? "btn-grey" : "btn-blue"}"
+          onclick="toggleMajorPublished(${m.id}, ${m.published ? "false" : "true"})">
+          ${m.published ? "Unpublish" : "Publish"}</button>
+        <button class="btn btn-danger" onclick="deleteMajor(${m.id})">🗑</button>
+      </div>`;
+  }).join("");
+}
+
 async function loadUsers() {
   try {
     const res = await fetch(`${AUTH_URL}/admin/users`, { headers: auth() });
@@ -808,7 +1093,14 @@ document.getElementById("searchInput").addEventListener("input", renderTable);
 document.getElementById("filterSelect").addEventListener("change", renderTable);
 
 // IDs of all view panels (user-table area + new panels)
-const USER_VIEW_IDS = ["view-servers", "view-announcements", "view-profanity"];
+// Derived, not listed. This was a hard-coded array of three ids sitting
+// next to markup that declares seven panels, so Finance, Store,
+// Transactions and Featured Curation all hid the user table and then
+// unhid nothing -- four admin screens that exist and are wired but
+// render a blank page. Reading the ids off the DOM means a panel is
+// registered by existing, and the next one added cannot be forgotten.
+const USER_VIEW_IDS = Array.from(document.querySelectorAll('[id^="view-"]'))
+  .map(el => el.id);
 const USER_TABLE_ELEMENTS = [
   document.querySelector(".stats-row"),
   document.querySelector(".toolbar"),
@@ -817,13 +1109,14 @@ const USER_TABLE_ELEMENTS = [
 
 function showUserTableView() {
   USER_TABLE_ELEMENTS.forEach(el => { if (el) el.style.display = ""; });
-  USER_VIEW_IDS.forEach(id => { document.getElementById(id).style.display = "none"; });
+  USER_VIEW_IDS.forEach(id => { const el = document.getElementById(id); if (el) el.style.display = "none"; });
 }
 
 function showPanelView(panelId) {
   USER_TABLE_ELEMENTS.forEach(el => { if (el) el.style.display = "none"; });
   USER_VIEW_IDS.forEach(id => {
-    document.getElementById(id).style.display = id === panelId ? "" : "none";
+    const el = document.getElementById(id);
+    if (el) el.style.display = id === panelId ? "" : "none";
   });
 }
 
@@ -843,6 +1136,7 @@ document.querySelectorAll(".nav-item[data-view]").forEach(btn => {
       store: "🎁 Store & Cosmetics",
       transactions: "🧾 Transactions",
       featured: "✨ Featured Curation",
+      majors: "🏆 Majors · real-world events",
     };
     const filters = { all:"all", banned:"banned", admin:"admin" };
     document.getElementById("viewTitle").textContent = titles[view] || view;
@@ -870,6 +1164,9 @@ document.querySelectorAll(".nav-item[data-view]").forEach(btn => {
     } else if (view === "featured") {
       showPanelView("view-featured");
       if (window._financeUnlocked) loadFeatured();
+    } else if (view === "majors") {
+      showPanelView("view-majors");
+      loadMajors();
     } else {
       showUserTableView();
       if (filters[view]) document.getElementById("filterSelect").value = filters[view];

@@ -1,0 +1,695 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<style>
+  :root{color-scheme:light dark}
+  html,body{margin:0}
+  img{max-width:100%}
+  [hidden]{display:none!important}
+</style>
+<title>Tournaments Layout Directions</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo+Black&family=Barlow:wght@400;500;600;700&family=JetBrains+Mono:wght@400;700&display=swap">
+
+<style>
+/* ─────────────────────────────────────────────────────────────────
+   Deliberately single-theme. The subject is a dark desktop app's UI:
+   rendering these mockups on a light ground would misrepresent the
+   thing being judged. Every colour is painted explicitly, including
+   the body ground, so the page holds on either host theme.
+   ───────────────────────────────────────────────────────────────── */
+:root{
+  --ground:#0a0b11;         /* near-black, biased very slightly violet */
+  --surface:#12131c;
+  --surface-2:#181a25;
+  --line:#262a3b;
+  --line-soft:#1c1f2d;
+  --text:#e9eaf2;
+  --text-2:#989db4;
+  --text-3:#666b82;
+  --rose:#ef5da8;           /* Tournaments accent, from the live page */
+  --amber:#f0b429;          /* open registration, majors */
+  --live:#ff4d4d;
+  --violet:#8b6bff;
+
+  --display:'Archivo Black','Arial Black',system-ui,sans-serif;
+  --body:'Barlow','Helvetica Neue',Arial,sans-serif;
+  --mono:'JetBrains Mono',ui-monospace,Consolas,monospace;
+}
+
+*{box-sizing:border-box}
+body{
+  margin:0; background:var(--ground); color:var(--text);
+  font-family:var(--body); font-size:16px; line-height:1.6;
+  -webkit-font-smoothing:antialiased;
+}
+.wrap{max-width:1180px; margin:0 auto; padding:0 28px}
+
+/* ── Page head ─────────────────────────────────────────────────── */
+.head{padding:72px 0 40px}
+.eyebrow{
+  font-family:var(--mono); font-size:11px; font-weight:700;
+  letter-spacing:.22em; text-transform:uppercase; color:var(--rose);
+  margin:0 0 22px;
+}
+h1{
+  font-family:var(--display); font-weight:400;
+  font-size:clamp(38px,5.6vw,68px); line-height:1.02;
+  letter-spacing:-.02em; margin:0 0 20px; text-wrap:balance;
+}
+h1 em{font-style:normal; color:var(--rose)}
+.stand{
+  font-size:19px; line-height:1.55; color:var(--text-2);
+  max-width:62ch; margin:0;
+}
+.stand strong{color:var(--text); font-weight:600}
+
+/* ── Locked spec ───────────────────────────────────────────────── */
+.locked{
+  margin:44px 0 0; border:1px solid var(--line);
+  border-radius:10px; background:var(--surface);
+  padding:24px 26px 26px;
+}
+.locked h2{
+  font-family:var(--mono); font-size:11px; font-weight:700;
+  letter-spacing:.2em; text-transform:uppercase; color:var(--text-3);
+  margin:0 0 18px;
+}
+.spec{display:grid; gap:14px; margin:0; padding:0; list-style:none}
+@media(min-width:720px){.spec{grid-template-columns:1fr 1fr; gap:14px 34px}}
+.spec li{display:flex; gap:12px; font-size:14.5px; line-height:1.5; color:var(--text-2)}
+.spec b{color:var(--text); font-weight:600}
+.spec .k{
+  flex:0 0 auto; width:7px; height:7px; margin-top:8px; border-radius:50%;
+  background:var(--rose);
+}
+.spec li:nth-child(even) .k{background:var(--violet)}
+
+/* ── Direction sections ────────────────────────────────────────── */
+.dir{padding:76px 0 12px; border-top:1px solid var(--line-soft); margin-top:64px}
+.dir-head{display:grid; gap:14px; margin-bottom:30px}
+@media(min-width:860px){
+  .dir-head{grid-template-columns:minmax(0,1fr) minmax(0,42ch); align-items:end; gap:40px}
+}
+.dir-name{
+  font-family:var(--display); font-weight:400; font-size:clamp(28px,3.4vw,42px);
+  line-height:1.05; letter-spacing:-.015em; margin:0;
+}
+.dir-tag{
+  font-family:var(--mono); font-size:10.5px; font-weight:700; letter-spacing:.2em;
+  text-transform:uppercase; color:var(--text-3); margin:0 0 8px;
+}
+.dir-thesis{margin:0; color:var(--text-2); font-size:16px; line-height:1.6}
+
+/* ── Notes under each mockup ───────────────────────────────────── */
+.notes{display:grid; gap:22px; margin-top:26px}
+@media(min-width:720px){.notes{grid-template-columns:1fr 1fr; gap:34px}}
+.note h3{
+  font-family:var(--mono); font-size:10.5px; font-weight:700; letter-spacing:.18em;
+  text-transform:uppercase; margin:0 0 9px;
+}
+.note.good h3{color:#5ddba0}
+.note.cost h3{color:var(--amber)}
+.note p{margin:0; font-size:14.5px; line-height:1.6; color:var(--text-2)}
+
+/* ═══ MOCKUP CHROME ════════════════════════════════════════════════
+   A miniature of the real app: window bar, pill row, hotbar row, then
+   the page. Everything below is scaled-down real UI rather than
+   abstract blocks, so the layouts can actually be judged.
+   ════════════════════════════════════════════════════════════════ */
+.mock{
+  border:1px solid var(--line); border-radius:12px; overflow:hidden;
+  background:var(--ground); box-shadow:0 30px 70px -30px rgba(0,0,0,.9);
+  font-size:11px; line-height:1.35;
+}
+.mock-bar{
+  height:34px; display:flex; align-items:center; gap:9px; padding:0 12px;
+  background:#0d0e16; border-bottom:1px solid var(--line-soft);
+}
+.brand{font-family:var(--display); font-size:11px; letter-spacing:.02em}
+.brand span{color:var(--rose)}
+.pill{
+  height:17px; padding:0 9px; border-radius:99px; display:inline-flex;
+  align-items:center; background:#191b26; border:1px solid #2a2e40;
+  font-family:var(--mono); font-size:8px; font-weight:700; letter-spacing:.12em;
+  color:var(--text-3);
+}
+.pill.on{background:rgba(239,93,168,.16); border-color:rgba(239,93,168,.5); color:#ffa9d6}
+.mock-hot{
+  height:26px; display:flex; align-items:center; gap:6px; padding:0 12px;
+  background:#101119; border-bottom:1px solid var(--line-soft);
+}
+.ic{width:14px; height:14px; border-radius:4px; background:#232636}
+.ic.a{background:linear-gradient(135deg,#4b3a8f,#8b6bff)}
+.ic.b{background:linear-gradient(135deg,#7a2f4f,#ef5da8)}
+.ic.c{background:linear-gradient(135deg,#2f5a7a,#4fb3d9)}
+.spacer{flex:1}
+
+.mock-body{padding:14px; display:grid; gap:12px; min-height:340px}
+
+/* ── Shared miniature components ───────────────────────────────── */
+.lbl{
+  font-family:var(--mono); font-size:8px; font-weight:700; letter-spacing:.18em;
+  text-transform:uppercase; color:var(--text-3);
+}
+.lbl.rose{color:var(--rose)} .lbl.amber{color:var(--amber)} .lbl.live{color:var(--live)}
+.panel{background:var(--surface); border:1px solid var(--line-soft); border-radius:8px; padding:11px}
+.tcard{
+  border:1px solid var(--line-soft); border-radius:7px; overflow:hidden;
+  background:var(--surface); display:grid; grid-template-rows:auto 1fr;
+}
+.tcard .art{height:44px; position:relative}
+.tcard .art::after{
+  content:''; position:absolute; inset:0;
+  background:linear-gradient(180deg,transparent 30%,rgba(10,11,17,.85) 100%);
+}
+.art.g1{background:linear-gradient(135deg,#7a3d1f,#c9741f)}
+.art.g2{background:linear-gradient(135deg,#1f3d7a,#4f7fd9)}
+.art.g3{background:linear-gradient(135deg,#5a1f4a,#b93f8f)}
+.art.g4{background:linear-gradient(135deg,#1f5a3d,#3fb97f)}
+.art.g5{background:linear-gradient(135deg,#4a1f5a,#8b3fb9)}
+.tcard .meta{padding:7px 8px 8px; display:grid; gap:4px}
+.tname{font-weight:700; font-size:10.5px; letter-spacing:-.01em}
+.tsub{font-family:var(--mono); font-size:7.5px; letter-spacing:.1em; color:var(--text-3)}
+.badge{
+  position:absolute; top:5px; left:5px; z-index:2;
+  font-family:var(--mono); font-size:7px; font-weight:700; letter-spacing:.12em;
+  padding:2px 5px; border-radius:3px; background:rgba(255,77,77,.9); color:#fff;
+}
+.badge.open{background:rgba(240,180,41,.92); color:#241a00}
+.badge.major{background:rgba(139,107,255,.92); color:#fff}
+
+/* Bracket miniature — real structure, not decoration */
+.bracket{display:flex; gap:0; align-items:center}
+.br-col{display:flex; flex-direction:column; gap:6px; justify-content:center}
+.seed{
+  width:52px; height:15px; border-radius:3px; background:var(--surface-2);
+  border:1px solid var(--line); display:flex; align-items:center;
+  padding:0 5px; font-family:var(--mono); font-size:7px; color:var(--text-2);
+  letter-spacing:.04em;
+}
+.seed.win{border-color:rgba(239,93,168,.6); color:#ffa9d6; background:rgba(239,93,168,.1)}
+.seed.now{border-color:var(--live); color:#ff9b9b; background:rgba(255,77,77,.12)}
+.br-link{width:11px; border-top:1px solid var(--line); height:1px}
+.br-join{width:11px; align-self:stretch; border:1px solid var(--line); border-left:0; border-radius:0 3px 3px 0}
+
+.cta{
+  height:19px; border-radius:5px; display:inline-flex; align-items:center;
+  justify-content:center; padding:0 11px; font-family:var(--mono);
+  font-size:8px; font-weight:700; letter-spacing:.13em;
+  background:var(--rose); color:#26041a;
+}
+.cta.ghost{background:transparent; border:1px solid var(--line); color:var(--text-2)}
+.cta.amber{background:var(--amber); color:#241a00}
+
+.code{
+  font-family:var(--mono); font-size:9px; font-weight:700; letter-spacing:.22em;
+  color:var(--text); background:var(--surface-2); border:1px dashed var(--line);
+  border-radius:5px; padding:5px 8px; display:inline-block;
+}
+
+.countdown{font-family:var(--mono); font-size:13px; font-weight:700; letter-spacing:.04em; color:var(--text)}
+.stat{display:grid; gap:1px}
+.stat b{font-family:var(--mono); font-size:12px; letter-spacing:-.01em}
+.stat span{font-family:var(--mono); font-size:7px; letter-spacing:.14em; color:var(--text-3)}
+.avs{display:flex}
+.av{
+  width:15px; height:15px; border-radius:50%; border:1.5px solid var(--surface);
+  margin-left:-4px; background:#2a2e40;
+  font-family:var(--mono); font-size:7px; display:flex; align-items:center; justify-content:center;
+  color:var(--text-2);
+}
+.av:first-child{margin-left:0}
+
+/* ── Direction A · The Desk ────────────────────────────────────── */
+.desk{grid-template-columns:118px minmax(0,1fr) 172px}
+.rail{display:grid; gap:9px; align-content:start}
+.rail-group{display:grid; gap:5px}
+.rail-item{
+  display:flex; align-items:center; gap:6px; font-size:9.5px; color:var(--text-3);
+  padding:3px 6px; border-radius:5px;
+}
+.rail-item.on{background:rgba(239,93,168,.12); color:#ffa9d6}
+.dot{width:5px; height:5px; border-radius:50%; background:currentColor; opacity:.7}
+.shelf{display:grid; gap:7px}
+.shelf-row{display:grid; grid-template-columns:repeat(4,1fr); gap:8px}
+
+/* ── Direction B · The Marquee ─────────────────────────────────── */
+.marquee{
+  border-radius:8px; overflow:hidden; position:relative; min-height:112px;
+  background:
+    radial-gradient(120% 150% at 78% -20%, rgba(139,107,255,.5) 0%, transparent 62%),
+    linear-gradient(115deg,#1a0f2e 0%,#2b1140 45%,#0f0a18 100%);
+  padding:13px 15px; display:grid; align-content:space-between;
+}
+.mq-rot{display:flex; gap:4px; align-items:center}
+.rot-bar{width:16px; height:2px; border-radius:2px; background:#3d3560}
+.rot-bar.on{background:var(--violet); width:26px}
+.stagger{display:grid; gap:14px}
+.stag-row{display:grid; gap:10px; align-items:center}
+.stag-row.left{grid-template-columns:minmax(0,1.35fr) minmax(0,.65fr)}
+.stag-row.right{grid-template-columns:minmax(0,.65fr) minmax(0,1.35fr)}
+.bleed{
+  border-radius:7px; min-height:78px;
+  background:linear-gradient(135deg,#241a3d,#3d2456);
+  border:1px solid var(--line-soft); padding:10px; display:grid; align-content:center; gap:5px;
+}
+
+/* ── Direction C · The Split ───────────────────────────────────── */
+.split{grid-template-columns:1fr 1fr; gap:14px}
+.col{display:grid; gap:9px; align-content:start}
+.col-head{display:flex; align-items:center; justify-content:space-between; padding-bottom:7px; border-bottom:1px solid var(--line-soft)}
+.live-card{border:1px solid rgba(255,77,77,.28); border-radius:7px; background:linear-gradient(180deg,rgba(255,77,77,.06),transparent); padding:10px; display:grid; gap:8px}
+.open-card{border:1px solid var(--line-soft); border-radius:7px; background:var(--surface); padding:10px; display:grid; gap:7px}
+
+/* ── Close ─────────────────────────────────────────────────────── */
+.close{padding:78px 0 96px; border-top:1px solid var(--line-soft); margin-top:70px}
+.close h2{font-family:var(--display); font-weight:400; font-size:clamp(26px,3.2vw,38px); margin:0 0 18px; letter-spacing:-.015em}
+.close p{color:var(--text-2); max-width:64ch; font-size:16px; margin:0 0 16px}
+.close p strong{color:var(--text); font-weight:600}
+.rec{
+  border-left:2px solid var(--rose); padding:2px 0 2px 20px; margin:30px 0;
+}
+.rec .lbl{display:block; margin-bottom:8px}
+.foot{
+  margin-top:44px; padding-top:22px; border-top:1px solid var(--line-soft);
+  font-family:var(--mono); font-size:11px; color:var(--text-3); line-height:1.7;
+}
+:focus-visible{outline:2px solid var(--rose); outline-offset:3px}
+@media(prefers-reduced-motion:reduce){*{animation:none!important; transition:none!important}}
+</style>
+
+<div class="wrap">
+
+  <header class="head">
+    <p class="eyebrow">Lobby · Tournaments</p>
+    <h1>Three ways to lay out <em>Tournaments</em></h1>
+    <p class="stand">You said it doesn't pop, wastes the cards, wastes the bracket structure, ignores the real-world majors, and sits too centred. Here are three layouts that each fix all five — they differ in <strong>where your own match lives</strong> and <strong>what the page leads with</strong>. Pick one and I'll build it.</p>
+
+    <div class="locked">
+      <h2>Locked, whichever you pick</h2>
+      <ul class="spec">
+        <li><i class="k"></i><span><b>Public, or private by code.</b> Its own code type — 4 letters + 4 digits, <span style="font-family:var(--mono);letter-spacing:.1em">EVOX-4417</span> — not reused from anywhere else in the app.</span></li>
+        <li><i class="k"></i><span><b>Completely separate from Lobby tournaments.</b> Those stay private to their Lobby and never appear here.</span></li>
+        <li><i class="k"></i><span><b>Leads with you.</b> The tournament you're in, your next match, a countdown, and standings you can read without entering.</span></li>
+        <li><i class="k"></i><span><b>Majors rail is curated.</b> Evo, CEO, ECW and championship finals, read from a server table you populate — follow and countdown only, never entered here.</span></li>
+        <li><i class="k"></i><span><b>Auto-rotation.</b> One live major takes the stage; several rotate.</span></li>
+        <li><i class="k"></i><span><b>Create a tournament</b> is a first-class action on the page, not buried in a menu.</span></li>
+      </ul>
+    </div>
+  </header>
+
+  <!-- ══════════════════════════════════════════════════════════════
+       DIRECTION · THE DESK
+       ══════════════════════════════════════════════════════════════ -->
+  <section class="dir">
+    <div class="dir-head">
+      <div>
+        <p class="dir-tag">Direction</p>
+        <h2 class="dir-name">The Desk</h2>
+      </div>
+      <p class="dir-thesis">A broadcast desk. Filters stand on the left, the stage runs down the middle, and your next match never leaves the right-hand column — it stays with you while you browse everything else.</p>
+    </div>
+
+    <div class="mock">
+      <div class="mock-bar">
+        <span class="brand">LOBBY<span>.</span></span>
+        <span class="pill">Discover</span><span class="pill">Queue</span>
+        <span class="pill on">Tournaments</span><span class="pill">Store</span>
+        <span class="spacer"></span>
+        <span class="pill">Messages</span><span class="pill">Feed</span>
+      </div>
+      <div class="mock-hot">
+        <span class="ic"></span><span class="ic a"></span><span class="ic b"></span><span class="ic c"></span>
+        <span class="spacer"></span><span class="lbl">Quick access</span>
+      </div>
+
+      <div class="mock-body desk">
+        <!-- Left rail -->
+        <aside class="rail">
+          <div class="rail-group">
+            <p class="lbl">Circuit</p>
+            <div class="rail-item on"><i class="dot"></i>All</div>
+            <div class="rail-item"><i class="dot"></i>Majors</div>
+            <div class="rail-item"><i class="dot"></i>Qualifiers</div>
+            <div class="rail-item"><i class="dot"></i>Weeklies</div>
+          </div>
+          <div class="rail-group">
+            <p class="lbl">Game</p>
+            <div class="rail-item"><i class="dot"></i>Street Fighter 6</div>
+            <div class="rail-item"><i class="dot"></i>Tekken 8</div>
+            <div class="rail-item"><i class="dot"></i>Counter-Strike 2</div>
+          </div>
+          <div class="rail-group">
+            <p class="lbl">Format</p>
+            <div class="rail-item"><i class="dot"></i>Single elim</div>
+            <div class="rail-item"><i class="dot"></i>Double elim</div>
+            <div class="rail-item"><i class="dot"></i>Round robin</div>
+          </div>
+          <div class="rail-group" style="margin-top:4px">
+            <span class="cta">Create</span>
+            <span class="code" style="margin-top:6px">ABCD·1234</span>
+          </div>
+        </aside>
+
+        <!-- Centre stage -->
+        <main style="display:grid;gap:12px;align-content:start">
+          <div class="marquee" style="min-height:92px">
+            <div>
+              <span class="badge major" style="position:static;display:inline-block;margin-bottom:7px">Major · Live</span>
+              <div style="font-family:var(--display);font-size:19px;line-height:1.05;letter-spacing:-.01em">EVO · Street Fighter 6</div>
+              <div class="lbl" style="margin-top:5px">Top 8 · Las Vegas</div>
+            </div>
+            <div style="display:flex;align-items:center;justify-content:space-between">
+              <span class="cta ghost" style="border-color:rgba(255,255,255,.25);color:#fff">Follow</span>
+              <div class="mq-rot"><i class="rot-bar on"></i><i class="rot-bar"></i><i class="rot-bar"></i></div>
+            </div>
+          </div>
+
+          <div class="shelf">
+            <div style="display:flex;align-items:baseline;gap:8px">
+              <span class="lbl live">● Live now</span><span class="lbl">3 brackets</span>
+            </div>
+            <div class="shelf-row">
+              <div class="tcard"><div class="art g1"><span class="badge">Live</span></div><div class="meta"><span class="tname">Test</span><span class="tsub">3 · Single</span></div></div>
+              <div class="tcard"><div class="art g2"><span class="badge">Live</span></div><div class="meta"><span class="tname">Iron Fist</span><span class="tsub">16 · Double</span></div></div>
+              <div class="tcard"><div class="art g3"><span class="badge">Live</span></div><div class="meta"><span class="tname">Night Bracket</span><span class="tsub">8 · Single</span></div></div>
+              <div class="tcard"><div class="art g4"></div><div class="meta"><span class="tname">Clutch Cup</span><span class="tsub">32 · Groups</span></div></div>
+            </div>
+          </div>
+
+          <div class="shelf">
+            <div style="display:flex;align-items:baseline;gap:8px">
+              <span class="lbl amber">⚑ Open registration</span><span class="lbl">4 open</span>
+            </div>
+            <div class="shelf-row">
+              <div class="tcard"><div class="art g5"><span class="badge open">5 seats</span></div><div class="meta"><span class="tname">CEO Qualifier</span><span class="tsub">Sat 19:00</span></div></div>
+              <div class="tcard"><div class="art g2"><span class="badge open">12 seats</span></div><div class="meta"><span class="tname">Friday Nighter</span><span class="tsub">Fri 20:00</span></div></div>
+              <div class="tcard"><div class="art g1"><span class="badge open">2 seats</span></div><div class="meta"><span class="tname">Ladder Gauntlet</span><span class="tsub">Sun 18:00</span></div></div>
+              <div class="tcard"><div class="art g4"><span class="badge open">Open</span></div><div class="meta"><span class="tname">Rookie Rumble</span><span class="tsub">Mon 19:30</span></div></div>
+            </div>
+          </div>
+        </main>
+
+        <!-- Right: your match, persistent -->
+        <aside style="display:grid;gap:10px;align-content:start">
+          <div class="panel" style="border-color:rgba(239,93,168,.3);background:linear-gradient(180deg,rgba(239,93,168,.07),var(--surface))">
+            <p class="lbl rose">You're in · Test</p>
+            <div class="countdown" style="margin:6px 0 3px">00:04:12</div>
+            <div class="lbl">Semi-final starts</div>
+            <div style="display:flex;align-items:center;gap:6px;margin:9px 0 8px">
+              <span class="av">O</span><span class="lbl" style="letter-spacing:.1em">vs</span><span class="av">T</span>
+            </div>
+            <span class="cta" style="width:100%">Go to match</span>
+          </div>
+
+          <div class="panel">
+            <p class="lbl" style="margin-bottom:8px">Standings</p>
+            <div class="bracket">
+              <div class="br-col">
+                <span class="seed win">1 ovrlrd</span>
+                <span class="seed">4 kite</span>
+                <span class="seed">2 T</span>
+                <span class="seed">3 mo</span>
+              </div>
+              <div class="br-col"><span class="br-join" style="height:21px"></span><span class="br-join" style="height:21px;margin-top:6px"></span></div>
+              <div class="br-col">
+                <span class="seed now">ovrlrd</span>
+                <span class="seed">T</span>
+              </div>
+            </div>
+            <p class="lbl" style="margin-top:9px">Round 2 of 3 · read-only</p>
+          </div>
+        </aside>
+      </div>
+    </div>
+
+    <div class="notes">
+      <div class="note good"><h3>Reads best when</h3><p>You're already entered in something. Your match and the standings stay pinned while you browse, so the page answers "what am I doing next" without you leaving it. The left rail is where circuit, game and format filters finally get room — and it's the closest sibling to what Discover became, so the app stays coherent.</p></div>
+      <div class="note cost"><h3>What it costs</h3><p>Two standing rails eat horizontal space, so cards run four-up instead of five and the majors stage is smaller than it could be. And when you're not in a tournament, the right column has to earn its place with something else — recent results, or the circuit standings.</p></div>
+    </div>
+  </section>
+
+  <!-- ══════════════════════════════════════════════════════════════
+       DIRECTION · THE MARQUEE
+       ══════════════════════════════════════════════════════════════ -->
+  <section class="dir">
+    <div class="dir-head">
+      <div>
+        <p class="dir-tag">Direction</p>
+        <h2 class="dir-name">The Marquee</h2>
+      </div>
+      <p class="dir-thesis">The stage takes the whole width and rotates: your live match first if you have one, then whichever majors are on. Below it, shelves stagger left and right down the page — nothing is centred, and every band has its own art bleeding off one edge.</p>
+    </div>
+
+    <div class="mock">
+      <div class="mock-bar">
+        <span class="brand">LOBBY<span>.</span></span>
+        <span class="pill">Discover</span><span class="pill">Queue</span>
+        <span class="pill on">Tournaments</span><span class="pill">Store</span>
+        <span class="spacer"></span>
+        <span class="pill">Messages</span><span class="pill">Feed</span>
+      </div>
+      <div class="mock-hot">
+        <span class="ic"></span><span class="ic a"></span><span class="ic b"></span><span class="ic c"></span>
+        <span class="spacer"></span><span class="lbl">Quick access</span>
+      </div>
+
+      <div class="mock-body">
+        <!-- Full-bleed rotating stage -->
+        <div class="marquee" style="min-height:126px">
+          <div style="display:flex;justify-content:space-between;align-items:start;gap:16px">
+            <div>
+              <span class="badge major" style="position:static;display:inline-block;margin-bottom:8px">Your match · Live</span>
+              <div style="font-family:var(--display);font-size:26px;line-height:1.02;letter-spacing:-.015em">Test <span style="color:var(--text-3)">·</span> Semi-final</div>
+              <div style="display:flex;align-items:center;gap:9px;margin-top:9px">
+                <span class="av">O</span><span class="lbl">ovrlrd</span>
+                <span class="lbl" style="color:var(--rose)">vs</span>
+                <span class="av">T</span><span class="lbl">T</span>
+              </div>
+            </div>
+            <div style="text-align:right">
+              <div class="countdown" style="font-size:22px">00:04:12</div>
+              <div class="lbl" style="margin-top:3px">until you're up</div>
+            </div>
+          </div>
+          <div style="display:flex;align-items:center;justify-content:space-between;gap:12px">
+            <div style="display:flex;gap:7px">
+              <span class="cta">Go to match</span>
+              <span class="cta ghost" style="border-color:rgba(255,255,255,.25);color:#fff">Standings</span>
+            </div>
+            <div class="mq-rot">
+              <i class="rot-bar on"></i><i class="rot-bar"></i><i class="rot-bar"></i>
+              <span class="lbl" style="margin-left:6px">Next: EVO top 8</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- Staggered shelves -->
+        <div class="stagger">
+          <div class="stag-row left">
+            <div>
+              <div style="display:flex;align-items:baseline;gap:8px;margin-bottom:7px">
+                <span class="lbl live">● Live now</span><span class="lbl">3 brackets</span>
+              </div>
+              <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:8px">
+                <div class="tcard"><div class="art g1"><span class="badge">Live</span></div><div class="meta"><span class="tname">Test</span><span class="tsub">3 · Single</span></div></div>
+                <div class="tcard"><div class="art g2"><span class="badge">Live</span></div><div class="meta"><span class="tname">Iron Fist</span><span class="tsub">16 · Double</span></div></div>
+                <div class="tcard"><div class="art g3"><span class="badge">Live</span></div><div class="meta"><span class="tname">Night Bracket</span><span class="tsub">8 · Single</span></div></div>
+              </div>
+            </div>
+            <div class="bleed">
+              <span class="lbl" style="color:#c9b6ff">Bracket · Test</span>
+              <div class="bracket" style="margin-top:3px">
+                <div class="br-col"><span class="seed win">1 ovrlrd</span><span class="seed">4 kite</span></div>
+                <div class="br-col"><span class="br-join" style="height:21px"></span></div>
+                <div class="br-col"><span class="seed now">ovrlrd</span></div>
+              </div>
+            </div>
+          </div>
+
+          <div class="stag-row right">
+            <div class="bleed" style="background:linear-gradient(135deg,#3d2a15,#5a3d1a)">
+              <span class="lbl" style="color:#f5d18a">Majors · Follow</span>
+              <div style="font-family:var(--display);font-size:14px;line-height:1.1;margin-top:2px">CEO</div>
+              <div class="lbl">Orlando · countdown 42d</div>
+              <span class="cta amber" style="margin-top:5px;width:fit-content">Follow</span>
+            </div>
+            <div>
+              <div style="display:flex;align-items:baseline;gap:8px;margin-bottom:7px">
+                <span class="lbl amber">⚑ Open registration</span><span class="lbl">4 open</span>
+              </div>
+              <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:8px">
+                <div class="tcard"><div class="art g5"><span class="badge open">5 seats</span></div><div class="meta"><span class="tname">CEO Qualifier</span><span class="tsub">Sat 19:00</span></div></div>
+                <div class="tcard"><div class="art g4"><span class="badge open">12 seats</span></div><div class="meta"><span class="tname">Friday Nighter</span><span class="tsub">Fri 20:00</span></div></div>
+                <div class="tcard"><div class="art g1"><span class="badge open">2 seats</span></div><div class="meta"><span class="tname">Ladder Gauntlet</span><span class="tsub">Sun 18:00</span></div></div>
+              </div>
+            </div>
+          </div>
+
+          <div style="display:flex;align-items:center;gap:10px;padding-top:2px">
+            <span class="cta">Create tournament</span>
+            <span class="lbl">or join with a code</span>
+            <span class="code">ABCD·1234</span>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="notes">
+      <div class="note good"><h3>Reads best when</h3><p>This is the one that pops. The stage is the width of the page and it's the first thing your eye lands on, whether that's your own semi-final or Evo top 8 rotating through. The staggered bands are genuinely uncentred — each one anchors to a different edge with art bleeding off it, so scrolling has rhythm instead of one column of shelves.</p></div>
+      <div class="note cost"><h3>What it costs</h3><p>Filters lose their permanent home — they'd sit in a bar under the stage, so heavy browsing means more scrolling back up. And the stage is only as good as what's in it: with no majors on and you not entered, it has to fall back to a featured open tournament or it reads empty.</p></div>
+    </div>
+  </section>
+
+  <!-- ══════════════════════════════════════════════════════════════
+       DIRECTION · THE SPLIT
+       ══════════════════════════════════════════════════════════════ -->
+  <section class="dir">
+    <div class="dir-head">
+      <div>
+        <p class="dir-tag">Direction</p>
+        <h2 class="dir-name">The Split</h2>
+      </div>
+      <p class="dir-thesis">The page divides down the middle by verb. Left is what's <em style="font-style:normal;color:var(--live)">happening</em> — brackets ticking over, standings advancing live. Right is what you can <em style="font-style:normal;color:var(--amber)">do</em> — enter, create, join by code. Two standing columns, no centre at all.</p>
+    </div>
+
+    <div class="mock">
+      <div class="mock-bar">
+        <span class="brand">LOBBY<span>.</span></span>
+        <span class="pill">Discover</span><span class="pill">Queue</span>
+        <span class="pill on">Tournaments</span><span class="pill">Store</span>
+        <span class="spacer"></span>
+        <span class="pill">Messages</span><span class="pill">Feed</span>
+      </div>
+      <div class="mock-hot">
+        <span class="ic"></span><span class="ic a"></span><span class="ic b"></span><span class="ic c"></span>
+        <span class="spacer"></span><span class="lbl">Quick access</span>
+      </div>
+
+      <div class="mock-body">
+        <!-- Slim majors ribbon across the top -->
+        <div style="display:flex;align-items:center;gap:10px;padding:8px 11px;border-radius:7px;background:linear-gradient(90deg,rgba(139,107,255,.22),rgba(139,107,255,.04));border:1px solid rgba(139,107,255,.3)">
+          <span class="badge major" style="position:static">Major live</span>
+          <span style="font-weight:700;font-size:11px">EVO · Street Fighter 6 — Top 8</span>
+          <span class="lbl">Las Vegas</span>
+          <span class="spacer"></span>
+          <div class="mq-rot"><i class="rot-bar on"></i><i class="rot-bar"></i></div>
+          <span class="cta ghost" style="border-color:rgba(255,255,255,.25);color:#fff">Follow</span>
+        </div>
+
+        <div class="split" style="display:grid">
+          <!-- LEFT: happening -->
+          <section class="col">
+            <div class="col-head"><span class="lbl live">● Happening now</span><span class="lbl">3</span></div>
+
+            <div class="live-card">
+              <div style="display:flex;justify-content:space-between;align-items:start">
+                <div>
+                  <div class="tname" style="font-size:12px">Test</div>
+                  <div class="tsub">Single elim · hosted by Overlord</div>
+                </div>
+                <div style="text-align:right"><div class="countdown">00:04:12</div><div class="lbl">you're up</div></div>
+              </div>
+              <div class="bracket">
+                <div class="br-col">
+                  <span class="seed win">1 ovrlrd</span><span class="seed">4 kite</span>
+                  <span class="seed">2 T</span><span class="seed">3 mo</span>
+                </div>
+                <div class="br-col"><span class="br-join" style="height:21px"></span><span class="br-join" style="height:21px;margin-top:6px"></span></div>
+                <div class="br-col"><span class="seed now">ovrlrd</span><span class="seed">T</span></div>
+                <div class="br-col"><span class="br-join" style="height:21px"></span></div>
+                <div class="br-col"><span class="seed">Final</span></div>
+              </div>
+              <div style="display:flex;gap:6px"><span class="cta">Go to match</span><span class="cta ghost">Full standings</span></div>
+            </div>
+
+            <div class="open-card" style="border-color:rgba(255,77,77,.18)">
+              <div style="display:flex;justify-content:space-between"><span class="tname">Iron Fist</span><span class="lbl live">● R3</span></div>
+              <div class="bracket">
+                <div class="br-col"><span class="seed">jax</span><span class="seed win">rue</span></div>
+                <div class="br-col"><span class="br-join" style="height:21px"></span></div>
+                <div class="br-col"><span class="seed now">rue</span></div>
+              </div>
+              <div class="tsub">16 entrants · double elim</div>
+            </div>
+
+            <div class="open-card" style="border-color:rgba(255,77,77,.18)">
+              <div style="display:flex;justify-content:space-between"><span class="tname">Night Bracket</span><span class="lbl live">● Final</span></div>
+              <div class="tsub">8 entrants · single elim</div>
+            </div>
+          </section>
+
+          <!-- RIGHT: do -->
+          <section class="col">
+            <div class="col-head"><span class="lbl amber">⚑ Open to enter</span><span class="lbl">4</span></div>
+
+            <div class="open-card">
+              <div style="display:flex;justify-content:space-between;align-items:start">
+                <div><div class="tname" style="font-size:12px">CEO Qualifier</div><div class="tsub">Sat 19:00 · single elim</div></div>
+                <span class="badge open" style="position:static">5 seats</span>
+              </div>
+              <div style="display:flex;align-items:center;gap:8px">
+                <div class="avs"><span class="av">O</span><span class="av">T</span><span class="av">k</span><span class="av">+8</span></div>
+                <span class="spacer"></span><span class="cta amber">Enter</span>
+              </div>
+            </div>
+
+            <div class="open-card">
+              <div style="display:flex;justify-content:space-between;align-items:start">
+                <div><div class="tname" style="font-size:12px">Friday Nighter</div><div class="tsub">Fri 20:00 · round robin</div></div>
+                <span class="badge open" style="position:static">12 seats</span>
+              </div>
+              <div style="display:flex;align-items:center;gap:8px">
+                <div class="avs"><span class="av">m</span><span class="av">s</span><span class="av">+2</span></div>
+                <span class="spacer"></span><span class="cta amber">Enter</span>
+              </div>
+            </div>
+
+            <div class="panel" style="display:grid;gap:8px">
+              <p class="lbl">Start or join</p>
+              <span class="cta" style="width:100%">Create tournament</span>
+              <div style="display:flex;gap:6px;align-items:center">
+                <span class="code" style="flex:1;text-align:center">ABCD·1234</span>
+                <span class="cta ghost">Join</span>
+              </div>
+              <p class="lbl" style="line-height:1.5">Four letters, four digits. Private tournaments only.</p>
+            </div>
+          </section>
+        </div>
+      </div>
+    </div>
+
+    <div class="notes">
+      <div class="note good"><h3>Reads best when</h3><p>It's the clearest information design of the three: one glance tells you what's running and what you can join, and nothing competes for the same space. The brackets are the content rather than a preview panel, so the structure you said we're wasting is the whole left half of the page. Create and join-by-code get a permanent home.</p></div>
+      <div class="note cost"><h3>What it costs</h3><p>Cards shrink to fit half a page, so the art pipeline does less work — this is the least "poster" of the three. And with only one or two tournaments running, the left column looks thin next to the right.</p></div>
+    </div>
+  </section>
+
+  <!-- ══════════════════════════════════════════════════════════════ -->
+  <section class="close">
+    <h2>What I'd pick, and why</h2>
+
+    <div class="rec">
+      <span class="lbl rose">Recommendation</span>
+      <p style="margin:0"><strong>The Marquee</strong> — because your first complaint was that nothing pops, and it's the only one of the three that solves that in its structure rather than its styling. It also does the most with your two strongest assets: the rotating stage is exactly where a live major belongs, and the staggered bands are the "left and right diversity" you asked for, in a way the two-rail layouts can't be.</p>
+    </div>
+
+    <p>The honest trade is filters. If you browse tournaments the way you browse Discover — heavy filtering, lots of comparing — <strong>The Desk</strong> is the better tool and the more consistent app. If the page is somewhere you check what's on and then act, The Marquee wins.</p>
+
+    <p><strong>The Split</strong> is the one I'd hold in reserve. It's the best pure information design here, but it's the weakest at what you actually asked for first.</p>
+
+    <p>Whichever you pick, the bracket, the countdown, the standings preview, the majors rotation, create, and join-by-code all ship — they're placed differently, not cut.</p>
+
+    <div class="foot">
+      Event names in these mockups are placeholders for layout only. The majors rail reads from a server table you populate — I won't ship invented event data, dates or results.<br>
+      Tournament data stays server-authoritative throughout, as it does everywhere else in the app.
+    </div>
+  </section>
+
+</div>
+</body>
+</html>

@@ -2987,8 +2987,19 @@ async function steamArt(appid) {
       if (a && a.asset_url_format) {
         // asset_url_format is "steam/apps/<id>/${FILENAME}?t=...", and each
         // filename already carries its own hash directory.
-        const mk = (f) =>
-          f ? STEAM_ASSET_HOST + a.asset_url_format.replace("${FILENAME}", f) : null;
+        // asset_url_format is DOCUMENTED as relative, and usually is —
+        // but Steam returns it absolute for some titles, and prefixing
+        // the host onto an absolute URL builds
+        //   https://shared.akamai…/store_item_assets/https://cdn…
+        // which resolves to nothing. Every card built from one of those
+        // fires a request that fails, which is where several hundred
+        // ERR_NAME_NOT_RESOLVED entries came from.
+        const mk = (f) => {
+          if (!f) return null;
+          const path = a.asset_url_format.replace("${FILENAME}", f);
+          const abs = /^https?:/i.test(path) && path.indexOf("//") === path.indexOf(":") + 1;
+          return abs ? path : STEAM_ASSET_HOST + path;
+        };
         // 2x first: a true 600x900 rather than the 300x450, which the
         // poster card would otherwise have to scale up.
         const poster = mk(a.library_capsule_2x || a.library_capsule || a.main_capsule);
@@ -3173,7 +3184,9 @@ const OWNED_TTL = 30 * 60 * 1000;
 app.get("/steam/owned", requireAuth, async (req, res) => {
   const userRow = await pool.query("SELECT steam_id FROM users WHERE id = $1", [req.userId]);
   const steam_id = userRow.rows[0]?.steam_id;
-  if (!steam_id) return res.json([]);
+  /* No account linked is not an empty library: the caller has to be
+     able to say so instead of claiming the account owns nothing. */
+  if (!steam_id) return res.json({ linked: false, games: [] });
   if (!STEAM_KEY) return res.status(503).json({ error: "Steam API key not configured" });
 
   const hit = _ownedCache.get(steam_id);
@@ -3185,7 +3198,12 @@ app.get("/steam/owned", requireAuth, async (req, res) => {
       `&steamid=${steam_id}&include_appinfo=1&include_played_free_games=1`
     );
     const j = await r.json();
-    const games = (j?.response?.games || [])
+    /* A private profile answers with no games key at all; a public
+       one with an empty library answers with an empty array. */
+    if (!Array.isArray(j?.response?.games)){
+      return res.json({ linked: true, private: true, games: [] });
+    }
+    const games = (j.response.games || [])
       .sort((a, b) => (b.playtime_forever || 0) - (a.playtime_forever || 0))
       .slice(0, 200)
       .map(g => ({
@@ -3415,9 +3433,21 @@ app.get("/steam/recent/:userId", requireAuth, async (req, res) => {
 app.post("/tournaments/create", requireAuth, async (req, res) => {
   const { lobbyId, name, description, format, playerCount, rules, prize, startTime, joinType } = req.body;
 
+  /* A hub tournament belongs to the Tournaments page, not to a Lobby,
+     so it has no lobbyId and must not be given one. A lobby tournament
+     is unchanged and still requires it. Anything the client does not
+     say is a lobby tournament, which is what every existing caller
+     sends. */
+  const scope = req.body.scope === "global" ? "global" : "lobby";
+  const visibility = (scope === "global" && req.body.visibility === "code")
+    ? "code" : "public";
+
   // Validate input
-  if (!lobbyId || !name || !format || !playerCount) {
+  if (!name || !format || !playerCount) {
     return res.status(400).json({ error: "Missing required fields" });
+  }
+  if (scope === "lobby" && !lobbyId) {
+    return res.status(400).json({ error: "A Lobby tournament needs a Lobby" });
   }
 
   const validFormats = ['single', 'double', 'round-robin'];
@@ -3435,13 +3465,18 @@ app.post("/tournaments/create", requireAuth, async (req, res) => {
   const resolvedJoinType = validJoinTypes.includes(joinType) ? joinType : 'open';
 
   try {
+    /* Minted before the insert so the unique index is the thing that
+       decides, and a collision fails the request rather than silently
+       handing two tournaments the same code. */
+    const joinCode = visibility === "code" ? await mintTourneyCode() : null;
+
     const result = await pool.query(
       `INSERT INTO tournaments
-        (lobby_id, host_id, name, description, format, player_count, max_players, status, rules, prize, start_time, join_type)
-      VALUES ($1, $2, $3, $4, $5, $6, $7, 'setup', $8, $9, $10, $11)
+        (lobby_id, host_id, name, description, format, player_count, max_players, status, rules, prize, start_time, join_type, scope, visibility, join_code)
+      VALUES ($1, $2, $3, $4, $5, $6, $7, 'setup', $8, $9, $10, $11, $12, $13, $14)
       RETURNING *;`,
       [
-        lobbyId,
+        scope === "global" ? null : lobbyId,
         req.userId,
         name,
         description || null,
@@ -3451,12 +3486,19 @@ app.post("/tournaments/create", requireAuth, async (req, res) => {
         rules || null,
         prize || null,
         startTime ? new Date(startTime) : null,
-        resolvedJoinType
+        resolvedJoinType,
+        scope,
+        visibility,
+        joinCode
       ]
     );
 
+    /* The one place the code is handed out unprompted: to the person who
+       just created the tournament. After this it comes back only through
+       /me/tournaments, and only to the host or someone already in. */
     res.status(201).json({
       success: true,
+      joinCode: joinCode || null,
       tournament: result.rows[0]
     });
   } catch (error) {
@@ -3872,6 +3914,36 @@ const Q_SESSION_MAX_MS = 3 * 60 * 60 * 1000;   // the UI promises 3 hours
 // cap is the only rule that touches them.
 const Q_SEARCH_IDLE_MS = 20 * 60 * 1000;
 
+// A table code is read off a screen and typed, or said out loud and
+// typed. So the alphabet drops every character that survives neither:
+// no O or 0, no I, 1 or L, no S or 5.
+const Q_CODE_ALPHABET = "ABCDEFGHJKMNPQRTUVWXYZ2346789";
+function _qMakeCode(){
+  let out = "";
+  for (let i = 0; i < 6; i++){
+    out += Q_CODE_ALPHABET[Math.floor(Math.random() * Q_CODE_ALPHABET.length)];
+  }
+  return out.slice(0, 3) + "-" + out.slice(3);
+}
+
+// Collisions are possible, so the unique index is the arbiter and the
+// loop is what makes it a non-event.
+async function _qAssignCode(sessionId){
+  for (let i = 0; i < 6; i++){
+    const code = _qMakeCode();
+    try {
+      const r = await pool.query(
+        "UPDATE queue_sessions SET join_code = $2 WHERE id = $1 AND join_code IS NULL RETURNING join_code",
+        [sessionId, code]);
+      if (r.rowCount) return r.rows[0].join_code;
+      // Already had one.
+      const cur = await pool.query("SELECT join_code FROM queue_sessions WHERE id = $1", [sessionId]);
+      return (cur.rows[0] || {}).join_code || null;
+    } catch (e) { /* unique violation: try another */ }
+  }
+  return null;
+}
+
 function _qTierIdx(t) {
   const i = Q_TIERS.indexOf(String(t || "").toLowerCase());
   return i === -1 ? 3 : i;   // unknown sits mid-ladder rather than at an end
@@ -3985,7 +4057,13 @@ function _qPrefOk(a, b) {
 async function _qRoster(sessionId) {
   const r = await pool.query(`
     SELECT m.user_id, m.skill, m.proof, m.joined_at, m.role, m.ping_ms, m.region,
+           m.hours,
            u.username, u.avatar_url,
+           -- What they have done in the app, not just in this table.
+           (SELECT COUNT(*)::int FROM tournament_players tp
+             WHERE tp.user_id = m.user_id) AS tourneys,
+           (SELECT COUNT(*)::int FROM tournament_players tp
+             WHERE tp.user_id = m.user_id AND tp.status = 'winner') AS tourney_wins,
            (s.owner_id = m.user_id) AS is_owner
     FROM queue_members m
     JOIN users u ON u.id = m.user_id
@@ -4004,6 +4082,9 @@ async function _qRoster(sessionId) {
     role: x.role || null,
     pingMs: x.ping_ms == null ? null : Number(x.ping_ms),
     region: x.region || null,
+    hours: x.hours == null ? null : Number(x.hours),
+    tourneys: x.tourneys || 0,
+    tourneyWins: x.tourney_wins || 0,
   }));
 }
 
@@ -4100,6 +4181,7 @@ function _qPayload(sess, members) {
     startedAt2: sess.started_at || null,
     inPlay: !!sess.started_at,
     voiceRoom: "qt:" + sess.id,
+    joinCode: sess.join_code || null,
   };
 }
 
@@ -4363,6 +4445,7 @@ app.post("/queue/intent", requireAuth, async (req, res) => {
       `, [game, size, effTier, req.userId, wMic, wPlay, wMode, wWidth,
           wSteamOnly, wMinAge, verified]);
       sessionId = created.rows[0].id;
+      await _qAssignCode(sessionId);
       await pool.query(
         "INSERT INTO queue_members (session_id, user_id, skill, proof) VALUES ($1,$2,$3,$4)",
         [sessionId, req.userId, effTier, effProof || null]
@@ -4852,6 +4935,7 @@ app.get("/queue/:id/room", requireAuth, async (req, res) => {
     // before the room is described, so the answer is never one poll
     // out of date.
     await _qPromoteWaiting(sess0.id);
+    if (!sess0.join_code) await _qAssignCode(sess0.id);
     // The same staleness check /status runs. Without it a table could be
     // reported as live here and expired there, and the client believed
     // whichever it asked last.
@@ -5185,11 +5269,15 @@ app.post("/queue/:id/rate", requireAuth, async (req, res) => {
 app.post("/queue/:id/net", requireAuth, async (req, res) => {
   const ping = Math.max(0, Math.min(5000, parseInt((req.body || {}).pingMs, 10) || 0));
   const region = String((req.body || {}).region || "").trim().slice(0, 24) || null;
+  const hours = Math.max(0, Math.min(100000, parseInt((req.body || {}).hours, 10) || 0));
   try {
     await pool.query(`
-      UPDATE queue_members SET ping_ms = $3, region = COALESCE($4, region)
+      UPDATE queue_members
+         SET ping_ms = $3,
+             region = COALESCE($4, region),
+             hours = COALESCE($5, hours)
        WHERE session_id = $1 AND user_id = $2
-    `, [req.params.id, req.userId, ping || null, region]);
+    `, [req.params.id, req.userId, ping || null, region, hours || null]);
     res.json({ ok: true });
   } catch (e) { res.status(500).json({ error: "Could not record that" }); }
 });
@@ -5360,6 +5448,39 @@ app.post("/queue/:id/role", requireAuth, async (req, res) => {
   } catch (e) {
     console.error("[queue/role]", e.message);
     res.status(500).json({ error: "Could not claim that role" });
+  }
+});
+
+// GET /queue/code/:code -- find a table by the code you were given.
+//
+// Returns what it is, not a seat. Joining still goes through
+// /queue/:id/join, which is what enforces the rank window, the
+// blocks and the door policy -- a code is an address, not a pass.
+app.get("/queue/code/:code", requireAuth, async (req, res) => {
+  const code = String(req.params.code || "").toUpperCase().replace(/[^A-Z0-9]/g, "");
+  if (code.length < 5) return res.status(400).json({ error: "That is not a code" });
+  const dashed = code.slice(0, 3) + "-" + code.slice(3, 6);
+  try {
+    const r = await pool.query(`
+      SELECT s.*,
+             (SELECT COUNT(*)::int FROM queue_members m
+               WHERE m.session_id = s.id AND m.left_at IS NULL) AS filled
+        FROM queue_sessions s
+       WHERE s.join_code = $1
+         AND s.state IN ('searching','matched') AND s.ended_at IS NULL
+       LIMIT 1
+    `, [dashed]);
+    const sess = r.rows[0];
+    if (!sess) return res.status(404).json({ error: "No table with that code" });
+    res.json({
+      queueId: sess.id, game: sess.game, players: sess.players,
+      filled: sess.filled || 0, skill: sess.skill,
+      locked: !!sess.locked, full: (sess.filled || 0) >= sess.players,
+      joinCode: sess.join_code,
+    });
+  } catch (e) {
+    console.error("[queue/code]", e.message);
+    res.status(500).json({ error: "Could not look that up" });
   }
 });
 
@@ -5669,7 +5790,72 @@ function _tourneyCard(r) {
     lobbyName: r.lobby_name || null,
     startTime: r.scheduled_start || r.start_time || null,
     createdAt: r.created_at,
+    scope: r.scope || 'lobby',
+    visibility: r.visibility || 'public',
+    /* The code itself is a credential and is never in a browse payload.
+       Saying one EXISTS is not sensitive and is what the card needs to
+       draw the private badge. _tourneyCardFor() adds the real code for
+       the people entitled to it. */
+    hasCode: !!r.join_code,
   };
+}
+
+/* The same card, plus the join code, for someone entitled to see it:
+   the host, or a player already in the bracket. Everyone else gets the
+   plain card — a private tournament's code must not leak through a
+   listing the way a name or an entrant count can. */
+function _tourneyCardFor(row, viewerId, isEntrant) {
+  const card = _tourneyCard(row);
+  const maySee = viewerId != null &&
+    (row.host_id === viewerId || isEntrant === true);
+  if (maySee && row.join_code) card.joinCode = row.join_code;
+  return card;
+}
+
+/* ── Join codes ──────────────────────────────────────────────────
+   Four letters then four digits: KRVX4417. Its own code type — the
+   lobby invite codes and the queue codes elsewhere in the app have
+   different shapes on purpose, so a code pasted into the wrong box
+   fails cleanly instead of half-matching something.
+
+   I, O, S and Z are out of the letters and 0 and 1 out of the digits:
+   these get read aloud and typed off screenshots, and every pair there
+   is a known misread. That leaves 22^4 * 8^4 ≈ 960 million codes, which
+   is ample, but the uniqueness that matters is enforced by the partial
+   unique index on join_code, not by this arithmetic. */
+const _CODE_LETTERS = "ABCDEFGHJKLMNPQRTUVWXY";   // no I, O, S, Z
+const _CODE_DIGITS  = "23456789";                 // no 0, 1
+
+function _mintCodeString() {
+  const crypto = require("crypto");
+  let out = "";
+  for (let i = 0; i < 4; i++) {
+    out += _CODE_LETTERS[crypto.randomInt(_CODE_LETTERS.length)];
+  }
+  for (let i = 0; i < 4; i++) {
+    out += _CODE_DIGITS[crypto.randomInt(_CODE_DIGITS.length)];
+  }
+  return out;
+}
+
+/* Normalises what a human typed: case, spaces, and the dash people add
+   because the UI shows one. "krvx-4417" and "KRVX 4417" are the same
+   code, and neither should be a failed lookup. */
+function normaliseTourneyCode(raw) {
+  const c = String(raw || "").toUpperCase().replace(/[^A-Z0-9]/g, "");
+  return /^[A-Z]{4}[0-9]{4}$/.test(c) ? c : null;
+}
+
+/* Asks the database, rather than assuming. Retries on the unique index
+   because that is the only authority on whether a code is free. */
+async function mintTourneyCode(tries = 12) {
+  for (let i = 0; i < tries; i++) {
+    const c = _mintCodeString();
+    const r = await pool.query(
+      "SELECT 1 FROM tournaments WHERE join_code = $1 LIMIT 1", [c]);
+    if (!r.rows.length) return c;
+  }
+  throw new Error("could not mint a free tournament code");
 }
 
 // GET /tournaments/global — every tournament worth showing, across lobbies.
@@ -5686,7 +5872,7 @@ app.get("/tournaments/global", async (req, res) => {
                    : ["setup", "registration", "in-progress"];
     const r = await pool.query(_TOURNEY_SELECT +
       ` WHERE t.status = ANY($3::text[])` +
-      `   AND ` + _PUBLIC_TOURNEY_WHERE +
+      `   AND ` + _HUB_TOURNEY_WHERE +
       ` ORDER BY (t.status = 'in-progress') DESC, entrants DESC, t.created_at DESC` +
       ` LIMIT $1 OFFSET $2`, [limit, offset, statuses]);
     res.json(r.rows.map(_tourneyCard));
@@ -5701,8 +5887,12 @@ app.get("/tournaments/global", async (req, res) => {
 // a random pick dressed up as editorial.
 app.get("/featured/tournaments", async (req, res) => {
   try {
+    /* This had no public filter, which meant the spotlight could put a
+       private lobby's bracket — its name, its host, its entrants — in
+       front of strangers. Same predicate as every other public route. */
     const r = await pool.query(_TOURNEY_SELECT +
       ` WHERE t.status IN ('registration','in-progress')` +
+      `   AND ` + _HUB_TOURNEY_WHERE +
       ` ORDER BY entrants DESC, t.created_at DESC LIMIT 6`);
     res.json(r.rows.map(_tourneyCard));
   } catch (e) {
@@ -5721,9 +5911,12 @@ app.get("/me/tournaments", requireAuth, async (req, res) => {
                      WHERE tp.tournament_id = t.id AND tp.user_id = $1)
        ORDER BY t.created_at DESC LIMIT $2 OFFSET $3`,
       [req.userId, limit, offset]);
-    res.json(r.rows.map((row) => Object.assign(_tourneyCard(row), {
-      isHost: row.host_id === req.userId,
-    })));
+    /* Every row here is one the caller hosts or plays in, which is
+       exactly the entitlement _tourneyCardFor checks — so this is where
+       a private tournament's code legitimately reaches its people. */
+    res.json(r.rows.map((row) => Object.assign(
+      _tourneyCardFor(row, req.userId, true), { isHost: row.host_id === req.userId }
+    )));
   } catch (e) {
     console.error("[me/tournaments]", e.message);
     res.json([]);
@@ -5820,7 +6013,17 @@ const _PUBLIC_LOBBY_WHERE =
 // in _TOURNEY_SELECT is a LEFT JOIN -- a lobby_id pointing at a row
 // that no longer exists yields NULL tags and is excluded, which is the
 // safe direction to fail.
-const _PUBLIC_TOURNEY_WHERE = _PUBLIC_LOBBY_WHERE;
+// What the TOURNAMENTS HUB lists: its own tournaments, the public ones.
+// A code-private tournament is reachable only through its code, and a
+// lobby tournament never appears here at all.
+const _HUB_TOURNEY_WHERE =
+  "t.scope = 'global' AND t.visibility = 'public'";
+
+// What DISCOVER may show a stranger: a bracket in a public lobby (the
+// original rule, unchanged) or a public hub tournament. Both are things
+// their owner chose to make browsable; nothing else is.
+const _PUBLIC_TOURNEY_WHERE =
+  "((t.scope = 'lobby' AND " + _PUBLIC_LOBBY_WHERE + ") OR (" + _HUB_TOURNEY_WHERE + "))";
 
 // Shared paging for the browse endpoints. Caps the page so a caller
 // cannot ask for the whole table, and floors the offset so a negative
@@ -5928,6 +6131,219 @@ app.get("/featured/spotlight", async (req, res) => {
   }
 });
 
+// GET /tournaments/code/:code — resolve a private tournament's code.
+//
+// Thin on purpose. It answers one question, for one exact code, and it
+// gives the same answer for "no such code" and "that code is not a
+// private hub tournament" -- a caller able to tell those apart could
+// walk the code space and learn which brackets exist.
+//
+// A correct code is proof of invitation, so this returns the tournament
+// itself; entering it still goes through /register like any other.
+app.get("/tournaments/code/:code", async (req, res) => {
+  try {
+    const code = normaliseTourneyCode(req.params.code);
+    if (!code) return res.status(404).json({ error: "No tournament with that code" });
+
+    const r = await pool.query(_TOURNEY_SELECT +
+      ` WHERE t.join_code = $1 AND t.scope = 'global' LIMIT 1`, [code]);
+    if (!r.rows.length) return res.status(404).json({ error: "No tournament with that code" });
+
+    res.json(_tourneyCard(r.rows[0]));
+  } catch (e) {
+    console.error("[tournaments/code]", e.message);
+    res.status(404).json({ error: "No tournament with that code" });
+  }
+});
+
+// ══════════════════════════════════════════════════════════════════
+// MAJORS -- real-world events, curated.
+//
+// Evo, CEO, ECW, championship finals. These are NOT run here: there is
+// no bracket, no entrant list and no way to join. What the app can
+// honestly offer is "this is on, here is when, here is where to watch",
+// plus a follow so it can remind you.
+//
+// Nothing seeds this table and nothing here invents a fixture. Until
+// real events are entered, GET /majors returns [] and the rail hides
+// itself. Writes are admin-only.
+// ══════════════════════════════════════════════════════════════════
+
+function _majorCard(r) {
+  return {
+    id: r.id,
+    name: r.name,
+    game: r.game || null,
+    organiser: r.organiser || null,
+    location: r.location || null,
+    startsAt: r.starts_at || null,
+    endsAt: r.ends_at || null,
+    url: r.url || null,
+    streamUrl: r.stream_url || null,
+    art: r.art_url || null,
+    tier: r.tier || "major",
+    followers: r.followers || 0,
+  };
+}
+
+/* The app never needs to know whether a row is published -- it only
+   ever receives published ones -- or how it is weighted. The screen
+   that sets those does. */
+function _majorAdminCard(r) {
+  return Object.assign(_majorCard(r), {
+    published: !!r.is_published,
+    sortOrder: r.sort_order || 0,
+  });
+}
+
+// GET /majors -- what is on, live first, then soonest.
+//
+// "Live" is computed from the window rather than stored as a flag, so
+// nobody has to remember to flip it. An event with no end date is live
+// for the day it starts.
+app.get("/majors", async (req, res) => {
+  try {
+    const r = await pool.query(`
+      SELECT m.*,
+        (SELECT COUNT(*)::int FROM major_follows f WHERE f.major_id = m.id) AS followers,
+        (m.starts_at IS NOT NULL AND m.starts_at <= NOW()
+          AND COALESCE(m.ends_at, m.starts_at + INTERVAL '1 day') >= NOW()) AS is_live
+      FROM majors m
+      WHERE m.is_published = TRUE
+        AND COALESCE(m.ends_at, m.starts_at, NOW()) >= NOW() - INTERVAL '1 day'
+      ORDER BY is_live DESC, m.sort_order DESC, m.starts_at ASC NULLS LAST
+      LIMIT 12`);
+    res.json(r.rows.map((row) => Object.assign(_majorCard(row), { live: !!row.is_live })));
+  } catch (e) {
+    console.error("[majors]", e.message);
+    res.json([]);   // an empty rail is correct here, not an error state
+  }
+});
+
+// GET /majors/following -- ids only. Kept separate from /majors so that
+// route can stay unauthenticated and cacheable.
+app.get("/majors/following", requireAuth, async (req, res) => {
+  try {
+    const r = await pool.query(
+      "SELECT major_id FROM major_follows WHERE user_id = $1", [req.userId]);
+    res.json(r.rows.map((x) => x.major_id));
+  } catch (e) {
+    console.error("[majors/following]", e.message);
+    res.json([]);
+  }
+});
+
+app.post("/majors/:id/follow", requireAuth, async (req, res) => {
+  try {
+    await pool.query(
+      `INSERT INTO major_follows (major_id, user_id) VALUES ($1, $2)
+         ON CONFLICT DO NOTHING`, [req.params.id, req.userId]);
+    res.json({ following: true });
+  } catch (e) {
+    console.error("[majors/follow]", e.message);
+    res.status(500).json({ error: "Could not follow that event" });
+  }
+});
+
+app.delete("/majors/:id/follow", requireAuth, async (req, res) => {
+  try {
+    await pool.query(
+      "DELETE FROM major_follows WHERE major_id = $1 AND user_id = $2",
+      [req.params.id, req.userId]);
+    res.json({ following: false });
+  } catch (e) {
+    console.error("[majors/unfollow]", e.message);
+    res.status(500).json({ error: "Could not unfollow that event" });
+  }
+});
+
+// GET /admin/majors — everything, drafts and finished included.
+//
+// Deliberately not a query flag on /majors. That route is public and
+// unauthenticated; giving it a parameter that reveals unpublished rows
+// would mean one misplaced `if` exposes editorial drafts to everyone.
+// A separate route behind requireAdmin cannot be got wrong that way.
+app.get("/admin/majors", requireAuth, requireAdmin, async (req, res) => {
+  try {
+    const r = await pool.query(`
+      SELECT m.*,
+        (SELECT COUNT(*)::int FROM major_follows f WHERE f.major_id = m.id) AS followers
+      FROM majors m
+      ORDER BY m.is_published DESC, m.starts_at DESC NULLS LAST, m.id DESC`);
+    res.json(r.rows.map(_majorAdminCard));
+  } catch (e) {
+    console.error("[admin/majors]", e.message);
+    res.status(500).json({ error: "Could not load the events" });
+  }
+});
+
+// ── Admin: entering the events ────────────────────────────────────
+// Rows are created unpublished, so a half-entered event cannot appear
+// on the rail. Publishing is a deliberate second step.
+const _MAJOR_FIELDS = ["name","game","organiser","location","starts_at",
+  "ends_at","url","stream_url","art_url","tier","sort_order","is_published"];
+
+app.post("/majors", requireAuth, requireAdmin, async (req, res) => {
+  try {
+    const name = String(req.body.name || "").trim();
+    if (!name) return res.status(400).json({ error: "An event needs a name" });
+    const b = req.body;
+    const r = await pool.query(`
+      INSERT INTO majors (name, game, organiser, location, starts_at, ends_at,
+                          url, stream_url, art_url, tier, sort_order, is_published)
+      VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12) RETURNING *`,
+      [name, b.game || null, b.organiser || null, b.location || null,
+       b.startsAt ? new Date(b.startsAt) : null,
+       b.endsAt ? new Date(b.endsAt) : null,
+       b.url || null, b.streamUrl || null, b.art || null,
+       b.tier || "major", Number(b.sortOrder) || 0, b.isPublished === true]);
+    res.status(201).json(_majorAdminCard(r.rows[0]));
+  } catch (e) {
+    console.error("[majors/create]", e.message);
+    res.status(500).json({ error: "Could not save that event" });
+  }
+});
+
+app.patch("/majors/:id", requireAuth, requireAdmin, async (req, res) => {
+  try {
+    const map = {
+      name:"name", game:"game", organiser:"organiser", location:"location",
+      startsAt:"starts_at", endsAt:"ends_at", url:"url", streamUrl:"stream_url",
+      art:"art_url", tier:"tier", sortOrder:"sort_order", isPublished:"is_published",
+    };
+    const sets = [], vals = [];
+    for (const [k, col] of Object.entries(map)) {
+      if (!(k in req.body)) continue;
+      if (!_MAJOR_FIELDS.includes(col)) continue;   // belt and braces
+      let v = req.body[k];
+      if (col === "starts_at" || col === "ends_at") v = v ? new Date(v) : null;
+      if (col === "sort_order") v = Number(v) || 0;
+      if (col === "is_published") v = v === true;
+      vals.push(v);
+      sets.push(`${col} = $${vals.length}`);
+    }
+    if (!sets.length) return res.status(400).json({ error: "Nothing to change" });
+    vals.push(req.params.id);
+    const r = await pool.query(
+      `UPDATE majors SET ${sets.join(", ")} WHERE id = $${vals.length} RETURNING *`, vals);
+    if (!r.rows.length) return res.status(404).json({ error: "No such event" });
+    res.json(_majorAdminCard(r.rows[0]));
+  } catch (e) {
+    console.error("[majors/update]", e.message);
+    res.status(500).json({ error: "Could not save that event" });
+  }
+});
+
+app.delete("/majors/:id", requireAuth, requireAdmin, async (req, res) => {
+  try {
+    await pool.query("DELETE FROM majors WHERE id = $1", [req.params.id]);
+    res.json({ ok: true });
+  } catch (e) {
+    console.error("[majors/delete]", e.message);
+    res.status(500).json({ error: "Could not delete that event" });
+  }
+});
+
 app.get("/tournaments/:tournamentId", async (req, res) => {
   try {
     const { tournamentId } = req.params;
@@ -6027,7 +6443,9 @@ app.get("/tournaments/lobby/:lobbyId", async (req, res) => {
         COUNT(tp.id) as registered_count
       FROM tournaments t
       LEFT JOIN tournament_players tp ON t.id = tp.tournament_id
-      WHERE t.lobby_id = $1
+      -- scope, not just lobby_id: a hub tournament must never surface
+      -- through a lobby's list, and the two are separate things now.
+      WHERE t.lobby_id = $1 AND COALESCE(t.scope, 'lobby') = 'lobby'
       GROUP BY t.id
       ORDER BY t.created_at DESC;`,
       [lobbyId]

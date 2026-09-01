@@ -604,6 +604,32 @@ wss.on("connection", (ws, req) => {
       return;
     }
 
+    // ── Voice channel: quality ────────────────────────────
+    //
+    // Two directions over one message. A viewer sends it to one
+    // person -- "send me less" -- and the sharer, who has a separate
+    // encoder per peer in a mesh, can honour that for them alone.
+    // A sharer sends it to the room to say what they are now sending,
+    // so everyone can show the truth rather than a guess.
+    if (msg.type === "vc-quality") {
+      const payload = JSON.stringify({
+        type: "vc-quality",
+        channelId: msg.channelId,
+        fromUserId: user.userId,
+        toUserId: msg.toUserId || null,
+        want: msg.want || null,        // what a viewer is asking for
+        info: msg.info || null,        // what a sharer is now sending
+      });
+      for (const [id, c] of clients) {
+        if (id === user.peerId) continue;
+        if (c.vcChannelId !== msg.channelId || c.ws.readyState !== 1) continue;
+        // Addressed to one person, or to the room.
+        if (msg.toUserId && String(c.userId) !== String(msg.toUserId)) continue;
+        c.ws.send(payload);
+      }
+      return;
+    }
+
     // ── Voice channel: leave ──────────────────────────────
     if (msg.type === "vc-leave") {
       const client = clients.get(user.peerId);

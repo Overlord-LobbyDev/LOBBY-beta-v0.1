@@ -44,6 +44,9 @@ contextBridge.exposeInMainWorld("electronAPI", {
   closeVcPip: () => ipcRenderer.invoke("vc-pip-close"),
   updateVcPip: (data) => ipcRenderer.invoke("vc-pip-update", data),
   vcPipAction: (action) => ipcRenderer.invoke("vc-pip-action", action),
+  moveVcPipBy: (d) => ipcRenderer.send("vc-pip-move-by", d),
+  vcPipExists: () => ipcRenderer.invoke("vc-pip-exists"),
+  closeVcPipTo: (rect) => ipcRenderer.invoke("vc-pip-close-to", rect),
 
   // Listeners for vcpip.html (the pip window itself)
   onVcPipData: (cb) => ipcRenderer.on("vc-pip-data", (_e, d) => cb(d)),

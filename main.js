@@ -236,14 +236,24 @@ ipcMain.handle("close-outgoing-call-window", () => {
 ipcMain.handle("get-desktop-sources", async () => {
   const sources = await desktopCapturer.getSources({
     types: ["screen", "window"],
-    thumbnailSize: { width: 320, height: 180 },
-    fetchWindowIcons: true,
+    // 256x144 is more than the picker draws a tile at, and the capture
+    // cost scales with this for every window that is open.
+    thumbnailSize: { width: 512, height: 288 },
+    // The icons were fetched and PNG-encoded for every window and then
+    // never used by anything. That was pure cost.
+    fetchWindowIcons: false,
   });
-  return sources.map(s => ({
-    id: s.id, name: s.name,
-    thumbnail: s.thumbnail.toDataURL(),
-    appIcon: s.appIcon ? s.appIcon.toDataURL() : null,
-  }));
+  return sources.map(s => {
+    let thumbnail = null;
+    try {
+      // JPEG rather than PNG: a screenshot is a photograph, and PNG
+      // encoding of a few dozen of them is what made this slow.
+      thumbnail = s.thumbnail.isEmpty()
+        ? null
+        : "data:image/jpeg;base64," + s.thumbnail.toJPEG(82).toString("base64");
+    } catch (e) { thumbnail = null; }
+    return { id: s.id, name: s.name, thumbnail, appIcon: null };
+  });
 });
 
 ipcMain.handle("set-app-icon", async (event, pngBuffer) => {
@@ -267,7 +277,42 @@ ipcMain.handle("set-app-icon", async (event, pngBuffer) => {
 // ── Voice Channel PiP native window ─────────────────────────
 let vcPipWindow = null;
 
-ipcMain.handle("vc-pip-open", (event, { channelName, width, height }) => {
+// Where the picture-in-picture window was last left. Kept beside the
+// app's own data rather than in the renderer, because the window
+// outlives any one page.
+const VC_PIP_STATE = path.join(app.getPath("userData"), "vcpip-bounds.json");
+
+function readPipBounds() {
+  try {
+    const raw = JSON.parse(fs.readFileSync(VC_PIP_STATE, "utf8"));
+    if (!raw || typeof raw.x !== "number") return null;
+    // A monitor that has since been unplugged would put the window
+    // somewhere nobody can see. Only restore onto a display that is
+    // actually there, and only if a good part of it lands on screen.
+    const fits = screen.getAllDisplays().some(d => {
+      const b = d.workArea;
+      return raw.x + raw.width  > b.x + 40 && raw.x < b.x + b.width  - 40 &&
+             raw.y + raw.height > b.y + 40 && raw.y < b.y + b.height - 40;
+    });
+    return fits ? raw : null;
+  } catch (e) { return null; }
+}
+
+let _pipSaveT = null;
+function savePipBounds() {
+  if (!vcPipWindow || vcPipWindow.isDestroyed()) return;
+  // Debounced: a drag fires this many times a second.
+  clearTimeout(_pipSaveT);
+  _pipSaveT = setTimeout(() => {
+    try {
+      if (!vcPipWindow || vcPipWindow.isDestroyed()) return;
+      fs.writeFileSync(VC_PIP_STATE, JSON.stringify(vcPipWindow.getBounds()));
+    } catch (e) {}
+  }, 400);
+}
+
+ipcMain.handle("vc-pip-open", (event, { channelName, width, height, from }) => {
+  try {
   if (vcPipWindow && !vcPipWindow.isDestroyed()) {
     vcPipWindow.show();
     vcPipWindow.focus();
@@ -275,14 +320,18 @@ ipcMain.handle("vc-pip-open", (event, { channelName, width, height }) => {
   }
 
   const { width: sw, height: sh } = screen.getPrimaryDisplay().workAreaSize;
-  const w = width  || 300;
-  const h = height || 220;
+  const saved = readPipBounds();
+  const w = (saved && saved.width)  || width  || 420;
+  const h = (saved && saved.height) || height || 300;
 
   vcPipWindow = new BrowserWindow({
     width: w, height: h,
-    x: sw - w - 24, y: sh - h - 24,
-    minWidth: 220, minHeight: 160,
-    maxWidth: 800, maxHeight: 700,
+    x: saved ? saved.x : sw - w - 24,   // overridden below when flying
+    y: saved ? saved.y : sh - h - 24,
+    minWidth: 260, minHeight: 180,
+    // Big enough to actually watch someone's screen on a second
+    // monitor. The old 800x700 cap made that impossible.
+    maxWidth: 3840, maxHeight: 2160,
     frame: false, transparent: true, hasShadow: true,
     alwaysOnTop: true, resizable: true, movable: true,
     skipTaskbar: true,
@@ -315,11 +364,121 @@ ipcMain.handle("vc-pip-open", (event, { channelName, width, height }) => {
     mainWin?.webContents.send("vc-pip-closed");
   });
 
-  vcPipWindow.on("resize", () => {
+  const relaySize = () => {
     if (!vcPipWindow || vcPipWindow.isDestroyed()) return;
     const [w, h] = vcPipWindow.getSize();
     vcPipWindow.webContents.send("vc-pip-resized", { width: w, height: h });
+    // The main window needs this too: it is the one capturing frames,
+    // and a 400px capture stretched across a 1400px window is the
+    // blur. It can only send the right size if it knows the size.
+    try {
+      // Resolved here: mainWin is a local in other handlers, not a
+      // module-level binding, so it does not exist in this scope.
+      const target = BrowserWindow.getAllWindows()
+        .find(x => !x.isDestroyed() && x !== vcPipWindow);
+      target?.webContents.send("vc-pip-resized", { width: w, height: h });
+    } catch (e) {}
+    savePipBounds();
+  };
+  vcPipWindow.on("resize", relaySize);
+  vcPipWindow.on("move", savePipBounds);
+  vcPipWindow.once("ready-to-show", relaySize);
+
+  // The flight out. Held at zero opacity until the first frame is
+  // painted, or it flies as an empty box and lands as a picture.
+  if (from && from.width > 40) {
+    const rest = pipRestingBounds(w, h);
+    try {
+      vcPipWindow.setOpacity(0);
+      vcPipWindow.setBounds(from);
+    } catch (e) {}
+    vcPipWindow.once("ready-to-show", () => {
+      animatePip(from, rest, 280, 0, 1);
+    });
+  }
+  } catch (err) {
+    // A failure here used to be silent in both processes.
+    console.error("[vc-pip-open]", err);
+    vcPipWindow = null;
+    return { error: String(err && err.message || err) };
+  }
+});
+
+// The floating window is dragged by its own contents rather than by a
+// drag region, so that hovering it still works. send/on rather than
+// invoke/handle: this fires many times a second and none of them
+// needs an answer.
+ipcMain.on("vc-pip-move-by", (event, d) => {
+  // A hand on the window wins over an animation.
+  if (_pipAnim) { clearInterval(_pipAnim); _pipAnim = null; }
+  if (!vcPipWindow || vcPipWindow.isDestroyed() || !d) return;
+  const dx = Math.round(Number(d.dx) || 0);
+  const dy = Math.round(Number(d.dy) || 0);
+  if (!dx && !dy) return;
+  const b = vcPipWindow.getBounds();
+  vcPipWindow.setBounds({ x: b.x + dx, y: b.y + dy, width: b.width, height: b.height });
+  savePipBounds();
+});
+
+// Ground truth, and the reason the renderer could not tell whether
+// its request had worked: openVcPip answers nothing either way.
+// Bounds and opacity, eased, on a frame timer. Electron has no
+// animation of its own for either, and both have to move together
+// or the window looks like it is fading rather than travelling.
+let _pipAnim = null;
+function animatePip(from, to, ms, opacityFrom, opacityTo, done) {
+  if (!vcPipWindow || vcPipWindow.isDestroyed()) return;
+  clearInterval(_pipAnim);
+  const t0 = Date.now();
+  const lerp = (a, b, k) => Math.round(a + (b - a) * k);
+  _pipAnim = setInterval(() => {
+    if (!vcPipWindow || vcPipWindow.isDestroyed()) { clearInterval(_pipAnim); return; }
+    const raw = Math.min(1, (Date.now() - t0) / ms);
+    // Out-cubic: quick off the mark, unhurried into place.
+    const k = 1 - Math.pow(1 - raw, 3);
+    try {
+      vcPipWindow.setBounds({
+        x: lerp(from.x, to.x, k), y: lerp(from.y, to.y, k),
+        width: lerp(from.width, to.width, k),
+        height: lerp(from.height, to.height, k),
+      });
+      vcPipWindow.setOpacity(opacityFrom + (opacityTo - opacityFrom) * k);
+    } catch (e) {}
+    if (raw >= 1) { clearInterval(_pipAnim); _pipAnim = null; if (done) done(); }
+  }, 16);
+}
+
+// Where the window lives when it is not travelling: the last place it
+// was left, or the bottom-right of the primary display.
+function pipRestingBounds(w, h) {
+  const saved = readPipBounds();
+  if (saved) return { x: saved.x, y: saved.y, width: saved.width, height: saved.height };
+  const { width: sw, height: sh } = screen.getPrimaryDisplay().workAreaSize;
+  return { x: sw - w - 24, y: sh - h - 24, width: w, height: h };
+}
+
+// Fly it back to where it came from, then close. The renderer sends
+// the rectangle because only it knows where the share is on screen.
+ipcMain.handle("vc-pip-close-to", (event, rect) => {
+  if (!vcPipWindow || vcPipWindow.isDestroyed()) return;
+  const win = vcPipWindow;
+  const from = win.getBounds();
+  if (!rect || !rect.width) { win.close(); return; }
+  // Saved first: the flight home would otherwise overwrite the
+  // position the user actually chose.
+  try { fs.writeFileSync(VC_PIP_STATE, JSON.stringify(from)); } catch (e) {}
+  animatePip(from, rect, 220, 1, 0, () => {
+    if (win && !win.isDestroyed()) win.close();
   });
+});
+
+ipcMain.handle("vc-pip-exists", () => {
+  const live = !!(vcPipWindow && !vcPipWindow.isDestroyed());
+  return {
+    exists: live,
+    visible: live ? vcPipWindow.isVisible() : false,
+    bounds: live ? vcPipWindow.getBounds() : null,
+  };
 });
 
 ipcMain.handle("vc-pip-close", () => {

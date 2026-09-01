@@ -412,8 +412,73 @@ async function initDb() {
       "ALTER TABLE users ADD COLUMN IF NOT EXISTS youtube_url       TEXT DEFAULT NULL",
       "ALTER TABLE users ADD COLUMN IF NOT EXISTS twitter_url       TEXT DEFAULT NULL",
       "ALTER TABLE users ADD COLUMN IF NOT EXISTS pinned_post_id    INTEGER DEFAULT NULL",
+
+      // ── Tournaments: hub tournaments vs Lobby tournaments ──────────
+      // scope tells the two apart instead of inferring it from whether
+      // the holding lobby happens to be public. Defaults keep every
+      // existing row exactly what it already was: a lobby tournament.
+      "ALTER TABLE tournaments ADD COLUMN IF NOT EXISTS scope      TEXT DEFAULT 'lobby'",
+      "ALTER TABLE tournaments ADD COLUMN IF NOT EXISTS visibility TEXT DEFAULT 'public'",
+      // Four letters then four digits, e.g. KRVX4417. Its own code type —
+      // nothing else in the app uses this shape.
+      "ALTER TABLE tournaments ADD COLUMN IF NOT EXISTS join_code  TEXT DEFAULT NULL",
+      // A hub tournament has no lobby, and NULL is how it says so.
+      "ALTER TABLE tournaments ALTER COLUMN lobby_id DROP NOT NULL",
     ];
     for (const sql of alters) await pool.query(sql).catch(() => {});
+
+    // Uniqueness is the index's job, not the generator's. Partial, so the
+    // NULL join_code every public tournament carries does not collide.
+    await pool.query(
+      `CREATE UNIQUE INDEX IF NOT EXISTS idx_tourney_join_code
+         ON tournaments(join_code) WHERE join_code IS NOT NULL;`
+    ).catch(() => {});
+    // The hub's browse query filters on both of these together.
+    await pool.query(
+      `CREATE INDEX IF NOT EXISTS idx_tourney_scope_vis
+         ON tournaments(scope, visibility, status);`
+    ).catch(() => {});
+
+    // ── Majors: real-world events, curated ─────────────────────────
+    // Evo, CEO, ECW, championship finals. These are NOT playable here —
+    // there is no bracket, no entrants and no join. They are a followable
+    // countdown and a link out, which is the only honest thing to offer
+    // for an event this app does not run.
+    //
+    // Nothing seeds this table. It stays empty until a real event is put
+    // in it, and the rail hides itself when it is empty rather than
+    // showing invented fixtures.
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS majors (
+        id           SERIAL PRIMARY KEY,
+        name         TEXT NOT NULL,
+        game         TEXT,
+        organiser    TEXT,
+        location     TEXT,
+        starts_at    TIMESTAMPTZ,
+        ends_at      TIMESTAMPTZ,
+        url          TEXT,
+        stream_url   TEXT,
+        art_url      TEXT,
+        tier         TEXT DEFAULT 'major',
+        sort_order   INTEGER DEFAULT 0,
+        is_published BOOLEAN DEFAULT FALSE,
+        created_at   TIMESTAMPTZ DEFAULT NOW()
+      );
+    `).catch((e) => console.error("[majors]", e.message));
+    await pool.query(
+      `CREATE INDEX IF NOT EXISTS idx_majors_window
+         ON majors(is_published, starts_at);`
+    ).catch(() => {});
+
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS major_follows (
+        major_id   INTEGER REFERENCES majors(id) ON DELETE CASCADE,
+        user_id    INTEGER REFERENCES users(id)  ON DELETE CASCADE,
+        created_at TIMESTAMPTZ DEFAULT NOW(),
+        PRIMARY KEY (major_id, user_id)
+      );
+    `).catch((e) => console.error("[major_follows]", e.message));
 
     // ── Email verification codes (for email prompt on login) ──
     await pool.query(`
@@ -912,6 +977,18 @@ async function initDb() {
     // table after twenty minutes; this is how a table says it means to
     // keep waiting, without having to type something to prove it.
     await pool.query(`ALTER TABLE queue_sessions ADD COLUMN IF NOT EXISTS kept_at TIMESTAMPTZ DEFAULT NULL;`).catch(() => {});
+
+    // A table's own short code, so it can be found by being told rather
+    // than by being browsed. Distinct from lobby_code, which is the
+    // GAME's invite code -- this one addresses the Lobby table itself.
+    await pool.query(`ALTER TABLE queue_sessions ADD COLUMN IF NOT EXISTS join_code TEXT DEFAULT NULL;`).catch(() => {});
+    await pool.query(`CREATE UNIQUE INDEX IF NOT EXISTS idx_queue_join_code ON queue_sessions(join_code) WHERE join_code IS NOT NULL;`).catch(() => {});
+
+    // Hours in THIS game, reported by the client when it sits down.
+    // Only the client knows it -- it comes from the Steam library the
+    // queue page already loaded -- and it is the single most useful
+    // thing to know about somebody you are about to play with.
+    await pool.query(`ALTER TABLE queue_members ADD COLUMN IF NOT EXISTS hours INTEGER DEFAULT NULL;`).catch(() => {});
 
     // Tournament Invites (for invite-only tournaments)
     await pool.query(`
