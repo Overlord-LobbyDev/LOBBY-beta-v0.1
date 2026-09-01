@@ -28335,7 +28335,8 @@ window.HUB_CLOSERS = {
   storeOverlay:             'closeStorePanel',
   queueOverlay:             'closeQueuePanel',
   discoverOverlay:          'closeDiscoverPanel',
-  createTournamentOverlay:  'closeCreateTournamentPage'
+  createTournamentOverlay:  'closeCreateTournamentPage',
+  tournamentsPage:          'closeTournamentsPage'
 };
 
 /* Runs a hub's own close without going back through the manager, which
@@ -28410,6 +28411,7 @@ window.HUB_PILLS = {
   speedrunOverlay:          '.tba-speedrun',
   storeOverlay:             '.tba-store',
   queueOverlay:             '.tba-queue',
+  tournamentsPage:          '.tba-tourney',
   discoverOverlay:          '.tba-discover'
 };
 window._syncHubPills = function () {
@@ -51729,7 +51731,7 @@ body.feed-resizing .lobby-overlay{ transition:none !important; }
   'use strict';
 
   var PANELS = ['homePanel', 'chatPanel', 'profilePage', 'calendarPanel', 'vcPanel'];
-  var OVERLAYS = ['discoverOverlay', 'globalTournamentsOverlay', 'leaderboardOverlay',
+  var OVERLAYS = ['discoverOverlay', 'globalTournamentsOverlay', 'tournamentsPage', 'leaderboardOverlay',
                   'myTournamentsOverlay', 'queueOverlay', 'speedrunOverlay',
                   'storeOverlay', 'gamePageOverlay', 'newOverlay', 'helpOverlay'];
 
@@ -81656,773 +81658,6 @@ body.q-max #queueOverlay{ padding:0 !important; }
 </script>
 
 
-<!-- ═══ TOURNAMENTS · THE ARENA ══════════════════════════════════════
-     The page owns itself now. The previous versions layered a new top
-     onto the old hub, so the old centred section headings, the old chip
-     rail and the old empty states kept rendering underneath — which is
-     why it read as two designs stitched together. Those nodes are still
-     in the DOM and still fed by their renderers, but they are hidden and
-     this page draws the browse grid from the same data.
-
-     One column, centred on the stream, because that is what the page is
-     for. Nothing is pushed off the first screen.
-     ══════════════════════════════════════════════════════════════ -->
-<style>
-/* The old hub, off. Kept in the DOM because renderGtTournaments and
-   _gtPaintList still write into these and a missing node throws inside
-   code this page does not own. */
-#globalTournamentsOverlay .gt-hero,
-#globalTournamentsOverlay #gtFeaturedHost,
-#globalTournamentsOverlay #gtGamesHead,
-#globalTournamentsOverlay #gtGameGrid,
-#globalTournamentsOverlay #gtListHead,
-#globalTournamentsOverlay #gtStatusRail,
-#globalTournamentsOverlay #gtTournamentList,
-/* The LobbyHub instance: its own tab row, its own section headings and
-   its own empty state, all drawing the same tournaments this page draws.
-   Two renderers for one list is what made the page look like two
-   designs. Hidden rather than unhooked, because it loads on its own
-   schedule and tearing it out would mean owning that too. */
-#globalTournamentsOverlay #gtHubFilters,
-#globalTournamentsOverlay #gtHubStage{ display:none !important; }
-
-#globalTournamentsOverlay{
-  --ar:#ff3d6e;
-  --ar-dim:rgba(255,61,110,.14);
-  --ar-line:rgba(255,255,255,.07);
-  --ar-surf:rgba(255,255,255,.028);
-}
-#gtDeskGrid{ flex:1; min-height:0; display:block; }
-#globalTournamentsOverlay #gtScroller{ padding:0 0 56px !important; }
-/* A measure. Without one the page ran the full width of the display,
-   which put five tournament rows across with a sixth orphaned beneath
-   and left the agenda marooned against the right edge. Everything below
-   sits in this column. */
-#gtStage, #gtCols, #gtBrowse{ max-width:1480px; margin-left:auto; margin-right:auto; width:100% }
-
-/* ── Identity bar ──────────────────────────────────────────────── */
-#gtTop{
-  position:sticky; top:0; z-index:6;
-  display:flex; align-items:center; gap:14px; padding:0 26px;
-  height:52px; flex:0 0 52px;
-  background:#0d0a10; border-bottom:1px solid var(--ar-line);
-}
-.gt-wordmark{
-  font-family:var(--font); font-size:14px; font-weight:900;
-  letter-spacing:2.4px; margin:0; white-space:nowrap; text-transform:uppercase;
-}
-.gt-wordmark b{ color:var(--ar) }
-.gt-top-stats{ display:flex; gap:6px }
-.gt-stat{
-  display:inline-flex; align-items:center; gap:6px; height:24px; padding:0 9px;
-  border-radius:6px; background:rgba(255,255,255,.045);
-  border:1px solid var(--ar-line); font-size:10.5px; color:var(--text-3); white-space:nowrap;
-}
-.gt-stat b{ color:var(--text-1); font-weight:800; font-variant-numeric:tabular-nums }
-.gt-stat.live{ background:var(--ar-dim); border-color:rgba(255,61,110,.32); color:#ffa3b6 }
-.gt-stat.live b{ color:#fff }
-.gt-stat.live i{ width:5px; height:5px; border-radius:50%; background:var(--ar); animation:arP 1.7s ease-in-out infinite }
-@keyframes arP{ 0%,100%{opacity:1} 50%{opacity:.25} }
-.gt-sp{ flex:1 }
-.gt-code{ display:flex; gap:5px; flex:0 0 auto }
-.gt-code input{
-  width:106px; height:30px; border-radius:7px; padding:0 9px;
-  background:rgba(255,255,255,.045); border:1px solid var(--ar-line);
-  color:var(--text-1); font-family:"JetBrains Mono",ui-monospace,monospace;
-  font-size:11px; font-weight:700; letter-spacing:1.6px; text-transform:uppercase;
-}
-.gt-code input:focus{ outline:none; border-color:rgba(255,61,110,.55) }
-.gt-code button, .gt-new{
-  height:30px; padding:0 12px; border-radius:7px; cursor:pointer; border:1px solid var(--ar-line);
-  background:rgba(255,255,255,.05); color:var(--text-1); font-family:var(--font);
-  font-size:9.5px; font-weight:800; letter-spacing:1.1px; text-transform:uppercase;
-}
-.gt-code button:hover{ background:rgba(255,255,255,.1) }
-.gt-new{ background:var(--ar); border-color:var(--ar); color:#fff; font-weight:900; padding:0 15px }
-.gt-new:hover{ filter:brightness(1.12) }
-
-/* ── The stage, centred ────────────────────────────────────────────
-   Centred because the stream is what the page is about. Capped so it
-   is a hero and not the whole document. */
-#gtStage{ padding:20px 26px 6px; display:grid; justify-items:center; gap:12px }
-.ar-live{
-  position:relative; width:100%; max-width:880px; aspect-ratio:16/9; max-height:340px;
-  border-radius:14px; overflow:hidden;
-  /* Not a black rectangle. This is the first thing on the page and it is
-     empty until channels are watched, so the empty state has to look
-     intended rather than broken. */
-  background:
-    radial-gradient(120% 130% at 50% -30%, rgba(255,61,110,.16) 0%, transparent 62%),
-    linear-gradient(165deg,#14101a 0%,#0a0810 60%,#07060b 100%);
-  border:1px solid rgba(255,255,255,.1);
-  box-shadow:0 26px 60px -28px rgba(0,0,0,.9);
-}
-.ar-live iframe{ position:absolute; inset:0; width:100%; height:100%; border:0 }
-.ar-live-fill{ position:absolute; inset:0; background-size:cover; background-position:center }
-.ar-live-over{
-  position:absolute; left:0; right:0; bottom:0; z-index:2;
-  padding:30px 16px 13px; display:grid; gap:6px; pointer-events:none;
-  background:linear-gradient(0deg,rgba(4,5,9,.95) 10%,transparent 100%);
-}
-.ar-live-over > *{ pointer-events:auto }
-.ar-chip{
-  display:inline-flex; align-items:center; gap:5px; width:fit-content;
-  padding:3px 8px; border-radius:4px; font-family:var(--font);
-  font-size:8.5px; font-weight:900; letter-spacing:1.4px; text-transform:uppercase;
-  background:rgba(255,255,255,.15); color:#fff;
-}
-.ar-chip.live{ background:var(--ar) }
-.ar-chip.live i{ width:5px; height:5px; border-radius:50%; background:#fff; animation:arP 1.7s ease-in-out infinite }
-.ar-live-name{
-  font-family:var(--font); font-size:18px; font-weight:800; letter-spacing:-.3px;
-  line-height:1.15; margin:0; color:#fff;
-  display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical; overflow:hidden;
-}
-.ar-live-meta{ display:flex; flex-wrap:wrap; gap:10px; font-size:11px; color:rgba(255,255,255,.72) }
-.ar-live-meta b{ color:#fff; font-weight:700 }
-.ar-live-empty{ position:absolute; inset:0; display:grid; place-content:center; gap:7px; text-align:center; padding:24px }
-.ar-live-empty h3{ margin:0; font-size:15px; font-weight:800 }
-.ar-live-glyph{
-  width:46px; height:46px; border-radius:12px; display:grid; place-content:center;
-  margin:0 auto 4px; color:rgba(255,255,255,.42);
-  background:rgba(255,255,255,.04); border:1px solid rgba(255,255,255,.08);
-}
-.ar-live-glyph svg{ width:22px; height:22px }
-.ar-live-empty p{ margin:0; font-size:12px; color:var(--text-3); max-width:44ch; line-height:1.6 }
-
-/* The switcher: every other thing that is on, centred under the player,
-   as a strip you pick from. This is the "let users change it" — a
-   channel row, not a hidden rotation. */
-.ar-switch{
-  display:flex; gap:8px; justify-content:center; flex-wrap:wrap;
-  width:100%; max-width:880px;
-}
-.ar-sw{
-  display:grid; grid-template-columns:52px minmax(0,1fr); gap:8px; align-items:center;
-  width:206px; padding:6px; border-radius:9px; cursor:pointer; text-align:left;
-  font-family:inherit; background:var(--ar-surf); border:1px solid var(--ar-line);
-}
-.ar-sw:hover{ background:rgba(255,255,255,.07) }
-.ar-sw.on{ border-color:var(--ar); background:var(--ar-dim) }
-.ar-sw-th{ width:52px; height:30px; border-radius:4px; background:#0d0e14 center/cover; position:relative }
-.ar-sw-th i{
-  position:absolute; left:3px; bottom:3px; width:5px; height:5px;
-  border-radius:50%; background:var(--ar);
-}
-.ar-sw-b{ min-width:0; display:grid; gap:1px }
-.ar-sw-t{ font-size:11px; font-weight:700; color:var(--text-1); overflow:hidden; text-overflow:ellipsis; white-space:nowrap }
-.ar-sw-s{ font-size:9.5px; color:var(--text-3); overflow:hidden; text-overflow:ellipsis; white-space:nowrap }
-
-/* ── Sections ──────────────────────────────────────────────────── */
-.ar-band{ padding:16px 26px 0; display:grid; gap:10px }
-.ar-cols{
-  padding:16px 26px 0; display:grid; gap:18px;
-  grid-template-columns:minmax(0,1.62fr) minmax(268px,.55fr); align-items:start;
-}
-.ar-h{ display:flex; align-items:baseline; gap:9px; margin:0 }
-.ar-h h2{
-  font-family:var(--font); font-size:10.5px; font-weight:900; letter-spacing:1.7px;
-  text-transform:uppercase; margin:0;
-}
-.ar-h span{ font-size:10.5px; color:var(--text-3) }
-.ar-h .ar-more{
-  margin-left:auto; background:none; border:none; cursor:pointer; padding:0;
-  color:var(--text-3); font-family:var(--font); font-size:9.5px; font-weight:800;
-  letter-spacing:1.1px; text-transform:uppercase;
-}
-.ar-h .ar-more:hover{ color:var(--ar) }
-
-/* ── Your tournaments: rows, not cramped tiles ─────────────────────
-   The strip of identical squares said almost nothing: the name was
-   clipped, the stage was a word, and there was nowhere for the round to
-   go. A row has space for the art, the stage, the round it is on and
-   who is in it. */
-.ar-mine{ display:grid; gap:8px; grid-template-columns:repeat(auto-fill,minmax(330px,1fr)) }
-.ar-m{
-  display:grid; grid-template-columns:52px minmax(0,1fr) auto; gap:11px; align-items:center;
-  padding:9px 12px 9px 9px; border-radius:10px; text-align:left; cursor:pointer;
-  background:var(--ar-surf); border:1px solid var(--ar-line); font-family:inherit;
-}
-.ar-m:hover{ background:rgba(255,255,255,.065); border-color:rgba(255,255,255,.15) }
-.ar-m-art{
-  width:52px; height:52px; border-radius:8px; background:#14151d center/cover;
-  display:grid; place-content:center; font-family:var(--font); font-size:17px;
-  font-weight:900; color:rgba(255,255,255,.35); flex:0 0 auto;
-}
-.ar-m-b{ min-width:0; display:grid; gap:5px }
-.ar-m-name{ font-size:13px; font-weight:800; overflow:hidden; text-overflow:ellipsis; white-space:nowrap }
-.ar-m-line{ display:flex; align-items:center; gap:7px }
-.ar-track{ flex:1; min-width:40px; height:4px; border-radius:99px; background:rgba(255,255,255,.08); overflow:hidden }
-.ar-track span{ display:block; height:100%; border-radius:99px; background:var(--ar) }
-.ar-round{
-  font-family:"JetBrains Mono",ui-monospace,monospace; font-size:9.5px;
-  color:var(--text-3); white-space:nowrap; font-variant-numeric:tabular-nums;
-}
-.ar-m-sub{ font-size:10.5px; color:var(--text-3); overflow:hidden; text-overflow:ellipsis; white-space:nowrap }
-.ar-stage{
-  font-family:var(--font); font-size:8px; font-weight:900; letter-spacing:1.1px;
-  text-transform:uppercase; padding:4px 8px; border-radius:5px; flex:0 0 auto; align-self:center;
-  background:rgba(255,255,255,.07); color:var(--text-2);
-}
-.ar-stage.live{ background:var(--ar-dim); color:#ffa3b6 }
-.ar-stage.reg{ background:rgba(240,180,41,.15); color:#f0b429 }
-
-/* ── Agenda ────────────────────────────────────────────────────── */
-.ar-cal{
-  border:1px solid var(--ar-line); border-radius:12px; background:var(--ar-surf);
-  padding:12px; display:grid; gap:9px; align-content:start;
-}
-.ar-cal-head{ display:flex; align-items:center; gap:6px }
-.ar-cal-title{
-  font-family:var(--font); font-size:10px; font-weight:900; letter-spacing:1.4px;
-  text-transform:uppercase; margin:0; flex:1;
-}
-.ar-cal-nav{
-  width:20px; height:20px; border-radius:5px; cursor:pointer; padding:0;
-  background:rgba(255,255,255,.06); border:1px solid var(--ar-line);
-  color:var(--text-2); font-size:11px; line-height:1;
-}
-.ar-cal-nav:hover{ background:rgba(255,255,255,.14); color:var(--text-1) }
-.ar-week{ display:grid; grid-template-columns:repeat(7,1fr); gap:3px }
-.ar-d{
-  border-radius:6px; padding:5px 0 6px; border:1px solid transparent; cursor:default;
-  background:rgba(255,255,255,.02); display:grid; gap:2px; justify-items:center;
-}
-.ar-d small{ font-size:7.5px; letter-spacing:.5px; text-transform:uppercase; color:var(--text-3) }
-.ar-d b{ font-size:11.5px; font-weight:700; color:var(--text-3); font-variant-numeric:tabular-nums }
-.ar-d.today{ border-color:rgba(255,255,255,.22) }
-.ar-d.today b{ color:var(--text-1) }
-.ar-d.has{ cursor:pointer; background:var(--ar-dim); border-color:rgba(255,61,110,.3) }
-.ar-d.has b{ color:var(--text-1) }
-.ar-d.sel{ outline:2px solid var(--ar); outline-offset:-2px }
-.ar-d i{ width:4px; height:4px; border-radius:50%; background:var(--ar) }
-.ar-d i.ghost{ background:transparent }
-.ar-agenda{ display:grid; gap:5px; max-height:184px; overflow-y:auto; scrollbar-width:thin }
-.ar-agenda::-webkit-scrollbar{ width:6px }
-.ar-agenda::-webkit-scrollbar-thumb{ background:rgba(255,255,255,.12); border-radius:99px }
-.ar-a{
-  display:grid; grid-template-columns:34px minmax(0,1fr); gap:8px; align-items:center;
-  padding:6px 7px; border-radius:7px; cursor:pointer; text-align:left; font-family:inherit;
-  background:rgba(255,255,255,.03); border:1px solid rgba(255,255,255,.06);
-}
-.ar-a:hover{ background:rgba(255,255,255,.075) }
-.ar-a-when{ display:grid; justify-items:center; font-family:"JetBrains Mono",ui-monospace,monospace }
-.ar-a-when b{ font-size:12px; font-weight:700; color:var(--text-1); line-height:1.1 }
-.ar-a-when small{ font-size:7px; letter-spacing:.6px; text-transform:uppercase; color:var(--text-3) }
-.ar-a-b{ min-width:0; display:grid; gap:1px }
-.ar-a-t{ font-size:11px; font-weight:700; color:var(--text-1); overflow:hidden; text-overflow:ellipsis; white-space:nowrap }
-.ar-a-s{ font-size:9.5px; color:var(--text-3); overflow:hidden; text-overflow:ellipsis; white-space:nowrap }
-
-/* ── Browse ────────────────────────────────────────────────────── */
-.ar-filters{ display:flex; gap:6px; flex-wrap:wrap; margin-left:auto }
-.ar-f{
-  height:26px; padding:0 11px; border-radius:99px; cursor:pointer;
-  background:rgba(255,255,255,.04); border:1px solid var(--ar-line);
-  color:var(--text-3); font-family:var(--font); font-size:9.5px; font-weight:800;
-  letter-spacing:1px; text-transform:uppercase;
-}
-.ar-f:hover{ color:var(--text-1) }
-.ar-f.on{ background:var(--ar-dim); border-color:rgba(255,61,110,.4); color:#ffa3b6 }
-.ar-f b{ font-variant-numeric:tabular-nums; opacity:.7; margin-left:5px }
-.ar-grid{ display:grid; gap:12px; grid-template-columns:repeat(auto-fill,minmax(212px,1fr)) }
-.ar-c{
-  border-radius:11px; overflow:hidden; cursor:pointer; text-align:left; padding:0;
-  background:var(--ar-surf); border:1px solid var(--ar-line); font-family:inherit;
-  display:grid; grid-template-rows:92px auto;
-}
-.ar-c:hover{ border-color:rgba(255,255,255,.2); transform:translateY(-2px) }
-.ar-c{ transition:transform .16s ease, border-color .16s ease }
-@media (prefers-reduced-motion:reduce){ .ar-c{ transition:none } .ar-c:hover{ transform:none } }
-.ar-c-art{ position:relative; background:#14151d center/cover }
-.ar-c-art::after{ content:''; position:absolute; inset:0; background:linear-gradient(0deg,rgba(10,11,17,.9),transparent 70%) }
-.ar-c-badge{
-  position:absolute; top:7px; left:7px; z-index:2; padding:3px 7px; border-radius:4px;
-  font-family:var(--font); font-size:7.5px; font-weight:900; letter-spacing:1.1px;
-  text-transform:uppercase; background:rgba(0,0,0,.65); color:#fff; backdrop-filter:none;
-}
-.ar-c-badge.live{ background:var(--ar) }
-.ar-c-badge.open{ background:#f0b429; color:#241a00 }
-.ar-c-fb{
-  position:absolute; inset:0; display:grid; place-content:center;
-  font-family:var(--font); font-size:24px; font-weight:900; color:rgba(255,255,255,.28);
-}
-.ar-c-b{ padding:10px 11px 11px; display:grid; gap:6px }
-.ar-c-t{
-  font-size:13px; font-weight:800; line-height:1.25;
-  display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical; overflow:hidden;
-}
-.ar-c-m{ font-size:10.5px; color:var(--text-3); display:flex; gap:7px; flex-wrap:wrap }
-.ar-c-bar{ height:3px; border-radius:99px; background:rgba(255,255,255,.08); overflow:hidden }
-.ar-c-bar span{ display:block; height:100%; background:var(--ar) }
-.ar-empty{
-  border:1px dashed rgba(255,255,255,.12); border-radius:12px;
-  padding:34px 20px; text-align:center; display:grid; gap:8px; justify-items:center;
-}
-.ar-empty h3{ margin:0; font-size:15px; font-weight:800 }
-.ar-empty p{ margin:0; font-size:12px; color:var(--text-3); max-width:46ch; line-height:1.6 }
-.ar-empty button{
-  margin-top:4px; height:34px; padding:0 16px; border-radius:8px; border:none; cursor:pointer;
-  background:var(--ar); color:#fff; font-family:var(--font); font-size:10px;
-  font-weight:900; letter-spacing:1.2px; text-transform:uppercase;
-}
-.ar-note{ font-size:11px; color:var(--text-3); line-height:1.55; margin:0 }
-.ar-note.err{ color:#ff8a8a }
-
-@media (max-width:1180px){ .ar-cols{ grid-template-columns:minmax(0,1fr) } }
-</style>
-
-<script>
-(function () {
-  'use strict';
-  var esc = function (x) {
-    return String(x == null ? '' : x)
-      .replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
-  };
-  var $ = function (id){ return document.getElementById(id); };
-  function api(p, o){ return (typeof window.api === 'function') ? window.api(p, o) : Promise.reject(); }
-
-  var stage = [], idx = 0, rot = null, mine = [], filt = 'all', codeMsg = '';
-
-  function rowsNow(){
-    try { if (typeof _gtRowsCache !== 'undefined' && Array.isArray(_gtRowsCache)) return _gtRowsCache; }
-    catch (e) {}
-    return Array.isArray(window._gtRowsCache) ? window._gtRowsCache : [];
-  }
-  function gameOf(id){
-    try { if (typeof window._gtGame === 'function') return window._gtGame(id) || null; } catch (e) {}
-    return null;
-  }
-  function statusOf(r){ return String(r && r.status || 'OPEN').toUpperCase(); }
-
-  /* ══ Structure ════════════════════════════════════════════════ */
-  function ensureArena(){
-    var ov = $('globalTournamentsOverlay'), sc = $('gtScroller');
-    if (!ov || !sc) return false;
-    ['gtDesk', 'gtRail'].forEach(function (id){ var e = $(id); if (e) e.remove(); });
-
-    if (!$('gtDeskGrid')){
-      var g = document.createElement('div');
-      g.id = 'gtDeskGrid';
-      sc.parentNode.insertBefore(g, sc);
-      g.appendChild(sc);
-    }
-    if (!$('gtTop')){
-      var t = document.createElement('header');
-      t.id = 'gtTop';
-      var g2 = $('gtDeskGrid');
-      g2.parentNode.insertBefore(t, g2);
-    }
-    if (!$('gtStage')){
-      var s = document.createElement('section');
-      s.id = 'gtStage';
-      s.innerHTML = '<div class="ar-live" id="gtLive"></div><div class="ar-switch" id="gtSwitch"></div>';
-      sc.insertBefore(s, sc.firstChild);
-    }
-    if (!$('gtCols')){
-      var c = document.createElement('div');
-      c.id = 'gtCols';
-      c.className = 'ar-cols';
-      c.innerHTML = '<section id="gtYours"></section><aside class="ar-cal" id="gtCal"></aside>';
-      sc.insertBefore(c, $('gtStage').nextSibling);
-    }
-    if (!$('gtBrowse')){
-      var b = document.createElement('section');
-      b.id = 'gtBrowse';
-      b.className = 'ar-band';
-      sc.appendChild(b);
-    }
-    if (sc._shrinkWired){
-      ov.classList.remove('is-shrunk');
-      if (ov._resetShrink) ov._resetShrink();
-    }
-    return true;
-  }
-
-  /* ══ Header ═══════════════════════════════════════════════════ */
-  function paintTop(){
-    var top = $('gtTop');
-    if (!top) return;
-    var rows = rowsNow();
-    var live = rows.filter(function (r){ return statusOf(r) === 'LIVE'; }).length;
-    var open = rows.filter(function (r){ var x = statusOf(r); return x === 'OPEN' || x === 'REGISTRATION' || x === 'STARTING'; }).length;
-    var air = stage.filter(function (x){ return x.live; }).length;
-
-    top.innerHTML =
-      '<h1 class="gt-wordmark">Tourna<b>ments</b></h1>' +
-      '<div class="gt-top-stats">' +
-        (air ? '<span class="gt-stat live"><i></i><b>' + air + '</b> on air</span>' : '') +
-        '<span class="gt-stat"><b>' + live + '</b> live</span>' +
-        '<span class="gt-stat"><b>' + open + '</b> open</span>' +
-        (mine.length ? '<span class="gt-stat"><b>' + mine.length + '</b> yours</span>' : '') +
-      '</div>' +
-      '<span class="gt-sp"></span>' +
-      '<div class="gt-code">' +
-        '<input id="gtCodeInput" maxlength="9" placeholder="ABCD1234" aria-label="Tournament code" ' +
-          'title="' + esc(codeMsg || 'Join a private tournament: four letters, four digits') + '" ' +
-          'onkeydown="if(event.key===\'Enter\')window.gtJoinByCode()">' +
-        '<button type="button" onclick="window.gtJoinByCode()">Join</button>' +
-      '</div>' +
-      '<button class="gt-new" type="button" onclick="window.openCreateTournament()">Create</button>';
-  }
-
-  window.gtJoinByCode = async function (){
-    var input = $('gtCodeInput');
-    if (!input) return;
-    var raw = String(input.value || '').toUpperCase().replace(/[^A-Z0-9]/g, '');
-    var say = function (m, err){
-      codeMsg = m;
-      input.title = m;
-      input.style.borderColor = err ? 'rgba(255,120,120,.7)' : '';
-      if (err && window.showToast) window.showToast(m, 'error');
-    };
-    if (!/^[A-Z]{4}[0-9]{4}$/.test(raw)) return say('Four letters, then four digits.', true);
-    var r = await api('/tournaments/code/' + raw).catch(function (){ return null; });
-    if (!r || !r.id || r.error) return say('No tournament with that code.', true);
-    say('');
-    input.value = '';
-    if (typeof window.gtJoin === 'function') window.gtJoin(String(r.id));
-  };
-
-  /* ══ Stage ════════════════════════════════════════════════════ */
-  function ytId(u){
-    var m = String(u || '').match(/(?:youtube\.com\/(?:watch\?v=|live\/|embed\/)|youtu\.be\/)([\w-]{6,})/);
-    return m ? m[1] : null;
-  }
-  function ytCh(u){
-    var m = String(u || '').match(/youtube\.com\/(?:channel\/)(UC[\w-]+)/);
-    return m ? m[1] : null;
-  }
-  function embedFor(m){
-    var v = m.videoId || ytId(m.streamUrl) || ytId(m.url);
-    if (v) return 'https://www.youtube.com/embed/' + v + '?autoplay=1&mute=1&playsinline=1&rel=0&modestbranding=1';
-    var c = ytCh(m.streamUrl) || ytCh(m.url);
-    if (c) return 'https://www.youtube.com/embed/live_stream?channel=' + c + '&autoplay=1&mute=1&playsinline=1';
-    return null;
-  }
-  function inText(iso){
-    if (!iso) return '';
-    var ms = new Date(iso).getTime() - Date.now();
-    if (!isFinite(ms) || ms <= 0) return '';
-    var mn = Math.round(ms / 60000);
-    return mn < 60 ? 'in ' + mn + 'm' : mn < 1440 ? 'in ' + Math.round(mn / 60) + 'h' : 'in ' + Math.round(mn / 1440) + 'd';
-  }
-
-  function paintLive(){
-    var host = $('gtLive');
-    if (!host) return;
-    if (!stage.length){
-      host.innerHTML =
-        '<div class="ar-live-empty">' +
-          '<span class="ar-live-glyph" aria-hidden="true">' +
-            '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" ' +
-              'stroke-linecap="round" stroke-linejoin="round">' +
-              '<rect x="2" y="5" width="20" height="14" rx="2.5"/>' +
-              '<path d="M10 10.2v3.6l3.2-1.8z" fill="currentColor" stroke="none"/>' +
-            '</svg></span>' +
-          '<h3>Nothing on right now</h3>' +
-          '<p>The moment a watched channel goes live it plays here, and when ' +
-          'none is, whatever starts next takes the stage.</p></div>';
-      return;
-    }
-    if (idx >= stage.length) idx = 0;
-    var m = stage[idx], src = embedFor(m), meta = [];
-    if (m.game) meta.push('<span><b>' + esc(m.game) + '</b></span>');
-    if (m.organiser) meta.push('<span>' + esc(m.organiser) + '</span>');
-    if (m.viewers) meta.push('<span><b>' + Number(m.viewers).toLocaleString() + '</b> watching</span>');
-    if (!m.live){ var w = inText(m.startsAt); if (w) meta.push('<span>starts ' + esc(w) + '</span>'); }
-
-    host.innerHTML =
-      (src ? '<iframe src="' + esc(src) + '" allow="autoplay; encrypted-media; picture-in-picture" ' +
-             'allowfullscreen title="' + esc(m.name) + '"></iframe>'
-           : '<div class="ar-live-fill" style="background-image:url(\'' + esc(m.art || '') + '\')"></div>') +
-      '<div class="ar-live-over">' +
-        '<span class="ar-chip' + (m.live ? ' live' : '') + '">' +
-          (m.live ? '<i></i>Live' : esc(m.tier || 'Next up')) + '</span>' +
-        '<h2 class="ar-live-name">' + esc(m.name) + '</h2>' +
-        (meta.length ? '<div class="ar-live-meta">' + meta.join('') + '</div>' : '') +
-      '</div>';
-  }
-
-  /* Every other thing that is on, as a strip you pick from. Explicit,
-     not a hidden rotation: the brief was to let people change it. */
-  function paintSwitch(){
-    var host = $('gtSwitch');
-    if (!host) return;
-    if (stage.length < 2){ host.innerHTML = ''; return; }
-    host.innerHTML = stage.slice(0, 4).map(function (m, i){
-      var sub = m.live ? (m.viewers ? Number(m.viewers).toLocaleString() + ' watching' : 'Live')
-                       : (inText(m.startsAt) || m.game || 'Scheduled');
-      return '<button type="button" class="ar-sw' + (i === idx ? ' on' : '') + '" ' +
-        'onclick="window.arPick(' + i + ')">' +
-        '<span class="ar-sw-th" style="background-image:url(\'' + esc(m.art || '') + '\')">' +
-          (m.live ? '<i></i>' : '') + '</span>' +
-        '<span class="ar-sw-b"><span class="ar-sw-t">' + esc(m.name) + '</span>' +
-        '<span class="ar-sw-s">' + esc(sub) + '</span></span></button>';
-    }).join('');
-  }
-  window.arPick = function (i){ idx = i; paintLive(); paintSwitch(); rotate(); };
-
-  function rotate(){
-    clearInterval(rot);
-    if (stage.filter(function (x){ return x.live; }).length < 2) return;
-    rot = setInterval(function (){
-      if (!document.body.contains($('gtLive'))){ clearInterval(rot); return; }
-      idx = (idx + 1) % stage.length;
-      paintLive(); paintSwitch();
-    }, 60000);
-  }
-
-  /* ══ Yours ════════════════════════════════════════════════════ */
-  function stageOf(t){
-    var s = String(t.status || '').toUpperCase();
-    if (s === 'DONE' || s === 'COMPLETED') return { key:'done', label:'Finished', at:1, of:1, pct:100 };
-    if (s === 'OPEN' || s === 'REGISTRATION') return { key:'reg', label:'Registration', at:0, of:0, pct:0 };
-    if (s === 'STARTING') return { key:'reg', label:'Starting', at:0, of:0, pct:0 };
-    var n = Math.max(2, Number(t.entrants) || 2);
-    var of = Math.max(1, Math.ceil(Math.log(n) / Math.log(2)));
-    var at = Math.min(of, Number(t.round) || 1);
-    return { key:'live', label:(at >= of ? 'Final' : at === of - 1 ? 'Semi-final' : 'Round ' + at),
-             at:at, of:of, pct:Math.round(at / of * 100) };
-  }
-
-  function paintYours(){
-    var host = $('gtYours');
-    if (!host) return;
-    if (!mine.length){
-      host.innerHTML =
-        '<div class="ar-h"><h2>Your tournaments</h2><span>none yet</span></div>' +
-        '<p class="ar-note">Enter one below, or run your own.</p>';
-      return;
-    }
-    var shown = mine.slice(0, 6);
-    host.innerHTML =
-      '<div class="ar-h"><h2>Your tournaments</h2><span>' + mine.length + ' entered</span>' +
-        (mine.length > 6 ? '<button class="ar-more" type="button" onclick="window.openMyTournaments()">See all</button>' : '') +
-      '</div>' +
-      '<div class="ar-mine">' + shown.map(function (t){
-        var s = stageOf(t), g = gameOf(t.game);
-        var art = g && (g.cover || g.header);
-        var sub = [];
-        if (t.entrants) sub.push(t.entrants + ' entrants');
-        if (t.format) sub.push(t.format);
-        if (t.isHost) sub.push('you host');
-        if (t.joinCode) sub.push(t.joinCode);
-        return '<button type="button" class="ar-m" onclick="window.gtJoin(\'' + esc(t.id) + '\')">' +
-          '<span class="ar-m-art"' + (art ? ' style="background-image:url(\'' + esc(art) + '\')"' : '') + '>' +
-            (art ? '' : esc((t.name || '?').slice(0, 1).toUpperCase())) + '</span>' +
-          '<span class="ar-m-b">' +
-            '<span class="ar-m-name">' + esc(t.name || 'Tournament') + '</span>' +
-            (s.of > 1
-              ? '<span class="ar-m-line"><span class="ar-track"><span style="width:' + s.pct + '%"></span></span>' +
-                '<span class="ar-round">' + s.at + '/' + s.of + '</span></span>'
-              : '') +
-            '<span class="ar-m-sub">' + esc(sub.join(' · ')) + '</span>' +
-          '</span>' +
-          '<span class="ar-stage ' + s.key + '">' + esc(s.label) + '</span>' +
-        '</button>';
-      }).join('') + '</div>';
-  }
-
-  /* ══ Agenda ═══════════════════════════════════════════════════ */
-  var weekStart = null, sel = null;
-  function sow(d){ var x = new Date(d.getFullYear(), d.getMonth(), d.getDate()); x.setDate(x.getDate() - ((x.getDay() + 6) % 7)); return x; }
-  function key(d){ return d.getFullYear() + '-' + (d.getMonth()+1) + '-' + d.getDate(); }
-
-  function events(){
-    var out = [];
-    stage.forEach(function (m){
-      if (m.live || !m.startsAt) return;
-      out.push({ at:new Date(m.startsAt), kind:'major', id:m.id, name:m.name, sub:m.game || m.organiser || 'Event' });
-    });
-    (mine || []).concat(rowsNow() || []).forEach(function (t){
-      if (!t.startTime) return;
-      if (out.some(function (e){ return e.kind === 'tourney' && String(e.id) === String(t.id); })) return;
-      out.push({ at:new Date(t.startTime), kind:'tourney', id:t.id, name:t.name,
-                 sub:(t.format || 'Tournament') + (t.entrants ? ' · ' + t.entrants + ' in' : '') });
-    });
-    return out.filter(function (e){ return !isNaN(e.at); }).sort(function (a, b){ return a.at - b.at; });
-  }
-
-  function paintCal(){
-    var host = $('gtCal');
-    if (!host) return;
-    var now = new Date();
-    if (!weekStart) weekStart = sow(now);
-    var evs = events(), byDay = {};
-    evs.forEach(function (e){ (byDay[key(e.at)] = byDay[key(e.at)] || []).push(e); });
-
-    var days = '';
-    for (var i = 0; i < 7; i++){
-      var d = new Date(weekStart); d.setDate(weekStart.getDate() + i);
-      var k = key(d), has = !!byDay[k], cls = ['ar-d'];
-      if (k === key(now)) cls.push('today');
-      if (has) cls.push('has');
-      if (sel === k) cls.push('sel');
-      days += '<button type="button" class="' + cls.join(' ') + '"' +
-        (has ? ' onclick="window.arDay(\'' + k + '\')"' : ' disabled') + '>' +
-        '<small>' + ['M','T','W','T','F','S','S'][i] + '</small><b>' + d.getDate() + '</b>' +
-        '<i class="' + (has ? '' : 'ghost') + '"></i></button>';
-    }
-    var list = sel && byDay[sel] ? byDay[sel]
-             : evs.filter(function (e){ return e.at >= new Date(now.getTime() - 36e5); }).slice(0, 7);
-
-    host.innerHTML =
-      '<div class="ar-cal-head"><h3 class="ar-cal-title">' +
-        esc(weekStart.toLocaleDateString(undefined, { month:'long', year:'numeric' })) + '</h3>' +
-        '<button class="ar-cal-nav" type="button" onclick="window.arWeek(-1)" aria-label="Previous week">&lsaquo;</button>' +
-        '<button class="ar-cal-nav" type="button" onclick="window.arWeek(1)" aria-label="Next week">&rsaquo;</button></div>' +
-      '<div class="ar-week">' + days + '</div>' +
-      '<div class="ar-h"><h2>' + (sel ? 'That day' : 'Coming up') + '</h2></div>' +
-      (list.length
-        ? '<div class="ar-agenda">' + list.map(function (e){
-            return '<button type="button" class="ar-a" onclick="window.arEvent(\'' + e.kind + '\',\'' + esc(e.id) + '\')">' +
-              '<span class="ar-a-when"><b>' + e.at.getDate() + '</b><small>' +
-                e.at.toLocaleDateString(undefined, { month:'short' }) + '</small></span>' +
-              '<span class="ar-a-b"><span class="ar-a-t">' + esc(e.name) + '</span>' +
-              '<span class="ar-a-s">' + esc(e.sub) + ' · ' +
-                e.at.toLocaleTimeString([], { hour:'2-digit', minute:'2-digit' }) + '</span></span></button>';
-          }).join('') + '</div>'
-        : '<p class="ar-note">Nothing scheduled. Tournaments with a start time and published events both land here.</p>');
-  }
-  window.arWeek = function (n){ weekStart = new Date(weekStart); weekStart.setDate(weekStart.getDate() + n * 7); sel = null; paintCal(); };
-  window.arDay = function (k){ sel = (sel === k ? null : k); paintCal(); };
-  window.arEvent = function (kind, id){
-    if (kind === 'tourney'){ if (window.gtJoin) window.gtJoin(String(id)); return; }
-    var i = stage.findIndex(function (x){ return String(x.id) === String(id); });
-    if (i >= 0) window.arPick(i);
-  };
-
-  /* ══ Browse ═══════════════════════════════════════════════════
-     Drawn here rather than by _gtPaintList: that renderer uses the
-     shared hub grammar — centred section headings, a chip rail, its own
-     empty state — which is what made this page look like two designs at
-     once. Same data, one design. */
-  function matches(r){
-    var s = statusOf(r);
-    if (filt === 'live') return s === 'LIVE';
-    if (filt === 'soon') return s === 'STARTING';
-    if (filt === 'open') return s !== 'LIVE' && s !== 'STARTING' && s !== 'DONE' && s !== 'COMPLETED';
-    if (filt === 'done') return s === 'DONE' || s === 'COMPLETED';
-    return true;
-  }
-
-  function paintBrowse(){
-    var host = $('gtBrowse');
-    if (!host) return;
-    var rows = rowsNow();
-    var c = {
-      all: rows.length,
-      live: rows.filter(function (r){ return statusOf(r) === 'LIVE'; }).length,
-      soon: rows.filter(function (r){ return statusOf(r) === 'STARTING'; }).length,
-      open: rows.filter(function (r){ var x = statusOf(r); return x !== 'LIVE' && x !== 'STARTING' && x !== 'DONE' && x !== 'COMPLETED'; }).length,
-      done: rows.filter(function (r){ var x = statusOf(r); return x === 'DONE' || x === 'COMPLETED'; }).length
-    };
-    function f(id, label){
-      return '<button type="button" class="ar-f' + (filt === id ? ' on' : '') + '" ' +
-        'onclick="window.arFilter(\'' + id + '\')">' + label + '<b>' + c[id] + '</b></button>';
-    }
-
-    var list = rows.filter(matches);
-    var rank = { LIVE:0, STARTING:1, OPEN:2, REGISTRATION:2 };
-    list.sort(function (a, b){
-      var ra = rank[statusOf(a)], rb = rank[statusOf(b)];
-      ra = ra == null ? 3 : ra; rb = rb == null ? 3 : rb;
-      if (ra !== rb) return ra - rb;
-      return (Number(b.entrants) || 0) - (Number(a.entrants) || 0);
-    });
-
-    host.innerHTML =
-      '<div class="ar-h"><h2>Brackets</h2><span>' + list.length +
-        (list.length === 1 ? ' tournament' : ' tournaments') + '</span>' +
-        '<span class="ar-filters">' + f('all','All') + f('live','Live') +
-          f('soon','Starting') + f('open','Open') + f('done','Finished') + '</span>' +
-      '</div>' +
-      (list.length
-        ? '<div class="ar-grid">' + list.map(function (r){
-            var g = gameOf(r.game), art = g && (g.header || g.cover);
-            var s = statusOf(r);
-            var cap = Number(r.maxPlayers || r.max_players) || 0;
-            var ent = Number(r.entrants) || 0;
-            var badge = s === 'LIVE' ? '<span class="ar-c-badge live">Live</span>'
-                      : (s === 'DONE' || s === 'COMPLETED') ? '<span class="ar-c-badge">Finished</span>'
-                      : '<span class="ar-c-badge open">' + (cap ? Math.max(0, cap - ent) + ' seats' : 'Open') + '</span>';
-            var meta = [];
-            if (g && g.name) meta.push(esc(g.name));
-            if (r.format) meta.push(esc(r.format));
-            meta.push(cap ? ent + '/' + cap : ent + ' in');
-            return '<button type="button" class="ar-c" onclick="window.gtJoin(\'' + esc(r.id) + '\')">' +
-              '<span class="ar-c-art"' + (art ? ' style="background-image:url(\'' + esc(art) + '\')"' : '') + '>' +
-                badge + (art ? '' : '<span class="ar-c-fb">' + esc((r.name || '?').slice(0,1).toUpperCase()) + '</span>') +
-              '</span>' +
-              '<span class="ar-c-b">' +
-                '<span class="ar-c-t">' + esc(r.name || 'Tournament') + '</span>' +
-                '<span class="ar-c-m">' + meta.join('<span>·</span>') + '</span>' +
-                (cap ? '<span class="ar-c-bar"><span style="width:' +
-                  Math.min(100, Math.round(ent / cap * 100)) + '%"></span></span>' : '') +
-              '</span></button>';
-          }).join('') + '</div>'
-        : '<div class="ar-empty"><h3>' +
-            (filt === 'all' ? 'No tournaments yet' : 'Nothing under that filter') + '</h3>' +
-            '<p>' + (filt === 'all'
-              ? 'Be the first to run one. It takes about a minute.'
-              : 'There may be brackets under a different heading.') + '</p>' +
-            '<button type="button" onclick="window.openCreateTournament()">Create a tournament</button>' +
-          '</div>');
-  }
-  window.arFilter = function (id){ filt = (filt === id && id !== 'all') ? 'all' : id; paintBrowse(); };
-
-  /* ══ Loading ══════════════════════════════════════════════════ */
-  async function loadStage(){
-    var r = await api('/arena/stage').catch(function (){ return null; });
-    if (!Array.isArray(r) || !r.length){
-      var m = await api('/majors').catch(function (){ return null; });
-      r = Array.isArray(m) ? m.map(function (x){ return Object.assign({ kind:'major' }, x); }) : [];
-    }
-    stage = r; idx = 0;
-    paintLive(); paintSwitch(); rotate(); paintCal(); paintTop();
-  }
-  async function loadMine(){
-    var r = await api('/me/tournaments').catch(function (){ return null; });
-    mine = Array.isArray(r) ? r : [];
-    paintYours(); paintCal(); paintTop();
-  }
-
-  function refresh(){
-    if (!ensureArena()) return;
-    paintTop(); paintLive(); paintSwitch(); paintYours(); paintCal(); paintBrowse();
-    loadStage(); loadMine();
-  }
-
-  function start(){
-    if (typeof window.api !== 'function'){ setTimeout(start, 300); return; }
-    var o = window.openGlobalTournaments;
-    if (typeof o === 'function' && !o.__arena){
-      var w = function (){ var out = o.apply(this, arguments); setTimeout(refresh, 30); return out; };
-      w.__arena = true;
-      window.openGlobalTournaments = w;
-    }
-    /* renderGtTournaments is called as a bare identifier, so wrapping the
-       window property never fires. Watch the node it fills instead — it
-       is hidden now, but it is still where fresh data lands. */
-    var list = $('gtTournamentList');
-    if (list && !list.__arenaWatched){
-      list.__arenaWatched = true;
-      var q = false;
-      new MutationObserver(function (){
-        if (q) return;
-        q = true;
-        requestAnimationFrame(function (){ q = false; paintBrowse(); paintTop(); paintCal(); });
-      }).observe(list, { childList:true });
-    }
-    var ov = $('globalTournamentsOverlay');
-    if (ov && ov.classList.contains('open')) refresh();
-    console.log('[tournaments] arena ready');
-  }
-
-  if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', start);
-  else start();
-})();
-</script>
 
 <!-- ═══ CREATE A TOURNAMENT · ITS OWN PAGE ═══════════════════════════
      The modal asked eight questions in a box the size of a dialog, with
@@ -82843,6 +82078,638 @@ body.q-max #queueOverlay{ padding:0 !important; }
   window.openCreateTournament.__page = true;
   /* Kept reachable in case anything still wants the dialog. */
   window.openCreateTournamentModal = origOpen;
+})();
+</script>
+<!-- ═══ TOURNAMENTS ═══════════════════════════════════════════════════
+     Its own page, not a layer over the old one.
+
+     Four rebuilds went the other way: keep #globalTournamentsOverlay and
+     dress it. That kept failing because THREE renderers write into that
+     overlay — _gtPaintList, the shelves engine, and a LobbyHub instance
+     that mounts #gtHubFilters/#gtHubStage at the top of the scroller.
+     Each round I hid the one I had just found, the next appeared, and
+     the last round left the page empty. Hiding other people's renderers
+     one at a time is not a design.
+
+     So this is a separate overlay with its own DOM, its own data, and
+     nothing else drawing into it. The legacy overlay is left untouched
+     and simply unused; openGlobalTournaments points here.
+     ══════════════════════════════════════════════════════════════ -->
+<div id="tournamentsPage" class="lobby-overlay"
+     style="background:radial-gradient(1200px 560px at 78% -14%, rgba(255,61,110,.17) 0%, transparent 62%), linear-gradient(163deg,var(--bg-0) 0%,var(--bg-1) 100%)">
+
+  <header id="tpTop">
+    <h1 class="tp-mark">Tourna<b>ments</b></h1>
+    <div class="tp-stats" id="tpStats"></div>
+    <span class="tp-sp"></span>
+    <div class="tp-code">
+      <input id="tpCode" maxlength="9" placeholder="ABCD1234" aria-label="Tournament code"
+             onkeydown="if(event.key==='Enter')window.tpJoinCode()">
+      <button type="button" onclick="window.tpJoinCode()">Join</button>
+    </div>
+    <button class="tp-new" type="button" onclick="window.openCreateTournament()">
+      <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+           stroke-width="3" stroke-linecap="round"><line x1="12" y1="5" x2="12" y2="19"/>
+        <line x1="5" y1="12" x2="19" y2="12"/></svg>
+      Create tournament
+    </button>
+  </header>
+
+  <div id="tpScroll">
+    <div class="tp-measure">
+
+      <section class="tp-stage">
+        <div class="tp-player" id="tpPlayer"></div>
+        <div class="tp-channels" id="tpChannels"></div>
+      </section>
+
+      <section class="tp-cols">
+        <div class="tp-main">
+          <div id="tpYours"></div>
+          <div id="tpBrowse"></div>
+        </div>
+        <aside class="tp-side">
+          <div class="tp-cal" id="tpCal"></div>
+          <div class="tp-make" id="tpMake"></div>
+        </aside>
+      </section>
+
+    </div>
+  </div>
+</div>
+
+<style>
+#tournamentsPage{ --tp:#ff3d6e; --tp-dim:rgba(255,61,110,.14); --tp-line:rgba(255,255,255,.075);
+  --tp-surf:rgba(255,255,255,.03); flex-direction:column; }
+#tpTop{
+  flex:0 0 52px; display:flex; align-items:center; gap:13px; padding:0 24px;
+  background:#0d0a10; border-bottom:1px solid var(--tp-line); z-index:3;
+}
+.tp-mark{ font-family:var(--font); font-size:13.5px; font-weight:900; letter-spacing:2.4px;
+  text-transform:uppercase; margin:0; white-space:nowrap }
+.tp-mark b{ color:var(--tp) }
+.tp-stats{ display:flex; gap:6px }
+.tp-st{
+  display:inline-flex; align-items:center; gap:6px; height:24px; padding:0 9px;
+  border-radius:6px; background:rgba(255,255,255,.045); border:1px solid var(--tp-line);
+  font-size:10.5px; color:var(--text-3); white-space:nowrap;
+}
+.tp-st b{ color:var(--text-1); font-weight:800; font-variant-numeric:tabular-nums }
+.tp-st.on{ background:var(--tp-dim); border-color:rgba(255,61,110,.32); color:#ffa3b6 }
+.tp-st.on b{ color:#fff }
+.tp-st.on i{ width:5px; height:5px; border-radius:50%; background:var(--tp); animation:tpP 1.7s ease-in-out infinite }
+@keyframes tpP{ 0%,100%{opacity:1} 50%{opacity:.25} }
+.tp-sp{ flex:1 }
+.tp-code{ display:flex; gap:5px }
+.tp-code input{
+  width:104px; height:30px; border-radius:7px; padding:0 9px;
+  background:rgba(255,255,255,.045); border:1px solid var(--tp-line); color:var(--text-1);
+  font-family:"JetBrains Mono",ui-monospace,monospace; font-size:11px;
+  font-weight:700; letter-spacing:1.6px; text-transform:uppercase;
+}
+.tp-code input:focus{ outline:none; border-color:rgba(255,61,110,.55) }
+.tp-code button{
+  height:30px; padding:0 12px; border-radius:7px; cursor:pointer;
+  background:rgba(255,255,255,.05); border:1px solid var(--tp-line); color:var(--text-1);
+  font-family:var(--font); font-size:9.5px; font-weight:800; letter-spacing:1.1px; text-transform:uppercase;
+}
+.tp-code button:hover{ background:rgba(255,255,255,.1) }
+.tp-new{
+  display:inline-flex; align-items:center; gap:7px; height:30px; padding:0 14px;
+  border-radius:7px; cursor:pointer; border:none; background:var(--tp); color:#fff;
+  font-family:var(--font); font-size:9.5px; font-weight:900; letter-spacing:1.1px; text-transform:uppercase;
+}
+.tp-new:hover{ filter:brightness(1.12) }
+
+#tpScroll{ flex:1; min-height:0; overflow-y:auto; overflow-x:hidden;
+  scrollbar-width:thin; scrollbar-color:rgba(255,255,255,.14) transparent }
+#tpScroll::-webkit-scrollbar{ width:9px }
+#tpScroll::-webkit-scrollbar-thumb{ background:rgba(255,255,255,.14); border-radius:99px }
+.tp-measure{ max-width:1460px; margin:0 auto; padding:18px 24px 60px; display:grid; gap:20px }
+
+/* ── Stage ─────────────────────────────────────────────────────── */
+.tp-stage{ display:grid; justify-items:center; gap:11px }
+.tp-player{
+  position:relative; width:100%; max-width:900px; aspect-ratio:16/9; max-height:352px;
+  border-radius:14px; overflow:hidden; border:1px solid rgba(255,255,255,.1);
+  background:radial-gradient(120% 130% at 50% -30%, rgba(255,61,110,.16) 0%, transparent 62%),
+             linear-gradient(165deg,#14101a 0%,#0a0810 60%,#07060b 100%);
+  box-shadow:0 26px 64px -30px rgba(0,0,0,.92);
+}
+.tp-player iframe{ position:absolute; inset:0; width:100%; height:100%; border:0 }
+.tp-fill{ position:absolute; inset:0; background-size:cover; background-position:center }
+.tp-over{
+  position:absolute; left:0; right:0; bottom:0; z-index:2; padding:32px 16px 13px;
+  display:grid; gap:6px; pointer-events:none;
+  background:linear-gradient(0deg,rgba(4,5,9,.95) 10%,transparent 100%);
+}
+.tp-over > *{ pointer-events:auto }
+.tp-badge{
+  display:inline-flex; align-items:center; gap:5px; width:fit-content; padding:3px 8px;
+  border-radius:4px; font-family:var(--font); font-size:8.5px; font-weight:900;
+  letter-spacing:1.4px; text-transform:uppercase; background:rgba(255,255,255,.15); color:#fff;
+}
+.tp-badge.live{ background:var(--tp) }
+.tp-badge.live i{ width:5px; height:5px; border-radius:50%; background:#fff; animation:tpP 1.7s ease-in-out infinite }
+.tp-title{ font-family:var(--font); font-size:18px; font-weight:800; letter-spacing:-.3px;
+  line-height:1.16; margin:0; color:#fff;
+  display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical; overflow:hidden }
+.tp-meta{ display:flex; flex-wrap:wrap; gap:10px; font-size:11px; color:rgba(255,255,255,.72) }
+.tp-meta b{ color:#fff; font-weight:700 }
+.tp-blank{ position:absolute; inset:0; display:grid; place-content:center; gap:8px; text-align:center; padding:24px }
+.tp-blank-i{
+  width:46px; height:46px; border-radius:13px; display:grid; place-content:center; margin:0 auto;
+  background:rgba(255,255,255,.04); border:1px solid rgba(255,255,255,.08); color:rgba(255,255,255,.4);
+}
+.tp-blank h3{ margin:0; font-size:15px; font-weight:800 }
+.tp-blank p{ margin:0; font-size:12px; color:var(--text-3); max-width:46ch; line-height:1.6 }
+
+.tp-channels{ display:flex; gap:8px; justify-content:center; flex-wrap:wrap; max-width:900px; width:100% }
+.tp-ch{
+  display:grid; grid-template-columns:52px minmax(0,1fr); gap:8px; align-items:center;
+  width:200px; padding:6px; border-radius:9px; cursor:pointer; text-align:left;
+  font-family:inherit; background:var(--tp-surf); border:1px solid var(--tp-line);
+}
+.tp-ch:hover{ background:rgba(255,255,255,.07) }
+.tp-ch.on{ border-color:var(--tp); background:var(--tp-dim) }
+.tp-ch-th{ width:52px; height:30px; border-radius:4px; background:#0d0e14 center/cover; position:relative }
+.tp-ch-th i{ position:absolute; left:3px; bottom:3px; width:5px; height:5px; border-radius:50%; background:var(--tp) }
+.tp-ch-b{ min-width:0; display:grid; gap:1px }
+.tp-ch-t{ font-size:11px; font-weight:700; color:var(--text-1); overflow:hidden; text-overflow:ellipsis; white-space:nowrap }
+.tp-ch-s{ font-size:9.5px; color:var(--text-3); overflow:hidden; text-overflow:ellipsis; white-space:nowrap }
+
+/* ── Columns ───────────────────────────────────────────────────── */
+.tp-cols{ display:grid; gap:20px; grid-template-columns:minmax(0,1fr) 300px; align-items:start }
+.tp-main{ display:grid; gap:20px; min-width:0 }
+.tp-side{ display:grid; gap:14px }
+@media (max-width:1120px){ .tp-cols{ grid-template-columns:minmax(0,1fr) } }
+
+.tp-h{ display:flex; align-items:baseline; gap:9px; margin:0 0 10px }
+.tp-h h2{ font-family:var(--font); font-size:10.5px; font-weight:900; letter-spacing:1.7px;
+  text-transform:uppercase; margin:0 }
+.tp-h span{ font-size:10.5px; color:var(--text-3) }
+.tp-h .more{ margin-left:auto; background:none; border:none; cursor:pointer; padding:0;
+  color:var(--text-3); font-family:var(--font); font-size:9.5px; font-weight:800;
+  letter-spacing:1.1px; text-transform:uppercase }
+.tp-h .more:hover{ color:var(--tp) }
+.tp-note{ font-size:11.5px; color:var(--text-3); line-height:1.55; margin:0 }
+
+/* ── Yours ─────────────────────────────────────────────────────── */
+.tp-mine{ display:grid; gap:8px; grid-template-columns:repeat(auto-fill,minmax(316px,1fr)) }
+.tp-m{
+  display:grid; grid-template-columns:50px minmax(0,1fr) auto; gap:11px; align-items:center;
+  padding:9px 12px 9px 9px; border-radius:10px; text-align:left; cursor:pointer;
+  background:var(--tp-surf); border:1px solid var(--tp-line); font-family:inherit;
+}
+.tp-m:hover{ background:rgba(255,255,255,.065); border-color:rgba(255,255,255,.15) }
+.tp-m-art{ width:50px; height:50px; border-radius:8px; background:#14151d center/cover;
+  display:grid; place-content:center; font-family:var(--font); font-size:16px;
+  font-weight:900; color:rgba(255,255,255,.35) }
+.tp-m-b{ min-width:0; display:grid; gap:5px }
+.tp-m-n{ font-size:13px; font-weight:800; overflow:hidden; text-overflow:ellipsis; white-space:nowrap }
+.tp-m-line{ display:flex; align-items:center; gap:7px }
+.tp-track{ flex:1; min-width:36px; height:4px; border-radius:99px; background:rgba(255,255,255,.08); overflow:hidden }
+.tp-track span{ display:block; height:100%; border-radius:99px; background:var(--tp) }
+.tp-round{ font-family:"JetBrains Mono",ui-monospace,monospace; font-size:9.5px;
+  color:var(--text-3); white-space:nowrap; font-variant-numeric:tabular-nums }
+.tp-m-s{ font-size:10.5px; color:var(--text-3); overflow:hidden; text-overflow:ellipsis; white-space:nowrap }
+.tp-stage-tag{
+  font-family:var(--font); font-size:8px; font-weight:900; letter-spacing:1.1px;
+  text-transform:uppercase; padding:4px 8px; border-radius:5px;
+  background:rgba(255,255,255,.07); color:var(--text-2);
+}
+.tp-stage-tag.live{ background:var(--tp-dim); color:#ffa3b6 }
+.tp-stage-tag.reg{ background:rgba(240,180,41,.15); color:#f0b429 }
+
+/* ── Browse ────────────────────────────────────────────────────── */
+.tp-filters{ display:flex; gap:6px; flex-wrap:wrap; margin-left:auto }
+.tp-f{ height:26px; padding:0 11px; border-radius:99px; cursor:pointer;
+  background:rgba(255,255,255,.04); border:1px solid var(--tp-line); color:var(--text-3);
+  font-family:var(--font); font-size:9.5px; font-weight:800; letter-spacing:1px; text-transform:uppercase }
+.tp-f:hover{ color:var(--text-1) }
+.tp-f.on{ background:var(--tp-dim); border-color:rgba(255,61,110,.4); color:#ffa3b6 }
+.tp-f b{ font-variant-numeric:tabular-nums; opacity:.7; margin-left:5px }
+.tp-grid{ display:grid; gap:12px; grid-template-columns:repeat(auto-fill,minmax(208px,1fr)) }
+.tp-c{ border-radius:11px; overflow:hidden; cursor:pointer; text-align:left; padding:0;
+  background:var(--tp-surf); border:1px solid var(--tp-line); font-family:inherit;
+  display:grid; grid-template-rows:90px auto; transition:transform .16s ease, border-color .16s ease }
+.tp-c:hover{ border-color:rgba(255,255,255,.2); transform:translateY(-2px) }
+@media (prefers-reduced-motion:reduce){ .tp-c{ transition:none } .tp-c:hover{ transform:none } }
+.tp-c-art{ position:relative; background:#14151d center/cover }
+.tp-c-art::after{ content:''; position:absolute; inset:0; background:linear-gradient(0deg,rgba(10,11,17,.9),transparent 70%) }
+.tp-c-badge{ position:absolute; top:7px; left:7px; z-index:2; padding:3px 7px; border-radius:4px;
+  font-family:var(--font); font-size:7.5px; font-weight:900; letter-spacing:1.1px;
+  text-transform:uppercase; background:rgba(0,0,0,.66); color:#fff }
+.tp-c-badge.live{ background:var(--tp) }
+.tp-c-badge.open{ background:#f0b429; color:#241a00 }
+.tp-c-fb{ position:absolute; inset:0; display:grid; place-content:center;
+  font-family:var(--font); font-size:23px; font-weight:900; color:rgba(255,255,255,.28) }
+.tp-c-b{ padding:10px 11px 11px; display:grid; gap:6px }
+.tp-c-t{ font-size:12.5px; font-weight:800; line-height:1.25;
+  display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical; overflow:hidden }
+.tp-c-m{ font-size:10.5px; color:var(--text-3); display:flex; gap:6px; flex-wrap:wrap }
+.tp-bar{ height:3px; border-radius:99px; background:rgba(255,255,255,.08); overflow:hidden }
+.tp-bar span{ display:block; height:100%; background:var(--tp) }
+.tp-empty{ border:1px dashed rgba(255,255,255,.12); border-radius:12px; padding:32px 20px;
+  text-align:center; display:grid; gap:8px; justify-items:center }
+.tp-empty h3{ margin:0; font-size:14.5px; font-weight:800 }
+.tp-empty p{ margin:0; font-size:12px; color:var(--text-3); max-width:46ch; line-height:1.6 }
+
+/* ── Calendar + create ─────────────────────────────────────────── */
+.tp-cal, .tp-make{ border:1px solid var(--tp-line); border-radius:12px; background:var(--tp-surf); padding:12px }
+.tp-cal{ display:grid; gap:9px; align-content:start }
+.tp-cal-h{ display:flex; align-items:center; gap:6px }
+.tp-cal-t{ font-family:var(--font); font-size:10px; font-weight:900; letter-spacing:1.4px;
+  text-transform:uppercase; margin:0; flex:1 }
+.tp-nav{ width:20px; height:20px; border-radius:5px; cursor:pointer; padding:0;
+  background:rgba(255,255,255,.06); border:1px solid var(--tp-line); color:var(--text-2); font-size:11px; line-height:1 }
+.tp-nav:hover{ background:rgba(255,255,255,.14); color:var(--text-1) }
+.tp-week{ display:grid; grid-template-columns:repeat(7,1fr); gap:3px }
+.tp-d{ border-radius:6px; padding:5px 0 6px; border:1px solid transparent; cursor:default;
+  background:rgba(255,255,255,.02); display:grid; gap:2px; justify-items:center }
+.tp-d small{ font-size:7.5px; letter-spacing:.5px; text-transform:uppercase; color:var(--text-3) }
+.tp-d b{ font-size:11.5px; font-weight:700; color:var(--text-3); font-variant-numeric:tabular-nums }
+.tp-d.today{ border-color:rgba(255,255,255,.22) } .tp-d.today b{ color:var(--text-1) }
+.tp-d.has{ cursor:pointer; background:var(--tp-dim); border-color:rgba(255,61,110,.3) }
+.tp-d.has b{ color:var(--text-1) }
+.tp-d.sel{ outline:2px solid var(--tp); outline-offset:-2px }
+.tp-d i{ width:4px; height:4px; border-radius:50%; background:var(--tp) }
+.tp-d i.ghost{ background:transparent }
+.tp-agenda{ display:grid; gap:5px; max-height:196px; overflow-y:auto; scrollbar-width:thin }
+.tp-agenda::-webkit-scrollbar{ width:6px }
+.tp-agenda::-webkit-scrollbar-thumb{ background:rgba(255,255,255,.12); border-radius:99px }
+.tp-a{ display:grid; grid-template-columns:34px minmax(0,1fr); gap:8px; align-items:center;
+  padding:6px 7px; border-radius:7px; cursor:pointer; text-align:left; font-family:inherit;
+  background:rgba(255,255,255,.03); border:1px solid rgba(255,255,255,.06) }
+.tp-a:hover{ background:rgba(255,255,255,.075) }
+.tp-a-w{ display:grid; justify-items:center; font-family:"JetBrains Mono",ui-monospace,monospace }
+.tp-a-w b{ font-size:12px; font-weight:700; color:var(--text-1); line-height:1.1 }
+.tp-a-w small{ font-size:7px; letter-spacing:.6px; text-transform:uppercase; color:var(--text-3) }
+.tp-a-b{ min-width:0; display:grid; gap:1px }
+.tp-a-t{ font-size:11px; font-weight:700; color:var(--text-1); overflow:hidden; text-overflow:ellipsis; white-space:nowrap }
+.tp-a-s{ font-size:9.5px; color:var(--text-3); overflow:hidden; text-overflow:ellipsis; white-space:nowrap }
+
+.tp-make{ display:grid; gap:7px; background:linear-gradient(160deg, rgba(255,61,110,.16), rgba(255,61,110,.04));
+  border-color:rgba(255,61,110,.32) }
+.tp-make h3{ margin:0; font-size:13px; font-weight:900 }
+.tp-make p{ margin:0; font-size:11px; color:var(--text-2); line-height:1.5 }
+.tp-make button{ margin-top:4px; height:34px; border-radius:8px; border:none; cursor:pointer;
+  background:var(--tp); color:#fff; font-family:var(--font); font-size:10px;
+  font-weight:900; letter-spacing:1.2px; text-transform:uppercase }
+.tp-make button:hover{ filter:brightness(1.1) }
+</style>
+
+<script>
+(function () {
+  'use strict';
+  var esc = function (x){ return String(x == null ? '' : x)
+    .replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); };
+  var $ = function (id){ return document.getElementById(id); };
+  function api(p, o){ return (typeof window.api === 'function') ? window.api(p, o) : Promise.reject(); }
+
+  var streams = [], idx = 0, rot = null, mine = [], all = [], filt = 'all';
+  var weekStart = null, selDay = null;
+
+  function gameOf(id){
+    try { if (typeof window._gtGame === 'function') return window._gtGame(id) || null; } catch (e) {}
+    return null;
+  }
+  function stat(r){ return String(r && r.status || 'OPEN').toUpperCase(); }
+
+  /* ── Header ──────────────────────────────────────────────────── */
+  function paintTop(){
+    var host = $('tpStats');
+    if (!host) return;
+    var live = all.filter(function (r){ return stat(r) === 'LIVE'; }).length;
+    var open = all.filter(function (r){ var x = stat(r); return x === 'OPEN' || x === 'REGISTRATION' || x === 'STARTING'; }).length;
+    var air = streams.filter(function (x){ return x.live; }).length;
+    host.innerHTML =
+      (air ? '<span class="tp-st on"><i></i><b>' + air + '</b> on air</span>' : '') +
+      '<span class="tp-st"><b>' + live + '</b> live</span>' +
+      '<span class="tp-st"><b>' + open + '</b> open</span>' +
+      (mine.length ? '<span class="tp-st"><b>' + mine.length + '</b> yours</span>' : '');
+  }
+
+  window.tpJoinCode = async function (){
+    var el = $('tpCode');
+    if (!el) return;
+    var raw = String(el.value || '').toUpperCase().replace(/[^A-Z0-9]/g, '');
+    var fail = function (m){
+      el.style.borderColor = 'rgba(255,120,120,.75)';
+      if (window.showToast) window.showToast(m, 'error');
+    };
+    if (!/^[A-Z]{4}[0-9]{4}$/.test(raw)) return fail('Four letters, then four digits.');
+    var r = await api('/tournaments/code/' + raw).catch(function (){ return null; });
+    if (!r || !r.id || r.error) return fail('No tournament with that code.');
+    el.style.borderColor = ''; el.value = '';
+    if (typeof window.gtJoin === 'function') window.gtJoin(String(r.id));
+  };
+
+  /* ── Stage ───────────────────────────────────────────────────── */
+  function ytId(u){
+    var m = String(u || '').match(/(?:youtube\.com\/(?:watch\?v=|live\/|embed\/)|youtu\.be\/)([\w-]{6,})/);
+    return m ? m[1] : null;
+  }
+  function ytCh(u){
+    var m = String(u || '').match(/youtube\.com\/channel\/(UC[\w-]+)/);
+    return m ? m[1] : null;
+  }
+  function embed(m){
+    var v = m.videoId || ytId(m.streamUrl) || ytId(m.url);
+    if (v) return 'https://www.youtube.com/embed/' + v + '?autoplay=1&mute=1&playsinline=1&rel=0&modestbranding=1';
+    var c = ytCh(m.streamUrl) || ytCh(m.url);
+    if (c) return 'https://www.youtube.com/embed/live_stream?channel=' + c + '&autoplay=1&mute=1&playsinline=1';
+    return null;
+  }
+  function inText(iso){
+    if (!iso) return '';
+    var ms = new Date(iso).getTime() - Date.now();
+    if (!isFinite(ms) || ms <= 0) return '';
+    var mn = Math.round(ms / 60000);
+    return mn < 60 ? 'in ' + mn + 'm' : mn < 1440 ? 'in ' + Math.round(mn / 60) + 'h' : 'in ' + Math.round(mn / 1440) + 'd';
+  }
+
+  function paintPlayer(){
+    var host = $('tpPlayer');
+    if (!host) return;
+    if (!streams.length){
+      host.innerHTML =
+        '<div class="tp-blank"><span class="tp-blank-i" aria-hidden="true">' +
+        '<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" ' +
+        'stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">' +
+        '<rect x="2" y="5" width="20" height="14" rx="2.5"/>' +
+        '<path d="M10 10.2v3.6l3.2-1.8z" fill="currentColor" stroke="none"/></svg></span>' +
+        '<h3>Nothing on right now</h3>' +
+        '<p>The moment a watched channel goes live it plays here, and when none is, ' +
+        'whatever starts next takes the stage.</p></div>';
+      return;
+    }
+    if (idx >= streams.length) idx = 0;
+    var m = streams[idx], src = embed(m), meta = [];
+    if (m.game) meta.push('<span><b>' + esc(m.game) + '</b></span>');
+    if (m.organiser) meta.push('<span>' + esc(m.organiser) + '</span>');
+    if (m.viewers) meta.push('<span><b>' + Number(m.viewers).toLocaleString() + '</b> watching</span>');
+    if (!m.live){ var w = inText(m.startsAt); if (w) meta.push('<span>starts ' + esc(w) + '</span>'); }
+    host.innerHTML =
+      (src ? '<iframe src="' + esc(src) + '" allow="autoplay; encrypted-media; picture-in-picture" ' +
+             'allowfullscreen title="' + esc(m.name) + '"></iframe>'
+           : '<div class="tp-fill" style="background-image:url(\'' + esc(m.art || '') + '\')"></div>') +
+      '<div class="tp-over">' +
+        '<span class="tp-badge' + (m.live ? ' live' : '') + '">' +
+          (m.live ? '<i></i>Live' : esc(m.tier || 'Next up')) + '</span>' +
+        '<h2 class="tp-title">' + esc(m.name) + '</h2>' +
+        (meta.length ? '<div class="tp-meta">' + meta.join('') + '</div>' : '') +
+      '</div>';
+  }
+
+  function paintChannels(){
+    var host = $('tpChannels');
+    if (!host) return;
+    if (streams.length < 2){ host.innerHTML = ''; return; }
+    host.innerHTML = streams.slice(0, 4).map(function (m, i){
+      var sub = m.live ? (m.viewers ? Number(m.viewers).toLocaleString() + ' watching' : 'Live')
+                       : (inText(m.startsAt) || m.game || 'Scheduled');
+      return '<button type="button" class="tp-ch' + (i === idx ? ' on' : '') + '" onclick="window.tpPick(' + i + ')">' +
+        '<span class="tp-ch-th" style="background-image:url(\'' + esc(m.art || '') + '\')">' +
+          (m.live ? '<i></i>' : '') + '</span>' +
+        '<span class="tp-ch-b"><span class="tp-ch-t">' + esc(m.name) + '</span>' +
+        '<span class="tp-ch-s">' + esc(sub) + '</span></span></button>';
+    }).join('');
+  }
+  window.tpPick = function (i){ idx = i; paintPlayer(); paintChannels(); rotate(); };
+  function rotate(){
+    clearInterval(rot);
+    if (streams.filter(function (x){ return x.live; }).length < 2) return;
+    rot = setInterval(function (){
+      if (!document.body.contains($('tpPlayer'))){ clearInterval(rot); return; }
+      idx = (idx + 1) % streams.length; paintPlayer(); paintChannels();
+    }, 60000);
+  }
+
+  /* ── Yours ───────────────────────────────────────────────────── */
+  function stageOf(t){
+    var s = stat(t);
+    if (s === 'DONE' || s === 'COMPLETED') return { k:'done', l:'Finished', at:1, of:1, pct:100 };
+    if (s === 'STARTING') return { k:'reg', l:'Starting', at:0, of:0, pct:0 };
+    if (s === 'OPEN' || s === 'REGISTRATION') return { k:'reg', l:'Registration', at:0, of:0, pct:0 };
+    var n = Math.max(2, Number(t.entrants) || 2);
+    var of = Math.max(1, Math.ceil(Math.log(n) / Math.log(2)));
+    var at = Math.min(of, Number(t.round) || 1);
+    return { k:'live', l:(at >= of ? 'Final' : at === of - 1 ? 'Semi-final' : 'Round ' + at),
+             at:at, of:of, pct:Math.round(at / of * 100) };
+  }
+
+  function paintYours(){
+    var host = $('tpYours');
+    if (!host) return;
+    if (!mine.length){
+      host.innerHTML = '<div class="tp-h"><h2>Your tournaments</h2><span>none yet</span></div>' +
+        '<p class="tp-note">Enter one below, or run your own.</p>';
+      return;
+    }
+    host.innerHTML =
+      '<div class="tp-h"><h2>Your tournaments</h2><span>' + mine.length + ' entered</span>' +
+        (mine.length > 6 ? '<button class="more" type="button" onclick="window.openMyTournaments()">See all</button>' : '') +
+      '</div><div class="tp-mine">' + mine.slice(0, 6).map(function (t){
+        var s = stageOf(t), g = gameOf(t.game), art = g && (g.cover || g.header), sub = [];
+        if (t.entrants) sub.push(t.entrants + ' entrants');
+        if (t.format) sub.push(t.format);
+        if (t.isHost) sub.push('you host');
+        if (t.joinCode) sub.push(t.joinCode);
+        return '<button type="button" class="tp-m" onclick="window.gtJoin(\'' + esc(t.id) + '\')">' +
+          '<span class="tp-m-art"' + (art ? ' style="background-image:url(\'' + esc(art) + '\')"' : '') + '>' +
+            (art ? '' : esc((t.name || '?').slice(0,1).toUpperCase())) + '</span>' +
+          '<span class="tp-m-b"><span class="tp-m-n">' + esc(t.name || 'Tournament') + '</span>' +
+            (s.of > 1 ? '<span class="tp-m-line"><span class="tp-track"><span style="width:' + s.pct + '%"></span></span>' +
+              '<span class="tp-round">' + s.at + '/' + s.of + '</span></span>' : '') +
+            '<span class="tp-m-s">' + esc(sub.join(' · ')) + '</span></span>' +
+          '<span class="tp-stage-tag ' + s.k + '">' + esc(s.l) + '</span></button>';
+      }).join('') + '</div>';
+  }
+
+  /* ── Browse ──────────────────────────────────────────────────── */
+  function keep(r){
+    var s = stat(r);
+    if (filt === 'live') return s === 'LIVE';
+    if (filt === 'soon') return s === 'STARTING';
+    if (filt === 'open') return s !== 'LIVE' && s !== 'STARTING' && s !== 'DONE' && s !== 'COMPLETED';
+    if (filt === 'done') return s === 'DONE' || s === 'COMPLETED';
+    return true;
+  }
+  function paintBrowse(){
+    var host = $('tpBrowse');
+    if (!host) return;
+    var c = {
+      all: all.length,
+      live: all.filter(function (r){ return stat(r) === 'LIVE'; }).length,
+      soon: all.filter(function (r){ return stat(r) === 'STARTING'; }).length,
+      open: all.filter(function (r){ var x = stat(r); return x !== 'LIVE' && x !== 'STARTING' && x !== 'DONE' && x !== 'COMPLETED'; }).length,
+      done: all.filter(function (r){ var x = stat(r); return x === 'DONE' || x === 'COMPLETED'; }).length
+    };
+    function f(id, label){
+      return '<button type="button" class="tp-f' + (filt === id ? ' on' : '') + '" ' +
+        'onclick="window.tpFilter(\'' + id + '\')">' + label + '<b>' + c[id] + '</b></button>';
+    }
+    var list = all.filter(keep);
+    var rank = { LIVE:0, STARTING:1, OPEN:2, REGISTRATION:2 };
+    list.sort(function (a, b){
+      var ra = rank[stat(a)], rb = rank[stat(b)];
+      ra = ra == null ? 3 : ra; rb = rb == null ? 3 : rb;
+      if (ra !== rb) return ra - rb;
+      return (Number(b.entrants) || 0) - (Number(a.entrants) || 0);
+    });
+    host.innerHTML =
+      '<div class="tp-h"><h2>Brackets</h2><span>' + list.length +
+        (list.length === 1 ? ' tournament' : ' tournaments') + '</span>' +
+        '<span class="tp-filters">' + f('all','All') + f('live','Live') + f('soon','Starting') +
+          f('open','Open') + f('done','Finished') + '</span></div>' +
+      (list.length
+        ? '<div class="tp-grid">' + list.map(function (r){
+            var g = gameOf(r.game), art = g && (g.header || g.cover), s = stat(r);
+            var cap = Number(r.maxPlayers || r.max_players) || 0, ent = Number(r.entrants) || 0;
+            var badge = s === 'LIVE' ? '<span class="tp-c-badge live">Live</span>'
+                      : (s === 'DONE' || s === 'COMPLETED') ? '<span class="tp-c-badge">Finished</span>'
+                      : '<span class="tp-c-badge open">' + (cap ? Math.max(0, cap - ent) + ' seats' : 'Open') + '</span>';
+            var meta = [];
+            if (g && g.name) meta.push(esc(g.name));
+            if (r.format) meta.push(esc(r.format));
+            meta.push(cap ? ent + '/' + cap : ent + ' in');
+            return '<button type="button" class="tp-c" onclick="window.gtJoin(\'' + esc(r.id) + '\')">' +
+              '<span class="tp-c-art"' + (art ? ' style="background-image:url(\'' + esc(art) + '\')"' : '') + '>' +
+              badge + (art ? '' : '<span class="tp-c-fb">' + esc((r.name || '?').slice(0,1).toUpperCase()) + '</span>') +
+              '</span><span class="tp-c-b"><span class="tp-c-t">' + esc(r.name || 'Tournament') + '</span>' +
+              '<span class="tp-c-m">' + meta.join('<span>·</span>') + '</span>' +
+              (cap ? '<span class="tp-bar"><span style="width:' + Math.min(100, Math.round(ent/cap*100)) + '%"></span></span>' : '') +
+              '</span></button>';
+          }).join('') + '</div>'
+        : '<div class="tp-empty"><h3>' + (filt === 'all' ? 'No tournaments yet' : 'Nothing under that filter') + '</h3>' +
+          '<p>' + (filt === 'all' ? 'Be the first to run one. It takes about a minute.'
+                                  : 'There may be brackets under a different heading.') + '</p></div>');
+  }
+  window.tpFilter = function (id){ filt = (filt === id && id !== 'all') ? 'all' : id; paintBrowse(); };
+
+  /* ── Calendar ────────────────────────────────────────────────── */
+  function sow(d){ var x = new Date(d.getFullYear(), d.getMonth(), d.getDate());
+    x.setDate(x.getDate() - ((x.getDay() + 6) % 7)); return x; }
+  function key(d){ return d.getFullYear() + '-' + (d.getMonth()+1) + '-' + d.getDate(); }
+  function events(){
+    var out = [];
+    streams.forEach(function (m){
+      if (m.live || !m.startsAt) return;
+      out.push({ at:new Date(m.startsAt), kind:'event', id:m.id, name:m.name, sub:m.game || m.organiser || 'Event' });
+    });
+    mine.concat(all).forEach(function (t){
+      if (!t.startTime) return;
+      if (out.some(function (e){ return e.kind === 'tourney' && String(e.id) === String(t.id); })) return;
+      out.push({ at:new Date(t.startTime), kind:'tourney', id:t.id, name:t.name,
+                 sub:(t.format || 'Tournament') + (t.entrants ? ' · ' + t.entrants + ' in' : '') });
+    });
+    return out.filter(function (e){ return !isNaN(e.at); }).sort(function (a,b){ return a.at - b.at; });
+  }
+  function paintCal(){
+    var host = $('tpCal');
+    if (!host) return;
+    var now = new Date();
+    if (!weekStart) weekStart = sow(now);
+    var evs = events(), byDay = {};
+    evs.forEach(function (e){ (byDay[key(e.at)] = byDay[key(e.at)] || []).push(e); });
+    var days = '';
+    for (var i = 0; i < 7; i++){
+      var d = new Date(weekStart); d.setDate(weekStart.getDate() + i);
+      var k = key(d), has = !!byDay[k], cls = ['tp-d'];
+      if (k === key(now)) cls.push('today');
+      if (has) cls.push('has');
+      if (selDay === k) cls.push('sel');
+      days += '<button type="button" class="' + cls.join(' ') + '"' +
+        (has ? ' onclick="window.tpDay(\'' + k + '\')"' : ' disabled') + '>' +
+        '<small>' + ['M','T','W','T','F','S','S'][i] + '</small><b>' + d.getDate() + '</b>' +
+        '<i class="' + (has ? '' : 'ghost') + '"></i></button>';
+    }
+    var list = selDay && byDay[selDay] ? byDay[selDay]
+             : evs.filter(function (e){ return e.at >= new Date(now.getTime() - 36e5); }).slice(0, 8);
+    host.innerHTML =
+      '<div class="tp-cal-h"><h3 class="tp-cal-t">' +
+        esc(weekStart.toLocaleDateString(undefined, { month:'long', year:'numeric' })) + '</h3>' +
+        '<button class="tp-nav" type="button" onclick="window.tpWeek(-1)" aria-label="Previous week">&lsaquo;</button>' +
+        '<button class="tp-nav" type="button" onclick="window.tpWeek(1)" aria-label="Next week">&rsaquo;</button></div>' +
+      '<div class="tp-week">' + days + '</div>' +
+      '<div class="tp-h" style="margin:2px 0 0"><h2>' + (selDay ? 'That day' : 'Coming up') + '</h2></div>' +
+      (list.length
+        ? '<div class="tp-agenda">' + list.map(function (e){
+            return '<button type="button" class="tp-a" onclick="window.tpEvent(\'' + e.kind + '\',\'' + esc(e.id) + '\')">' +
+              '<span class="tp-a-w"><b>' + e.at.getDate() + '</b><small>' +
+                e.at.toLocaleDateString(undefined, { month:'short' }) + '</small></span>' +
+              '<span class="tp-a-b"><span class="tp-a-t">' + esc(e.name) + '</span>' +
+              '<span class="tp-a-s">' + esc(e.sub) + ' · ' +
+                e.at.toLocaleTimeString([], { hour:'2-digit', minute:'2-digit' }) + '</span></span></button>';
+          }).join('') + '</div>'
+        : '<p class="tp-note">Nothing scheduled. Tournaments with a start time and published events both land here.</p>');
+  }
+  window.tpWeek = function (n){ weekStart = new Date(weekStart); weekStart.setDate(weekStart.getDate() + n*7); selDay = null; paintCal(); };
+  window.tpDay = function (k){ selDay = (selDay === k ? null : k); paintCal(); };
+  window.tpEvent = function (kind, id){
+    if (kind === 'tourney'){ if (window.gtJoin) window.gtJoin(String(id)); return; }
+    var i = streams.findIndex(function (x){ return String(x.id) === String(id); });
+    if (i >= 0) window.tpPick(i);
+  };
+
+  function paintMake(){
+    var host = $('tpMake');
+    if (!host) return;
+    host.innerHTML =
+      '<h3>Run your own</h3>' +
+      '<p>Pick a game, a format and a size. Public, or private with a code you hand out.</p>' +
+      '<button type="button" onclick="window.openCreateTournament()">Create tournament</button>';
+  }
+
+  /* ── Loading ─────────────────────────────────────────────────── */
+  async function load(){
+    /* Its own fetches. The previous builds read _gtRowsCache, which is
+       filled by a renderer on the legacy overlay — so this page depended
+       on a page it had replaced. */
+    var s = await api('/arena/stage').catch(function (){ return null; });
+    if (!Array.isArray(s) || !s.length){
+      var mj = await api('/majors').catch(function (){ return null; });
+      s = Array.isArray(mj) ? mj.map(function (x){ return Object.assign({ kind:'major' }, x); }) : [];
+    }
+    streams = s; idx = 0;
+    paintPlayer(); paintChannels(); rotate();
+
+    var t = await api('/tournaments/global').catch(function (){ return null; });
+    all = Array.isArray(t) ? t : [];
+    var m = await api('/me/tournaments').catch(function (){ return null; });
+    mine = Array.isArray(m) ? m : [];
+
+    paintTop(); paintYours(); paintBrowse(); paintCal();
+  }
+
+  window.openTournamentsPage = function (){
+    if (typeof window.showOverlay !== 'function') return;
+    window.showOverlay('tournamentsPage', function (){
+      paintMake(); paintPlayer(); paintChannels(); paintYours(); paintBrowse(); paintCal(); paintTop();
+    });
+    load();
+  };
+  window.closeTournamentsPage = function (){
+    clearInterval(rot);
+    if (typeof window.hideOverlay === 'function') window.hideOverlay('tournamentsPage');
+  };
+
+  /* Every entry point — the top-bar pill, the hub manager, deep links —
+     goes through openGlobalTournaments, so that is the one thing to
+     repoint. The legacy overlay is left in the DOM, untouched and
+     unused, rather than deleted: three other modules still reference its
+     nodes and would throw on a missing element. */
+  function adopt(){
+    if (typeof window.showOverlay !== 'function'){ setTimeout(adopt, 250); return; }
+    window.openGlobalTournaments = window.openTournamentsPage;
+    window.closeGlobalTournaments = window.closeTournamentsPage;
+    if (window.HUB_CLOSERS) window.HUB_CLOSERS.tournamentsPage = 'closeTournamentsPage';
+    if (window.HUB_PILLS) window.HUB_PILLS.tournamentsPage = '.tba-tourney';
+    console.log('[tournaments] page ready');
+  }
+  if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', adopt);
+  else adopt();
 })();
 </script>
 </body>
