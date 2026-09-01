@@ -6611,6 +6611,44 @@ app.post("/admin/stream-sources", requireAuth, requireAdmin, async (req, res) =>
   }
 });
 
+// POST /admin/stream-sources/bulk { items:[{channel,game,organiser,weight}] }
+//
+// Resolves each one and reports per item. Deliberately not atomic: if
+// forty-six of fifty resolve, those forty-six are worth having, and the
+// four that did not are worth naming.
+app.post("/admin/stream-sources/bulk", requireAuth, requireAdmin, async (req, res) => {
+  const items = Array.isArray(req.body && req.body.items) ? req.body.items : [];
+  if (!items.length) return res.status(400).json({ error: "Nothing to add." });
+  if (items.length > 100) return res.status(400).json({ error: "Too many at once — 100 max." });
+  if (!YT_KEY) return res.status(400).json({ error: "YOUTUBE_API_KEY is not set on the server." });
+
+  const added = [], failed = [];
+  for (const it of items) {
+    const given = String((it && (it.channel || it.channelId)) || "").trim();
+    if (!given) { failed.push({ channel: "(blank)", reason: "no channel given" }); continue; }
+    try {
+      const found = await _ytLookupChannel(given);
+      if (!found) { failed.push({ channel: given, reason: "no such channel" }); continue; }
+      await pool.query(`
+        INSERT INTO stream_sources (platform, channel_id, name, game, organiser, weight, is_enabled)
+        VALUES ('youtube',$1,$2,$3,$4,$5,TRUE)
+        ON CONFLICT (platform, channel_id) DO UPDATE SET
+          name = COALESCE(stream_sources.name, EXCLUDED.name),
+          game = COALESCE(EXCLUDED.game, stream_sources.game),
+          organiser = COALESCE(EXCLUDED.organiser, stream_sources.organiser)`,
+        [found.channelId, (it.name || found.title || null), it.game || null,
+         it.organiser || null, Number(it.weight) || 0]);
+      added.push({ channel: given, channelId: found.channelId, title: found.title });
+    } catch (e) {
+      failed.push({ channel: given, reason: String(e.message || "lookup failed").slice(0, 120) });
+    }
+  }
+
+  /* Poll once at the end rather than per item. */
+  if (added.length) setTimeout(pollStreamSources, 800);
+  res.json({ added: added.length, failed: failed.length, addedList: added, failedList: failed });
+});
+
 app.delete("/admin/stream-sources/:id", requireAuth, requireAdmin, async (req, res) => {
   try {
     await pool.query("DELETE FROM stream_sources WHERE id = $1", [req.params.id]);

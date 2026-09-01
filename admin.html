@@ -651,6 +651,7 @@
         <div class="mj-actions">
           <button class="btn btn-blue" onclick="saveStreamSource()">Add channel</button>
           <button class="btn btn-grey" onclick="pollStreamsNow()">Check now</button>
+          <button class="btn btn-grey" onclick="addStarterSources()">Add starter set</button>
           <span id="ssNote" class="mj-note"></span>
         </div>
       </div>
@@ -1078,6 +1079,103 @@ async function pollStreamsNow() {
     const out = await res.json().catch(() => null);
     if (!res.ok) throw new Error((out && out.error) || "Check failed");
     ssNote("Checked.", "ok");
+    loadStreamSources();
+  } catch (e) { ssNote(e.message, "err"); }
+}
+
+// A starting set of channels that actually broadcast tournaments.
+// Handles, not ids: the server resolves each one against the API, and
+// anything that no longer exists is reported instead of stored. Edit
+// this list freely -- it is a starting point, not a fixed set.
+const STARTER_SOURCES = [
+  // ── Counter-Strike ──
+  { channel:"@ESLCS",              game:"Counter-Strike 2", organiser:"ESL",       weight:30 },
+  { channel:"@BLASTPremier",       game:"Counter-Strike 2", organiser:"BLAST",     weight:30 },
+  { channel:"@PGLDota",            game:"Counter-Strike 2", organiser:"PGL",       weight:25 },
+  { channel:"@FACEITtv",           game:"Counter-Strike 2", organiser:"FACEIT",    weight:20 },
+  // ── League of Legends ──
+  { channel:"@lolesports",         game:"League of Legends", organiser:"Riot",     weight:30 },
+  { channel:"@LEC",                game:"League of Legends", organiser:"Riot EMEA",weight:25 },
+  { channel:"@LCK",                game:"League of Legends", organiser:"LCK",      weight:25 },
+  { channel:"@LCSOfficial",        game:"League of Legends", organiser:"LCS",      weight:20 },
+  // ── Dota 2 ──
+  { channel:"@dota2",              game:"Dota 2",           organiser:"Valve",     weight:30 },
+  { channel:"@ESLDota2",           game:"Dota 2",           organiser:"ESL",       weight:25 },
+  { channel:"@BeyondTheSummit",    game:"Dota 2",           organiser:"BTS",       weight:20 },
+  // ── VALORANT ──
+  { channel:"@valorantesports",    game:"VALORANT",         organiser:"Riot",      weight:30 },
+  { channel:"@ValorantEsportsEMEA",game:"VALORANT",         organiser:"Riot EMEA", weight:22 },
+  // ── Fighting games ──
+  { channel:"@EVO",                game:"Fighting games",   organiser:"Evo",       weight:35 },
+  { channel:"@CapcomFighters",     game:"Street Fighter 6", organiser:"Capcom",    weight:30 },
+  { channel:"@BandaiNamcoEsports", game:"Tekken 8",         organiser:"Bandai Namco", weight:28 },
+  { channel:"@ceogaming",          game:"Fighting games",   organiser:"CEO",       weight:25 },
+  { channel:"@combobreaker",       game:"Fighting games",   organiser:"Combo Breaker", weight:24 },
+  { channel:"@ArcSystemWorksU",    game:"Guilty Gear",      organiser:"Arc System Works", weight:18 },
+  // ── Super Smash Bros. ──
+  { channel:"@VGBootCamp",         game:"Super Smash Bros.", organiser:"VGBC",     weight:22 },
+  { channel:"@BeyondTheSummitSSB", game:"Super Smash Bros.", organiser:"BTS",      weight:18 },
+  // ── Call of Duty ──
+  { channel:"@CallofDutyLeague",   game:"Call of Duty",     organiser:"CDL",       weight:28 },
+  { channel:"@CODEsports",         game:"Call of Duty",     organiser:"Activision",weight:22 },
+  // ── Overwatch ──
+  { channel:"@OverwatchEsports",   game:"Overwatch 2",      organiser:"Blizzard",  weight:25 },
+  // ── Rocket League ──
+  { channel:"@RocketLeague",       game:"Rocket League",    organiser:"Psyonix",   weight:26 },
+  { channel:"@RLCS",               game:"Rocket League",    organiser:"RLCS",      weight:24 },
+  // ── Apex / Fortnite / battle royale ──
+  { channel:"@ApexLegendsEsports", game:"Apex Legends",     organiser:"EA",        weight:24 },
+  { channel:"@PlayApex",           game:"Apex Legends",     organiser:"EA",        weight:18 },
+  { channel:"@FortniteEsports",    game:"Fortnite",         organiser:"Epic",      weight:24 },
+  { channel:"@PUBGEsports",        game:"PUBG",             organiser:"Krafton",   weight:20 },
+  // ── StarCraft ──
+  { channel:"@ESLSC2",             game:"StarCraft II",     organiser:"ESL",       weight:24 },
+  { channel:"@afreecatvesports",   game:"StarCraft II",     organiser:"AfreecaTV", weight:18 },
+  // ── Rainbow Six ──
+  { channel:"@R6esports",          game:"Rainbow Six Siege",organiser:"Ubisoft",   weight:22 },
+  // ── Halo ──
+  { channel:"@Halo",               game:"Halo",             organiser:"343",       weight:18 },
+  // ── Chess ──
+  { channel:"@chess",              game:"Chess",            organiser:"Chess.com", weight:26 },
+  { channel:"@ChessBaseIndia",     game:"Chess",            organiser:"ChessBase India", weight:20 },
+  { channel:"@TakeTakeTake",       game:"Chess",            organiser:"Take Take Take", weight:18 },
+  { channel:"@FIDEchess",          game:"Chess",            organiser:"FIDE",      weight:22 },
+  // ── Fighting / racing / sports ──
+  { channel:"@Formula1",           game:"F1 Esports",       organiser:"F1",        weight:16 },
+  { channel:"@EASPORTSFC",         game:"EA SPORTS FC",     organiser:"EA",        weight:16 },
+  { channel:"@NBA2KLeague",        game:"NBA 2K",           organiser:"NBA 2K League", weight:14 },
+  // ── Mobile ──
+  { channel:"@MLBBEsports",        game:"Mobile Legends",   organiser:"Moonton",   weight:16 },
+  { channel:"@FreeFireEsports",    game:"Free Fire",        organiser:"Garena",    weight:14 },
+  // ── Multi-game organisers ──
+  { channel:"@ESL",                game:"Multi-game",       organiser:"ESL",       weight:26 },
+  { channel:"@DreamHack",          game:"Multi-game",       organiser:"DreamHack", weight:24 },
+  { channel:"@RiotGames",          game:"Multi-game",       organiser:"Riot",      weight:20 },
+  { channel:"@IEM",                game:"Multi-game",       organiser:"IEM",       weight:22 },
+  { channel:"@GamersClubTV",       game:"Multi-game",       organiser:"Gamers Club", weight:12 },
+  { channel:"@WePlayEsports",      game:"Multi-game",       organiser:"WePlay",    weight:12 },
+  { channel:"@BLASTtv",            game:"Multi-game",       organiser:"BLAST",     weight:18 },
+  { channel:"@GamesDoneQuick",     game:"Speedrunning",     organiser:"GDQ",       weight:20 },
+];
+
+async function addStarterSources() {
+  if (!confirm("Add " + STARTER_SOURCES.length + " channels? Each is checked against " +
+               "YouTube first, and any that no longer exist are reported rather than added.")) return;
+  ssNote("Resolving " + STARTER_SOURCES.length + " channels\u2026");
+  try {
+    const res = await fetch(AUTH_URL + "/admin/stream-sources/bulk", {
+      method: "POST", headers: auth(), body: JSON.stringify({ items: STARTER_SOURCES }) });
+    const out = await res.json().catch(() => null);
+    if (!res.ok) throw new Error((out && out.error) || "Bulk add failed");
+
+    // Naming the failures is the point: a handle I got wrong should be
+    // visible and fixable, not quietly missing from the list.
+    let msg = "Added " + out.added + " of " + STARTER_SOURCES.length + ".";
+    if (out.failed) {
+      msg += " " + out.failed + " could not be resolved: " +
+        (out.failedList || []).map(f => f.channel).join(", ");
+    }
+    ssNote(msg, out.failed ? "" : "ok");
     loadStreamSources();
   } catch (e) { ssNote(e.message, "err"); }
 }
