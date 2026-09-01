@@ -117,6 +117,30 @@ function createWindow() {
     callback(allowed.includes(permission));
   });
 
+  // ── YouTube embeds need a Referer ──────────────────────────────
+  // The renderer is loaded with loadFile, so its origin is file:// and it
+  // sends no Referer. YouTube's player refuses with "Error 153" when it
+  // cannot tell who is embedding it. Referer is a forbidden header, so no
+  // amount of renderer code can set it — only the main process can.
+  //
+  // Scoped to YouTube's own hosts so nothing else in the app is touched,
+  // and it names the domain this app genuinely belongs to rather than
+  // impersonating another site.
+  const YT_HOSTS = /^https:\/\/([\w-]+\.)*(youtube\.com|youtube-nocookie\.com|ytimg\.com|googlevideo\.com)\//i;
+  const APP_ORIGIN = "https://lobby-auth-server.onrender.com";
+  session.defaultSession.webRequest.onBeforeSendHeaders(
+    { urls: ["https://*.youtube.com/*", "https://youtube.com/*",
+             "https://*.youtube-nocookie.com/*",
+             "https://*.ytimg.com/*", "https://*.googlevideo.com/*"] },
+    (details, callback) => {
+      if (YT_HOSTS.test(details.url)) {
+        details.requestHeaders["Referer"] = APP_ORIGIN + "/";
+        details.requestHeaders["Origin"]  = APP_ORIGIN;
+      }
+      callback({ requestHeaders: details.requestHeaders });
+    }
+  );
+
   win.webContents.setWindowOpenHandler(({ url }) => {
     if (
       url.startsWith("https://steamcommunity.com") ||

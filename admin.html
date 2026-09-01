@@ -1157,6 +1157,189 @@ const STARTER_SOURCES = [
   { channel:"@WePlayEsports",      game:"Multi-game",       organiser:"WePlay",    weight:12 },
   { channel:"@BLASTtv",            game:"Multi-game",       organiser:"BLAST",     weight:18 },
   { channel:"@GamesDoneQuick",     game:"Speedrunning",     organiser:"GDQ",       weight:20 },
+
+  // ── Fighting games ────────────────────────────────────────────
+  { channel:"@PandaGlobal", game:"Fighting games", organiser:"Panda", weight:18 },
+  { channel:"@TheBeastTV", game:"Fighting games", organiser:"Beast Coast", weight:14 },
+  { channel:"@NorCalRegionals", game:"Fighting games", organiser:"NCR", weight:14 },
+  { channel:"@FinalRoundATL", game:"Fighting games", organiser:"Final Round", weight:14 },
+  { channel:"@KumiteInTennessee", game:"Fighting games", organiser:"KIT", weight:12 },
+  { channel:"@FightingGameVillage", game:"Fighting games", organiser:"FGV", weight:12 },
+  { channel:"@TOPANGATV", game:"Street Fighter 6", organiser:"TOPANGA", weight:16 },
+  { channel:"@SNKPOfficial", game:"King of Fighters", organiser:"SNK", weight:14 },
+  { channel:"@RivalsofAether", game:"Rivals of Aether", organiser:"Aether Studios", weight:12 },
+  { channel:"@MultiVersus", game:"MultiVersus", organiser:"WB Games", weight:12 },
+  { channel:"@brawlhalla", game:"Brawlhalla", organiser:"Blue Mammoth", weight:12 },
+  { channel:"@GranblueFantasy_EN", game:"Granblue Fantasy Versus", organiser:"Cygames", weight:10 },
+  { channel:"@mortalkombat", game:"Mortal Kombat", organiser:"NetherRealm", weight:14 },
+  { channel:"@SkullgirlsGame", game:"Skullgirls", organiser:"Hidden Variable", weight:8 },
+  { channel:"@Riot_Fighting", game:"2XKO", organiser:"Riot", weight:12 },
+  // ── Super Smash Bros. ─────────────────────────────────────────
+  { channel:"@GENESIS", game:"Super Smash Bros.", organiser:"Genesis", weight:18 },
+  { channel:"@SmashSummit", game:"Super Smash Bros.", organiser:"BTS", weight:16 },
+  { channel:"@ssbmtournaments", game:"Super Smash Bros. Melee", organiser:"Community", weight:12 },
+  { channel:"@CoinboxTV", game:"Super Smash Bros. Melee", organiser:"Coinbox", weight:12 },
+  { channel:"@LumiRank", game:"Super Smash Bros.", organiser:"LumiRank", weight:10 },
+  // ── Counter-Strike ────────────────────────────────────────────
+  { channel:"@ESLCSb", game:"Counter-Strike 2", organiser:"ESL", weight:18 },
+  { channel:"@IEMCS", game:"Counter-Strike 2", organiser:"IEM", weight:24 },
+  { channel:"@HLTVorg", game:"Counter-Strike 2", organiser:"HLTV", weight:16 },
+  { channel:"@Thunderpick", game:"Counter-Strike 2", organiser:"Thunderpick", weight:12 },
+  { channel:"@YaLLaEsports", game:"Counter-Strike 2", organiser:"YaLLa Compass", weight:10 },
+  { channel:"@Relog_Media", game:"Counter-Strike 2", organiser:"Relog", weight:10 },
+  { channel:"@fissureesports", game:"Counter-Strike 2", organiser:"FISSURE", weight:12 },
+  // ── VALORANT ──────────────────────────────────────────────────
+  { channel:"@ValorantEsportsAmericas", game:"VALORANT", organiser:"Riot Americas", weight:22 },
+  { channel:"@ValorantEsportsPacific", game:"VALORANT", organiser:"Riot Pacific", weight:22 },
+  { channel:"@ValorantEsportsChina", game:"VALORANT", organiser:"Riot China", weight:18 },
+  { channel:"@VCTGameChangers", game:"VALORANT", organiser:"Riot", weight:18 },
+  { channel:"@ValorantEsportsBR", game:"VALORANT", organiser:"Riot Brazil", weight:16 },
+  // ── League of Legends ─────────────────────────────────────────
+  { channel:"@LPL", game:"League of Legends", organiser:"LPL", weight:24 },
+  { channel:"@LLA", game:"League of Legends", organiser:"LLA", weight:16 },
+  { channel:"@CBLOL", game:"League of Legends", organiser:"CBLOL", weight:18 },
+  { channel:"@PCSLoL", game:"League of Legends", organiser:"PCS", weight:14 },
+  { channel:"@VCSLoL", game:"League of Legends", organiser:"VCS", weight:14 },
+  { channel:"@LoLEsportsVN", game:"League of Legends", organiser:"Riot Vietnam", weight:12 },
+  { channel:"@teamfighttactics", game:"Teamfight Tactics", organiser:"Riot", weight:14 },
+  { channel:"@wildriftesports", game:"Wild Rift", organiser:"Riot", weight:12 },
+  // ── Dota 2 ────────────────────────────────────────────────────
+  { channel:"@PGLEsports", game:"Dota 2", organiser:"PGL", weight:22 },
+  { channel:"@DreamLeague", game:"Dota 2", organiser:"DreamLeague", weight:20 },
+  { channel:"@EPICENTER", game:"Dota 2", organiser:"Epicenter", weight:12 },
+  { channel:"@OGesports", game:"Dota 2", organiser:"OG", weight:12 },
+  { channel:"@dota2ti", game:"Dota 2", organiser:"Valve", weight:26 },
+  // ── Call of Duty / shooters ───────────────────────────────────
+  { channel:"@CoDEsportsEU", game:"Call of Duty", organiser:"Activision", weight:16 },
+  { channel:"@Battlefield", game:"Battlefield", organiser:"EA", weight:10 },
+  { channel:"@Splitgate", game:"Splitgate", organiser:"1047 Games", weight:8 },
+  { channel:"@TheFinalsGame", game:"The Finals", organiser:"Embark", weight:12 },
+  { channel:"@XDefiant", game:"XDefiant", organiser:"Ubisoft", weight:8 },
+  // ── Overwatch / hero shooters ─────────────────────────────────
+  { channel:"@OWCS", game:"Overwatch 2", organiser:"OWCS", weight:20 },
+  { channel:"@PlayOverwatch", game:"Overwatch 2", organiser:"Blizzard", weight:16 },
+  { channel:"@MarvelRivals", game:"Marvel Rivals", organiser:"NetEase", weight:14 },
+  { channel:"@PaladinsGame", game:"Paladins", organiser:"Hi-Rez", weight:8 },
+  // ── Rocket League / sports ────────────────────────────────────
+  { channel:"@RocketLeagueEsports", game:"Rocket League", organiser:"Psyonix", weight:20 },
+  { channel:"@RLCSEU", game:"Rocket League", organiser:"RLCS EU", weight:14 },
+  { channel:"@EAFCPro", game:"EA SPORTS FC", organiser:"EA", weight:14 },
+  { channel:"@eMLS", game:"EA SPORTS FC", organiser:"MLS", weight:10 },
+  { channel:"@NHL", game:"NHL", organiser:"NHL", weight:8 },
+  { channel:"@MaddenNFL", game:"Madden NFL", organiser:"EA", weight:10 },
+  { channel:"@FIFAeWorldCup", game:"EA SPORTS FC", organiser:"FIFAe", weight:12 },
+  // ── Racing / sim ──────────────────────────────────────────────
+  { channel:"@iRacingcom", game:"iRacing", organiser:"iRacing", weight:14 },
+  { channel:"@GranTurismo", game:"Gran Turismo", organiser:"Polyphony", weight:14 },
+  { channel:"@AssettoCorsa", game:"Assetto Corsa", organiser:"Kunos", weight:10 },
+  { channel:"@F1Esports", game:"F1 Esports", organiser:"Formula 1", weight:16 },
+  { channel:"@RennsportOfficial", game:"Rennsport", organiser:"Rennsport", weight:8 },
+  { channel:"@TrackmaniaEsports", game:"Trackmania", organiser:"Ubisoft Nadeo", weight:10 },
+  // ── Battle royale ─────────────────────────────────────────────
+  { channel:"@ALGS", game:"Apex Legends", organiser:"EA", weight:20 },
+  { channel:"@FNCompetitive", game:"Fortnite", organiser:"Epic", weight:20 },
+  { channel:"@PUBGMOBILEESPORTS", game:"PUBG Mobile", organiser:"Krafton", weight:16 },
+  { channel:"@warzone", game:"Call of Duty: Warzone", organiser:"Activision", weight:12 },
+  { channel:"@NaraKaBladepoint", game:"Naraka Bladepoint", organiser:"NetEase", weight:10 },
+  // ── StarCraft / RTS ───────────────────────────────────────────
+  { channel:"@GSLeSports", game:"StarCraft II", organiser:"GSL", weight:20 },
+  { channel:"@WardiTV", game:"StarCraft II", organiser:"WardiTV", weight:14 },
+  { channel:"@PiGStarcraft", game:"StarCraft II", organiser:"PiG", weight:12 },
+  { channel:"@AgeOfEmpires", game:"Age of Empires", organiser:"Xbox Game Studios", weight:14 },
+  { channel:"@T90Official", game:"Age of Empires II", organiser:"T90", weight:12 },
+  { channel:"@CompanyofHeroes", game:"Company of Heroes", organiser:"Relic", weight:8 },
+  { channel:"@BeastyqtSC2", game:"StarCraft II", organiser:"Beastyqt", weight:8 },
+  // ── Rainbow Six / tactical ────────────────────────────────────
+  { channel:"@Rainbow6Game", game:"Rainbow Six Siege", organiser:"Ubisoft", weight:16 },
+  { channel:"@SiegeGG", game:"Rainbow Six Siege", organiser:"SiegeGG", weight:12 },
+  { channel:"@escapefromtarkov", game:"Escape from Tarkov", organiser:"Battlestate", weight:8 },
+  // ── Card games / autobattlers ─────────────────────────────────
+  { channel:"@PlayHearthstone", game:"Hearthstone", organiser:"Blizzard", weight:16 },
+  { channel:"@magicthegathering", game:"Magic: The Gathering", organiser:"Wizards", weight:16 },
+  { channel:"@PlayMTGArena", game:"MTG Arena", organiser:"Wizards", weight:14 },
+  { channel:"@LegendsofRuneterra", game:"Legends of Runeterra", organiser:"Riot", weight:10 },
+  { channel:"@PokemonTCG", game:"Pokémon TCG", organiser:"The Pokémon Company", weight:14 },
+  { channel:"@Gwent", game:"Gwent", organiser:"CD Projekt", weight:8 },
+  { channel:"@yugiohtcg", game:"Yu-Gi-Oh!", organiser:"Konami", weight:12 },
+  { channel:"@MarvelSnap", game:"Marvel Snap", organiser:"Second Dinner", weight:10 },
+  // ── Pokémon / Nintendo ────────────────────────────────────────
+  { channel:"@PokemonOfficial", game:"Pokémon", organiser:"The Pokémon Company", weight:18 },
+  { channel:"@PokemonUNITE", game:"Pokémon UNITE", organiser:"The Pokémon Company", weight:12 },
+  { channel:"@NintendoAmerica", game:"Nintendo", organiser:"Nintendo", weight:12 },
+  { channel:"@SplatoonNA", game:"Splatoon 3", organiser:"Nintendo", weight:12 },
+  // ── Chess ─────────────────────────────────────────────────────
+  { channel:"@GMHikaru", game:"Chess", organiser:"Hikaru Nakamura", weight:16 },
+  { channel:"@ChessBase", game:"Chess", organiser:"ChessBase", weight:14 },
+  { channel:"@lichessdotorg", game:"Chess", organiser:"Lichess", weight:14 },
+  { channel:"@GrandChessTour", game:"Chess", organiser:"Grand Chess Tour", weight:20 },
+  { channel:"@ChampionsChessTour", game:"Chess", organiser:"Champions Chess Tour", weight:20 },
+  { channel:"@saintlouischessclub", game:"Chess", organiser:"Saint Louis Chess Club", weight:18 },
+  { channel:"@agadmator", game:"Chess", organiser:"agadmator", weight:10 },
+  // ── Mobile ────────────────────────────────────────────────────
+  { channel:"@ClashRoyale", game:"Clash Royale", organiser:"Supercell", weight:14 },
+  { channel:"@BrawlStars", game:"Brawl Stars", organiser:"Supercell", weight:14 },
+  { channel:"@ClashofClans", game:"Clash of Clans", organiser:"Supercell", weight:12 },
+  { channel:"@ArenaofValor", game:"Arena of Valor", organiser:"Level Infinite", weight:10 },
+  { channel:"@HonorofKingsGlobal", game:"Honor of Kings", organiser:"Level Infinite", weight:14 },
+  { channel:"@CODMobile", game:"Call of Duty: Mobile", organiser:"Activision", weight:12 },
+  { channel:"@WildRiftEsportsSEA", game:"Wild Rift", organiser:"Riot SEA", weight:10 },
+  // ── Rhythm / precision ────────────────────────────────────────
+  { channel:"@osugame", game:"osu!", organiser:"osu!", weight:12 },
+  { channel:"@BeatSaber", game:"Beat Saber", organiser:"Beat Games", weight:8 },
+  // ── Speedrunning / retro ──────────────────────────────────────
+  { channel:"@ESAMarathon", game:"Speedrunning", organiser:"ESA", weight:14 },
+  { channel:"@SpeedGaming", game:"Speedrunning", organiser:"SpeedGaming", weight:12 },
+  { channel:"@summoningsalt", game:"Speedrunning", organiser:"Summoning Salt", weight:8 },
+  { channel:"@AwesomeGamesDoneQuick", game:"Speedrunning", organiser:"GDQ", weight:16 },
+  { channel:"@TheCuttingRoomFloor", game:"Retro", organiser:"Community", weight:6 },
+  // ── Minecraft / sandbox ───────────────────────────────────────
+  { channel:"@MinecraftChampionship", game:"Minecraft", organiser:"Noxcrew", weight:14 },
+  { channel:"@Noxcrew", game:"Minecraft", organiser:"Noxcrew", weight:10 },
+  { channel:"@Minecraft", game:"Minecraft", organiser:"Mojang", weight:10 },
+  // ── Regional organisers ───────────────────────────────────────
+  { channel:"@LiquipediaNet", game:"Multi-game", organiser:"Liquipedia", weight:8 },
+  { channel:"@GamersClub", game:"Multi-game", organiser:"Gamers Club", weight:10 },
+  { channel:"@FlowEsports", game:"Multi-game", organiser:"Flow", weight:8 },
+  { channel:"@RedBullGaming", game:"Multi-game", organiser:"Red Bull", weight:18 },
+  { channel:"@RedBullEsports", game:"Multi-game", organiser:"Red Bull", weight:18 },
+  { channel:"@ESLAsia", game:"Multi-game", organiser:"ESL Asia", weight:12 },
+  { channel:"@ESLIndia", game:"Multi-game", organiser:"ESL India", weight:10 },
+  { channel:"@ESLBrasil", game:"Multi-game", organiser:"ESL Brasil", weight:10 },
+  { channel:"@LVPesports", game:"Multi-game", organiser:"LVP", weight:12 },
+  { channel:"@ESLFrance", game:"Multi-game", organiser:"ESL France", weight:10 },
+  { channel:"@FreaksLeague", game:"Multi-game", organiser:"Freaks 4U", weight:8 },
+  { channel:"@ProdigyAgency", game:"Multi-game", organiser:"Prodigy", weight:6 },
+  { channel:"@UnitedEsports", game:"Multi-game", organiser:"United", weight:6 },
+  { channel:"@GGWPtv", game:"Multi-game", organiser:"GGWP", weight:6 },
+  { channel:"@ESportsWorldCup", game:"Multi-game", organiser:"EWC", weight:24 },
+  { channel:"@OlympicEsports", game:"Multi-game", organiser:"IOC", weight:14 },
+  { channel:"@CommonwealthSport", game:"Multi-game", organiser:"Commonwealth", weight:6 },
+  { channel:"@IESF_Esports", game:"Multi-game", organiser:"IESF", weight:8 },
+  // ── Broadcast / studio ────────────────────────────────────────
+  { channel:"@theScoreesports", game:"Multi-game", organiser:"theScore", weight:10 },
+  { channel:"@dexerto", game:"Multi-game", organiser:"Dexerto", weight:8 },
+  { channel:"@Jaxon", game:"Multi-game", organiser:"Jaxon", weight:6 },
+  { channel:"@OneEsports", game:"Multi-game", organiser:"ONE Esports", weight:10 },
+  { channel:"@Esportsdotgg", game:"Multi-game", organiser:"Esports.gg", weight:6 },
+  { channel:"@BLASTRainbowSix", game:"Rainbow Six Siege", organiser:"BLAST", weight:14 },
+  { channel:"@BLASTBounty", game:"Counter-Strike 2", organiser:"BLAST", weight:14 },
+  { channel:"@PGLMajor", game:"Counter-Strike 2", organiser:"PGL", weight:20 },
+  { channel:"@StarLadder", game:"Multi-game", organiser:"StarLadder", weight:14 },
+  { channel:"@Maincast", game:"Multi-game", organiser:"Maincast", weight:10 },
+  { channel:"@BetBoomTeam", game:"Multi-game", organiser:"BetBoom", weight:8 },
+  { channel:"@NAVIofficial", game:"Multi-game", organiser:"NAVI", weight:10 },
+  { channel:"@FazeClan", game:"Multi-game", organiser:"FaZe", weight:8 },
+  { channel:"@G2Esports", game:"Multi-game", organiser:"G2", weight:10 },
+  { channel:"@TeamLiquid", game:"Multi-game", organiser:"Team Liquid", weight:10 },
+  { channel:"@Cloud9", game:"Multi-game", organiser:"Cloud9", weight:8 },
+  { channel:"@FNATIC", game:"Multi-game", organiser:"Fnatic", weight:8 },
+  { channel:"@TeamVitality", game:"Multi-game", organiser:"Vitality", weight:8 },
+  { channel:"@T1", game:"Multi-game", organiser:"T1", weight:10 },
+  { channel:"@GenG", game:"Multi-game", organiser:"Gen.G", weight:8 },
+  { channel:"@100Thieves", game:"Multi-game", organiser:"100 Thieves", weight:8 },
+  { channel:"@TSM", game:"Multi-game", organiser:"TSM", weight:6 },
+  { channel:"@Astralis", game:"Multi-game", organiser:"Astralis", weight:6 },
+  { channel:"@Heroic", game:"Multi-game", organiser:"HEROIC", weight:6 },
 ];
 
 async function addStarterSources() {
@@ -1164,10 +1347,22 @@ async function addStarterSources() {
                "YouTube first, and any that no longer exist are reported rather than added.")) return;
   ssNote("Resolving " + STARTER_SOURCES.length + " channels\u2026");
   try {
-    const res = await fetch(AUTH_URL + "/admin/stream-sources/bulk", {
-      method: "POST", headers: auth(), body: JSON.stringify({ items: STARTER_SOURCES }) });
-    const out = await res.json().catch(() => null);
-    if (!res.ok) throw new Error((out && out.error) || "Bulk add failed");
+    // Chunked so the server's 100-item cap stays a real guard rather
+    // than something to raise every time this list grows.
+    const CHUNK = 50;
+    let added = 0; const failedList = [];
+    for (let i = 0; i < STARTER_SOURCES.length; i += CHUNK) {
+      const slice = STARTER_SOURCES.slice(i, i + CHUNK);
+      ssNote("Resolving " + Math.min(i + CHUNK, STARTER_SOURCES.length) +
+             " of " + STARTER_SOURCES.length + "\u2026");
+      const res = await fetch(AUTH_URL + "/admin/stream-sources/bulk", {
+        method: "POST", headers: auth(), body: JSON.stringify({ items: slice }) });
+      const part = await res.json().catch(() => null);
+      if (!res.ok) throw new Error((part && part.error) || "Bulk add failed");
+      added += (part && part.added) || 0;
+      if (part && part.failedList) failedList.push(...part.failedList);
+    }
+    const out = { added, failed: failedList.length, failedList };
 
     // Naming the failures is the point: a handle I got wrong should be
     // visible and fixable, not quietly missing from the list.

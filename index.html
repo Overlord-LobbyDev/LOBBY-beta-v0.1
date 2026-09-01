@@ -82402,6 +82402,13 @@ body.q-max #queueOverlay{ padding:0 !important; }
 .tp-a-b{ min-width:0; display:grid; gap:1px }
 .tp-a-t{ font-size:11px; font-weight:700; color:var(--text-1); overflow:hidden; text-overflow:ellipsis; white-space:nowrap }
 .tp-a-s{ font-size:9.5px; color:var(--text-3); overflow:hidden; text-overflow:ellipsis; white-space:nowrap }
+.tp-a.on{ border-color:rgba(255,61,110,.4); background:var(--tp-dim) }
+.tp-a-w.live{ gap:3px }
+.tp-a-w.live i{
+  width:7px; height:7px; border-radius:50%; background:var(--tp);
+  animation:tpP 1.7s ease-in-out infinite;
+}
+.tp-a-w.live small{ color:#ffa3b6; font-weight:700 }
 
 .tp-make{ display:grid; gap:7px; background:linear-gradient(160deg, rgba(255,61,110,.16), rgba(255,61,110,.04));
   border-color:rgba(255,61,110,.32) }
@@ -82724,8 +82731,17 @@ body.q-max #queueOverlay{ padding:0 !important; }
   function events(){
     var out = [];
     streams.forEach(function (m){
-      if (m.live || !m.startsAt) return;
-      out.push({ at:new Date(m.startsAt), kind:'event', id:m.id, name:m.name, sub:m.game || m.organiser || 'Event' });
+      if (m.live){
+        /* On now. It has no future start to place on a day, so it is
+           flagged rather than dated — the agenda puts it first and the
+           week grid leaves it out. */
+        out.push({ at:new Date(), live:true, kind:'event', id:m.id, name:m.name,
+                   sub:m.game || m.organiser || 'Live now' });
+        return;
+      }
+      if (!m.startsAt) return;
+      out.push({ at:new Date(m.startsAt), kind:'event', id:m.id, name:m.name,
+                 sub:m.game || m.organiser || 'Event' });
     });
     mine.concat(all).forEach(function (t){
       if (!t.startTime) return;
@@ -82741,7 +82757,12 @@ body.q-max #queueOverlay{ padding:0 !important; }
     var now = new Date();
     if (!weekStart) weekStart = sow(now);
     var evs = events(), byDay = {};
-    evs.forEach(function (e){ (byDay[key(e.at)] = byDay[key(e.at)] || []).push(e); });
+    /* Dated entries only: a live stream has no start time to mark, and
+       putting it on today would say it begins later. */
+    evs.forEach(function (e){
+      if (e.live) return;
+      (byDay[key(e.at)] = byDay[key(e.at)] || []).push(e);
+    });
     var days = '';
     for (var i = 0; i < 7; i++){
       var d = new Date(weekStart); d.setDate(weekStart.getDate() + i);
@@ -82754,8 +82775,16 @@ body.q-max #queueOverlay{ padding:0 !important; }
         '<small>' + ['M','T','W','T','F','S','S'][i] + '</small><b>' + d.getDate() + '</b>' +
         '<i class="' + (has ? '' : 'ghost') + '"></i></button>';
     }
+    /* Picking a day shows that day. Otherwise: what is on now, then what
+       is next — because the thing playing above this panel is the most
+       relevant line in it, and leaving it out was why the list read as
+       though nothing were happening. */
+    var live = evs.filter(function (e){ return e.live; });
+    var soon = evs.filter(function (e){
+      return !e.live && e.at >= new Date(now.getTime() - 36e5);
+    });
     var list = selDay && byDay[selDay] ? byDay[selDay]
-             : evs.filter(function (e){ return e.at >= new Date(now.getTime() - 36e5); }).slice(0, 8);
+             : live.concat(soon).slice(0, 8);
     host.innerHTML =
       '<div class="tp-cal-h"><h3 class="tp-cal-t">' +
         esc(weekStart.toLocaleDateString(undefined, { month:'long', year:'numeric' })) + '</h3>' +
@@ -82765,12 +82794,17 @@ body.q-max #queueOverlay{ padding:0 !important; }
       '<div class="tp-h" style="margin:2px 0 0"><h2>' + (selDay ? 'That day' : 'Coming up') + '</h2></div>' +
       (list.length
         ? '<div class="tp-agenda">' + list.map(function (e){
-            return '<button type="button" class="tp-a" onclick="window.tpEvent(\'' + e.kind + '\',\'' + esc(e.id) + '\')">' +
-              '<span class="tp-a-w"><b>' + e.at.getDate() + '</b><small>' +
-                e.at.toLocaleDateString(undefined, { month:'short' }) + '</small></span>' +
+            return '<button type="button" class="tp-a' + (e.live ? ' on' : '') + '" ' +
+              'onclick="window.tpEvent(\'' + e.kind + '\',\'' + esc(e.id) + '\')">' +
+              (e.live
+                ? '<span class="tp-a-w live"><i></i><small>Live</small></span>'
+                : '<span class="tp-a-w"><b>' + e.at.getDate() + '</b><small>' +
+                  e.at.toLocaleDateString(undefined, { month:'short' }) + '</small></span>') +
               '<span class="tp-a-b"><span class="tp-a-t">' + esc(e.name) + '</span>' +
-              '<span class="tp-a-s">' + esc(e.sub) + ' · ' +
-                e.at.toLocaleTimeString([], { hour:'2-digit', minute:'2-digit' }) + '</span></span></button>';
+              '<span class="tp-a-s">' + esc(e.sub) +
+                (e.live ? ' · on now'
+                        : ' · ' + e.at.toLocaleTimeString([], { hour:'2-digit', minute:'2-digit' })) +
+              '</span></span></button>';
           }).join('') + '</div>'
         : '<p class="tp-note">Nothing scheduled. Tournaments with a start time and published events both land here.</p>');
   }
