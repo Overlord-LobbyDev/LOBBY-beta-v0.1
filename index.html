@@ -81657,273 +81657,329 @@ body.q-max #queueOverlay{ padding:0 !important; }
 
 
 <!-- ═══ TOURNAMENTS · THE ARENA ══════════════════════════════════════
-     Rebuilt to the brief: a live major playing the moment you arrive, a
-     calendar you can open, what you are entered in and how far it has
-     got, and a create route that is impossible to miss.
+     Rebuilt again. What was wrong with the last one:
 
-     The old page is switched off here rather than restyled. Its hero
-     was the "very AI" centred landing block, its game grid duplicated
-     Discover, and _wireOverlayShrinkOnScroll collapsed the hero mid
-     scroll -- which is the scrolling bug: the page jumped because the
-     thing above the scroller changed height while you were moving.
+       · the player took the whole viewport, so the page was one thing
+       · you had to scroll past all of it to reach a tournament
+       · the calendar was a month of empty squares
+       · nothing said what page you were on
+
+     The stage is now one band: a player at a sane size, the other
+     things that are on beside it as cards you can switch to, and a
+     calendar that lists real entries instead of drawing empty boxes.
+     Under that, your tournaments, then the shelves — all of it inside
+     the first screen.
      ══════════════════════════════════════════════════════════════ -->
 <style>
-/* ── Switch off the old page ───────────────────────────────────── */
-/* Kept in the DOM, not deleted: renderGtTournaments and friends still
-   write into gtStat*, gtGameGrid and gtGamesHead, and a missing node
-   would throw inside code this rebuild does not own. */
 #globalTournamentsOverlay .gt-hero,
 #globalTournamentsOverlay #gtFeaturedHost,
 #globalTournamentsOverlay #gtGamesHead,
 #globalTournamentsOverlay #gtGameGrid{ display:none !important; }
 
-#globalTournamentsOverlay{ --arena:#ff4d6d; }
+#globalTournamentsOverlay{ --arena:#ff4d6d; --arena-dim:rgba(255,77,109,.16); }
 
 /* ── Shell ─────────────────────────────────────────────────────── */
-#gtDeskGrid{
-  flex:1; min-height:0; display:grid;
-  grid-template-columns:224px minmax(0,1fr);
-}
+#gtDeskGrid{ flex:1; min-height:0; display:grid; grid-template-columns:210px minmax(0,1fr); }
 #gtRail{
-  min-height:0; overflow-y:auto; overflow-x:hidden; padding:16px 14px 40px;
+  min-height:0; overflow-y:auto; padding:14px 12px 40px;
   border-right:1px solid rgba(255,255,255,.06);
-  scrollbar-width:thin; scrollbar-color:rgba(255,255,255,.14) transparent;
+  scrollbar-width:thin; scrollbar-color:rgba(255,255,255,.13) transparent;
 }
-#gtRail::-webkit-scrollbar{ width:8px }
-#gtRail::-webkit-scrollbar-thumb{ background:rgba(255,255,255,.14); border-radius:99px }
-#gtRail::-webkit-scrollbar-track{ background:transparent }
-#globalTournamentsOverlay #gtScroller{ padding:0 0 60px !important; }
+#gtRail::-webkit-scrollbar{ width:7px }
+#gtRail::-webkit-scrollbar-thumb{ background:rgba(255,255,255,.13); border-radius:99px }
+#globalTournamentsOverlay #gtScroller{ padding:0 0 48px !important; }
 
-/* ── The stage: a live major, and the calendar beside it ───────── */
+/* ── Page header ───────────────────────────────────────────────────
+   The page said nothing about what it was. This is the identity bar:
+   name, what is happening on it right now as live numbers, and the two
+   actions. 54px, so it costs almost nothing vertically. */
+#gtTop{
+  position:sticky; top:0; z-index:5;
+  display:flex; align-items:center; gap:16px;
+  padding:0 20px; height:54px; flex:0 0 54px;
+  background:linear-gradient(180deg, rgba(16,10,14,.97), rgba(12,9,13,.94));
+  border-bottom:1px solid rgba(255,255,255,.07);
+  backdrop-filter:none;
+}
+.gt-wordmark{
+  font-family:var(--font); font-size:15px; font-weight:900;
+  letter-spacing:-.3px; margin:0; white-space:nowrap;
+}
+.gt-wordmark b{ color:var(--arena); font-weight:900 }
+.gt-top-stats{ display:flex; align-items:center; gap:7px; margin-left:4px }
+.gt-stat{
+  display:inline-flex; align-items:center; gap:6px; height:25px; padding:0 10px;
+  border-radius:99px; background:rgba(255,255,255,.05);
+  border:1px solid rgba(255,255,255,.08);
+  font-size:11px; color:var(--text-2); white-space:nowrap;
+}
+.gt-stat b{ color:var(--text-1); font-weight:800; font-variant-numeric:tabular-nums }
+.gt-stat.live{ background:var(--arena-dim); border-color:rgba(255,77,109,.34); color:#ffa7b8 }
+.gt-stat.live b{ color:#fff }
+.gt-stat.live i{
+  width:6px; height:6px; border-radius:50%; background:var(--arena);
+  animation:arPulse 1.7s ease-in-out infinite;
+}
+@keyframes arPulse{ 0%,100%{opacity:1} 50%{opacity:.3} }
+.gt-top-spacer{ flex:1 }
+.gt-top-search{
+  position:relative; width:210px; height:31px; flex:0 0 auto;
+}
+.gt-top-search input{
+  width:100%; height:100%; border-radius:8px; padding:0 10px 0 30px;
+  background:rgba(255,255,255,.05); border:1px solid rgba(255,255,255,.09);
+  color:var(--text-1); font-family:inherit; font-size:12px;
+}
+.gt-top-search input:focus{ outline:none; border-color:rgba(255,77,109,.55) }
+.gt-top-search svg{ position:absolute; left:9px; top:8px; color:var(--text-3) }
+.gt-top-new{
+  height:31px; padding:0 14px; border-radius:8px; border:none; cursor:pointer;
+  background:var(--arena); color:#fff; font-family:var(--font);
+  font-size:10px; font-weight:900; letter-spacing:1.2px; text-transform:uppercase;
+  white-space:nowrap;
+}
+.gt-top-new:hover{ filter:brightness(1.1) }
+
+/* ── The stage band ────────────────────────────────────────────────
+   Player, what else is on, and the calendar — one row, one screen. */
 #gtStage{
-  display:grid; gap:16px; padding:16px 22px 22px;
-  grid-template-columns:minmax(0,1fr) 316px;
-  border-bottom:1px solid rgba(255,255,255,.06);
+  display:grid; gap:14px; padding:14px 20px 16px;
+  grid-template-columns:minmax(0,1.55fr) minmax(210px,.62fr) minmax(232px,.66fr);
+  align-items:start;
 }
 .ar-live{
-  position:relative; border-radius:14px; overflow:hidden;
-  background:#07080d; border:1px solid rgba(255,255,255,.09);
-  aspect-ratio:16/9; min-height:280px;
+  position:relative; border-radius:12px; overflow:hidden;
+  background:#06070b; border:1px solid rgba(255,255,255,.09);
+  aspect-ratio:16/9; max-height:330px;
 }
 .ar-live iframe{ position:absolute; inset:0; width:100%; height:100%; border:0 }
-.ar-live-fill{
-  position:absolute; inset:0; background-size:cover; background-position:center;
-}
-.ar-live-fill::after{
-  content:""; position:absolute; inset:0;
-  background:linear-gradient(0deg,rgba(6,7,11,.94) 0%,rgba(6,7,11,.25) 55%,transparent 100%);
-}
+.ar-live-fill{ position:absolute; inset:0; background-size:cover; background-position:center }
 .ar-live-over{
   position:absolute; left:0; right:0; bottom:0; z-index:2;
-  padding:16px 18px; display:grid; gap:9px;
-  background:linear-gradient(0deg,rgba(6,7,11,.92) 0%,transparent 100%);
+  padding:26px 14px 12px; display:grid; gap:7px;
+  background:linear-gradient(0deg,rgba(5,6,10,.94) 12%,transparent 100%);
   pointer-events:none;
 }
 .ar-live-over > *{ pointer-events:auto }
 .ar-chip{
-  display:inline-flex; align-items:center; gap:6px; width:fit-content;
-  padding:4px 9px; border-radius:5px; font-family:var(--font);
-  font-size:9px; font-weight:900; letter-spacing:1.5px; text-transform:uppercase;
-  background:rgba(255,255,255,.12); color:#fff;
+  display:inline-flex; align-items:center; gap:5px; width:fit-content;
+  padding:3px 8px; border-radius:4px; font-family:var(--font);
+  font-size:8.5px; font-weight:900; letter-spacing:1.4px; text-transform:uppercase;
+  background:rgba(255,255,255,.14); color:#fff;
 }
-.ar-chip.live{ background:var(--arena); color:#fff }
-.ar-chip.live i{
-  width:6px; height:6px; border-radius:50%; background:#fff;
-  animation:arPulse 1.6s ease-in-out infinite;
-}
-@keyframes arPulse{ 0%,100%{opacity:1} 50%{opacity:.35} }
+.ar-chip.live{ background:var(--arena) }
+.ar-chip.live i{ width:5px; height:5px; border-radius:50%; background:#fff; animation:arPulse 1.7s ease-in-out infinite }
 .ar-live-name{
-  font-family:var(--font); font-size:clamp(19px,2.1vw,27px); font-weight:900;
-  letter-spacing:-.4px; line-height:1.06; margin:0; color:#fff;
+  font-family:var(--font); font-size:17px; font-weight:800; letter-spacing:-.25px;
+  line-height:1.15; margin:0; color:#fff;
+  display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical; overflow:hidden;
 }
-.ar-live-meta{ display:flex; flex-wrap:wrap; gap:12px; font-size:12px; color:rgba(255,255,255,.72) }
+.ar-live-meta{ display:flex; flex-wrap:wrap; gap:10px; font-size:11px; color:rgba(255,255,255,.7) }
 .ar-live-meta b{ color:#fff; font-weight:700 }
-.ar-live-btns{ display:flex; flex-wrap:wrap; gap:8px; align-items:center }
+.ar-live-btns{ display:flex; gap:6px; margin-top:2px }
 .ar-btn{
-  height:31px; padding:0 13px; border-radius:8px; cursor:pointer;
+  height:26px; padding:0 11px; border-radius:6px; cursor:pointer;
   border:1px solid rgba(255,255,255,.22); background:rgba(255,255,255,.1);
-  color:#fff; font-family:var(--font); font-size:9.5px; font-weight:900;
-  letter-spacing:1.2px; text-transform:uppercase;
+  color:#fff; font-family:var(--font); font-size:9px; font-weight:900;
+  letter-spacing:1.1px; text-transform:uppercase;
 }
-.ar-btn:hover{ background:rgba(255,255,255,.18) }
-.ar-btn.solid{ background:var(--arena); border-color:var(--arena) }
-.ar-rot{ margin-left:auto; display:flex; gap:5px }
-.ar-rot button{
-  width:16px; height:3px; border-radius:3px; padding:0; border:none; cursor:pointer;
-  background:rgba(255,255,255,.24);
-}
-.ar-rot button.on{ width:28px; background:#fff }
-
-/* The empty case is a real state, not a fault: no major is on. */
+.ar-btn:hover{ background:rgba(255,255,255,.2) }
 .ar-live-empty{
-  position:absolute; inset:0; display:grid; place-content:center; gap:9px;
-  text-align:center; padding:28px;
+  position:absolute; inset:0; display:grid; place-content:center; gap:7px;
+  text-align:center; padding:22px;
 }
-.ar-live-empty h3{ margin:0; font-size:16px; font-weight:800 }
-.ar-live-empty p{ margin:0; font-size:12.5px; color:var(--text-3); max-width:44ch; line-height:1.6 }
+.ar-live-empty h3{ margin:0; font-size:14px; font-weight:800 }
+.ar-live-empty p{ margin:0; font-size:11.5px; color:var(--text-3); max-width:40ch; line-height:1.55 }
 
-/* ── Calendar ──────────────────────────────────────────────────── */
-.ar-cal{
-  border:1px solid rgba(255,255,255,.09); border-radius:14px;
-  background:rgba(255,255,255,.028); padding:13px 14px 14px;
-  display:grid; gap:10px; align-content:start;
+/* ── Now & next: the other things on, as switchable cards ────────── */
+.ar-next{ display:grid; gap:8px; align-content:start; min-width:0 }
+.ar-sec{
+  font-family:var(--font); font-size:9px; font-weight:900; letter-spacing:1.5px;
+  text-transform:uppercase; color:var(--text-3); margin:0 0 1px;
 }
-.ar-cal-head{ display:flex; align-items:center; gap:8px }
+.ar-n{
+  display:grid; grid-template-columns:64px minmax(0,1fr); gap:9px; align-items:center;
+  padding:6px; border-radius:9px; cursor:pointer; text-align:left; font-family:inherit;
+  background:rgba(255,255,255,.03); border:1px solid rgba(255,255,255,.07);
+}
+.ar-n:hover{ background:rgba(255,255,255,.07) }
+.ar-n.on{ border-color:rgba(255,77,109,.55); background:var(--arena-dim) }
+.ar-n-th{
+  width:64px; height:36px; border-radius:5px; background:#0d0e14 center/cover;
+  position:relative; flex:0 0 auto;
+}
+.ar-n-th span{
+  position:absolute; left:3px; bottom:3px; padding:1px 4px; border-radius:3px;
+  font-family:var(--font); font-size:7px; font-weight:900; letter-spacing:.8px;
+  background:var(--arena); color:#fff;
+}
+.ar-n-b{ min-width:0; display:grid; gap:2px }
+.ar-n-t{
+  font-size:11.5px; font-weight:700; line-height:1.25; color:var(--text-1);
+  display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical; overflow:hidden;
+}
+.ar-n-s{ font-size:10px; color:var(--text-3); white-space:nowrap; overflow:hidden; text-overflow:ellipsis }
+.ar-next-empty{ font-size:11px; color:var(--text-3); line-height:1.55; margin:0 }
+
+/* ── Calendar: an agenda that lists real things ──────────────────── */
+.ar-cal{
+  border:1px solid rgba(255,255,255,.08); border-radius:12px;
+  background:rgba(255,255,255,.025); padding:11px 12px 12px;
+  display:grid; gap:9px; align-content:start; min-width:0;
+}
+.ar-cal-head{ display:flex; align-items:center; gap:6px }
 .ar-cal-title{
-  font-family:var(--font); font-size:11px; font-weight:900; letter-spacing:1.4px;
+  font-family:var(--font); font-size:10px; font-weight:900; letter-spacing:1.4px;
   text-transform:uppercase; margin:0; flex:1;
 }
 .ar-cal-nav{
-  width:22px; height:22px; border-radius:6px; cursor:pointer; padding:0;
+  width:20px; height:20px; border-radius:5px; cursor:pointer; padding:0;
   background:rgba(255,255,255,.06); border:1px solid rgba(255,255,255,.1);
-  color:var(--text-2); font-size:12px; line-height:1;
+  color:var(--text-2); font-size:11px; line-height:1;
 }
-.ar-cal-nav:hover{ background:rgba(255,255,255,.12); color:var(--text-1) }
-.ar-cal-grid{ display:grid; grid-template-columns:repeat(7,1fr); gap:3px }
-.ar-dow{
-  font-family:var(--font); font-size:8.5px; font-weight:800; letter-spacing:.8px;
-  text-transform:uppercase; color:var(--text-3); text-align:center; padding-bottom:2px;
+.ar-cal-nav:hover{ background:rgba(255,255,255,.14); color:var(--text-1) }
+/* A week strip, not a month of empty squares. Seven days is what anyone
+   actually plans against, and it leaves room below for the entries
+   themselves — which is the part that was missing. */
+.ar-week{ display:grid; grid-template-columns:repeat(7,1fr); gap:3px }
+.ar-d{
+  border-radius:7px; padding:5px 0 6px; cursor:default; border:1px solid transparent;
+  background:rgba(255,255,255,.02); display:grid; gap:2px; justify-items:center;
 }
-.ar-day{
-  aspect-ratio:1; border-radius:6px; border:1px solid transparent; cursor:default;
-  background:rgba(255,255,255,.02); color:var(--text-3);
-  font-size:10.5px; font-variant-numeric:tabular-nums;
-  display:grid; place-content:center; position:relative; padding:0;
+.ar-d small{ font-size:8px; letter-spacing:.6px; text-transform:uppercase; color:var(--text-3) }
+.ar-d b{ font-size:12px; font-weight:700; color:var(--text-3); font-variant-numeric:tabular-nums }
+.ar-d.today{ border-color:rgba(255,255,255,.24) }
+.ar-d.today b{ color:var(--text-1) }
+.ar-d.has{ cursor:pointer; background:var(--arena-dim); border-color:rgba(255,77,109,.3) }
+.ar-d.has b{ color:var(--text-1) }
+.ar-d.sel{ outline:2px solid var(--arena); outline-offset:-2px }
+.ar-d i{ width:4px; height:4px; border-radius:50%; background:var(--arena); display:block }
+.ar-d i.ghost{ background:transparent }
+.ar-agenda{ display:grid; gap:5px; max-height:172px; overflow-y:auto; scrollbar-width:thin }
+.ar-agenda::-webkit-scrollbar{ width:6px }
+.ar-agenda::-webkit-scrollbar-thumb{ background:rgba(255,255,255,.12); border-radius:99px }
+.ar-a{
+  display:grid; grid-template-columns:38px minmax(0,1fr); gap:8px; align-items:center;
+  padding:6px 7px; border-radius:7px; cursor:pointer; text-align:left; font-family:inherit;
+  background:rgba(255,255,255,.03); border:1px solid rgba(255,255,255,.06);
 }
-.ar-day.out{ opacity:.28 }
-.ar-day.today{ border-color:rgba(255,255,255,.28); color:var(--text-1); font-weight:800 }
-.ar-day.has{ cursor:pointer; color:var(--text-1); background:rgba(255,77,109,.14); border-color:rgba(255,77,109,.34) }
-.ar-day.has:hover{ background:rgba(255,77,109,.26) }
-.ar-day.has::after{
-  content:''; position:absolute; bottom:3px; left:50%; transform:translateX(-50%);
-  width:4px; height:4px; border-radius:50%; background:var(--arena);
+.ar-a:hover{ background:rgba(255,255,255,.07) }
+.ar-a-when{
+  display:grid; justify-items:center; gap:0;
+  font-family:"JetBrains Mono",ui-monospace,monospace;
 }
-.ar-day.sel{ outline:2px solid var(--arena); outline-offset:-2px }
-.ar-cal-list{ display:grid; gap:6px; margin-top:2px }
-.ar-ev{
-  display:grid; gap:2px; padding:7px 9px; border-radius:8px; cursor:pointer;
-  background:rgba(255,255,255,.035); border:1px solid rgba(255,255,255,.07);
-  text-align:left; font-family:inherit;
-}
-.ar-ev:hover{ background:rgba(255,255,255,.07) }
-.ar-ev b{ font-size:11.5px; font-weight:700; color:var(--text-1) }
-.ar-ev span{ font-size:10px; color:var(--text-3) }
-.ar-ev.tourney b::before{ content:'\25C6  '; color:var(--arena) }
+.ar-a-when b{ font-size:12px; font-weight:700; color:var(--text-1); line-height:1.1 }
+.ar-a-when small{ font-size:7.5px; letter-spacing:.7px; text-transform:uppercase; color:var(--text-3) }
+.ar-a-b{ min-width:0; display:grid; gap:1px }
+.ar-a-t{ font-size:11.5px; font-weight:700; color:var(--text-1); overflow:hidden; text-overflow:ellipsis; white-space:nowrap }
+.ar-a-s{ font-size:10px; color:var(--text-3); overflow:hidden; text-overflow:ellipsis; white-space:nowrap }
+.ar-a-k{ width:3px; align-self:stretch; border-radius:99px; background:var(--arena); grid-row:1; grid-column:1; justify-self:start; opacity:0 }
+.ar-a.tourney .ar-a-when b{ color:#ffa7b8 }
 .ar-cal-empty{ font-size:11px; color:var(--text-3); line-height:1.55; margin:2px 0 0 }
 
-/* ── Your tournaments, and how far they have got ───────────────── */
-#gtYours{ padding:18px 22px 4px; display:grid; gap:11px }
-.ar-h{
-  display:flex; align-items:baseline; gap:10px; margin:0;
-}
+/* ── Your tournaments ──────────────────────────────────────────── */
+#gtYours{ padding:2px 20px 14px; display:grid; gap:9px }
+.ar-h{ display:flex; align-items:baseline; gap:9px; margin:0 }
 .ar-h h2{
-  font-family:var(--font); font-size:12px; font-weight:900; letter-spacing:1.6px;
+  font-family:var(--font); font-size:11px; font-weight:900; letter-spacing:1.5px;
   text-transform:uppercase; margin:0;
 }
 .ar-h span{ font-size:11px; color:var(--text-3) }
-.ar-mine{ display:grid; gap:9px; grid-template-columns:repeat(auto-fill,minmax(268px,1fr)) }
-.ar-m{
-  display:grid; gap:8px; padding:12px 13px; border-radius:11px; text-align:left;
-  background:rgba(255,255,255,.03); border:1px solid rgba(255,255,255,.08);
-  cursor:pointer; font-family:inherit;
+.ar-mine{
+  display:flex; gap:9px; overflow-x:auto; padding-bottom:4px;
+  scrollbar-width:thin; scrollbar-color:rgba(255,255,255,.13) transparent;
 }
-.ar-m:hover{ background:rgba(255,255,255,.06); border-color:rgba(255,255,255,.16) }
-.ar-m-top{ display:flex; align-items:center; gap:8px }
-.ar-m-name{ font-size:13.5px; font-weight:800; flex:1; min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap }
+.ar-mine::-webkit-scrollbar{ height:6px }
+.ar-mine::-webkit-scrollbar-thumb{ background:rgba(255,255,255,.13); border-radius:99px }
+.ar-m{
+  flex:0 0 224px; display:grid; gap:7px; padding:10px 11px; border-radius:10px;
+  text-align:left; background:rgba(255,255,255,.03);
+  border:1px solid rgba(255,255,255,.08); cursor:pointer; font-family:inherit;
+}
+.ar-m:hover{ background:rgba(255,255,255,.07); border-color:rgba(255,255,255,.16) }
+.ar-m-top{ display:flex; align-items:center; gap:7px }
+.ar-m-name{ font-size:12.5px; font-weight:800; flex:1; min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap }
 .ar-stage{
-  font-family:var(--font); font-size:8.5px; font-weight:900; letter-spacing:1.2px;
-  text-transform:uppercase; padding:3px 7px; border-radius:4px; flex:0 0 auto;
+  font-family:var(--font); font-size:8px; font-weight:900; letter-spacing:1.1px;
+  text-transform:uppercase; padding:3px 6px; border-radius:4px; flex:0 0 auto;
   background:rgba(255,255,255,.08); color:var(--text-2);
 }
-.ar-stage.live{ background:rgba(255,77,109,.2); color:#ff97ab }
-.ar-stage.reg{ background:rgba(240,180,41,.18); color:#f0b429 }
-.ar-stage.done{ background:rgba(255,255,255,.06); color:var(--text-3) }
-/* The progress rail is the "what stage is it at" question answered as a
-   picture: filled pips are rounds played, the lit one is where it is. */
-.ar-pips{ display:flex; gap:3px; align-items:center }
-.ar-pip{ height:4px; flex:1; border-radius:99px; background:rgba(255,255,255,.09) }
-.ar-pip.done{ background:rgba(255,255,255,.34) }
+.ar-stage.live{ background:var(--arena-dim); color:#ffa7b8 }
+.ar-stage.reg{ background:rgba(240,180,41,.16); color:#f0b429 }
+.ar-pips{ display:flex; gap:2px }
+.ar-pip{ height:3px; flex:1; border-radius:99px; background:rgba(255,255,255,.09) }
+.ar-pip.done{ background:rgba(255,255,255,.32) }
 .ar-pip.now{ background:var(--arena) }
-.ar-m-sub{ font-size:11px; color:var(--text-3); display:flex; gap:9px; flex-wrap:wrap }
+.ar-m-sub{ font-size:10.5px; color:var(--text-3) }
 
 /* ── Rail ──────────────────────────────────────────────────────── */
-.ar-create{
-  display:grid; gap:7px; padding:13px; border-radius:12px; margin-bottom:18px;
-  background:linear-gradient(160deg, rgba(255,77,109,.22), rgba(255,77,109,.06));
-  border:1px solid rgba(255,77,109,.38);
-}
-.ar-create h3{ margin:0; font-size:13px; font-weight:900; letter-spacing:-.1px }
-.ar-create p{ margin:0; font-size:11px; color:var(--text-2); line-height:1.5 }
-.ar-create button{
-  margin-top:4px; height:36px; border-radius:9px; border:none; cursor:pointer;
-  background:var(--arena); color:#fff; font-family:var(--font);
-  font-size:10.5px; font-weight:900; letter-spacing:1.3px; text-transform:uppercase;
-}
-.ar-create button:hover{ filter:brightness(1.1) }
-.gtr-group{ margin-bottom:18px }
+.gtr-group{ margin-bottom:16px }
 .gtr-head{
-  font-family:var(--font); font-size:9.5px; font-weight:800; letter-spacing:1.6px;
-  text-transform:uppercase; color:var(--text-3); margin:0 0 8px; padding:0 4px;
+  font-family:var(--font); font-size:9px; font-weight:800; letter-spacing:1.5px;
+  text-transform:uppercase; color:var(--text-3); margin:0 0 7px; padding:0 4px;
 }
 .gtr-item{
-  display:flex; align-items:center; gap:9px; width:100%;
-  padding:7px 9px; border-radius:8px; border:1px solid transparent;
+  display:flex; align-items:center; gap:8px; width:100%;
+  padding:6px 9px; border-radius:7px; border:1px solid transparent;
   background:transparent; color:var(--text-2); cursor:pointer; text-align:left;
-  font-family:var(--font); font-size:12.5px; font-weight:600;
+  font-family:var(--font); font-size:12px; font-weight:600;
 }
 .gtr-item:hover{ background:rgba(255,255,255,.05); color:var(--text-1) }
-.gtr-item.on{ background:rgba(255,77,109,.16); border-color:rgba(255,77,109,.38); color:var(--text-1) }
-.gtr-dot{ width:6px; height:6px; border-radius:50%; background:currentColor; opacity:.55; flex:0 0 auto }
+.gtr-item.on{ background:var(--arena-dim); border-color:rgba(255,77,109,.36); color:var(--text-1) }
+.gtr-dot{ width:5px; height:5px; border-radius:50%; background:currentColor; opacity:.55 }
 .gtr-item.on .gtr-dot{ opacity:1; background:var(--arena) }
-.gtr-n{ margin-left:auto; font-size:10.5px; font-weight:800; color:var(--text-3); font-variant-numeric:tabular-nums }
-.gtr-code{ display:flex; gap:6px }
+.gtr-n{ margin-left:auto; font-size:10px; font-weight:800; color:var(--text-3); font-variant-numeric:tabular-nums }
+.gtr-code{ display:flex; gap:5px }
 .gtr-code input{
-  flex:1; min-width:0; height:33px; border-radius:8px;
+  flex:1; min-width:0; height:31px; border-radius:7px;
   background:rgba(255,255,255,.04); border:1px solid rgba(255,255,255,.1);
-  color:var(--text-1); padding:0 10px;
-  font-family:"JetBrains Mono",ui-monospace,monospace; font-size:12px;
-  font-weight:700; letter-spacing:2.2px; text-transform:uppercase;
+  color:var(--text-1); padding:0 9px;
+  font-family:"JetBrains Mono",ui-monospace,monospace; font-size:11.5px;
+  font-weight:700; letter-spacing:2px; text-transform:uppercase;
 }
 .gtr-code input:focus{ outline:none; border-color:rgba(255,77,109,.6) }
 .gtr-code button{
-  height:33px; padding:0 12px; border-radius:8px; cursor:pointer;
+  height:31px; padding:0 11px; border-radius:7px; cursor:pointer;
   background:rgba(255,255,255,.06); border:1px solid rgba(255,255,255,.12);
-  color:var(--text-1); font-family:var(--font); font-size:9.5px; font-weight:800;
-  letter-spacing:1.2px; text-transform:uppercase;
+  color:var(--text-1); font-family:var(--font); font-size:9px; font-weight:800;
+  letter-spacing:1.1px; text-transform:uppercase;
 }
-.gtr-note{ font-size:10.5px; color:var(--text-3); margin:7px 4px 0; line-height:1.5 }
+.gtr-note{ font-size:10px; color:var(--text-3); margin:6px 4px 0; line-height:1.45 }
 .gtr-note.err{ color:#ff8a8a }
 
 /* ── Shelves ───────────────────────────────────────────────────── */
 #globalTournamentsOverlay #gtListHead,
 #globalTournamentsOverlay #gtStatusRail,
-#globalTournamentsOverlay #gtTournamentList{ padding-left:22px; padding-right:22px }
+#globalTournamentsOverlay #gtTournamentList{ padding-left:20px; padding-right:20px }
 #globalTournamentsOverlay #gtTournamentList{
   display:grid !important;
-  grid-template-columns:repeat(auto-fill,minmax(214px,1fr));
-  gap:13px !important;
+  grid-template-columns:repeat(auto-fill,minmax(206px,1fr));
+  gap:12px !important;
 }
 #globalTournamentsOverlay .gt-tournament-row{
   display:flex !important; flex-direction:column !important;
   align-items:stretch !important; gap:0 !important;
-  padding:0 !important; overflow:hidden; border-radius:11px; height:auto;
+  padding:0 !important; overflow:hidden; border-radius:10px; height:auto;
 }
 #globalTournamentsOverlay .gt-row-art{
-  width:100% !important; height:96px !important; flex:0 0 96px !important; border-radius:0 !important;
+  width:100% !important; height:88px !important; flex:0 0 88px !important; border-radius:0 !important;
 }
 #globalTournamentsOverlay .gt-row-body{
   flex-direction:column !important; align-items:stretch !important;
-  gap:8px !important; padding:10px 11px 11px !important;
+  gap:7px !important; padding:9px 10px 10px !important;
 }
-#globalTournamentsOverlay .gt-row-title{ font-size:13.5px !important; white-space:normal !important }
+#globalTournamentsOverlay .gt-row-title{ font-size:13px !important; white-space:normal !important }
 #globalTournamentsOverlay .gt-row-chips{ flex-wrap:wrap !important }
 #globalTournamentsOverlay .gt-row-chev{ display:none !important }
 
-@media (max-width:1240px){
-  #gtStage{ grid-template-columns:minmax(0,1fr) }
-  .ar-cal{ order:-1 }
+@media (max-width:1500px){
+  #gtStage{ grid-template-columns:minmax(0,1.5fr) minmax(200px,.7fr); }
+  .ar-cal{ grid-column:1 / -1 }
+  .ar-cal .ar-week{ grid-template-columns:repeat(7,1fr) }
 }
-@media (max-width:980px){
+@media (max-width:1080px){
+  #gtStage{ grid-template-columns:minmax(0,1fr) }
+  .ar-next{ grid-auto-flow:column; grid-auto-columns:minmax(190px,1fr); overflow-x:auto }
   #gtDeskGrid{ grid-template-columns:minmax(0,1fr) }
   #gtRail{ display:none }
 }
@@ -81932,31 +81988,27 @@ body.q-max #queueOverlay{ padding:0 !important; }
 <script>
 (function () {
   'use strict';
-
   var esc = function (x) {
     return String(x == null ? '' : x)
       .replace(/&/g,'&amp;').replace(/</g,'&lt;')
       .replace(/>/g,'&gt;').replace(/"/g,'&quot;');
   };
-  var $ = function (id) { return document.getElementById(id); };
-  function api(path, opts) {
+  var $ = function (id){ return document.getElementById(id); };
+  function api(path, opts){
     if (typeof window.api === 'function') return window.api(path, opts);
     return Promise.reject(new Error('api not ready'));
   }
+
+  var stage = [], liveIdx = 0, rotTimer = null, mine = [];
 
   /* ══ Structure ════════════════════════════════════════════════ */
   function ensureArena(){
     var ov = $('globalTournamentsOverlay');
     var sc = $('gtScroller');
     if (!ov || !sc) return false;
+    var old = $('gtDesk'); if (old) old.remove();
 
-    /* The previous build left a right-hand column. It is gone: one panel
-       repeating what the cards already say is not worth a third of the
-       width. */
-    var oldDesk = $('gtDesk');
-    if (oldDesk) oldDesk.remove();
-
-    if (!$('gtDeskGrid')) {
+    if (!$('gtDeskGrid')){
       var grid = document.createElement('div');
       grid.id = 'gtDeskGrid';
       var rail = document.createElement('aside');
@@ -81965,45 +82017,71 @@ body.q-max #queueOverlay{ padding:0 !important; }
       grid.appendChild(rail);
       grid.appendChild(sc);
     }
-    if (!$('gtStage')) {
-      var stage = document.createElement('section');
-      stage.id = 'gtStage';
-      stage.innerHTML =
+    /* The identity bar sits OUTSIDE the scroller and above the grid, so
+       it is the first thing on the page and does not scroll away with
+       the content it labels. */
+    if (!$('gtTop')){
+      var top = document.createElement('header');
+      top.id = 'gtTop';
+      var grid2 = $('gtDeskGrid');
+      grid2.parentNode.insertBefore(top, grid2);
+    }
+    if (!$('gtStage')){
+      var s2 = document.createElement('section');
+      s2.id = 'gtStage';
+      s2.innerHTML =
         '<div class="ar-live" id="gtLive"></div>' +
+        '<div class="ar-next" id="gtNext"></div>' +
         '<aside class="ar-cal" id="gtCal"></aside>';
-      sc.insertBefore(stage, sc.firstChild);
+      sc.insertBefore(s2, sc.firstChild);
     }
-    if (!$('gtYours')) {
-      var yours = document.createElement('section');
-      yours.id = 'gtYours';
-      sc.insertBefore(yours, $('gtStage').nextSibling);
+    if (!$('gtYours')){
+      var y = document.createElement('section');
+      y.id = 'gtYours';
+      sc.insertBefore(y, $('gtStage').nextSibling);
     }
-
-    /* Shrink-on-scroll collapses the hero while you scroll, which is the
-       jumping. The hero is switched off here, so the behaviour has
-       nothing left to do but change the scroller's height mid-gesture. */
-    if (sc._shrinkWired && ov.classList) {
+    if (sc._shrinkWired){
       ov.classList.remove('is-shrunk');
       if (ov._resetShrink) ov._resetShrink();
     }
     return true;
   }
 
-  /* ══ The live stage ═══════════════════════════════════════════
-     A major playing the moment the page opens, muted, the way a
-     directory of live things should behave.
+  /* ══ Header ═══════════════════════════════════════════════════ */
+  function paintTop(){
+    var top = $('gtTop');
+    if (!top) return;
+    var rows = rowsNow();
+    var st = function (r){ return String(r && r.status || 'OPEN').toUpperCase(); };
+    var live = rows.filter(function (r){ return st(r) === 'LIVE'; }).length;
+    var open = rows.filter(function (r){ var x = st(r); return x === 'OPEN' || x === 'REGISTRATION' || x === 'STARTING'; }).length;
+    var onAir = stage.filter(function (x){ return x.live; }).length;
 
-     What can actually be embedded matters here. The app is loaded with
-     BrowserWindow.loadFile, so the page's origin is file:// — it has no
-     hostname. Twitch's player REQUIRES a `parent` parameter matching the
-     embedding page's domain and refuses to load without one, so a Twitch
-     stream cannot play inline until the renderer is served from a real
-     origin. YouTube has no such requirement and plays. So: YouTube
-     embeds inline, everything else shows the event on its key art with a
-     way out to the stream. Nothing here pretends a stream is playing
-     when it is not. */
-  var majors = [], liveIdx = 0, liveTimer = null;
+    top.innerHTML =
+      '<h1 class="gt-wordmark">TOURNA<b>MENTS</b></h1>' +
+      '<div class="gt-top-stats">' +
+        (onAir ? '<span class="gt-stat live"><i></i><b>' + onAir + '</b> on air</span>' : '') +
+        '<span class="gt-stat"><b>' + live + '</b> live brackets</span>' +
+        '<span class="gt-stat"><b>' + open + '</b> open to enter</span>' +
+        (mine.length ? '<span class="gt-stat"><b>' + mine.length + '</b> yours</span>' : '') +
+      '</div>' +
+      '<span class="gt-top-spacer"></span>' +
+      '<div class="gt-top-search">' +
+        '<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" ' +
+          'stroke-width="2.4" stroke-linecap="round"><circle cx="11" cy="11" r="7"/>' +
+          '<line x1="21" y1="21" x2="16.5" y2="16.5"/></svg>' +
+        '<input type="text" placeholder="Search tournaments…" ' +
+          'value="' + esc(window._gtQueryStr || '') + '" ' +
+          'oninput="window.arSearch(this.value)">' +
+      '</div>' +
+      '<button class="gt-top-new" type="button" onclick="window.openCreateTournament()">Create</button>';
+  }
+  window.arSearch = function (q){
+    window._gtQueryStr = q;
+    if (typeof window.gtSearch === 'function') window.gtSearch(q);
+  };
 
+  /* ══ Stage ════════════════════════════════════════════════════ */
   function ytId(url){
     var m = String(url || '').match(
       /(?:youtube\.com\/(?:watch\?v=|live\/|embed\/)|youtu\.be\/)([\w-]{6,})/);
@@ -82013,229 +82091,232 @@ body.q-max #queueOverlay{ padding:0 !important; }
     var m = String(url || '').match(/youtube\.com\/(?:channel\/)(UC[\w-]+)/);
     return m ? m[1] : null;
   }
-  function isTwitch(url){ return /twitch\.tv/i.test(String(url || '')); }
-
-  /* The server decides what is live and in what order — it is the only
-     side that can, because liveness for a discovered stream comes from
-     YouTube and not from a date range. `live` arrives on the item. */
-  function liveNow(list){
-    return list.filter(function (m){ return !!m.live; });
+  function embedFor(m){
+    var vid = m.videoId || ytId(m.streamUrl) || ytId(m.url);
+    if (vid) return 'https://www.youtube.com/embed/' + vid +
+      '?autoplay=1&mute=1&playsinline=1&rel=0&modestbranding=1';
+    var ch = ytChannel(m.streamUrl) || ytChannel(m.url);
+    if (ch) return 'https://www.youtube.com/embed/live_stream?channel=' + ch +
+      '&autoplay=1&mute=1&playsinline=1';
+    return null;
+  }
+  function whenText(iso){
+    if (!iso) return '';
+    var ms = new Date(iso).getTime() - Date.now();
+    if (!isFinite(ms)) return '';
+    if (ms <= 0) return 'now';
+    var mins = Math.round(ms / 60000);
+    return mins < 60 ? 'in ' + mins + 'm'
+         : mins < 1440 ? 'in ' + Math.round(mins / 60) + 'h'
+         : 'in ' + Math.round(mins / 1440) + 'd';
   }
 
   function paintLive(){
     var host = $('gtLive');
     if (!host) return;
-
-    var on = liveNow(majors);
-    /* Nothing live: show the next one up. The server has already sorted
-       the not-live ones by how soon they start, so the front of the list
-       IS the next one — no client-side date arithmetic that could
-       disagree with the ordering the calendar uses. */
-    var pool = on.length ? on : majors.slice(0, 1);
-    if (!pool.length){
+    if (!stage.length){
       host.innerHTML =
         '<div class="ar-live-empty">' +
           '<h3>Nothing on right now</h3>' +
-          '<p>The moment a watched channel goes live it plays here, and ' +
-             'when none is, whatever starts next takes the stage. Add ' +
-             'channels and events in the admin screen &mdash; nothing is ' +
-             'invented, so an empty schedule looks empty.</p>' +
+          '<p>The moment a watched channel goes live it plays here, and when ' +
+            'none is, whatever starts next takes the stage.</p>' +
         '</div>';
       return;
     }
-    if (liveIdx >= pool.length) liveIdx = 0;
-    var m = pool[liveIdx];
-    var isLive = on.length > 0;
-
-    /* A discovered stream arrives with its video id already resolved;
-       a curated major has to have one parsed out of whatever URL was
-       entered for it. */
-    var vid = m.videoId || ytId(m.streamUrl) || ytId(m.url);
-    var ch  = ytChannel(m.streamUrl) || ytChannel(m.url);
-    var src = vid ? ('https://www.youtube.com/embed/' + vid +
-                     '?autoplay=1&mute=1&playsinline=1&rel=0&modestbranding=1')
-            : ch  ? ('https://www.youtube.com/embed/live_stream?channel=' + ch +
-                     '&autoplay=1&mute=1&playsinline=1')
-            : null;
+    if (liveIdx >= stage.length) liveIdx = 0;
+    var m = stage[liveIdx];
+    var src = embedFor(m);
 
     var meta = [];
     if (m.game) meta.push('<span><b>' + esc(m.game) + '</b></span>');
-    if (m.location) meta.push('<span>' + esc(m.location) + '</span>');
     if (m.organiser) meta.push('<span>' + esc(m.organiser) + '</span>');
     if (m.viewers) meta.push('<span><b>' + Number(m.viewers).toLocaleString() + '</b> watching</span>');
-    if (m.followers) meta.push('<span>' + m.followers + ' following</span>');
-    if (!isLive && m.startsAt) {
-      var mins = Math.round((new Date(m.startsAt) - Date.now()) / 60000);
-      if (mins > 0) {
-        meta.push('<span>starts in ' + (mins < 60 ? mins + 'm'
-          : mins < 1440 ? Math.round(mins / 60) + 'h'
-          : Math.round(mins / 1440) + 'd') + '</span>');
-      }
-    }
+    if (!m.live && m.startsAt) { var w = whenText(m.startsAt); if (w) meta.push('<span>starts ' + esc(w) + '</span>'); }
 
     host.innerHTML =
-      (src
-        ? '<iframe src="' + esc(src) + '" allow="autoplay; encrypted-media; picture-in-picture" ' +
-          'allowfullscreen title="' + esc(m.name) + '"></iframe>'
-        : '<div class="ar-live-fill" style="background-image:url(\'' + esc(m.art || '') + '\')"></div>') +
+      (src ? '<iframe src="' + esc(src) + '" allow="autoplay; encrypted-media; picture-in-picture" ' +
+             'allowfullscreen title="' + esc(m.name) + '"></iframe>'
+           : '<div class="ar-live-fill" style="background-image:url(\'' + esc(m.art || '') + '\')"></div>') +
       '<div class="ar-live-over">' +
-        '<span class="ar-chip' + (isLive ? ' live' : '') + '">' +
-          (isLive ? '<i></i>Live now' : esc(m.tier || 'Next up')) + '</span>' +
+        '<span class="ar-chip' + (m.live ? ' live' : '') + '">' +
+          (m.live ? '<i></i>Live' : esc(m.tier || 'Next up')) + '</span>' +
         '<h2 class="ar-live-name">' + esc(m.name) + '</h2>' +
         (meta.length ? '<div class="ar-live-meta">' + meta.join('') + '</div>' : '') +
         '<div class="ar-live-btns">' +
-          (m.streamUrl && !src
-            ? '<button class="ar-btn solid" type="button" onclick="window.arOpen(' + m.id + ',1)">' +
-              (isTwitch(m.streamUrl) ? 'Watch on Twitch' : 'Watch stream') + '</button>' : '') +
-          (m.url ? '<button class="ar-btn" type="button" onclick="window.arOpen(' + m.id + ',0)">Event page</button>' : '') +
-          (m.kind === 'major'
-            ? '<button class="ar-btn" type="button" onclick="window.arFollow(' + m.id + ')">Follow</button>'
-            : '') +
-          (pool.length > 1
-            ? '<span class="ar-rot">' + pool.map(function (_, i){
-                return '<button type="button" aria-label="Event ' + (i+1) + '" ' +
-                  'class="' + (i === liveIdx ? 'on' : '') + '" ' +
-                  'onclick="window.arLiveAt(' + i + ')"></button>';
-              }).join('') + '</span>' : '') +
+          (!src && (m.streamUrl || m.url)
+            ? '<button class="ar-btn" type="button" onclick="window.arOpen(' + liveIdx + ',1)">Watch</button>' : '') +
+          (m.url ? '<button class="ar-btn" type="button" onclick="window.arOpen(' + liveIdx + ',0)">Event page</button>' : '') +
+          (m.kind === 'major' ? '<button class="ar-btn" type="button" onclick="window.arFollow(' + m.id + ')">Follow</button>' : '') +
         '</div>' +
       '</div>';
   }
 
-  /* Rotation only when more than one is genuinely live, and slow: an
-     embedded player restarting every few seconds is worse than no
-     rotation at all. */
-  function rotateLive(){
-    clearInterval(liveTimer);
-    if (liveNow(majors).length < 2) return;
-    liveTimer = setInterval(function (){
-      if (!document.body.contains($('gtLive'))) { clearInterval(liveTimer); return; }
-      liveIdx++;
-      paintLive();
+  /* The "rotate between screens" the brief asked for: everything else
+     that is on, as cards. Clicking one puts it on the stage; among the
+     genuinely live ones it also advances on its own, slowly, because an
+     embedded player that restarts every few seconds is worse than one
+     that does not move. */
+  function paintNext(){
+    var host = $('gtNext');
+    if (!host) return;
+    var rest = stage.filter(function (_, i){ return i !== liveIdx; }).slice(0, 5);
+    if (!rest.length){
+      host.innerHTML = '<p class="ar-sec">Now &amp; next</p>' +
+        '<p class="ar-next-empty">Nothing else scheduled. Watched channels and ' +
+        'published events both appear here.</p>';
+      return;
+    }
+    host.innerHTML = '<p class="ar-sec">Now &amp; next</p>' + rest.map(function (m){
+      var i = stage.indexOf(m);
+      var sub = [m.game, m.organiser].filter(Boolean).join(' · ') ||
+                (m.live ? 'Live' : whenText(m.startsAt));
+      return '<button type="button" class="ar-n" onclick="window.arLiveAt(' + i + ')">' +
+        '<span class="ar-n-th" style="background-image:url(\'' + esc(m.art || '') + '\')">' +
+          (m.live ? '<span>Live</span>' : '') +
+        '</span>' +
+        '<span class="ar-n-b">' +
+          '<span class="ar-n-t">' + esc(m.name) + '</span>' +
+          '<span class="ar-n-s">' + esc(sub) + '</span>' +
+        '</span>' +
+      '</button>';
+    }).join('');
+  }
+
+  function rotate(){
+    clearInterval(rotTimer);
+    if (stage.filter(function (x){ return x.live; }).length < 2) return;
+    rotTimer = setInterval(function (){
+      if (!document.body.contains($('gtLive'))){ clearInterval(rotTimer); return; }
+      liveIdx = (liveIdx + 1) % stage.length;
+      paintLive(); paintNext();
     }, 45000);
   }
-  window.arLiveAt = function (i){ liveIdx = i; paintLive(); rotateLive(); };
-  window.arOpen = function (id, stream){
-    var m = majors.find(function (x){ return x.id === id; });
+  window.arLiveAt = function (i){ liveIdx = i; paintLive(); paintNext(); rotate(); };
+  window.arOpen = function (i, wantStream){
+    var m = stage[i];
     if (!m) return;
-    var href = stream ? (m.streamUrl || m.url) : (m.url || m.streamUrl);
+    var href = wantStream ? (m.streamUrl || m.url) : (m.url || m.streamUrl);
     if (!href) return;
     if (window.lobbyOpenExternal) window.lobbyOpenExternal(href);
     else window.open(href, '_blank', 'noopener');
   };
   window.arFollow = function (id){
-    api('/majors/' + id + '/follow', { method: 'POST' })
-      .then(function (){ if (window.showToast) window.showToast('Following — you will be reminded', 'success'); })
+    api('/majors/' + id + '/follow', { method:'POST' })
+      .then(function (){ if (window.showToast) window.showToast('Following', 'success'); })
       .catch(function (){ if (window.showToast) window.showToast('Could not follow that', 'error'); });
   };
 
   /* ══ Calendar ═════════════════════════════════════════════════
-     Majors and tournaments on the same grid, because "what is on" is
-     one question. Tournaments are marked so the two never blur. */
-  var calMonth = null, calSel = null;
+     A week, and then the entries themselves. The month grid it replaces
+     was 42 boxes of which two were ever filled — a calendar's job is to
+     tell you what is on, and a list does that in the same space. */
+  var weekStart = null, calSel = null;
 
+  function startOfWeek(d){
+    var x = new Date(d.getFullYear(), d.getMonth(), d.getDate());
+    x.setDate(x.getDate() - ((x.getDay() + 6) % 7));
+    return x;
+  }
   function dayKey(d){ return d.getFullYear() + '-' + (d.getMonth()+1) + '-' + d.getDate(); }
 
-  function calEvents(){
-    var out = {};
-    function add(when, item){
-      if (!when) return;
-      var d = new Date(when);
-      if (isNaN(d)) return;
-      (out[dayKey(d)] = out[dayKey(d)] || []).push(item);
-    }
-    majors.forEach(function (m){
-      /* A stream that is already live has no future date to sit on, and
-         putting it on today's cell would say it starts later. */
-      if (m.live) return;
-      add(m.startsAt, { kind:'major', id:m.id, name:m.name,
-                        sub:m.game || m.location || m.organiser || 'Event' });
+  function allEvents(){
+    var out = [];
+    stage.forEach(function (m){
+      if (m.live || !m.startsAt) return;   /* live has no future date to sit on */
+      out.push({ at:new Date(m.startsAt), kind:'major', ref:m,
+                 name:m.name, sub:m.game || m.organiser || 'Event' });
     });
-    (rowsNow() || []).forEach(function (t){
-      add(t.startTime, { kind:'tourney', id:t.id, name:t.name, sub:(t.format || 'Tournament') });
+    (mine || []).concat(rowsNow() || []).forEach(function (t){
+      if (!t.startTime) return;
+      if (out.some(function (e){ return e.kind === 'tourney' && e.id === t.id; })) return;
+      out.push({ at:new Date(t.startTime), kind:'tourney', id:t.id, ref:t,
+                 name:t.name, sub:(t.format || 'Tournament') +
+                   (t.entrants ? ' · ' + t.entrants + ' in' : '') });
     });
-    return out;
+    return out.filter(function (e){ return !isNaN(e.at); })
+              .sort(function (a, b){ return a.at - b.at; });
   }
 
   function paintCal(){
     var host = $('gtCal');
     if (!host) return;
     var now = new Date();
-    if (!calMonth) calMonth = new Date(now.getFullYear(), now.getMonth(), 1);
+    if (!weekStart) weekStart = startOfWeek(now);
+    var evs = allEvents();
 
-    var evs = calEvents();
-    var first = new Date(calMonth.getFullYear(), calMonth.getMonth(), 1);
-    /* Monday-first, which is what a European calendar looks like and what
-       the rest of this app's dates assume. */
-    var lead = (first.getDay() + 6) % 7;
-    var start = new Date(first); start.setDate(1 - lead);
+    var byDay = {};
+    evs.forEach(function (e){ (byDay[dayKey(e.at)] = byDay[dayKey(e.at)] || []).push(e); });
 
-    var cells = '';
-    for (var i = 0; i < 42; i++){
-      var d = new Date(start); d.setDate(start.getDate() + i);
-      var key = dayKey(d);
-      var has = !!evs[key];
-      var cls = ['ar-day'];
-      if (d.getMonth() !== calMonth.getMonth()) cls.push('out');
-      if (dayKey(d) === dayKey(now)) cls.push('today');
+    var days = '';
+    for (var i = 0; i < 7; i++){
+      var d = new Date(weekStart); d.setDate(weekStart.getDate() + i);
+      var k = dayKey(d), has = !!byDay[k];
+      var cls = ['ar-d'];
+      if (k === dayKey(now)) cls.push('today');
       if (has) cls.push('has');
-      if (calSel === key) cls.push('sel');
-      cells += '<button type="button" class="' + cls.join(' ') + '"' +
-        (has ? ' onclick="window.arCalPick(\'' + key + '\')"' : ' disabled') +
-        ' aria-label="' + d.toDateString() + '">' + d.getDate() + '</button>';
+      if (calSel === k) cls.push('sel');
+      days += '<button type="button" class="' + cls.join(' ') + '"' +
+        (has ? ' onclick="window.arCalPick(\'' + k + '\')"' : ' disabled') + '>' +
+        '<small>' + ['M','T','W','T','F','S','S'][i] + '</small>' +
+        '<b>' + d.getDate() + '</b>' +
+        '<i class="' + (has ? '' : 'ghost') + '"></i>' +
+      '</button>';
     }
 
-    var sel = calSel && evs[calSel] ? evs[calSel] : null;
-    var monthName = calMonth.toLocaleDateString(undefined, { month:'long', year:'numeric' });
+    /* The agenda shows the selected day if there is one, otherwise
+       everything coming up — so it is never a blank panel. */
+    var list = calSel && byDay[calSel] ? byDay[calSel]
+             : evs.filter(function (e){ return e.at >= new Date(now.getTime() - 36e5); }).slice(0, 8);
+
+    var label = weekStart.toLocaleDateString(undefined, { month:'long', year:'numeric' });
 
     host.innerHTML =
       '<div class="ar-cal-head">' +
-        '<h3 class="ar-cal-title">' + esc(monthName) + '</h3>' +
-        '<button class="ar-cal-nav" type="button" onclick="window.arCalMove(-1)" aria-label="Previous month">&lsaquo;</button>' +
-        '<button class="ar-cal-nav" type="button" onclick="window.arCalMove(1)" aria-label="Next month">&rsaquo;</button>' +
+        '<h3 class="ar-cal-title">' + esc(label) + '</h3>' +
+        '<button class="ar-cal-nav" type="button" onclick="window.arWeek(-1)" aria-label="Previous week">&lsaquo;</button>' +
+        '<button class="ar-cal-nav" type="button" onclick="window.arWeek(1)" aria-label="Next week">&rsaquo;</button>' +
       '</div>' +
-      '<div class="ar-cal-grid">' +
-        ['M','T','W','T','F','S','S'].map(function (d){ return '<span class="ar-dow">' + d + '</span>'; }).join('') +
-        cells +
-      '</div>' +
-      '<div class="ar-cal-list">' +
-        (sel
-          ? sel.map(function (e){
-              return '<button type="button" class="ar-ev ' + e.kind + '" ' +
-                'onclick="window.arCalOpen(\'' + e.kind + '\',\'' + esc(e.id) + '\')">' +
-                '<b>' + esc(e.name) + '</b><span>' + esc(e.sub) + '</span></button>';
-            }).join('')
-          : '<p class="ar-cal-empty">Days with something on are marked. ' +
-            'Majors and tournaments both show here.</p>') +
-      '</div>';
+      '<div class="ar-week">' + days + '</div>' +
+      '<p class="ar-sec" style="margin-top:2px">' +
+        (calSel ? 'That day' : 'Coming up') + '</p>' +
+      (list.length
+        ? '<div class="ar-agenda">' + list.map(function (e){
+            var d = e.at;
+            return '<button type="button" class="ar-a ' + e.kind + '" ' +
+              'onclick="window.arAgendaOpen(\'' + e.kind + '\',\'' + esc(e.id || (e.ref && e.ref.id) || '') + '\')">' +
+              '<span class="ar-a-when"><b>' + d.getDate() + '</b>' +
+                '<small>' + d.toLocaleDateString(undefined, { month:'short' }) + '</small></span>' +
+              '<span class="ar-a-b">' +
+                '<span class="ar-a-t">' + esc(e.name) + '</span>' +
+                '<span class="ar-a-s">' + esc(e.sub) + ' · ' +
+                  d.toLocaleTimeString([], { hour:'2-digit', minute:'2-digit' }) + '</span>' +
+              '</span>' +
+            '</button>';
+          }).join('') + '</div>'
+        : '<p class="ar-cal-empty">Nothing scheduled. Tournaments with a start ' +
+          'time and published events both land here.</p>');
   }
-
-  window.arCalMove = function (n){
-    calMonth = new Date(calMonth.getFullYear(), calMonth.getMonth() + n, 1);
+  window.arWeek = function (n){
+    weekStart = new Date(weekStart); weekStart.setDate(weekStart.getDate() + n * 7);
     calSel = null; paintCal();
   };
-  window.arCalPick = function (key){ calSel = (calSel === key ? null : key); paintCal(); };
-  window.arCalOpen = function (kind, id){
-    if (kind === 'tourney') { if (window.gtJoin) window.gtJoin(String(id)); return; }
-    window.arOpen(Number(id), 0);
+  window.arCalPick = function (k){ calSel = (calSel === k ? null : k); paintCal(); };
+  window.arAgendaOpen = function (kind, id){
+    if (kind === 'tourney'){ if (window.gtJoin) window.gtJoin(String(id)); return; }
+    var i = stage.findIndex(function (x){ return String(x.id) === String(id); });
+    if (i >= 0) window.arLiveAt(i);
   };
 
-  /* ══ Yours, and how far it has got ════════════════════════════ */
-  var mine = [];
-
-  /* The stage a bracket is at, as a label and a position. Rounds are
-     derived from the entrant count because a single-elimination bracket
-     of N needs ceil(log2 N) of them — so this can say "Round 2 of 4"
-     without the bracket having been fetched. */
+  /* ══ Yours ════════════════════════════════════════════════════ */
   function stageOf(t){
-    var st = String(t.status || '').toUpperCase();
-    if (st === 'DONE' || st === 'COMPLETED') return { key:'done', label:'Finished', at:1, of:1 };
-    if (st === 'OPEN' || st === 'REGISTRATION') return { key:'reg', label:'Registration', at:0, of:1 };
-    if (st === 'STARTING') return { key:'reg', label:'Starting', at:0, of:1 };
+    var s = String(t.status || '').toUpperCase();
+    if (s === 'DONE' || s === 'COMPLETED') return { key:'done', label:'Finished', at:1, of:1 };
+    if (s === 'OPEN' || s === 'REGISTRATION') return { key:'reg', label:'Registration', at:0, of:1 };
+    if (s === 'STARTING') return { key:'reg', label:'Starting', at:0, of:1 };
     var n = Math.max(2, Number(t.entrants) || 2);
     var of = Math.max(1, Math.ceil(Math.log(n) / Math.log(2)));
     var at = Math.min(of, Number(t.round) || 1);
-    var label = (at >= of) ? 'Final' : (at === of - 1 ? 'Semi-final' : 'Round ' + at);
-    return { key:'live', label:label, at:at, of:of };
+    return { key:'live', label:(at >= of ? 'Final' : at === of - 1 ? 'Semi-final' : 'Round ' + at), at:at, of:of };
   }
 
   function paintYours(){
@@ -82243,32 +82324,25 @@ body.q-max #queueOverlay{ padding:0 !important; }
     if (!host) return;
     if (!mine.length){
       host.innerHTML =
-        '<div class="ar-h"><h2>Your tournaments</h2><span>nothing yet</span></div>' +
-        '<p class="ar-cal-empty" style="padding:2px 0 6px">Enter one below, or start your own ' +
-        '&mdash; public, or private with a code you hand out.</p>';
+        '<div class="ar-h"><h2>Your tournaments</h2><span>none yet</span></div>' +
+        '<p class="ar-cal-empty" style="padding-bottom:4px">Enter one below, or run your own.</p>';
       return;
     }
     host.innerHTML =
-      '<div class="ar-h"><h2>Your tournaments</h2><span>' + mine.length +
-        (mine.length === 1 ? ' entered' : ' entered') + '</span></div>' +
+      '<div class="ar-h"><h2>Your tournaments</h2><span>' + mine.length + ' entered</span></div>' +
       '<div class="ar-mine">' + mine.map(function (t){
-        var s = stageOf(t);
-        var pips = '';
-        for (var i = 1; i <= s.of; i++){
+        var s = stageOf(t), pips = '';
+        for (var i = 1; i <= s.of; i++)
           pips += '<i class="ar-pip' + (i < s.at ? ' done' : i === s.at ? ' now' : '') + '"></i>';
-        }
         var sub = [];
         if (t.entrants) sub.push(t.entrants + ' entrants');
-        if (t.format) sub.push(esc(t.format));
-        if (t.isHost) sub.push('You host');
-        if (t.joinCode) sub.push('Code ' + esc(t.joinCode));
+        if (t.isHost) sub.push('you host');
+        if (t.joinCode) sub.push(t.joinCode);
         return '<button type="button" class="ar-m" onclick="window.gtJoin(\'' + esc(t.id) + '\')">' +
-          '<div class="ar-m-top">' +
-            '<span class="ar-m-name">' + esc(t.name || 'Tournament') + '</span>' +
-            '<span class="ar-stage ' + s.key + '">' + esc(s.label) + '</span>' +
-          '</div>' +
-          (s.of > 1 ? '<div class="ar-pips">' + pips + '</div>' : '') +
-          '<div class="ar-m-sub">' + sub.join('<span>&middot;</span>') + '</div>' +
+          '<span class="ar-m-top"><span class="ar-m-name">' + esc(t.name || 'Tournament') + '</span>' +
+          '<span class="ar-stage ' + s.key + '">' + esc(s.label) + '</span></span>' +
+          (s.of > 1 ? '<span class="ar-pips">' + pips + '</span>' : '') +
+          '<span class="ar-m-sub">' + esc(sub.join(' · ')) + '</span>' +
         '</button>';
       }).join('') + '</div>';
   }
@@ -82304,11 +82378,6 @@ body.q-max #queueOverlay{ padding:0 !important; }
         '</span><span class="gtr-n">' + n + '</span></button>';
     }
     rail.innerHTML =
-      '<div class="ar-create">' +
-        '<h3>Run your own</h3>' +
-        '<p>Pick a game, a format and a size. Public, or private with a code.</p>' +
-        '<button type="button" onclick="window.openCreateTournament()">Create tournament</button>' +
-      '</div>' +
       '<div class="gtr-group">' +
         '<p class="gtr-head">Have a code?</p>' +
         '<div class="gtr-code">' +
@@ -82325,7 +82394,6 @@ body.q-max #queueOverlay{ padding:0 !important; }
         item('done','Finished',c.done) +
       '</div>';
   }
-
   window.arStatus = function (id){
     if (typeof window.gtSetStatus === 'function') window.gtSetStatus(id);
     paintRail();
@@ -82335,63 +82403,48 @@ body.q-max #queueOverlay{ padding:0 !important; }
     var input = $('gtCodeInput'), note = $('gtCodeNote');
     if (!input) return;
     var raw = String(input.value || '').toUpperCase().replace(/[^A-Z0-9]/g, '');
-    var say = function (msg, err){
-      if (!note) return;
-      note.textContent = msg;
-      note.classList.toggle('err', !!err);
-    };
+    var say = function (m, e){ if (note){ note.textContent = m; note.classList.toggle('err', !!e); } };
     if (!/^[A-Z]{4}[0-9]{4}$/.test(raw)) return say('Four letters, then four digits.', true);
     say('Looking…');
     var r = await api('/tournaments/code/' + raw).catch(function (){ return null; });
     if (!r || !r.id || r.error) return say('No tournament with that code.', true);
-    say('Opening …');
+    say('Opening…');
     input.value = '';
     if (typeof window.gtJoin === 'function') window.gtJoin(String(r.id));
   };
 
   /* ══ Loading ══════════════════════════════════════════════════ */
-  /* One request, already ordered. Falls back to the curated majors alone
-     if the stage endpoint is not there yet — an older server should show
-     a smaller page, not a broken one. */
-  async function loadMajors(){
+  async function loadStage(){
     var r = await api('/arena/stage').catch(function (){ return null; });
-    if (!Array.isArray(r) || !r.length) {
+    if (!Array.isArray(r) || !r.length){
       var m = await api('/majors').catch(function (){ return null; });
-      r = Array.isArray(m) ? m.map(function (x){
-        return Object.assign({ kind: 'major' }, x);
-      }) : [];
+      r = Array.isArray(m) ? m.map(function (x){ return Object.assign({ kind:'major' }, x); }) : [];
     }
-    majors = r;
-    liveIdx = 0;
-    paintLive(); rotateLive(); paintCal();
+    stage = r; liveIdx = 0;
+    paintLive(); paintNext(); rotate(); paintCal(); paintTop();
   }
   async function loadMine(){
     var r = await api('/me/tournaments').catch(function (){ return null; });
     mine = Array.isArray(r) ? r : [];
-    paintYours(); paintCal();
+    paintYours(); paintCal(); paintTop();
   }
 
   function refresh(){
     if (!ensureArena()) return;
-    paintRail(); paintYours(); paintCal();
-    loadMajors(); loadMine();
+    paintTop(); paintRail(); paintYours(); paintLive(); paintNext(); paintCal();
+    loadStage(); loadMine();
   }
 
   function start(){
     if (typeof window.api !== 'function'){ setTimeout(start, 300); return; }
-
     var o = window.openGlobalTournaments;
     if (typeof o === 'function' && !o.__arena){
       var w = function (){ var out = o.apply(this, arguments); setTimeout(refresh, 30); return out; };
       w.__arena = true;
       window.openGlobalTournaments = w;
     }
-
-    /* The list is repainted by code that calls renderGtTournaments as a
-       BARE identifier, so wrapping window.renderGtTournaments never runs
-       — which is why the rail's counts sat at zero while the shelves
-       below showed eleven brackets. Watching the node the renderer
-       writes into cannot be bypassed that way. */
+    /* renderGtTournaments is called as a bare identifier, so wrapping the
+       window property never runs. Watch the node it writes instead. */
     var list = $('gtTournamentList');
     if (list && !list.__arenaWatched){
       list.__arenaWatched = true;
@@ -82399,13 +82452,12 @@ body.q-max #queueOverlay{ padding:0 !important; }
       new MutationObserver(function (){
         if (queued) return;
         queued = true;
-        requestAnimationFrame(function (){ queued = false; paintRail(); paintCal(); });
-      }).observe(list, { childList: true });
+        requestAnimationFrame(function (){ queued = false; paintRail(); paintTop(); paintCal(); });
+      }).observe(list, { childList:true });
     }
-
     var ov = $('globalTournamentsOverlay');
     if (ov && ov.classList.contains('open')) refresh();
-    console.log('[tournaments] arena ready — live stage, calendar, your brackets');
+    console.log('[tournaments] arena ready');
   }
 
   if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', start);
