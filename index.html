@@ -82244,6 +82244,32 @@ body.q-max #queueOverlay{ padding:0 !important; }
   display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical; overflow:hidden }
 .tp-meta{ display:flex; flex-wrap:wrap; gap:10px; font-size:11px; color:rgba(255,255,255,.72) }
 .tp-meta b{ color:#fff; font-weight:700 }
+/* Controls sit above the caption gradient and stay reachable — the
+   overlay itself is pointer-events:none so it never eats a click meant
+   for the video. */
+.tp-ctl{
+  position:absolute; top:10px; right:10px; z-index:3;
+  display:flex; align-items:center; gap:5px;
+  opacity:0; transition:opacity .18s ease;
+}
+.tp-player:hover .tp-ctl, .tp-ctl:focus-within{ opacity:1 }
+@media (prefers-reduced-motion:reduce){ .tp-ctl{ transition:none } }
+.tp-cbtn{
+  width:30px; height:30px; border-radius:7px; cursor:pointer; padding:0;
+  display:grid; place-content:center;
+  background:rgba(8,9,14,.78); border:1px solid rgba(255,255,255,.16);
+  color:#fff; font-size:15px; line-height:1;
+}
+.tp-cbtn:hover{ background:rgba(8,9,14,.95); border-color:rgba(255,255,255,.34) }
+.tp-cbtn:focus-visible{ outline:2px solid var(--tp); outline-offset:2px }
+.tp-count{
+  font-family:"JetBrains Mono",ui-monospace,monospace; font-size:10.5px;
+  color:#fff; background:rgba(8,9,14,.78); border:1px solid rgba(255,255,255,.16);
+  border-radius:7px; padding:0 8px; height:30px; display:grid; place-content:center;
+  font-variant-numeric:tabular-nums;
+}
+/* Fullscreen paints the element itself, so it needs a ground of its own. */
+.tp-player:fullscreen{ max-width:none; max-height:none; border-radius:0; background:#000 }
 .tp-blank{ position:absolute; inset:0; display:grid; place-content:center; gap:8px; text-align:center; padding:24px }
 .tp-blank-i{
   width:46px; height:46px; border-radius:13px; display:grid; place-content:center; margin:0 auto;
@@ -82396,6 +82422,10 @@ body.q-max #queueOverlay{ padding:0 !important; }
   function api(p, o){ return (typeof window.api === 'function') ? window.api(p, o) : Promise.reject(); }
 
   var streams = [], idx = 0, rot = null, mine = [], all = [], filt = 'all';
+  /* Muted by default because autoplay demands it; remembered so a
+     viewer who turned sound on does not have to every visit. */
+  var muted = true;
+  try { muted = localStorage.getItem('tp_muted') !== '0'; } catch (e) {}
   var weekStart = null, selDay = null;
 
   function gameOf(id){
@@ -82443,10 +82473,13 @@ body.q-max #queueOverlay{ padding:0 !important; }
     return m ? m[1] : null;
   }
   function embed(m){
+    var mu = muted ? '1' : '0';
     var v = m.videoId || ytId(m.streamUrl) || ytId(m.url);
-    if (v) return 'https://www.youtube.com/embed/' + v + '?autoplay=1&mute=1&playsinline=1&rel=0&modestbranding=1';
+    if (v) return 'https://www.youtube.com/embed/' + v +
+      '?autoplay=1&mute=' + mu + '&playsinline=1&rel=0&modestbranding=1';
     var c = ytCh(m.streamUrl) || ytCh(m.url);
-    if (c) return 'https://www.youtube.com/embed/live_stream?channel=' + c + '&autoplay=1&mute=1&playsinline=1';
+    if (c) return 'https://www.youtube.com/embed/live_stream?channel=' + c +
+      '&autoplay=1&mute=' + mu + '&playsinline=1';
     return null;
   }
   function inText(iso){
@@ -82487,12 +82520,30 @@ body.q-max #queueOverlay{ padding:0 !important; }
           (m.live ? '<i></i>Live' : esc(m.tier || 'Next up')) + '</span>' +
         '<h2 class="tp-title">' + esc(m.name) + '</h2>' +
         (meta.length ? '<div class="tp-meta">' + meta.join('') + '</div>' : '') +
+      '</div>' +
+      '<div class="tp-ctl">' +
+        (streams.length > 1
+          ? '<button type="button" class="tp-cbtn" title="Previous" aria-label="Previous stream" ' +
+            'onclick="window.tpStep(-1)">&lsaquo;</button>' : '') +
+        '<button type="button" class="tp-cbtn" aria-label="' + (muted ? 'Unmute' : 'Mute') + '" ' +
+          'title="' + (muted ? 'Sound on' : 'Mute') + '" onclick="window.tpMute()">' +
+          (muted ? SPK_OFF : SPK_ON) + '</button>' +
+        '<button type="button" class="tp-cbtn" title="Fullscreen" aria-label="Fullscreen" ' +
+          'onclick="window.tpFull()">' + FULL_ICO + '</button>' +
+        '<button type="button" class="tp-cbtn" title="Open on YouTube" aria-label="Open on YouTube" ' +
+          'onclick="window.tpPop()">' + POP_ICO + '</button>' +
+        (streams.length > 1
+          ? '<button type="button" class="tp-cbtn" title="Next" aria-label="Next stream" ' +
+            'onclick="window.tpStep(1)">&rsaquo;</button>' +
+            '<span class="tp-count">' + (idx + 1) + '/' + streams.length + '</span>' : '') +
       '</div>';
   }
 
   function paintChannels(){
     var host = $('tpChannels');
     if (!host) return;
+    /* One stream needs no picker; two or more do. The arrows on the
+       player cover the same ground for people who never look down. */
     if (streams.length < 2){ host.innerHTML = ''; return; }
     host.innerHTML = streams.slice(0, 4).map(function (m, i){
       var sub = m.live ? (m.viewers ? Number(m.viewers).toLocaleString() + ' watching' : 'Live')
@@ -82504,7 +82555,57 @@ body.q-max #queueOverlay{ padding:0 !important; }
         '<span class="tp-ch-s">' + esc(sub) + '</span></span></button>';
     }).join('');
   }
+  var SPK_ON = '<svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" ' +
+    'stroke-width="2" stroke-linecap="round" stroke-linejoin="round">' +
+    '<path d="M11 5 6 9H2v6h4l5 4z"/><path d="M15.5 8.5a5 5 0 0 1 0 7"/>' +
+    '<path d="M18.5 5.5a9 9 0 0 1 0 13"/></svg>';
+  var SPK_OFF = '<svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" ' +
+    'stroke-width="2" stroke-linecap="round" stroke-linejoin="round">' +
+    '<path d="M11 5 6 9H2v6h4l5 4z"/><line x1="22" y1="9" x2="16" y2="15"/>' +
+    '<line x1="16" y1="9" x2="22" y2="15"/></svg>';
+  var FULL_ICO = '<svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" ' +
+    'stroke-width="2" stroke-linecap="round" stroke-linejoin="round">' +
+    '<path d="M8 3H3v5M16 3h5v5M8 21H3v-5M16 21h5v-5"/></svg>';
+  var POP_ICO = '<svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" ' +
+    'stroke-width="2" stroke-linecap="round" stroke-linejoin="round">' +
+    '<path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/>' +
+    '<path d="M15 3h6v6"/><path d="M10 14 21 3"/></svg>';
+
   window.tpPick = function (i){ idx = i; paintPlayer(); paintChannels(); rotate(); };
+
+  /* Cycling, as a control rather than a list. Wraps both ways so it
+     never dead-ends. */
+  window.tpStep = function (d){
+    if (!streams.length) return;
+    idx = (idx + d + streams.length) % streams.length;
+    paintPlayer(); paintChannels(); rotate();
+  };
+
+  /* Re-mounts rather than driving the YouTube JS API: that needs an
+     `origin` matching the embedding page, and this renderer is file://
+     with none. A live stream rejoins at the live edge, so the cost is a
+     moment of buffering rather than losing your place. */
+  window.tpMute = function (){
+    muted = !muted;
+    try { localStorage.setItem('tp_muted', muted ? '1' : '0'); } catch (e) {}
+    paintPlayer();
+  };
+
+  window.tpFull = function (){
+    var el = $('tpPlayer');
+    if (!el) return;
+    if (document.fullscreenElement) document.exitFullscreen();
+    else if (el.requestFullscreen) el.requestFullscreen();
+  };
+
+  window.tpPop = function (){
+    var m = streams[idx];
+    if (!m) return;
+    var href = m.url || m.streamUrl;
+    if (!href) return;
+    if (window.lobbyOpenExternal) window.lobbyOpenExternal(href);
+    else window.open(href, '_blank', 'noopener');
+  };
   function rotate(){
     clearInterval(rot);
     if (streams.filter(function (x){ return x.live; }).length < 2) return;

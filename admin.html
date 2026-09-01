@@ -619,6 +619,7 @@
 .mj-pill.live{ background:rgba(237,66,69,.18); color:#ff9b9b }
 .mj-pill.draft{ background:rgba(255,255,255,.08); color:var(--text-3) }
 .mj-pill.pub{ background:rgba(93,219,160,.16); color:#5ddba0 }
+.mj-pill.pin{ background:rgba(88,101,242,.22); color:#a8b1ff }
 @media (max-width:900px){ .mj-grid{ grid-template-columns:1fr } .mj-f.mj-wide{ grid-column:auto } }
 </style>
 
@@ -1180,6 +1181,19 @@ async function addStarterSources() {
   } catch (e) { ssNote(e.message, "err"); }
 }
 
+// The pinned channel is what the Tournaments page opens with for every
+// user, for as long as that channel is actually live. Setting one clears
+// any other, server-side, so there is never a second.
+async function setPriority(id, on) {
+  try {
+    const res = await fetch(AUTH_URL + "/admin/stream-sources/" + id + "/priority", {
+      method: "POST", headers: auth(), body: JSON.stringify({ on }) });
+    if (!res.ok) throw new Error("Could not set that");
+    showToast(on ? "Pinned - it opens the page while it is live" : "Unpinned");
+    loadStreamSources();
+  } catch (e) { showToast(e.message, "error"); }
+}
+
 async function loadStreamSources() {
   const list = document.getElementById("ssList");
   if (!list) return;
@@ -1210,7 +1224,8 @@ async function loadStreamSources() {
   const esc = (x) => String(x == null ? "" : x)
     .replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;");
   list.innerHTML = rows.map(r => {
-    const pill = r.liveNow ? "<span class='mj-pill live'>Live</span>"
+    const pill = r.priority ? "<span class='mj-pill pin'>Pinned</span>"
+      : r.liveNow ? "<span class='mj-pill live'>Live</span>"
       : r.lastError ? "<span class='mj-pill draft'>Error</span>"
       : "<span class='mj-pill pub'>Watching</span>";
     const bits = [r.game, r.organiser, r.channelId].filter(Boolean).map(esc).join(" &middot; ");
@@ -1219,6 +1234,10 @@ async function loadStreamSources() {
       "<div class='mj-main'><h4>" + esc(r.name || r.channelId) + "</h4>" +
       "<p>" + bits + " &middot; " + esc(when) +
       (r.lastError ? " &middot; " + esc(r.lastError) : "") + "</p></div>" +
+      "<button class='btn " + (r.priority ? "btn-blue" : "btn-grey") + "' " +
+        "title='The pinned channel opens the page for everyone while it is live' " +
+        "onclick='setPriority(" + r.id + "," + (r.priority ? "false" : "true") + ")'>" +
+        (r.priority ? "Unpin" : "Pin") + "</button>" +
       "<button class='btn btn-danger' onclick='deleteStreamSource(" + r.id + ")'>Delete</button></div>";
   }).join("");
 }

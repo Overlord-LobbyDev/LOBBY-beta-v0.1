@@ -492,6 +492,9 @@ async function initDb() {
         is_enabled BOOLEAN DEFAULT TRUE,
         last_checked_at TIMESTAMPTZ,
         last_error TEXT,
+        -- The pinned channel. Editorial, not a ranking: at most one row
+        -- carries it, and it only matters while that channel is live.
+        is_priority BOOLEAN DEFAULT FALSE,
         created_at TIMESTAMPTZ DEFAULT NOW(),
         UNIQUE (platform, channel_id)
       );
@@ -552,6 +555,10 @@ async function initDb() {
       // prove they can edit it. Cleared the moment it is matched.
       "ALTER TABLE user_streams ADD COLUMN IF NOT EXISTS verify_code       TEXT",
       "ALTER TABLE user_streams ADD COLUMN IF NOT EXISTS verify_expires_at TIMESTAMPTZ",
+      // CREATE TABLE IF NOT EXISTS does not alter an existing table, so a
+      // column added to the definition above must be repeated here or it
+      // never reaches an install that already ran once.
+      "ALTER TABLE stream_sources ADD COLUMN IF NOT EXISTS is_priority BOOLEAN DEFAULT FALSE",
     ]) await pool.query(sql).catch(() => {});
 
     await pool.query(`

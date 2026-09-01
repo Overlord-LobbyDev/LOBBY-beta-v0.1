@@ -6473,7 +6473,8 @@ app.get("/arena/stage", async (req, res) => {
     const out = [];
 
     const disc = await pool.query(`
-      SELECT c.*, s.name AS source_name, s.game, s.organiser, s.weight, s.platform
+      SELECT c.*, s.name AS source_name, s.game, s.organiser, s.weight, s.platform,
+             s.is_priority
       FROM stream_cache c JOIN stream_sources s ON s.id = c.source_id
       WHERE s.is_enabled = TRUE
       ORDER BY (c.state = 'live') DESC, c.viewers DESC NULLS LAST,
@@ -6495,6 +6496,7 @@ app.get("/arena/stage", async (req, res) => {
         viewers: r.viewers || null,
         url: "https://www.youtube.com/watch?v=" + r.video_id,
         weight: r.weight || 0,
+        priority: !!r.is_priority,
       });
     }
 
@@ -6526,6 +6528,10 @@ app.get("/arena/stage", async (req, res) => {
     out.sort((a, b) => {
       if (a.live !== b.live) return a.live ? -1 : 1;
       if (a.live) {
+        /* The pinned channel leads, but only while it is genuinely live —
+           checked here rather than in the query precisely so an off-air
+           pin cannot hold the stage against something that is on. */
+        if (!!a.priority !== !!b.priority) return a.priority ? -1 : 1;
         if ((b.weight || 0) !== (a.weight || 0)) return (b.weight || 0) - (a.weight || 0);
         return (b.viewers || 0) - (a.viewers || 0);
       }
@@ -6553,6 +6559,7 @@ app.get("/admin/stream-sources", requireAuth, requireAdmin, async (req, res) => 
       id: x.id, platform: x.platform, channelId: x.channel_id,
       name: x.name, game: x.game, organiser: x.organiser,
       weight: x.weight || 0, enabled: !!x.is_enabled,
+      priority: !!x.is_priority,
       lastCheckedAt: x.last_checked_at, lastError: x.last_error,
       liveNow: x.live_now || 0,
     })));
@@ -6647,6 +6654,28 @@ app.post("/admin/stream-sources/bulk", requireAuth, requireAdmin, async (req, re
   /* Poll once at the end rather than per item. */
   if (added.length) setTimeout(pollStreamSources, 800);
   res.json({ added: added.length, failed: failed.length, addedList: added, failedList: failed });
+});
+
+// POST /admin/stream-sources/:id/priority { on }
+//
+// One statement sets the chosen row and clears every other, so "exactly
+// one" is a property of the write rather than something the caller has
+// to maintain.
+app.post("/admin/stream-sources/:id/priority", requireAuth, requireAdmin, async (req, res) => {
+  try {
+    const on = req.body && req.body.on !== false;
+    if (on) {
+      await pool.query(
+        "UPDATE stream_sources SET is_priority = (id = $1)", [req.params.id]);
+    } else {
+      await pool.query(
+        "UPDATE stream_sources SET is_priority = FALSE WHERE id = $1", [req.params.id]);
+    }
+    res.json({ ok: true, priority: on });
+  } catch (e) {
+    console.error("[stream-sources/priority]", e.message);
+    res.status(500).json({ error: "Could not set that." });
+  }
 });
 
 app.delete("/admin/stream-sources/:id", requireAuth, requireAdmin, async (req, res) => {
