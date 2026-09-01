@@ -548,6 +548,10 @@ async function initDb() {
       "ALTER TABLE user_streams ADD COLUMN IF NOT EXISTS refresh_token    TEXT",
       "ALTER TABLE user_streams ADD COLUMN IF NOT EXISTS token_expires_at TIMESTAMPTZ",
       "ALTER TABLE user_streams ADD COLUMN IF NOT EXISTS scope            TEXT",
+      // The one-time code a channel owner puts in their description to
+      // prove they can edit it. Cleared the moment it is matched.
+      "ALTER TABLE user_streams ADD COLUMN IF NOT EXISTS verify_code       TEXT",
+      "ALTER TABLE user_streams ADD COLUMN IF NOT EXISTS verify_expires_at TIMESTAMPTZ",
     ]) await pool.query(sql).catch(() => {});
 
     await pool.query(`

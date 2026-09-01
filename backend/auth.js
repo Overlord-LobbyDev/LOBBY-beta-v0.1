@@ -6609,6 +6609,141 @@ app.post("/admin/stream-sources/poll", requireAuth, requireAdmin, async (req, re
 });
 
 // ══════════════════════════════════════════════════════════════════
+// LINK A YOUTUBE CHANNEL BY PROVING YOU CAN EDIT IT
+//
+// The same shape as the Chess verification above: issue a code, the
+// owner puts it somewhere only an owner can put it, we read it back
+// from public data. Uses YOUTUBE_API_KEY — the key discovery already
+// needs — so there is no consent screen, no Google review, no test-user
+// list and nothing that expires.
+// ══════════════════════════════════════════════════════════════════
+
+/* One quota unit per call, whichever form the caller gave us. forHandle
+   takes @name, id takes a UC…, and a full URL is reduced to one of
+   those first so people can paste whatever they have to hand. */
+async function _ytLookupChannel(input) {
+  if (!YT_KEY) throw new Error("YOUTUBE_API_KEY is not set on the server");
+  const axios = require("axios");
+  const raw = String(input || "").trim();
+
+  let params = null;
+  const byId = raw.match(/(UC[\w-]{20,24})/);
+  const byHandle = raw.match(/@([\w.-]{3,})/);
+  if (byId) params = { id: byId[1] };
+  else if (byHandle) params = { forHandle: "@" + byHandle[1] };
+  else if (/^[\w.-]{3,}$/.test(raw)) params = { forHandle: "@" + raw };
+  if (!params) return null;
+
+  const r = await axios.get("https://www.googleapis.com/youtube/v3/channels", {
+    timeout: 10000,
+    params: Object.assign({ part: "snippet", key: YT_KEY }, params),
+  });
+  const item = r.data && r.data.items && r.data.items[0];
+  if (!item) return null;
+  return {
+    channelId: item.id,
+    title: (item.snippet && item.snippet.title) || item.id,
+    handle: (item.snippet && item.snippet.customUrl) || null,
+    description: (item.snippet && item.snippet.description) || "",
+    thumb: (item.snippet && item.snippet.thumbnails &&
+      (item.snippet.thumbnails.medium || item.snippet.thumbnails.default) || {}).url || null,
+  };
+}
+
+/* Unambiguous alphabet, same reasoning as the tournament codes: this
+   gets copied by hand between two windows. */
+function _ytMakeCode() {
+  const crypto = require("crypto");
+  const A = "ABCDEFGHJKLMNPQRTUVWXY23456789";
+  let out = "";
+  for (let i = 0; i < 6; i++) out += A[crypto.randomInt(A.length)];
+  return "LOBBY-" + out;
+}
+
+// POST /me/streams/youtube/start { channel } — find it, issue a code.
+app.post("/me/streams/youtube/start", requireAuth, async (req, res) => {
+  try {
+    const found = await _ytLookupChannel(req.body && req.body.channel);
+    if (!found) {
+      return res.status(404).json({
+        error: "No channel found. Paste your channel URL, your @handle, or your UC… id.",
+      });
+    }
+
+    /* Someone else having already PROVED this channel is theirs ends it
+       here: one channel, one owner. An unproven claim does not block. */
+    const taken = await pool.query(
+      `SELECT user_id FROM user_streams
+        WHERE platform = 'youtube' AND channel_id = $1 AND verified = TRUE
+          AND user_id <> $2 LIMIT 1`, [found.channelId, req.userId]);
+    if (taken.rows.length) {
+      return res.status(409).json({ error: "That channel is already linked to another account." });
+    }
+
+    const code = _ytMakeCode();
+    await pool.query(`
+      INSERT INTO user_streams (user_id, platform, channel_id, handle, url, verified,
+                                verify_code, verify_expires_at)
+      VALUES ($1,'youtube',$2,$3,$4,FALSE,$5, NOW() + INTERVAL '2 hours')
+      ON CONFLICT (user_id, platform, channel_id) DO UPDATE SET
+        handle = EXCLUDED.handle, url = EXCLUDED.url,
+        verify_code = EXCLUDED.verify_code,
+        verify_expires_at = EXCLUDED.verify_expires_at`,
+      [req.userId, found.channelId, found.handle || found.title,
+       "https://www.youtube.com/channel/" + found.channelId, code]);
+
+    res.json({
+      channelId: found.channelId, title: found.title,
+      handle: found.handle, thumb: found.thumb, code,
+    });
+  } catch (e) {
+    console.error("[youtube/start]", e.message);
+    res.status(500).json({ error: e.message.indexOf("YOUTUBE_API_KEY") >= 0
+      ? "YouTube lookups are not configured on the server yet."
+      : "Could not look that channel up." });
+  }
+});
+
+// POST /me/streams/youtube/check — read the description back.
+app.post("/me/streams/youtube/check", requireAuth, async (req, res) => {
+  try {
+    const row = await pool.query(
+      `SELECT id, channel_id, verify_code, verify_expires_at FROM user_streams
+        WHERE user_id = $1 AND platform = 'youtube' AND verify_code IS NOT NULL
+        ORDER BY id DESC LIMIT 1`, [req.userId]);
+    if (!row.rows.length) {
+      return res.status(400).json({ error: "Start the link first." });
+    }
+    const v = row.rows[0];
+    if (v.verify_expires_at && new Date(v.verify_expires_at) < new Date()) {
+      return res.status(400).json({ error: "That code expired. Start again for a fresh one." });
+    }
+
+    const found = await _ytLookupChannel(v.channel_id);
+    if (!found) return res.status(404).json({ error: "Could not read that channel." });
+
+    if (found.description.indexOf(v.verify_code) < 0) {
+      return res.status(409).json({
+        verified: false,
+        error: "The code is not in the channel description yet. YouTube can take a minute to publish an edit.",
+      });
+    }
+
+    /* Proved. The code is cleared so the description can go back to
+       normal — it was a one-time demonstration, not a permanent tag. */
+    await pool.query(
+      `UPDATE user_streams SET verified = TRUE, verify_code = NULL,
+              verify_expires_at = NULL, handle = $2 WHERE id = $1`,
+      [v.id, found.handle || found.title]);
+
+    res.json({ verified: true, channelId: found.channelId, title: found.title });
+  } catch (e) {
+    console.error("[youtube/check]", e.message);
+    res.status(500).json({ error: "Could not check that channel." });
+  }
+});
+
+// ══════════════════════════════════════════════════════════════════
 // SIGN IN WITH GOOGLE -> LINK YOUR YOUTUBE CHANNEL
 //
 // Needs GOOGLE_CLIENT_ID and GOOGLE_CLIENT_SECRET, and the callback
