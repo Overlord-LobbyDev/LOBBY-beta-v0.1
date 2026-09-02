@@ -82159,8 +82159,8 @@ body.q-max #queueOverlay{ padding:0 !important; }
           <div class="tp-code">
             <span class="tp-code-l">Have a code?</span>
             <input id="tpCode" maxlength="9" placeholder="ABCD1234" aria-label="Tournament code"
-                   onkeydown="if(event.key==='Enter')window.tpJoinCode()">
-            <button type="button" onclick="window.tpJoinCode()">Join</button>
+                   onkeydown="if(event.key==='Enter')window.tpJoinCode('tpCode')">
+            <button type="button" onclick="window.tpJoinCode('tpCode')">Join</button>
           </div>
           <button class="gt-cta-primary" type="button" onclick="window.openCreateTournament()">
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor"
@@ -82250,116 +82250,65 @@ body.q-max #queueOverlay{ padding:0 !important; }
             </div>
             <div id="tpCal"></div>
           </div>
-
-          <div class="tp-rail-b">
-            <div class="hub-sec tp-sec-l">
-              <div class="hub-sec-t">The bracket</div>
-              <div class="hub-sec-bar"></div>
-              <div class="hub-sec-k"><span id="tpPrevK">Preview</span></div>
-            </div>
-            <div id="tpPreview"></div>
-          </div>
         </aside>
       </div>
 
-      <!-- ── Three columns ──────────────────────────────────────────── -->
-      <section class="tp-tri">
+      <!-- ── Below the stage ────────────────────────────────────────
+           Split by what it is for, not by tournament state. The column
+           on the left is everything you act on and it does not scroll
+           away; the grid on the right is everything there is, with the
+           state as tabs. The preview opens over the grid, so it can be
+           wide without owning permanent space. -->
+      <section class="tp-below">
 
-            <div class="tp-col">
-              <div class="hub-sec tp-sec-l">
-                <div class="hub-sec-t">Ongoing</div>
-                <div class="hub-sec-bar"></div>
-                <div class="hub-sec-k">
-                  <span>01</span><span class="sep">/</span>
-                  <span>In progress</span><span class="sep">&middot;</span><span class="dot"></span>
-                  <b id="tpOnN">0</b> <span id="tpOnW">brackets</span>
-                </div>
-              </div>
-              <div class="tp-scroll-col" id="tpOngoing"></div>
-            </div>
+        <aside class="tp-cmd">
 
-            <!-- Wider, because it is the thing the page is for. -->
-            <div class="tp-col">
-              <div class="hub-sec tp-sec-l">
-                <div class="hub-sec-t">Run your own</div>
-                <div class="hub-sec-bar"></div>
-                <div class="hub-sec-k">
-                  <span>02</span><span class="sep">/</span>
-                  <span>Host</span>
-                </div>
-              </div>
-              <div class="tp-make">
-                <div class="tp-make-i" aria-hidden="true">
-                  <svg viewBox="0 0 24 24" width="26" height="26" fill="none" stroke="currentColor"
-                       stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
-                    <path d="M3 5h6v6H3zM3 13h6v6H3zM15 9h6v6h-6z"/><path d="M9 8h3v8h3"/></svg>
-                </div>
-                <h3>Build a bracket</h3>
-                <p>Public so anyone on Lobby can enter, or private with a code you hand out.
-                   Separate from a Lobby&rsquo;s own tournaments either way.</p>
-                <ol class="tp-steps">
-                  <li><b>01</b><span>Game</span></li>
-                  <li><b>02</b><span>Size</span></li>
-                  <li><b>03</b><span>Share</span></li>
-                </ol>
-                <div class="tp-make-do">
-                  <button class="gt-cta-primary" type="button" onclick="window.openCreateTournament()">
-                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor"
-                         stroke-width="2.8" stroke-linecap="round" aria-hidden="true">
-                      <line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
-                    <span>Create tournament</span>
-                  </button>
-                  <button class="tp-ghost" type="button" onclick="window.openMyTournaments()">See the ones you host</button>
-                </div>
-              </div>
+          <div class="tp-make">
+            <div class="tp-make-i" aria-hidden="true">
+              <svg viewBox="0 0 24 24" width="21" height="21" fill="none" stroke="currentColor"
+                   stroke-width="2.4" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg>
             </div>
+            <h3>Run one</h3>
+            <p>Public, or private with a code you hand out.</p>
+            <button class="gt-cta-primary" type="button" onclick="window.openCreateTournament()">
+              Create tournament</button>
+            <div class="tp-code tp-code-w">
+              <input id="tpCode2" maxlength="9" placeholder="ABCD1234" aria-label="Tournament code"
+                     onkeydown="if(event.key==='Enter')window.tpJoinCode('tpCode2')">
+              <button type="button" onclick="window.tpJoinCode('tpCode2')">Join</button>
+            </div>
+          </div>
 
-            <div class="tp-col">
+          <div class="tp-cmd-b" id="tpNextUp"></div>
+          <div class="tp-cmd-b" id="tpYoursSum"></div>
+
+        </aside>
+
+        <div class="tp-browse-wrap" id="tpBrowseWrap">
+          <div class="tp-browse-h">
+            <div id="tpTabs"></div>
+            <span class="tp-browse-k">
+              <b id="tpBrowseN">0</b> <span id="tpBrowseW">brackets</span>
+            </span>
+          </div>
+
+          <div id="tpBrowse"></div>
+
+          <aside class="tp-sheet" id="tpSheet" hidden>
+            <div class="tp-sheet-h">
               <div class="hub-sec tp-sec-l">
-                <div class="hub-sec-t">Upcoming</div>
+                <div class="hub-sec-t">The bracket</div>
                 <div class="hub-sec-bar"></div>
-                <div class="hub-sec-k">
-                  <span>03</span><span class="sep">/</span>
-                  <span>Not started</span><span class="sep">&middot;</span><span class="dot"></span>
-                  <b id="tpUpN">0</b> <span id="tpUpW">brackets</span>
-                </div>
+                <div class="hub-sec-k"><span id="tpPrevK">Preview</span></div>
               </div>
-              <div class="tp-scroll-col" id="tpUpcoming"></div>
+              <button type="button" class="tp-sheet-x" onclick="window.tpClosePreview()"
+                      aria-label="Close the preview">&#10005;</button>
             </div>
+            <div id="tpPreview"></div>
+          </aside>
+        </div>
 
       </section>
-
-      <!-- ── Your run ──────────────────────────────────────────────── -->
-      <div class="hub-sec">
-        <div class="hub-sec-t">Your run</div>
-        <div class="hub-sec-bar"></div>
-        <div class="hub-sec-k">
-          <span>04</span><span class="sep">/</span>
-          <svg viewBox="0 0 24 24" width="11" height="11" fill="none" stroke="currentColor"
-               stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-            <path d="M8 21h8M12 17v4M7 4h10v5a5 5 0 0 1-10 0z"/></svg>
-          <span>Entered</span><span class="sep">&middot;</span><span class="dot"></span>
-          <b id="tpYoursN">0</b> <span id="tpYoursW">brackets</span>
-        </div>
-      </div>
-      <div id="tpYours"></div>
-
-      <!-- ── Brackets ──────────────────────────────────────────────── -->
-      <div class="hub-sec">
-        <div class="hub-sec-t">Brackets</div>
-        <div class="hub-sec-bar"></div>
-        <div class="hub-sec-k">
-          <span>05</span><span class="sep">/</span>
-          <svg viewBox="0 0 24 24" width="11" height="11" fill="none" stroke="currentColor"
-               stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-            <path d="M3 5h6v6H3zM3 13h6v6H3zM15 9h6v6h-6z"/><path d="M9 8h3v8h3"/></svg>
-          <span>Public</span><span class="sep">&middot;</span><span class="dot"></span>
-          <b id="tpBrowseN">0</b> <span id="tpBrowseW">tournaments</span>
-        </div>
-        <div class="hub-sec-s">Private brackets are never listed here &mdash; they are reached with their code.</div>
-        <div class="hub-sec-act" id="tpRail"></div>
-      </div>
-      <div id="tpBrowse"></div>
 
     </div>
   </div>
@@ -82406,10 +82355,12 @@ body.q-max #queueOverlay{ padding:0 !important; }
      Speedrun and the legacy hub all do. The cap is only so an
      ultra-wide monitor does not stretch a row of text to a metre. */
   --tp-measure:2560px;
-  /* The page's columns, declared once. The top row (on air / stage /
-     calendar) and the row under it (ongoing / run your own / upcoming)
-     both read these, so their edges cannot drift apart. */
-  --tp-cols:minmax(0,340px) minmax(0,1fr) minmax(0,392px);
+  /* The page's rails, declared once. The top row uses both; the row
+     under it uses the left one. Nothing on this page sets a column
+     width of its own, so no edge can drift out of line with the edge
+     above it. */
+  --tp-rail-l:340px;
+  --tp-rail-r:392px;
   --tp-gap:26px;
   flex-direction:column;
 }
@@ -82499,22 +82450,20 @@ body.q-max #queueOverlay{ padding:0 !important; }
 
 /* ── Body: stage + columns on the left, rail on the right ──────── */
 /* Row one: what is on, what is playing, when things are.
-   Row two: what is running, how to start one, what is coming.
-   Same columns, so every edge lines up down the page. */
-.tp-body, .tp-tri{
-  display:grid; align-items:start;
-  grid-template-columns:var(--tp-cols);
-  gap:var(--tp-gap);
+   Row two: what you do, and everything there is.
+   Both start their left column on the same line. */
+.tp-body, .tp-below{
+  display:grid; align-items:start; gap:var(--tp-gap);
 }
-.tp-body{ margin-bottom:30px }
+.tp-body{
+  grid-template-columns:minmax(0,var(--tp-rail-l)) minmax(0,1fr) minmax(0,var(--tp-rail-r));
+  margin-bottom:30px;
+}
 .tp-stage-col{ min-width:0 }
 .tp-rail{ min-width:0; display:grid; gap:22px; align-content:start }
 .tp-rail-b{ min-width:0 }
 @media (max-width:1700px){
-  #tournamentsPage{
-    --tp-cols:minmax(0,290px) minmax(0,1fr) minmax(0,330px);
-    --tp-gap:20px;
-  }
+  #tournamentsPage{ --tp-rail-l:290px; --tp-rail-r:330px; --tp-gap:20px; }
 }
 /* Below this the stream leads and the rails share the row under it: a
    290px column beside a picture is a column of clipped words. The two
@@ -82522,7 +82471,6 @@ body.q-max #queueOverlay{ padding:0 !important; }
 @media (max-width:1240px){
   .tp-body{ grid-template-columns:minmax(0,1fr) minmax(0,1fr) }
   .tp-stage-col{ grid-column:1/-1; order:-1 }
-  .tp-tri{ grid-template-columns:minmax(0,1fr) }
 }
 @media (max-width:820px){ .tp-body{ grid-template-columns:minmax(0,1fr) } }
 
@@ -82684,11 +82632,104 @@ body.q-max #queueOverlay{ padding:0 !important; }
 .tp-blank h3{ margin:0; font-size:16px; font-weight:800 }
 .tp-blank p{ margin:0; font-size:13px; color:var(--text-3); max-width:46ch; line-height:1.6 }
 
-/* ── Three columns ─────────────────────────────────────────────── */
-/* The middle column is the stage's column, which is already wider than
-   the rails either side of it — so "wider in the middle" falls out of
-   the shared grid instead of being a second number to keep in step. */
-.tp-col{ min-width:0 }
+/* ── Below the stage ───────────────────────────────────────────── */
+/* Left: what you do, and it stays put. Right: what there is. */
+.tp-below{ grid-template-columns:minmax(0,var(--tp-rail-l)) minmax(0,1fr) }
+@media (max-width:1080px){ .tp-below{ grid-template-columns:minmax(0,1fr) } }
+.tp-cmd{
+  min-width:0; display:grid; gap:16px; align-content:start;
+  position:sticky; top:16px;
+}
+/* Sticky only helps while the column is shorter than the viewport;
+   past that it would trap the bottom of the column off screen. */
+@media (max-height:820px), (max-width:1080px){ .tp-cmd{ position:static } }
+.tp-cmd-b{
+  border:1px solid var(--tp-line); border-radius:15px; padding:15px;
+  background:var(--tp-surf); display:grid; gap:11px;
+}
+.tp-lab{
+  font-family:'JetBrains Mono', ui-monospace, monospace; font-size:8.5px; font-weight:700;
+  letter-spacing:1.6px; text-transform:uppercase; color:var(--text-3);
+}
+.tp-cmd-none{ margin:0; font-size:12.5px; color:var(--text-3); line-height:1.55 }
+.tp-cmd-chips{ display:flex; gap:6px; flex-wrap:wrap }
+
+/* What is coming for you. */
+.tp-nx{
+  display:grid; grid-template-columns:44px minmax(0,1fr); gap:11px; align-items:center;
+  padding:0; background:none; border:none; cursor:pointer; text-align:left; font-family:inherit;
+  min-width:0;
+}
+.tp-nx-art{
+  width:44px; height:44px; border-radius:10px; background:#14151d center/cover;
+  display:grid; place-content:center;
+  font-family:'Archivo', var(--font), sans-serif; font-size:15px; font-weight:900;
+  color:rgba(255,255,255,.32);
+}
+.tp-nx-b{ min-width:0; display:grid; gap:2px }
+.tp-nx-n{ font-size:14px; font-weight:800; color:var(--text-1);
+  overflow:hidden; text-overflow:ellipsis; white-space:nowrap }
+.tp-nx-s{ font-size:11px; color:var(--text-3);
+  overflow:hidden; text-overflow:ellipsis; white-space:nowrap }
+.tp-nx:hover .tp-nx-n{ color:#fff }
+/* The biggest number on the page, because for someone already in a
+   bracket it is the only one that changes anything. */
+.tp-clock{
+  font-family:'JetBrains Mono', ui-monospace, monospace; font-size:30px; font-weight:700;
+  letter-spacing:1.5px; color:var(--hub-accent); font-variant-numeric:tabular-nums;
+  line-height:1; text-shadow:0 0 34px color-mix(in srgb, var(--hub-accent) 55%, transparent);
+}
+.tp-clock.live{
+  display:flex; align-items:center; gap:9px; font-size:14px; letter-spacing:1.4px;
+  text-transform:uppercase; text-shadow:none;
+}
+.tp-clock.live i{
+  width:8px; height:8px; border-radius:50%; background:var(--tp);
+  animation:tpP 1.7s ease-in-out infinite;
+}
+.tp-clock.none{ font-size:13px; color:var(--text-3); letter-spacing:.4px; text-shadow:none }
+
+/* Wide enough to sit in the column rather than beside a label. */
+.tp-code-w{ width:100%; justify-content:space-between; padding-left:14px }
+.tp-code-w input{ width:100%; min-width:0 }
+
+/* ── The grid, and the sheet over it ───────────────────────────── */
+.tp-browse-wrap{ position:relative; min-width:0 }
+.tp-browse-h{
+  display:flex; align-items:center; gap:14px; flex-wrap:wrap; margin-bottom:16px;
+}
+.tp-browse-h .hub-rail{ margin:0; justify-content:flex-start }
+.tp-browse-k{
+  margin-left:auto;
+  font-family:'JetBrains Mono', ui-monospace, monospace; font-size:9.5px; font-weight:700;
+  letter-spacing:1.6px; text-transform:uppercase; color:var(--text-3);
+  padding:6px 13px; border-radius:99px;
+  background:rgba(255,255,255,.035); border:1px solid rgba(255,255,255,.07);
+}
+.tp-browse-k b{ color:#fff }
+/* Dimmed, not disabled: picking another card while the sheet is open
+   should swap what it shows rather than make you close it first. */
+.tp-browse-wrap.sheet-open #tpBrowse{ opacity:.42; transition:opacity .18s ease }
+@media (prefers-reduced-motion:reduce){ .tp-browse-wrap.sheet-open #tpBrowse{ transition:none } }
+.tp-sheet{
+  position:absolute; top:0; right:0; width:min(420px, 100%);
+  border-radius:16px; padding:15px;
+  background:linear-gradient(160deg,#191b28,#12131c);
+  border:1px solid color-mix(in srgb, var(--hub-accent) 34%, transparent);
+  box-shadow:-30px 0 80px -30px #000, 0 0 0 1px rgba(255,255,255,.04) inset;
+  display:grid; gap:12px; align-content:start;
+  max-height:none;
+}
+@media (max-width:820px){ .tp-sheet{ position:static; width:auto; margin-top:16px } }
+.tp-sheet-h{ display:flex; align-items:flex-start; gap:10px }
+.tp-sheet-h .hub-sec{ flex:1; margin:0 }
+.tp-sheet-x{
+  width:28px; height:28px; border-radius:8px; cursor:pointer; padding:0; flex:0 0 auto;
+  display:grid; place-content:center;
+  background:rgba(255,255,255,.06); border:1px solid var(--tp-line);
+  color:var(--text-2); font-size:11px; line-height:1;
+}
+.tp-sheet-x:hover{ background:rgba(255,255,255,.14); color:#fff }
 /* The shared section header, left-aligned and column-sized. Only the
    alignment and the scale change; it is the same component. */
 #tournamentsPage .hub-sec.tp-sec-l{
@@ -82761,29 +82802,6 @@ body.q-max #queueOverlay{ padding:0 !important; }
   box-shadow:0 0 0 1px color-mix(in srgb, var(--hub-accent) 32%, transparent);
 }
 
-/* ── Bracket rows ──────────────────────────────────────────────── */
-.tp-m{
-  display:grid; grid-template-columns:50px minmax(0,1fr); gap:12px;
-  padding:11px; text-align:left; cursor:pointer; font-family:inherit; align-items:start;
-}
-.tp-m-art{
-  width:50px; height:50px; border-radius:10px; background:#14151d center/cover;
-  display:grid; place-content:center;
-  font-family:'Archivo', var(--font), sans-serif; font-size:17px; font-weight:900;
-  color:rgba(255,255,255,.32);
-}
-.tp-m-b{ min-width:0; display:grid; gap:7px }
-.tp-m-top{ display:flex; align-items:center; gap:8px; min-width:0 }
-.tp-m-n{ font-size:13.5px; font-weight:800; overflow:hidden; text-overflow:ellipsis;
-  white-space:nowrap; flex:1; min-width:0 }
-.tp-m.on{
-  border-color:color-mix(in srgb, var(--hub-accent) 62%, transparent);
-  box-shadow:0 0 0 1px color-mix(in srgb, var(--hub-accent) 32%, transparent);
-}
-.tp-m-when{
-  font-family:'JetBrains Mono', ui-monospace, monospace; font-size:10px;
-  color:var(--hub-accent); white-space:nowrap;
-}
 /* The bracket, made visible. "Round 2" is a number; a rail of rounds
    says how far in it is and how much is left. */
 .tp-pips{ display:flex; align-items:center; gap:3px; flex-wrap:wrap }
@@ -82801,12 +82819,11 @@ body.q-max #queueOverlay{ padding:0 !important; }
   box-shadow:0 0 14px -4px color-mix(in srgb, var(--hub-accent) 80%, transparent);
 }
 .tp-pip-sep{ color:rgba(255,255,255,.16); font-size:8.5px }
-.tp-m-chips{ display:flex; gap:6px; flex-wrap:wrap }
 
 /* ── Run your own ──────────────────────────────────────────────── */
 .tp-make{
   display:grid; gap:11px; align-content:start;
-  padding:20px 20px 21px; border-radius:16px;
+  padding:18px; border-radius:16px;
   background:
     radial-gradient(560px 260px at 82% -10%, rgba(255,61,110,.22) 0%, transparent 64%),
     linear-gradient(160deg, rgba(255,61,110,.13), rgba(255,255,255,.018));
@@ -82825,18 +82842,7 @@ body.q-max #queueOverlay{ padding:0 !important; }
   text-shadow:0 1px 0 rgba(0,0,0,.5), 0 0 30px color-mix(in srgb, var(--hub-accent) 40%, transparent);
 }
 .tp-make p{ margin:0; font-size:13px; color:var(--text-2); line-height:1.62 }
-.tp-steps{ list-style:none; margin:3px 0 0; padding:0; display:flex; gap:8px; flex-wrap:wrap }
-.tp-steps li{
-  display:inline-flex; align-items:center; gap:7px; padding:7px 12px; border-radius:99px;
-  background:rgba(0,0,0,.24); border:1px solid rgba(255,255,255,.07);
-  font-size:11.5px; color:var(--text-2);
-}
-.tp-steps b{
-  font-family:'JetBrains Mono', ui-monospace, monospace; font-size:9.5px; font-weight:700;
-  color:var(--hub-accent); letter-spacing:.8px;
-}
-.tp-make-do{ display:grid; gap:9px; margin-top:3px }
-.tp-make-do .gt-cta-primary{ width:100%; justify-content:center }
+.tp-make .gt-cta-primary{ width:100%; justify-content:center }
 .tp-ghost{
   height:36px; padding:0 16px; border-radius:99px; cursor:pointer;
   background:rgba(255,255,255,.05); border:1px solid rgba(255,255,255,.12); color:var(--text-2);
@@ -82903,10 +82909,9 @@ body.q-max #queueOverlay{ padding:0 !important; }
 .tp-p-empty p{ margin:0; font-size:12.5px; color:var(--text-3); line-height:1.55; max-width:34ch }
 
 /* ── Your run and Brackets grids ───────────────────────────────── */
-.tp-mine{ display:grid; gap:13px; grid-template-columns:repeat(auto-fill,minmax(354px,1fr)) }
-.tp-grid{ display:grid; gap:16px; grid-template-columns:repeat(auto-fill,minmax(262px,1fr)) }
+.tp-grid{ display:grid; gap:16px; grid-template-columns:repeat(auto-fill,minmax(330px,1fr)) }
 .tp-c{ cursor:pointer; text-align:left; padding:0; font-family:inherit;
-  display:grid; grid-template-rows:116px auto }
+  display:grid; grid-template-rows:132px auto }
 .tp-c-art{ position:relative; background:#14151d center/cover }
 .tp-c-art::after{ content:''; position:absolute; inset:0;
   background:linear-gradient(0deg,rgba(10,11,17,.92),transparent 68%) }
@@ -83067,12 +83072,12 @@ body.q-max #queueOverlay{ padding:0 !important; }
     ? window.hubEmpty(o)
     : '<div class="hub-empty"><div class="hub-empty-t">' + esc(o.title) + '</div></div>'; }
 
-  var streams = [], idx = 0, rot = null, mine = [], all = [], filt = 'all';
+  var streams = [], idx = 0, rot = null, mine = [], all = [], filt = 'upcoming';
   /* Muted by default because autoplay demands it; remembered so a viewer
      who turned sound on does not have to every visit. */
   var muted = true;
   try { muted = localStorage.getItem('tp_muted') !== '0'; } catch (e) {}
-  var monthAt = null, selDay = null, findQ = '', selId = null;
+  var monthAt = null, selDay = null, findQ = '', selId = null, ticker = null;
 
   function gameOf(id){
     try { if (typeof window._gtGame === 'function') return window._gtGame(id) || null; } catch (e) {}
@@ -83114,8 +83119,10 @@ body.q-max #queueOverlay{ padding:0 !important; }
     setText('tpStatPlayers', num(u.reduce(function (n, r){ return n + (Number(r.entrants) || 0); }, 0)));
   }
 
-  window.tpJoinCode = async function (){
-    var el = $('tpCode');
+  /* Two boxes carry a code now — the bar and the command column — so the
+     handler is told which one it is reading. */
+  window.tpJoinCode = async function (which){
+    var el = $(which || 'tpCode');
     if (!el) return;
     var wrap = el.parentNode;
     var raw = String(el.value || '').toUpperCase().replace(/[^A-Z0-9]/g, '');
@@ -83410,113 +83417,205 @@ body.q-max #queueOverlay{ padding:0 !important; }
     return '<span class="tp-pips">' + out.join('<span class="tp-pip-sep">›</span>') + '</span>';
   }
 
-  /* One row, used by Ongoing, Upcoming and Your run. */
-  function bracketRow(t, extra){
-    var s = stageOf(t), g = gameOf(t.game), art = g && (g.cover || g.header);
-    var chips = [];
-    if (g && g.name) chips.push(chip(g.name));
-    if (t.entrants) chips.push(chip(t.entrants + ' in'));
-    if (t.isHost) chips.push(chip('You host', 'gold'));
-    else if (isMine(t.id)) chips.push(chip('You are in', 'on'));
-    var w = extra === 'when' ? when(t.startTime) : '';
-    return '<button type="button" class="tp-m hub-card' +
-        (String(t.id) === String(selId) ? ' on' : '') + '" ' +
-      'onclick="window.tpSelect(\'' + esc(t.id) + '\')">' +
-      '<span class="tp-m-art"' + (art ? ' style="background-image:url(\'' + esc(art) + '\')"' : '') + '>' +
-        (art ? '' : esc((t.name || '?').slice(0,1).toUpperCase())) + '</span>' +
-      '<span class="tp-m-b">' +
-        '<span class="tp-m-top"><span class="tp-m-n">' + esc(t.name || 'Tournament') + '</span>' +
-          (w ? '<span class="tp-m-when">' + esc(w) + '</span>'
-             : chip(s.l, s.k === 'live' ? 'live' : s.k === 'reg' ? 'gold' : '')) + '</span>' +
-        (s.of > 1 ? pips(s) : '') +
-        '<span class="tp-m-chips">' + chips.join('') + '</span>' +
-      '</span></button>';
-  }
-
-  /* ── Ongoing ─────────────────────────────────────────────────── */
-  function paintOngoing(){
-    var host = $('tpOngoing');
-    if (!host) return;
-    var list = everything().filter(isLive).sort(function (a, b){
-      return (Number(b.entrants) || 0) - (Number(a.entrants) || 0);
+  /* ── The command column ──────────────────────────────────────── */
+  /* What is coming for YOU, specifically. The payload has no match-level
+     data — no opponent, no per-round clock — so this says what it can
+     stand behind: the bracket that is live, or the next one of yours
+     with a start time, counted down to the second. */
+  function nextUp(){
+    var live = mine.filter(isLive);
+    if (live.length) return { t:live[0], live:true };
+    var now = Date.now();
+    var soon = mine.filter(function (t){
+      return !isDone(t) && t.startTime && new Date(t.startTime).getTime() > now;
+    }).sort(function (a, b){
+      return new Date(a.startTime).getTime() - new Date(b.startTime).getTime();
     });
-    setText('tpOnN', String(list.length));
-    setText('tpOnW', list.length === 1 ? 'bracket' : 'brackets');
-    host.innerHTML = list.length
-      ? list.map(function (t){ return bracketRow(t); }).join('')
-      : empty({ icon:'bolt', title:'Nothing in progress',
-                sub:'When a bracket starts it moves here, round by round, until someone wins it.' });
+    if (soon.length) return { t:soon[0], live:false };
+    var waiting = mine.filter(function (t){ return !isDone(t); });
+    if (waiting.length) return { t:waiting[0], live:false, undated:true };
+    return null;
   }
 
-  /* ── Upcoming ────────────────────────────────────────────────── */
-  function paintUpcoming(){
-    var host = $('tpUpcoming');
+  function fmtLeft(ms){
+    if (!(ms > 0)) return 'now';
+    var s = Math.floor(ms / 1000);
+    var d = Math.floor(s / 86400); s -= d * 86400;
+    var h = Math.floor(s / 3600);  s -= h * 3600;
+    var m = Math.floor(s / 60);    s -= m * 60;
+    var p = function (n){ return (n < 10 ? '0' : '') + n; };
+    /* Past a day, seconds are noise. */
+    return d ? d + 'd ' + h + 'h' : p(h) + ':' + p(m) + ':' + p(s);
+  }
+
+  /* Only the clock is re-rendered, so the panel around it does not
+     rebuild every second and eat a click mid-press. */
+  function tick(){
+    var el = $('tpClock');
+    if (!el){ stopTicker(); return; }
+    var iso = el.getAttribute('data-at');
+    if (!iso) return;
+    el.textContent = fmtLeft(new Date(iso).getTime() - Date.now());
+  }
+  function startTicker(){ stopTicker(); ticker = setInterval(tick, 1000); }
+  function stopTicker(){ if (ticker){ clearInterval(ticker); ticker = null; } }
+
+  function paintCmd(){
+    var host = $('tpNextUp');
+    if (host){
+      var n = nextUp();
+      if (!n){
+        host.innerHTML =
+          '<div class="tp-lab">Up next for you</div>' +
+          '<p class="tp-cmd-none">Nothing of yours is running. Enter one from the grid, join a ' +
+          'private bracket with its code, or start your own.</p>';
+        stopTicker();
+      } else {
+        var t = n.t, s = stageOf(t), g = gameOf(t.game), art = g && (g.cover || g.header);
+        host.innerHTML =
+          '<div class="tp-lab">Up next for you</div>' +
+          '<button type="button" class="tp-nx" onclick="window.tpSelect(\'' + esc(t.id) + '\')">' +
+            '<span class="tp-nx-art"' + (art ? ' style="background-image:url(\'' + esc(art) + '\')"' : '') + '>' +
+              (art ? '' : esc((t.name || '?').slice(0,1).toUpperCase())) + '</span>' +
+            '<span class="tp-nx-b">' +
+              '<span class="tp-nx-n">' + esc(t.name || 'Tournament') + '</span>' +
+              '<span class="tp-nx-s">' + esc(s.l) +
+                (g && g.name ? ' · ' + esc(g.name) : '') + '</span>' +
+            '</span></button>' +
+          (n.live
+            ? '<div class="tp-clock live"><i></i>In progress</div>'
+            : n.undated
+              ? '<div class="tp-clock none">No start time set</div>'
+              : '<div class="tp-clock" id="tpClock" data-at="' + esc(t.startTime) + '">' +
+                esc(fmtLeft(new Date(t.startTime).getTime() - Date.now())) + '</div>') +
+          '<button class="tp-ghost" type="button" onclick="window.tpOpen(\'' + esc(t.id) + '\')">' +
+            'Go to the bracket</button>';
+        if (n.live || n.undated) stopTicker(); else startTicker();
+      }
+    }
+
+    var sum = $('tpYoursSum');
+    if (sum){
+      var liveN = mine.filter(isLive).length;
+      var hostN = mine.filter(function (t){ return t.isHost; }).length;
+      var doneN = mine.filter(isDone).length;
+      sum.innerHTML =
+        '<div class="tp-lab">Yours &middot; ' + mine.length +
+          (mine.length === 1 ? ' entered' : ' entered') + '</div>' +
+        '<div class="tp-cmd-chips">' +
+          chip(liveN + ' live', liveN ? 'live' : '') +
+          chip(hostN + ' hosting', hostN ? 'gold' : '') +
+          chip(doneN + ' done') +
+        '</div>' +
+        '<button class="tp-ghost" type="button" onclick="window.openMyTournaments()">See all yours</button>';
+    }
+  }
+
+  /* ── The grid ────────────────────────────────────────────────── */
+  function keep(r){
+    if (filt === 'ongoing') return isLive(r);
+    if (filt === 'finished') return isDone(r);
+    return !isLive(r) && !isDone(r);          // upcoming
+  }
+  function paintBrowse(){
+    var host = $('tpBrowse'), tabs = $('tpTabs');
     if (!host) return;
-    /* Soonest first; the ones with no date at all sit at the bottom
-       rather than pretending to be imminent. */
-    var list = everything().filter(function (t){ return !isLive(t) && !isDone(t); })
-      .sort(function (a, b){
+    var u = everything();
+
+    if (tabs){
+      var items = [
+        { id:'upcoming', label:'Upcoming', count:u.filter(function (r){ return !isLive(r) && !isDone(r); }).length },
+        { id:'ongoing',  label:'Ongoing',  count:u.filter(isLive).length },
+        { id:'finished', label:'Finished', count:u.filter(isDone).length }
+      ];
+      tabs.innerHTML = typeof window.hubRail === 'function'
+        ? window.hubRail(items, filt, 'window.tpFilter')
+        : '';
+    }
+
+    var list = u.filter(keep);
+    setText('tpBrowseN', String(list.length));
+    setText('tpBrowseW', list.length === 1 ? 'bracket' : 'brackets');
+
+    /* Soonest first when looking forward, fullest first otherwise —
+       the thing most likely to need a decision, at the top. */
+    list = list.slice().sort(function (a, b){
+      if (filt === 'upcoming'){
         var ta = a.startTime ? new Date(a.startTime).getTime() : Infinity;
         var tb = b.startTime ? new Date(b.startTime).getTime() : Infinity;
         if (ta !== tb) return ta - tb;
-        return (Number(b.entrants) || 0) - (Number(a.entrants) || 0);
-      });
-    setText('tpUpN', String(list.length));
-    setText('tpUpW', list.length === 1 ? 'bracket' : 'brackets');
-    host.innerHTML = list.length
-      ? list.map(function (t){ return bracketRow(t, t.startTime ? 'when' : null); }).join('')
-      : empty({ icon:'timer', title:'Nothing scheduled',
-                sub:'Brackets taking entries appear here as soon as one exists.',
-                actions:'<button class="hub-chip on" style="cursor:pointer" ' +
-                        'onclick="window.openCreateTournament()">Create a tournament</button>' });
-  }
+      }
+      return (Number(b.entrants) || 0) - (Number(a.entrants) || 0);
+    });
 
-  /* ── Your run ────────────────────────────────────────────────── */
-  function paintYours(){
-    var host = $('tpYours');
-    if (!host) return;
-    setText('tpYoursN', String(mine.length));
-    setText('tpYoursW', mine.length === 1 ? 'bracket' : 'brackets');
-    if (!mine.length){
+    if (!list.length){
       host.innerHTML = empty({
-        icon:'trophy', title:'You are not in a bracket yet',
-        sub:'Enter a public one below, join a private one with its code, or run your own.',
+        icon: filt === 'ongoing' ? 'bolt' : filt === 'finished' ? 'trophy' : 'grid',
+        title: filt === 'ongoing' ? 'Nothing in progress'
+             : filt === 'finished' ? 'Nothing finished yet'
+             : 'Nothing coming up',
+        sub: filt === 'ongoing'
+          ? 'When a bracket starts it moves here, round by round, until someone wins it.'
+          : filt === 'finished'
+            ? 'Completed brackets keep their results and land here.'
+            : 'Be the first to run one. Pick a game, a format and a size — it takes about a minute.',
         actions:'<button class="hub-chip on" style="cursor:pointer" ' +
                 'onclick="window.openCreateTournament()">Create a tournament</button>'
       });
       return;
     }
-    host.innerHTML = '<div class="tp-mine">' +
-      mine.map(function (t){ return bracketRow(t); }).join('') + '</div>';
-  }
 
-  /* ── The preview ─────────────────────────────────────────────── */
-  /* Picking a bracket anywhere on the page shows it here instead of
-     opening it. Seeing who is in it and how far along it is without
-     entering was the point of asking for a preview at all. */
+    host.innerHTML = '<div class="tp-grid">' + list.map(function (r){
+      var g = gameOf(r.game), art = g && (g.header || g.cover);
+      var cap = Number(r.maxPlayers || r.max_players) || 0, ent = Number(r.entrants) || 0;
+      var pct = cap ? Math.min(100, Math.round(ent / cap * 100)) : 0;
+      var badge = isLive(r) ? '<span class="tp-c-badge live">' + esc(stageOf(r).l) + '</span>'
+                : isDone(r) ? '<span class="tp-c-badge">Finished</span>'
+                : '<span class="tp-c-badge open">' + (cap ? Math.max(0, cap - ent) + ' seats' : 'Open') + '</span>';
+      var chips = [];
+      if (g && g.name) chips.push(chip(g.name));
+      if (r.prize) chips.push(chip(r.prize, 'gold'));
+      if (isMine(r.id)) chips.push(chip(r.isHost ? 'You host' : 'You are in', 'on'));
+      var w = when(r.startTime);
+      return '<button type="button" class="tp-c hub-card' +
+          (String(r.id) === String(selId) ? ' on' : '') + '" ' +
+        'onclick="window.tpSelect(\'' + esc(r.id) + '\')">' +
+        '<span class="tp-c-art"' + (art ? ' style="background-image:url(\'' + esc(art) + '\')"' : '') + '>' +
+          badge + (art ? '' : '<span class="tp-c-fb">' + esc((r.name || '?').slice(0,1).toUpperCase()) + '</span>') +
+        '</span>' +
+        '<span class="tp-c-b">' +
+          '<span class="tp-c-t">' + esc(r.name || 'Tournament') + '</span>' +
+          '<span class="tp-c-chips">' + chips.join('') + '</span>' +
+          (cap
+            ? '<span class="tp-fillbar' + (pct >= 100 ? ' full' : '') + '"><span style="width:' + pct + '%"></span></span>'
+            : '') +
+          '<span class="tp-c-seats">' + (cap ? ent + ' / ' + cap : ent + ' in') +
+            (w && !isDone(r) ? ' &middot; ' + esc(w) : '') + '</span>' +
+        '</span></button>';
+    }).join('') + '</div>';
+  }
+  window.tpFilter = function (id){ filt = id; paintBrowse(); };
+
+  /* ── The preview, as a sheet over the grid ───────────────────── */
   window.tpSelect = function (id){
     selId = String(id);
-    paintPreview(); paintOngoing(); paintUpcoming(); paintYours(); paintBrowse();
-    var el = $('tpPreview');
-    if (el && el.scrollIntoView) el.scrollIntoView({ block:'nearest', behavior:'smooth' });
+    paintPreview(); paintBrowse();
+    var sheet = $('tpSheet'), wrap = $('tpBrowseWrap');
+    if (sheet) sheet.hidden = false;
+    if (wrap) wrap.classList.add('sheet-open');
+    /* The grid behind stays clickable on purpose: picking another card
+       should swap what the sheet shows rather than making you close it
+       first. Dimmed, not disabled. */
+    if (sheet && sheet.scrollIntoView) sheet.scrollIntoView({ block:'nearest', behavior:'smooth' });
+  };
+  window.tpClosePreview = function (){
+    var sheet = $('tpSheet'), wrap = $('tpBrowseWrap');
+    if (sheet) sheet.hidden = true;
+    if (wrap) wrap.classList.remove('sheet-open');
+    selId = null;
+    paintBrowse();
   };
   window.tpOpen = function (id){ if (window.gtJoin) window.gtJoin(String(id)); };
-
-  /* Something worth looking at before anything is picked: one you are in
-     and that is live, else the fullest thing open. */
-  function bestPick(){
-    var u = everything();
-    if (!u.length) return null;
-    var mineLive = mine.filter(isLive)[0];
-    if (mineLive) return String(mineLive.id);
-    var anyLive = u.filter(isLive)[0];
-    if (anyLive) return String(anyLive.id);
-    var open = all.filter(isOpen).slice().sort(function (a, b){
-      return (Number(b.entrants) || 0) - (Number(a.entrants) || 0);
-    })[0];
-    if (open) return String(open.id);
-    return String(u[0].id);
-  }
 
   function faces(t){
     var f = Array.isArray(t.faces) ? t.faces : [];
@@ -83533,15 +83632,13 @@ body.q-max #queueOverlay{ padding:0 !important; }
   function paintPreview(){
     var host = $('tpPreview');
     if (!host) return;
-    if (!selId) selId = bestPick();
     var t = selId ? byId(selId) : null;
-
     if (!t){
       setText('tpPrevK', 'Preview');
       host.innerHTML =
         '<div class="tp-p-empty"><h4>Nothing picked</h4>' +
-        '<p>Choose a bracket from any column, the calendar or the shelf below, and it opens ' +
-        'here &mdash; who is in it, how far along it is and when it runs &mdash; without entering it.</p></div>';
+        '<p>Choose a bracket and it opens here &mdash; who is in it, how far along it is and ' +
+        'when it runs &mdash; without entering it.</p></div>';
       return;
     }
 
@@ -83605,7 +83702,7 @@ body.q-max #queueOverlay{ padding:0 !important; }
       '</div>';
   }
 
-  /* The preview's own link into the month below it. */
+  /* The preview's own link into the month in the rail above. */
   window.tpShowOn = function (id){
     var t = byId(id);
     if (!t || !t.startTime) return;
@@ -83615,90 +83712,8 @@ body.q-max #queueOverlay{ padding:0 !important; }
     selDay = d.getFullYear() + '-' + (d.getMonth()+1) + '-' + d.getDate();
     paintCal();
     var el = $('tpCal');
-    if (el && el.scrollIntoView) el.scrollIntoView({ block:'start', behavior:'smooth' });
+    if (el && el.scrollIntoView) el.scrollIntoView({ block:'center', behavior:'smooth' });
   };
-
-  /* ── Brackets ────────────────────────────────────────────────── */
-  function keep(r){
-    if (filt === 'live') return isLive(r);
-    if (filt === 'open') return isOpen(r) && !isLive(r);
-    if (filt === 'done') return isDone(r);
-    return true;
-  }
-  function paintBrowse(){
-    var host = $('tpBrowse'), rail = $('tpRail');
-    if (!host) return;
-
-    if (rail){
-      var items = [
-        { id:'all',  label:'All',      count:all.length },
-        { id:'live', label:'Live',     count:all.filter(isLive).length },
-        { id:'open', label:'Open',     count:all.filter(function (r){ return isOpen(r) && !isLive(r); }).length },
-        { id:'done', label:'Finished', count:all.filter(isDone).length }
-      ];
-      rail.innerHTML = typeof window.hubRail === 'function'
-        ? window.hubRail(items, filt, 'window.tpFilter')
-        : '';
-    }
-
-    var list = all.filter(keep);
-    setText('tpBrowseN', String(list.length));
-    setText('tpBrowseW', list.length === 1 ? 'tournament' : 'tournaments');
-
-    /* Live first, then what is filling up: the two things that make
-       somebody act now. */
-    var rank = { LIVE:0, STARTING:1, OPEN:2, REGISTRATION:2 };
-    list = list.slice().sort(function (a, b){
-      var ra = rank[stat(a)], rb = rank[stat(b)];
-      ra = ra == null ? 3 : ra; rb = rb == null ? 3 : rb;
-      if (ra !== rb) return ra - rb;
-      return (Number(b.entrants) || 0) - (Number(a.entrants) || 0);
-    });
-
-    if (!list.length){
-      host.innerHTML = empty({
-        icon:'grid',
-        title: filt === 'all' ? 'No public tournaments yet' : 'Nothing under that filter',
-        sub: filt === 'all'
-          ? 'Be the first to run one. Pick a game, a format and a size — it takes about a minute.'
-          : 'There may be brackets under a different heading. Private ones are never listed here; they are reached with their code.',
-        actions: filt === 'all'
-          ? '<button class="hub-chip on" style="cursor:pointer" onclick="window.openCreateTournament()">Create a tournament</button>'
-          : '<button class="hub-chip on" style="cursor:pointer" onclick="window.tpFilter(\'all\')">Show all</button>'
-      });
-      return;
-    }
-
-    host.innerHTML = '<div class="tp-grid">' + list.map(function (r){
-      var g = gameOf(r.game), art = g && (g.header || g.cover);
-      var cap = Number(r.maxPlayers || r.max_players) || 0, ent = Number(r.entrants) || 0;
-      var pct = cap ? Math.min(100, Math.round(ent / cap * 100)) : 0;
-      var badge = isLive(r) ? '<span class="tp-c-badge live">Live</span>'
-                : isDone(r) ? '<span class="tp-c-badge">Finished</span>'
-                : '<span class="tp-c-badge open">' + (cap ? Math.max(0, cap - ent) + ' seats' : 'Open') + '</span>';
-      var chips = [];
-      if (g && g.name) chips.push(chip(g.name));
-      if (r.format) chips.push(chip(r.format));
-      if (r.prize) chips.push(chip(r.prize, 'gold'));
-      var w = when(r.startTime);
-      if (w && !isDone(r)) chips.push(chip(w));
-      return '<button type="button" class="tp-c hub-card' +
-          (String(r.id) === String(selId) ? ' on' : '') + '" ' +
-        'onclick="window.tpSelect(\'' + esc(r.id) + '\')">' +
-        '<span class="tp-c-art"' + (art ? ' style="background-image:url(\'' + esc(art) + '\')"' : '') + '>' +
-          badge + (art ? '' : '<span class="tp-c-fb">' + esc((r.name || '?').slice(0,1).toUpperCase()) + '</span>') +
-        '</span>' +
-        '<span class="tp-c-b">' +
-          '<span class="tp-c-t">' + esc(r.name || 'Tournament') + '</span>' +
-          '<span class="tp-c-chips">' + chips.join('') + '</span>' +
-          (cap
-            ? '<span class="tp-fillbar' + (pct >= 100 ? ' full' : '') + '"><span style="width:' + pct + '%"></span></span>' +
-              '<span class="tp-c-seats">' + ent + ' / ' + cap + ' entrants</span>'
-            : '<span class="tp-c-seats">' + ent + ' entrants</span>') +
-        '</span></button>';
-    }).join('') + '</div>';
-  }
-  window.tpFilter = function (id){ filt = id; paintBrowse(); };
 
   /* ── The calendar ────────────────────────────────────────────── */
   function dayKey(d){ return d.getFullYear() + '-' + (d.getMonth()+1) + '-' + d.getDate(); }
@@ -83707,7 +83722,7 @@ body.q-max #queueOverlay{ padding:0 !important; }
     streams.forEach(function (m){
       if (m.live){
         /* On now. It has no future start to place on a day, so it is
-           flagged rather than dated: the agenda leads with it and the
+           flagged rather than dated: the list leads with it and the
            month grid leaves it out. */
         out.push({ at:new Date(), live:true, kind:'event', id:m.id, name:m.name,
                    sub:m.game || m.organiser || 'Live now' });
@@ -83840,11 +83855,9 @@ body.q-max #queueOverlay{ padding:0 !important; }
   /* ── Loading ─────────────────────────────────────────────────── */
   function skeletons(){
     if (typeof window.hubSkeletons !== 'function') return;
-    var l = $('tpLive');    if (l && !l.innerHTML) l.innerHTML = window.hubSkeletons(5, 70);
-    var o = $('tpOngoing'); if (o && !o.innerHTML) o.innerHTML = window.hubSkeletons(3, 92);
-    var u = $('tpUpcoming');if (u && !u.innerHTML) u.innerHTML = window.hubSkeletons(3, 92);
+    var l = $('tpLive');   if (l && !l.innerHTML) l.innerHTML = window.hubSkeletons(5, 70);
     var b = $('tpBrowse');
-    if (b && !b.innerHTML) b.innerHTML = '<div class="tp-grid">' + window.hubSkeletons(8, 210) + '</div>';
+    if (b && !b.innerHTML) b.innerHTML = '<div class="tp-grid">' + window.hubSkeletons(6, 230) + '</div>';
   }
 
   async function load(){
@@ -83865,13 +83878,12 @@ body.q-max #queueOverlay{ padding:0 !important; }
     var m = await api('/me/tournaments').catch(function (){ return null; });
     mine = Array.isArray(m) ? m : [];
 
-    paintTop(); paintOngoing(); paintUpcoming(); paintYours();
-    paintBrowse(); paintPreview(); paintCal();
+    paintTop(); paintCmd(); paintBrowse(); paintPreview(); paintCal();
   }
 
   function paintAll(){
-    paintPlayer(); paintLive(); paintOngoing(); paintUpcoming();
-    paintYours(); paintBrowse(); paintPreview(); paintCal(); paintTop();
+    paintPlayer(); paintLive(); paintCmd(); paintBrowse();
+    paintPreview(); paintCal(); paintTop();
   }
 
   /* Hiding an overlay does not stop an iframe inside it. Watch the
@@ -83886,9 +83898,10 @@ body.q-max #queueOverlay{ padding:0 !important; }
       var open = ov.classList.contains('open');
       if (open === !!ov.__tpOpen) return;         // only act on a real change
       ov.__tpOpen = open;
-      if (open){ paintPlayer(); paintLive(); }
+      if (open){ paintPlayer(); paintLive(); paintCmd(); }
       else {
         clearInterval(rot);
+        stopTicker();
         var host = $('tpPlayer');
         /* Emptying the node is what actually stops the download. Setting
            the src to about:blank leaves a frame behind; removing it does
@@ -83903,13 +83916,14 @@ body.q-max #queueOverlay{ padding:0 !important; }
     window.showOverlay('tournamentsPage', paintAll);
     watchVisibility();
     /* The bar is fixed and only the page scrolls, so a second visit must
-       not open halfway down the calendar. */
+       not open halfway down. */
     var sc = $('tpScroll');
     if (sc) sc.scrollTop = 0;
     load();
   };
   window.closeTournamentsPage = function (){
     clearInterval(rot);
+    stopTicker();
     /* Belt and braces with the observer: whichever runs first, the
        player stops. */
     var host = $('tpPlayer');
