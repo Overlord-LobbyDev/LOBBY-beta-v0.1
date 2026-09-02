@@ -82183,7 +82183,7 @@ body.q-max #queueOverlay{ padding:0 !important; }
       <div class="tp-body">
 
         <!-- ── Left rail: what is on ────────────────────────────────── -->
-        <aside class="tp-rail tp-rail-l">
+        <aside class="tp-rail">
           <div class="tp-rail-b">
             <div class="hub-sec tp-sec-l">
               <div class="hub-sec-t">On air</div>
@@ -82201,7 +82201,7 @@ body.q-max #queueOverlay{ padding:0 !important; }
                 <button type="button" id="tpFindX" onclick="window.tpSearch('')" aria-label="Clear search">&#10005;</button>
               </div>
             </div>
-            <div class="tp-scroll-col tp-air-list" id="tpLive"></div>
+            <div class="tp-scroll-col" id="tpLive"></div>
           </div>
         </aside>
 
@@ -82380,6 +82380,18 @@ body.q-max #queueOverlay{ padding:0 !important; }
      leftover plus the padding; on anything narrower it is just the
      padding, which is what max() settles. */
   --tp-bleed:max(var(--tp-pad), calc((100vw - var(--tp-measure)) / 2 + var(--tp-pad)));
+}
+/* Grain, so the ground reads as a screen rather than as a fill. Drawn
+   rather than fetched: an inline SVG turbulence, no asset and no
+   request. Under everything — over the content it would soften every
+   edge on the page. */
+#tournamentsPage::after{
+  content:''; position:absolute; inset:0; z-index:0; pointer-events:none;
+  opacity:.5;
+  background-image:url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='140' height='140'><filter id='n'><feTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='3' stitchTiles='stitch'/><feColorMatrix type='saturate' values='0'/></filter><rect width='140' height='140' filter='url(%23n)' opacity='0.32'/></svg>");
+}
+@media (prefers-reduced-motion:reduce){ #tournamentsPage::after{ opacity:.34 } }
+#tournamentsPage{
   flex-direction:column;
 }
 
@@ -82464,32 +82476,72 @@ body.q-max #queueOverlay{ padding:0 !important; }
 .tp-code button:hover{ background:var(--tp); border-color:var(--tp); color:#fff }
 
 /* ── Scroller ──────────────────────────────────────────────────── */
-#tpScroll{ flex:1; min-height:0; overflow-y:auto; overflow-x:hidden;
+/* Above the grain, which is a pseudo-element on the overlay at z-index
+   0. Over the content it would fuzz every card edge; under it, it only
+   textures the ground. */
+#tpScroll{ position:relative; z-index:1;
+  flex:1; min-height:0; overflow-y:auto; overflow-x:hidden;
   scrollbar-width:thin; scrollbar-color:rgba(255,255,255,.14) transparent }
 #tpScroll::-webkit-scrollbar{ width:10px }
 #tpScroll::-webkit-scrollbar-thumb{ background:rgba(255,255,255,.14); border-radius:99px }
-.tp-measure{ max-width:var(--tp-measure); margin:0 auto; padding:24px var(--tp-pad) 64px }
+/* No top padding: the band starts where the bar ends, which is what
+   lets the two read as one surface rather than as a panel below a bar. */
+.tp-measure{ max-width:var(--tp-measure); margin:0 auto; padding:0 var(--tp-pad) 64px }
 
 /* ── Body: stage + columns on the left, rail on the right ──────── */
-/* Row one: what is on, what is playing, when things are.
-   Row two: what you do, and everything there is.
-   Both start their left column on the same line. */
-.tp-body, .tp-below{
-  display:grid; align-items:start; gap:var(--tp-gap);
-}
+/* Row two: what you do, and everything there is. */
+.tp-below{ display:grid; align-items:start; gap:var(--tp-gap) }
+
+/* ── Row one is one band, not three panels ─────────────────────────
+   The band carries the bleed, the fill and the lit top edge. The three
+   columns carry nothing but a seam between them, and stretch to a
+   common height — three things starting on the same line still read as
+   three things; three regions of one surface do not. */
 .tp-body{
+  display:grid; align-items:stretch;
   grid-template-columns:minmax(0,var(--tp-rail-l)) minmax(0,1fr) minmax(0,var(--tp-rail-r));
-  margin-bottom:30px;
-}
-.tp-stage-col{ min-width:0 }
-.tp-rail{ min-width:0; display:grid; gap:20px; align-content:start }
-/* Each rail block sits on a surface, so On air and the calendar read as
-   two blocks rather than as loose contents on the page ground. */
-.tp-rail-b{
-  min-width:0; padding:15px; border-radius:16px;
+  gap:0;
+  position:relative; isolation:isolate;
+  margin:0 calc(var(--tp-bleed) * -1) 30px;
+  padding:0 var(--tp-bleed);
   background:var(--tp-well);
-  border:1px solid var(--tp-edge);
+  border-bottom:1px solid var(--tp-edge);
   box-shadow:inset 0 1px 0 var(--tp-lip);
+}
+/* Above the tint, which is a positioned pseudo-element at z-index 0. */
+.tp-body > *{ position:relative; z-index:1 }
+/* The seams. One rule draws both, because they are the same line. */
+.tp-stage-col{ border-left:1px solid var(--tp-edge); border-right:1px solid var(--tp-edge) }
+
+/* ── 02: the band takes its colour from what is playing ────────────
+   The broadcast's own artwork, blurred hard and held low. Discover does
+   exactly this on its cards; this is the same trick one level up.
+
+   Why the blur is allowed here: the flicker audit forbids blur
+   INTERPOLATED in a keyframe, and blur on the big fixed panels, because
+   both re-rasterise on every page change. This is static, bounded to the
+   band, and repaints only when the stream changes. */
+.tp-body::before{
+  content:''; position:absolute; inset:0; z-index:0; pointer-events:none;
+  background-image:var(--tp-art, none);
+  background-size:cover; background-position:center 30%;
+  /* Low and desaturated on purpose: blurring artwork hard gives the
+     average of the whole frame, and for most broadcast graphics that is
+     mud unless it is held well back. */
+  filter:blur(64px) saturate(1.25) brightness(.62);
+  opacity:.38;
+}
+/* Nothing to tint from, and the page keeps its own ground. */
+#tournamentsPage:not([style*="--tp-art"]) .tp-body::before{ opacity:0 }
+.tp-stage-col{ min-width:0; padding:15px }
+.tp-rail{ min-width:0; display:grid; gap:20px; align-content:start }
+/* A region of the band rather than a panel on the page: no fill, no
+   border, no radius. The head sits at its natural height and the list
+   takes the rest, which is what lets the columns be equal height
+   without the contents floating in the middle of them. */
+.tp-rail-b{
+  min-width:0; padding:15px; height:100%;
+  display:grid; grid-template-rows:auto minmax(0,1fr);
 }
 
 /* ── The rails are anchored to the window ──────────────────────────
@@ -82497,12 +82549,6 @@ body.q-max #queueOverlay{ padding:0 !important; }
    rounded only on the inside one, and no border where there is no edge
    to draw. The padding is increased by exactly what the margin pulls
    back, so nothing inside moves — only the surface grows outward. */
-.tp-rail-l .tp-rail-b{
-  margin-left:calc(var(--tp-bleed) * -1);
-  padding-left:calc(var(--tp-bleed) + 15px);
-  border-left:0; border-top-left-radius:0; border-bottom-left-radius:0;
-  background:linear-gradient(90deg, rgba(0,0,0,.34), var(--tp-well) 60%);
-}
 
 
 /* The cards go out with it. The negative margin is on the SCROLLING
@@ -82512,22 +82558,23 @@ body.q-max #queueOverlay{ padding:0 !important; }
    horizontal scrollbar inside the rail. The column reaches the edge and
    the cards simply fill it, their padding putting the content back
    where it was. */
-.tp-rail-l .tp-scroll-col{ margin-left:calc((var(--tp-bleed) + 15px) * -1); padding-left:0 }
-.tp-rail-l .tp-air{
-  padding-left:calc(var(--tp-bleed) + 23px);
-  border-left:0; border-top-left-radius:0; border-bottom-left-radius:0;
-}
 
 /* Stacked, neither rail is against an edge any more, so the whole
    thing stands down rather than pulling into the middle of the page. */
 @media (max-width:1240px){
-  .tp-rail-l .tp-rail-b{
-    margin:0; padding:15px;
-    border:1px solid var(--tp-edge);
-    background:var(--tp-well);
+  /* Stacked, the band is no longer a band: the columns are rows, so
+     each takes its own surface back and the seams come off. */
+  .tp-body{
+    margin:0 0 30px; padding:0; gap:var(--tp-gap);
+    background:none; border-bottom:0; box-shadow:none;
   }
-  .tp-rail-l .tp-scroll-col{ margin-left:0; padding-right:5px }
-  .tp-rail-l .tp-air{ padding:8px; border-left-width:1px }
+  .tp-body::before{ display:none }
+  .tp-stage-col{ border-left:0; border-right:0 }
+  .tp-rail-b{
+    height:auto; padding:15px;
+    border:1px solid var(--tp-edge); background:var(--tp-well);
+    box-shadow:inset 0 1px 0 var(--tp-lip);
+  }
 }
 @media (max-width:1700px){
   #tournamentsPage{ --tp-rail-l:290px; --tp-rail-r:330px; --tp-gap:20px; }
@@ -82789,10 +82836,12 @@ body.q-max #queueOverlay{ padding:0 !important; }
    tall as its longest column. */
 .tp-scroll-col{
   display:grid; gap:9px; align-content:start;
-  max-height:474px; overflow-y:auto; padding-right:5px;
+  min-height:0; max-height:474px; overflow-y:auto; padding-right:5px;
   scrollbar-width:thin; scrollbar-color:rgba(255,255,255,.14) transparent;
 }
-.tp-air-list{ max-height:560px }
+/* Inside the band it fills its column rather than stopping short. */
+.tp-rail-b .tp-scroll-col{ max-height:none }
+@media (max-width:1240px){ .tp-rail-b .tp-scroll-col{ max-height:474px } }
 .tp-scroll-col::-webkit-scrollbar{ width:6px }
 .tp-scroll-col::-webkit-scrollbar-thumb{ background:rgba(255,255,255,.14); border-radius:99px }
 
@@ -83157,7 +83206,6 @@ body.q-max #queueOverlay{ padding:0 !important; }
    glass. Border-colour is kept as the mechanism rather than replaced by
    a ring, because hover and selection already work by changing it. */
 #tournamentsPage .hub-card,
-#tournamentsPage .tp-rail-b,
 #tournamentsPage .tp-cmd-b,
 #tournamentsPage .tp-sheet,
 #tournamentsPage .tp-p,
@@ -83176,10 +83224,6 @@ body.q-max #queueOverlay{ padding:0 !important; }
 }
 /* The rails keep their square outer edge and lose the inner rounding
    with everything else. */
-#tournamentsPage .tp-rail-l .tp-rail-b,
-#tournamentsPage .tp-rail-l .tp-air{
-  border-radius:0;
-}
 /* The cut corner is a diagonal on a rounded box; on a square one it is
    just a notch out of the corner, which fights the straight edge. */
 #tournamentsPage .hub-card::after{ display:none }
@@ -83316,11 +83360,12 @@ body.q-max #queueOverlay{ padding:0 !important; }
         '<h3>Nothing on right now</h3>' +
         '<p>The moment a watched channel goes live it plays here, and when none is, ' +
         'whatever starts next takes the stage.</p></div>';
-      paintBar(); paintPager();
+      paintBar(); paintPager(); paintTint(null);
       return;
     }
     if (idx >= streams.length) idx = 0;
     var m = streams[idx], src = embed(m);
+    paintTint(m);
     host.innerHTML = src
       ? '<iframe src="' + esc(src) + '" allow="autoplay; encrypted-media; picture-in-picture" ' +
         'allowfullscreen title="' + esc(m.name) + '"></iframe>'
@@ -83329,6 +83374,18 @@ body.q-max #queueOverlay{ padding:0 !important; }
         '<svg viewBox="0 0 24 24" width="24" height="24" fill="currentColor">' +
         '<path d="M8 5v14l11-7z"/></svg></button>';
     paintBar(); paintPager();
+  }
+
+  /* The band takes its colour from whatever is playing. Set as a custom
+     property so the tint is pure CSS; the URL is rejected rather than
+     escaped if it carries a quote or a paren, because those would break
+     out of the url() and there is no legitimate artwork URL with one. */
+  function paintTint(m){
+    var page = $('tournamentsPage');
+    if (!page) return;
+    var art = m && m.art ? String(m.art) : '';
+    if (!art || /["')(]/.test(art)) { page.style.removeProperty('--tp-art'); return; }
+    page.style.setProperty('--tp-art', 'url("' + art + '")');
   }
 
   var SPK_ON = '<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" ' +
