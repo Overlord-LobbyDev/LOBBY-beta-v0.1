@@ -1,0 +1,735 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Tournaments — below the stage</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo:wght@600;900&family=Barlow:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;700&display=swap">
+
+<style>
+/* ─────────────────────────────────────────────────────────────────
+   Single theme on purpose. The subject is a dark desktop app, and
+   rendering these on a light ground would misrepresent the thing being
+   judged. Every colour is painted explicitly, body included.
+   ───────────────────────────────────────────────────────────────── */
+:root{
+  --ground:#0d0e16;
+  --surface:#151622;
+  --surface-2:#1b1d2b;
+  --line:#252838;
+  --line-soft:#1e2130;
+  --text:#eceef6;
+  --text-2:#a8adc4;
+  --text-3:#6f748d;
+  --accent:#ff3d6e;
+  --accent-dim:rgba(255,61,110,.14);
+  --gold:#f0b429;
+  --mono:'JetBrains Mono', ui-monospace, monospace;
+  --display:'Archivo', system-ui, sans-serif;
+  color-scheme:dark;
+}
+*{box-sizing:border-box}
+html,body{margin:0}
+body{
+  background:
+    radial-gradient(1100px 520px at 78% -8%, rgba(255,61,110,.13) 0%, transparent 62%),
+    var(--ground);
+  color:var(--text);
+  font-family:'Barlow', system-ui, sans-serif;
+  font-size:15px; line-height:1.6;
+  padding:0 0 100px;
+}
+.wrap{max-width:1500px;margin:0 auto;padding:0 32px}
+
+/* ── Page furniture ───────────────────────────────────────────── */
+header.top{padding:64px 0 40px;border-bottom:1px solid var(--line-soft);margin-bottom:52px}
+.eyebrow{
+  display:inline-flex;align-items:center;gap:8px;
+  font-family:var(--mono);font-size:10px;font-weight:700;
+  letter-spacing:2.2px;text-transform:uppercase;color:var(--accent);
+  background:var(--accent-dim);border:1px solid rgba(255,61,110,.34);
+  padding:6px 13px;border-radius:99px;
+}
+h1{
+  font-family:var(--display);font-weight:900;font-size:clamp(34px,4.4vw,58px);
+  letter-spacing:1.5px;text-transform:uppercase;line-height:1.02;margin:20px 0 0;
+}
+h1 span{color:var(--accent)}
+.lede{max-width:74ch;color:var(--text-2);font-size:17px;margin:20px 0 0}
+.lede b{color:var(--text)}
+
+.problem{
+  margin-top:34px;display:grid;gap:14px;
+  grid-template-columns:repeat(auto-fit,minmax(280px,1fr));
+}
+.prob{
+  background:var(--surface);border:1px solid var(--line);border-radius:13px;padding:16px 17px;
+}
+.prob h4{
+  margin:0 0 7px;font-family:var(--mono);font-size:10px;font-weight:700;
+  letter-spacing:1.6px;text-transform:uppercase;color:var(--accent);
+}
+.prob p{margin:0;font-size:14px;color:var(--text-2)}
+
+nav.jump{
+  position:sticky;top:0;z-index:20;margin:0 0 44px;
+  background:rgba(13,14,22,.9);backdrop-filter:blur(10px);
+  border-bottom:1px solid var(--line-soft);
+}
+nav.jump .wrap{display:flex;gap:8px;padding-top:13px;padding-bottom:13px;flex-wrap:wrap;align-items:center}
+nav.jump a{
+  font-family:var(--mono);font-size:10px;font-weight:700;letter-spacing:1.4px;
+  text-transform:uppercase;color:var(--text-2);text-decoration:none;
+  padding:7px 13px;border-radius:8px;border:1px solid var(--line);background:var(--surface);
+}
+nav.jump a:hover{color:var(--text);border-color:var(--accent)}
+nav.jump .rec{color:var(--accent);border-color:rgba(255,61,110,.45);background:var(--accent-dim)}
+
+section.dir{margin:0 0 96px;scroll-margin-top:76px}
+.dir-head{display:flex;align-items:flex-start;gap:18px;flex-wrap:wrap;margin-bottom:8px}
+.dir-n{
+  font-family:var(--display);font-weight:900;font-size:44px;line-height:1;
+  color:transparent;-webkit-text-stroke:1.5px rgba(255,255,255,.16);
+}
+h2{
+  font-family:var(--display);font-weight:900;font-size:27px;letter-spacing:1.4px;
+  text-transform:uppercase;margin:0;line-height:1.1;
+}
+.tag{
+  font-family:var(--mono);font-size:9.5px;font-weight:700;letter-spacing:1.4px;
+  text-transform:uppercase;padding:5px 11px;border-radius:99px;align-self:center;
+  background:var(--accent-dim);border:1px solid rgba(255,61,110,.4);color:var(--accent);
+}
+.why{max-width:80ch;color:var(--text-2);margin:6px 0 26px;font-size:15.5px}
+.why b{color:var(--text)}
+
+.frame{
+  border:1px solid var(--line);border-radius:18px;overflow:hidden;
+  background:linear-gradient(160deg,#12131d,#0f1018);
+  box-shadow:0 40px 90px -50px #000;
+}
+.frame-bar{
+  display:flex;align-items:center;gap:8px;padding:11px 16px;
+  border-bottom:1px solid var(--line-soft);background:rgba(255,255,255,.02);
+  font-family:var(--mono);font-size:9.5px;letter-spacing:1.4px;
+  text-transform:uppercase;color:var(--text-3);
+}
+.frame-bar i{width:9px;height:9px;border-radius:50%;background:var(--line);display:inline-block}
+.stagehint{
+  padding:26px 22px;text-align:center;border-bottom:1px dashed var(--line);
+  font-family:var(--mono);font-size:10px;letter-spacing:2px;text-transform:uppercase;
+  color:var(--text-3);background:repeating-linear-gradient(45deg,transparent,transparent 9px,rgba(255,255,255,.015) 9px,rgba(255,255,255,.015) 18px);
+}
+.mock{padding:24px}
+
+.trade{
+  margin-top:20px;display:grid;gap:13px;
+  grid-template-columns:repeat(auto-fit,minmax(300px,1fr));
+}
+.tcard{border:1px solid var(--line);border-radius:12px;padding:14px 16px;background:var(--surface)}
+.tcard h5{
+  margin:0 0 6px;font-family:var(--mono);font-size:9.5px;font-weight:700;
+  letter-spacing:1.5px;text-transform:uppercase;
+}
+.tcard.good h5{color:#4ade80}
+.tcard.cost h5{color:var(--gold)}
+.tcard p{margin:0;font-size:13.5px;color:var(--text-2)}
+
+/* ══ Shared mock components ═══════════════════════════════════════ */
+.sec-h{display:flex;align-items:center;gap:10px;margin:0 0 13px}
+.sec-t{
+  font-family:var(--display);font-weight:900;font-size:15px;letter-spacing:1.8px;
+  text-transform:uppercase;color:#fff;
+}
+.sec-k{
+  font-family:var(--mono);font-size:9px;font-weight:700;letter-spacing:1.5px;
+  text-transform:uppercase;color:var(--text-3);
+  background:rgba(255,255,255,.04);border:1px solid var(--line-soft);
+  padding:4px 10px;border-radius:99px;
+}
+.sec-k b{color:#fff}
+.rule{height:2px;width:38px;border-radius:99px;background:linear-gradient(90deg,var(--accent),rgba(255,61,110,.2))}
+
+.chip{
+  display:inline-flex;align-items:center;gap:5px;
+  font-family:var(--mono);font-size:8.5px;font-weight:700;letter-spacing:1.2px;
+  text-transform:uppercase;padding:4px 8px;border-radius:6px;
+  background:rgba(255,255,255,.045);border:1px solid rgba(255,255,255,.08);color:var(--text-2);
+  white-space:nowrap;
+}
+.chip.live{background:rgba(255,61,110,.16);border-color:rgba(255,61,110,.44);color:#ff9db4}
+.chip.live i{width:5px;height:5px;border-radius:50%;background:var(--accent)}
+.chip.gold{background:rgba(240,180,41,.14);border-color:rgba(240,180,41,.4);color:#f7d074}
+.chip.on{background:var(--accent-dim);border-color:rgba(255,61,110,.42);color:#fff}
+
+.btn{
+  display:inline-flex;align-items:center;justify-content:center;gap:8px;
+  font-family:var(--display);font-weight:900;font-size:10.5px;letter-spacing:1.3px;
+  text-transform:uppercase;padding:11px 20px;border-radius:99px;border:none;cursor:default;
+  background:linear-gradient(135deg,#ff5a83,var(--accent) 60%,#e02659);color:#fff;
+  box-shadow:0 1px 0 rgba(255,255,255,.28) inset,0 12px 26px -10px rgba(255,61,110,.7);
+}
+.btn.ghost{
+  background:rgba(255,255,255,.05);border:1px solid rgba(255,255,255,.13);
+  color:var(--text-2);box-shadow:none;
+}
+.code{
+  display:inline-flex;align-items:center;gap:8px;padding:5px 6px 5px 13px;border-radius:99px;
+  background:rgba(255,255,255,.04);border:1px solid var(--line);
+}
+.code span{font-family:var(--mono);font-size:9px;letter-spacing:1.2px;text-transform:uppercase;color:var(--text-3)}
+.code em{
+  font-family:var(--mono);font-style:normal;font-size:12px;font-weight:700;letter-spacing:1.8px;
+  color:rgba(255,255,255,.24);
+}
+.code b{
+  font-family:var(--display);font-size:9.5px;font-weight:900;letter-spacing:1.2px;
+  text-transform:uppercase;padding:7px 14px;border-radius:99px;
+  background:rgba(255,255,255,.07);border:1px solid var(--line);color:var(--text-2);
+}
+
+.seg{display:inline-flex;gap:5px;padding:4px;border-radius:11px;background:rgba(255,255,255,.03);border:1px solid var(--line-soft)}
+.seg button{
+  font-family:var(--mono);font-size:9.5px;font-weight:700;letter-spacing:1.3px;
+  text-transform:uppercase;padding:8px 14px;border-radius:8px;border:1px solid transparent;
+  background:none;color:var(--text-3);cursor:default;
+}
+.seg button b{margin-left:6px;opacity:.7}
+.seg button.on{background:var(--accent-dim);border-color:rgba(255,61,110,.45);color:#fff}
+
+.art{
+  border-radius:9px;background:linear-gradient(150deg,#2a2340,#171a28);
+  display:grid;place-content:center;flex:0 0 auto;
+  font-family:var(--display);font-weight:900;color:rgba(255,255,255,.3);
+}
+.pips{display:flex;align-items:center;gap:3px;flex-wrap:wrap}
+.pip{
+  font-family:var(--mono);font-size:8px;font-weight:700;letter-spacing:.4px;
+  padding:3px 6px;border-radius:4px;background:rgba(255,255,255,.045);
+  border:1px solid rgba(255,255,255,.07);color:var(--text-3);
+}
+.pip.done{background:rgba(255,255,255,.1);color:var(--text-2)}
+.pip.now{background:rgba(255,61,110,.24);border-color:rgba(255,61,110,.55);color:#fff}
+.pip-sep{color:rgba(255,255,255,.16);font-size:8px}
+.bar{height:5px;border-radius:99px;background:rgba(255,255,255,.08);overflow:hidden}
+.bar i{display:block;height:100%;border-radius:99px;background:linear-gradient(90deg,#ff86a5,var(--accent))}
+.mut{font-family:var(--mono);font-size:9.5px;color:var(--text-3)}
+
+/* Wide list row */
+.row{
+  display:grid;grid-template-columns:52px minmax(0,1fr) auto;gap:14px;align-items:center;
+  padding:13px 15px;border-radius:12px;background:var(--surface);border:1px solid var(--line-soft);
+}
+.row + .row{margin-top:9px}
+.row.sel{border-color:rgba(255,61,110,.6);box-shadow:0 0 0 1px rgba(255,61,110,.28)}
+.row .art{width:52px;height:52px;font-size:17px}
+.row-b{min-width:0;display:grid;gap:7px}
+.row-t{display:flex;align-items:center;gap:9px;min-width:0}
+.row-n{font-size:14.5px;font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.row-c{display:flex;gap:6px;flex-wrap:wrap}
+.row-r{text-align:right;display:grid;gap:6px;justify-items:end;flex:0 0 auto}
+.row-when{font-family:var(--mono);font-size:11px;color:var(--accent);white-space:nowrap}
+.row-fill{width:110px}
+
+/* Card */
+.card{
+  border-radius:13px;overflow:hidden;background:var(--surface);border:1px solid var(--line-soft);
+}
+.card-art{height:78px;background:linear-gradient(150deg,#2a2340,#171a28);position:relative}
+.card-art::after{content:'';position:absolute;inset:0;background:linear-gradient(0deg,rgba(13,14,22,.9),transparent 70%)}
+.card-badge{
+  position:absolute;top:8px;left:8px;z-index:2;padding:3px 8px;border-radius:4px;
+  font-family:var(--display);font-size:7.5px;font-weight:900;letter-spacing:1.1px;
+  text-transform:uppercase;background:rgba(0,0,0,.68);color:#fff;
+}
+.card-badge.live{background:var(--accent)}
+.card-badge.open{background:var(--gold);color:#241a00}
+.card-b{padding:11px 12px 12px;display:grid;gap:7px}
+.card-n{font-size:13.5px;font-weight:700;line-height:1.3}
+
+/* Preview panel */
+.prev{border-radius:14px;overflow:hidden;background:var(--surface);border:1px solid var(--line)}
+.prev-art{height:104px;background:linear-gradient(150deg,#33254a,#171a28);position:relative}
+.prev-art::after{content:'';position:absolute;inset:0;background:linear-gradient(0deg,rgba(13,14,22,.96),transparent 72%)}
+.prev-h{position:absolute;left:14px;right:14px;bottom:11px;z-index:2;display:grid;gap:7px}
+.prev-n{font-family:var(--display);font-weight:900;font-size:17px;letter-spacing:.4px;color:#fff}
+.prev-b{padding:14px 15px 15px;display:grid;gap:13px}
+.lab{font-family:var(--mono);font-size:8.5px;font-weight:700;letter-spacing:1.5px;text-transform:uppercase;color:var(--text-3)}
+.facts{display:grid;grid-template-columns:auto minmax(0,1fr);gap:6px 16px;font-size:13px;margin:0}
+.facts dt{color:var(--text-3)}
+.facts dd{margin:0;font-weight:700}
+.faces{display:flex;align-items:center}
+.face{
+  width:29px;height:29px;border-radius:50%;margin-right:-8px;border:2px solid var(--surface);
+  background:linear-gradient(150deg,#3a2f52,#242838);display:grid;place-content:center;
+  font-size:10px;font-weight:800;color:var(--text-2);
+}
+.face-more{margin-left:16px;font-family:var(--mono);font-size:10px;color:var(--text-3)}
+
+/* Create block, used in a few shapes */
+.make{
+  border-radius:14px;padding:18px;display:grid;gap:11px;align-content:start;
+  background:
+    radial-gradient(420px 200px at 84% -10%,rgba(255,61,110,.24),transparent 64%),
+    linear-gradient(160deg,rgba(255,61,110,.12),rgba(255,255,255,.02));
+  border:1px solid rgba(255,61,110,.32);
+}
+.make-i{
+  width:42px;height:42px;border-radius:12px;display:grid;place-content:center;
+  background:rgba(255,61,110,.2);border:1px solid rgba(255,61,110,.36);color:#fff;font-size:19px;
+}
+.make h3{font-family:var(--display);font-weight:900;font-size:18px;letter-spacing:1.1px;text-transform:uppercase;margin:0}
+.make p{margin:0;font-size:13px;color:var(--text-2)}
+.picker{display:flex;gap:6px;flex-wrap:wrap}
+.picker .chip{cursor:default}
+
+.note{
+  margin-top:14px;padding:12px 15px;border-radius:11px;
+  border-left:2px solid var(--accent);background:rgba(255,61,110,.06);
+  font-size:13.5px;color:var(--text-2);
+}
+.note b{color:var(--text)}
+
+footer{border-top:1px solid var(--line-soft);padding-top:36px;margin-top:20px}
+footer h3{font-family:var(--display);font-weight:900;font-size:20px;letter-spacing:1.3px;text-transform:uppercase;margin:0 0 12px}
+footer p{max-width:80ch;color:var(--text-2)}
+footer b{color:var(--text)}
+</style>
+</head>
+<body>
+
+<header class="top">
+  <div class="wrap">
+    <div class="eyebrow">Lobby &middot; Tournaments &middot; Below the stage</div>
+    <h1>Three ways to build <span>the lower half</span></h1>
+    <p class="lede">
+      The stage and its rails are settled. This is only about what sits under them, and it has
+      three jobs: <b>start a tournament</b>, <b>see what you have running</b>, and
+      <b>see what is coming</b> &mdash; with the preview carrying the detail so the lists do not
+      have to.
+    </p>
+
+    <div class="problem">
+      <div class="prob">
+        <h4>What is wrong now &mdash; 01</h4>
+        <p>The lists are duplicated. Ongoing and Upcoming both show your brackets, then
+          <em>Your run</em> shows the same cards a third time further down.</p>
+      </div>
+      <div class="prob">
+        <h4>What is wrong now &mdash; 02</h4>
+        <p>The preview is in the top-right rail, a long way from the lists that feed it. You pick
+          on the left and the answer appears in the opposite corner.</p>
+      </div>
+      <div class="prob">
+        <h4>What is wrong now &mdash; 03</h4>
+        <p>Create is a slab. It has the widest column on the page and puts one button in it, while
+          the two lists that need width are squeezed into 340px rails.</p>
+      </div>
+    </div>
+  </div>
+</header>
+
+<nav class="jump">
+  <div class="wrap">
+    <a class="rec" href="#a">A &middot; The desk &middot; recommended</a>
+    <a href="#b">B &middot; Two lanes + detail strip</a>
+    <a href="#c">C &middot; Command column</a>
+    <a href="#verdict">Verdict</a>
+  </div>
+</nav>
+
+<!-- ═══════════════ A ═══════════════ -->
+<section class="dir wrap" id="a">
+  <div class="dir-head">
+    <div class="dir-n">A</div>
+    <h2>The desk</h2>
+    <span class="tag">Recommended</span>
+  </div>
+  <p class="why">
+    One list, not three. <b>Ongoing and Upcoming become a filter</b> rather than two separate
+    columns, which kills the duplication in one move and gives every row the full width of the
+    page to say something useful. The preview sits directly beside the list and <b>sticks</b> as
+    you scroll, so choosing and reading happen in the same place. Create is a bar across the top
+    of the list &mdash; always the first thing, never a slab.
+  </p>
+
+  <div class="frame">
+    <div class="frame-bar"><i></i><i></i><i></i><span>&nbsp;&nbsp;Below the stage</span></div>
+    <div class="stagehint">Live stream &middot; on air rail &middot; calendar rail</div>
+    <div class="mock">
+
+      <div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap;margin-bottom:18px">
+        <button class="btn">+ Create tournament</button>
+        <div class="code"><span>Have a code?</span><em>ABCD1234</em><b>Join</b></div>
+        <div style="flex:1"></div>
+        <div class="seg">
+          <button class="on">Ongoing<b>3</b></button>
+          <button>Upcoming<b>3</b></button>
+          <button>Yours<b>11</b></button>
+          <button>All<b>14</b></button>
+        </div>
+      </div>
+
+      <div style="display:grid;grid-template-columns:minmax(0,1fr) 380px;gap:22px;align-items:start">
+        <div>
+          <div class="row sel">
+            <div class="art">T</div>
+            <div class="row-b">
+              <div class="row-t">
+                <span class="row-n">Test</span>
+                <span class="chip live"><i></i>Semi-final</span>
+                <span class="chip gold">You host</span>
+              </div>
+              <div class="pips">
+                <span class="pip done">R1</span><span class="pip-sep">&rsaquo;</span>
+                <span class="pip now">SF</span><span class="pip-sep">&rsaquo;</span>
+                <span class="pip">F</span>
+              </div>
+            </div>
+            <div class="row-r">
+              <span class="row-when">match in 14m</span>
+              <div class="row-fill"><div class="bar"><i style="width:38%"></i></div></div>
+              <span class="mut">3 / 8 entrants</span>
+            </div>
+          </div>
+
+          <div class="row">
+            <div class="art">T</div>
+            <div class="row-b">
+              <div class="row-t">
+                <span class="row-n">Test</span>
+                <span class="chip live"><i></i>Final</span>
+                <span class="chip on">You are in</span>
+              </div>
+              <div class="pips">
+                <span class="pip done">R1</span><span class="pip-sep">&rsaquo;</span>
+                <span class="pip now">F</span>
+              </div>
+            </div>
+            <div class="row-r">
+              <span class="row-when">on now</span>
+              <div class="row-fill"><div class="bar"><i style="width:100%"></i></div></div>
+              <span class="mut">2 / 2 entrants</span>
+            </div>
+          </div>
+
+          <div class="row">
+            <div class="art">C</div>
+            <div class="row-b">
+              <div class="row-t">
+                <span class="row-n">Chess.com Blitz Arena</span>
+                <span class="chip">Registration</span>
+                <span class="chip gold">You host</span>
+              </div>
+              <div class="row-c">
+                <span class="chip">Chess</span><span class="chip">Single elim</span>
+                <span class="chip gold">£50 prize</span>
+              </div>
+            </div>
+            <div class="row-r">
+              <span class="row-when">starts in 2d</span>
+              <div class="row-fill"><div class="bar"><i style="width:12%"></i></div></div>
+              <span class="mut">1 / 8 entrants</span>
+            </div>
+          </div>
+        </div>
+
+        <div class="prev">
+          <div class="prev-art">
+            <div class="prev-h">
+              <div class="prev-n">Test</div>
+              <div style="display:flex;gap:6px;flex-wrap:wrap">
+                <span class="chip live"><i></i>Semi-final</span>
+                <span class="chip">Other games</span>
+                <span class="chip gold">You host</span>
+              </div>
+            </div>
+          </div>
+          <div class="prev-b">
+            <div><div class="lab">Where it is up to</div>
+              <div class="pips" style="margin-top:7px">
+                <span class="pip done">R1</span><span class="pip-sep">&rsaquo;</span>
+                <span class="pip now">SF</span><span class="pip-sep">&rsaquo;</span>
+                <span class="pip">F</span>
+              </div>
+            </div>
+            <div><div class="lab">5 seats left</div>
+              <div class="bar" style="margin-top:7px"><i style="width:38%"></i></div>
+            </div>
+            <div><div class="lab">Who is in</div>
+              <div class="faces" style="margin-top:7px">
+                <span class="face">O</span><span class="face">T</span><span class="face">T</span>
+              </div>
+            </div>
+            <div><div class="lab">Details</div>
+              <dl class="facts" style="margin-top:7px">
+                <dt>Format</dt><dd>Single elim</dd>
+                <dt>Size</dt><dd>3 of 8</dd>
+                <dt>Prize</dt><dd>TEST</dd>
+                <dt>Host</dt><dd>Overlord</dd>
+                <dt>Starts</dt><dd>Tue 14 Apr, 14:07</dd>
+              </dl>
+            </div>
+            <button class="btn" style="width:100%">Watch the bracket</button>
+            <button class="btn ghost" style="width:100%">Show in the calendar</button>
+          </div>
+        </div>
+      </div>
+
+    </div>
+  </div>
+
+  <div class="trade">
+    <div class="tcard good"><h5>What it buys</h5><p>The duplication is gone. Rows get real width, so
+      a row can carry the round rail, the fill and a countdown at once. Preview is next to the
+      list and stays put while you scroll it.</p></div>
+    <div class="tcard good"><h5>Scales</h5><p>Works the same at 3 tournaments and at 300. Nothing
+      has to be redesigned when the list grows.</p></div>
+    <div class="tcard cost"><h5>What it costs</h5><p>You see one slice at a time. Ongoing and
+      Upcoming are a click apart rather than both on screen &mdash; softened by the counts sitting
+      in the filter itself.</p></div>
+  </div>
+</section>
+
+<!-- ═══════════════ B ═══════════════ -->
+<section class="dir wrap" id="b">
+  <div class="dir-head">
+    <div class="dir-n">B</div>
+    <h2>Two lanes + detail strip</h2>
+  </div>
+  <p class="why">
+    Keeps <b>both lists visible at once</b>, which is the one thing A gives up. Ongoing and
+    Upcoming become two wide lanes of cards instead of two narrow rails of rows, create shrinks to
+    a single band across the top with the game picker built into it, and the preview becomes a
+    <b>full-width strip underneath</b> &mdash; so the critical info is laid out horizontally with
+    room to breathe rather than stacked in a 390px column.
+  </p>
+
+  <div class="frame">
+    <div class="frame-bar"><i></i><i></i><i></i><span>&nbsp;&nbsp;Below the stage</span></div>
+    <div class="stagehint">Live stream &middot; on air rail &middot; calendar rail</div>
+    <div class="mock">
+
+      <div class="make" style="grid-template-columns:auto minmax(0,1fr) auto;display:grid;align-items:center;gap:18px;margin-bottom:20px">
+        <div class="make-i">&#9636;</div>
+        <div style="display:grid;gap:8px;min-width:0">
+          <h3 style="font-size:16px">Build a bracket</h3>
+          <div class="picker">
+            <span class="chip on">Counter-Strike 2</span><span class="chip">Valorant</span>
+            <span class="chip">Chess</span><span class="chip">Rocket League</span>
+            <span class="chip">Smash</span><span class="chip">+ more</span>
+          </div>
+        </div>
+        <div style="display:grid;gap:8px;justify-items:end">
+          <button class="btn">+ Create tournament</button>
+          <div class="code"><span>Code</span><em>ABCD1234</em><b>Join</b></div>
+        </div>
+      </div>
+
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:22px;margin-bottom:20px">
+        <div>
+          <div class="sec-h"><span class="sec-t">Ongoing</span><span class="rule"></span>
+            <span class="sec-k"><b>3</b> in progress</span></div>
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
+            <div class="card"><div class="card-art"><span class="card-badge live">Semi-final</span></div>
+              <div class="card-b"><div class="card-n">Test</div>
+                <div class="pips"><span class="pip done">R1</span><span class="pip now">SF</span><span class="pip">F</span></div>
+                <div class="bar"><i style="width:38%"></i></div>
+                <span class="mut">3 / 8 &middot; match in 14m</span></div></div>
+            <div class="card"><div class="card-art"><span class="card-badge live">Final</span></div>
+              <div class="card-b"><div class="card-n">Test</div>
+                <div class="pips"><span class="pip done">R1</span><span class="pip now">F</span></div>
+                <div class="bar"><i style="width:100%"></i></div>
+                <span class="mut">2 / 2 &middot; on now</span></div></div>
+          </div>
+        </div>
+
+        <div>
+          <div class="sec-h"><span class="sec-t">Upcoming</span><span class="rule"></span>
+            <span class="sec-k"><b>3</b> not started</span></div>
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
+            <div class="card"><div class="card-art"><span class="card-badge open">7 seats</span></div>
+              <div class="card-b"><div class="card-n">Chess.com Blitz Arena</div>
+                <div class="row-c"><span class="chip">Chess</span><span class="chip gold">£50</span></div>
+                <div class="bar"><i style="width:12%"></i></div>
+                <span class="mut">1 / 8 &middot; starts in 2d</span></div></div>
+            <div class="card"><div class="card-art"><span class="card-badge open">Open</span></div>
+              <div class="card-b"><div class="card-n">TEST</div>
+                <div class="row-c"><span class="chip">Other games</span></div>
+                <div class="bar"><i style="width:6%"></i></div>
+                <span class="mut">1 in &middot; no date yet</span></div></div>
+          </div>
+        </div>
+      </div>
+
+      <div class="prev" style="border-color:rgba(255,61,110,.4)">
+        <div style="display:grid;grid-template-columns:230px minmax(0,1fr) minmax(0,1fr) 220px;gap:20px;padding:16px;align-items:start">
+          <div>
+            <div class="prev-art" style="height:92px;border-radius:11px;overflow:hidden;position:relative"></div>
+            <div style="margin-top:10px;display:grid;gap:7px">
+              <div class="prev-n" style="font-size:16px">Test</div>
+              <div style="display:flex;gap:6px;flex-wrap:wrap">
+                <span class="chip live"><i></i>Semi-final</span><span class="chip gold">You host</span>
+              </div>
+            </div>
+          </div>
+          <div style="display:grid;gap:13px">
+            <div><div class="lab">Where it is up to</div>
+              <div class="pips" style="margin-top:7px">
+                <span class="pip done">R1</span><span class="pip-sep">&rsaquo;</span>
+                <span class="pip now">SF</span><span class="pip-sep">&rsaquo;</span><span class="pip">F</span></div></div>
+            <div><div class="lab">5 seats left</div><div class="bar" style="margin-top:7px"><i style="width:38%"></i></div></div>
+            <div><div class="lab">Who is in</div>
+              <div class="faces" style="margin-top:7px"><span class="face">O</span><span class="face">T</span><span class="face">T</span></div></div>
+          </div>
+          <div><div class="lab">Details</div>
+            <dl class="facts" style="margin-top:7px">
+              <dt>Format</dt><dd>Single elim</dd><dt>Size</dt><dd>3 of 8</dd>
+              <dt>Prize</dt><dd>TEST</dd><dt>Host</dt><dd>Overlord</dd>
+              <dt>Starts</dt><dd>Tue 14 Apr, 14:07</dd><dt>Code</dt><dd style="font-family:var(--mono)">KRVX4417</dd>
+            </dl></div>
+          <div style="display:grid;gap:9px">
+            <button class="btn">Watch the bracket</button>
+            <button class="btn ghost">Show in the calendar</button>
+            <button class="btn ghost">Copy invite code</button>
+          </div>
+        </div>
+      </div>
+
+    </div>
+  </div>
+
+  <div class="trade">
+    <div class="tcard good"><h5>What it buys</h5><p>Both lists on screen at once, and the preview
+      gets the full width &mdash; art, progress, entrants, details and actions all in one line
+      instead of a tall stack.</p></div>
+    <div class="tcard good"><h5>Create feels like starting</h5><p>The game picker is in the band,
+      so the first choice happens before you have opened anything.</p></div>
+    <div class="tcard cost"><h5>What it costs</h5><p>The preview is below the lists, so picking
+      something moves your eye down and back. Needs a scroll-into-view, and on a short window it
+      sits off screen.</p></div>
+  </div>
+</section>
+
+<!-- ═══════════════ C ═══════════════ -->
+<section class="dir wrap" id="c">
+  <div class="dir-head">
+    <div class="dir-n">C</div>
+    <h2>Command column</h2>
+  </div>
+  <p class="why">
+    Splits the section by <b>what it is for</b> rather than by tournament state. A narrow sticky
+    column on the left is everything you <em>do</em> &mdash; create, join by code, and your own
+    next match with its countdown. Everything else is a browsing grid on the right with the state
+    as tabs. The preview opens as a sheet over the grid, so it can be large without owning
+    permanent space.
+  </p>
+
+  <div class="frame">
+    <div class="frame-bar"><i></i><i></i><i></i><span>&nbsp;&nbsp;Below the stage</span></div>
+    <div class="stagehint">Live stream &middot; on air rail &middot; calendar rail</div>
+    <div class="mock">
+      <div style="display:grid;grid-template-columns:300px minmax(0,1fr);gap:22px;align-items:start">
+
+        <div style="display:grid;gap:16px">
+          <div class="make">
+            <div class="make-i">+</div>
+            <h3>Run one</h3>
+            <p>Public, or private with a code you hand out.</p>
+            <button class="btn" style="width:100%">Create tournament</button>
+            <div class="code" style="width:100%;justify-content:space-between">
+              <em>ABCD1234</em><b>Join</b></div>
+          </div>
+
+          <div style="border:1px solid var(--line);border-radius:14px;padding:15px;background:var(--surface);display:grid;gap:11px">
+            <div class="lab">Your next match</div>
+            <div style="display:flex;align-items:center;gap:11px">
+              <div class="art" style="width:42px;height:42px;font-size:15px">T</div>
+              <div style="min-width:0">
+                <div style="font-weight:700;font-size:14px">Test</div>
+                <div class="mut">Semi-final &middot; vs Player 2</div>
+              </div>
+            </div>
+            <div style="font-family:var(--mono);font-size:26px;font-weight:700;color:var(--accent);letter-spacing:1px">14:02</div>
+            <button class="btn ghost" style="width:100%">Go to the bracket</button>
+          </div>
+
+          <div style="border:1px solid var(--line);border-radius:14px;padding:15px;background:var(--surface);display:grid;gap:9px">
+            <div class="lab">Yours &middot; 11 entered</div>
+            <div style="display:flex;align-items:center;gap:9px"><span class="chip live"><i></i>2 live</span>
+              <span class="chip gold">6 hosting</span><span class="chip">3 done</span></div>
+            <button class="btn ghost" style="width:100%">See all yours</button>
+          </div>
+        </div>
+
+        <div>
+          <div style="display:flex;align-items:center;gap:12px;margin-bottom:15px;flex-wrap:wrap">
+            <div class="seg">
+              <button class="on">Upcoming<b>3</b></button>
+              <button>Ongoing<b>3</b></button>
+              <button>Finished<b>8</b></button>
+            </div>
+            <div style="flex:1"></div>
+            <span class="sec-k"><b>14</b> public brackets</span>
+          </div>
+          <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:14px">
+            <div class="card"><div class="card-art"><span class="card-badge open">7 seats</span></div>
+              <div class="card-b"><div class="card-n">Chess.com Blitz Arena</div>
+                <div class="row-c"><span class="chip">Chess</span><span class="chip gold">£50</span></div>
+                <div class="bar"><i style="width:12%"></i></div><span class="mut">starts in 2d</span></div></div>
+            <div class="card"><div class="card-art"><span class="card-badge open">Open</span></div>
+              <div class="card-b"><div class="card-n">TEST</div>
+                <div class="row-c"><span class="chip">Other games</span></div>
+                <div class="bar"><i style="width:6%"></i></div><span class="mut">no date yet</span></div></div>
+            <div class="card"><div class="card-art"><span class="card-badge open">3 seats</span></div>
+              <div class="card-b"><div class="card-n">Rocket League 2v2</div>
+                <div class="row-c"><span class="chip">Rocket League</span></div>
+                <div class="bar"><i style="width:62%"></i></div><span class="mut">starts in 5h</span></div></div>
+            <div class="card" style="opacity:.55"><div class="card-art"></div>
+              <div class="card-b"><div class="card-n">Valorant Ladder</div>
+                <div class="row-c"><span class="chip">Valorant</span></div>
+                <div class="bar"><i style="width:30%"></i></div><span class="mut">starts in 6d</span></div></div>
+            <div class="card" style="opacity:.55"><div class="card-art"></div>
+              <div class="card-b"><div class="card-n">Smash Weekly</div>
+                <div class="row-c"><span class="chip">Smash</span></div>
+                <div class="bar"><i style="width:80%"></i></div><span class="mut">starts in 1d</span></div></div>
+            <div class="card" style="opacity:.55"><div class="card-art"></div>
+              <div class="card-b"><div class="card-n">CS2 Open Cup</div>
+                <div class="row-c"><span class="chip">Counter-Strike 2</span></div>
+                <div class="bar"><i style="width:45%"></i></div><span class="mut">starts in 3d</span></div></div>
+          </div>
+          <div class="note"><b>The preview</b> slides in over this grid from the right when you
+            pick a card, at about 420px, with the grid dimmed behind it.</div>
+        </div>
+
+      </div>
+    </div>
+  </div>
+
+  <div class="trade">
+    <div class="tcard good"><h5>What it buys</h5><p>The things you act on never scroll away, and
+      the countdown to your own next match gets to be the biggest number on the page.</p></div>
+    <div class="tcard good"><h5>Browsing gets real room</h5><p>Three cards across instead of one
+      narrow rail, so the public list stops feeling like an afterthought.</p></div>
+    <div class="tcard cost"><h5>What it costs</h5><p>A sheet hides what is behind it, and it is
+      the most work to build: open and close states, focus handling, and a second place the
+      preview has to render.</p></div>
+  </div>
+</section>
+
+<footer class="wrap" id="verdict">
+  <h3>Where I would go</h3>
+  <p><b>A, with one borrowed piece from C.</b> A is the only one of the three that removes the
+    duplication rather than rearranging it, and having the preview stick beside the list is the
+    difference between reading and hunting. The piece worth taking from C is the
+    <b>next-match countdown</b> &mdash; that is the single most useful thing on the page for
+    somebody already in a bracket, and in A it can sit in the toolbar beside Create.</p>
+  <p>B is the right answer only if seeing Ongoing and Upcoming <em>simultaneously</em> matters
+    more than everything else. It reads well in a mockup with six tournaments and gets thin at
+    sixty, because two half-width lanes cannot grow.</p>
+</footer>
+
+</body>
+</html>
