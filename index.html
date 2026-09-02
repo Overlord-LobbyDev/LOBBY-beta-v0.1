@@ -22243,7 +22243,7 @@ function pushVcPipData() {
     members: allMembers,
     muted: !(vcStream?.getAudioTracks()[0]?.enabled ?? true),
     sharing: !!vcScreenStream,
-    camOn: !!(vcCamStream?.getVideoTracks().some(t => t.readyState === "live")),
+    camOn: vcHasLiveVideo(vcCamStream),
     shareFrame: _pipFrame,
     shareBuf: _pipBuf,
     shareWho: _pipWho,
@@ -22320,7 +22320,9 @@ function renderVcPip() {
     // Remote: use vcVideoStreams for video (stored by ontrack handler)
     if (!m.isSelf && peerId) {
       const remoteVideoStream = vcVideoStreams[peerId];
-      if (remoteVideoStream?.getVideoTracks().some(t => t.readyState === "live")) {
+      /* Same test as the grid and the table: an open transceiver is not
+         a share. */
+      if (vcHasLiveVideo(remoteVideoStream)) {
         injectVideoIntoTile(tile, remoteVideoStream);
       }
     }
@@ -22467,8 +22469,8 @@ function renderVcGrid() {
   const tiles = [];
   members.forEach(m => {
     if (m.isSelf) {
-      const camActive = vcCamStream?.getVideoTracks().some(t => t.readyState === "live");
-      const screenActive = vcScreenStream?.getVideoTracks().some(t => t.readyState === "live");
+      const camActive = vcHasLiveVideo(vcCamStream);
+      const screenActive = vcHasLiveVideo(vcScreenStream);
       // Camera replaces avatar; if no camera, show avatar
       if (camActive) {
         tiles.push({ type:"camera", member:m, stream:vcCamStream });
@@ -22483,7 +22485,10 @@ function renderVcGrid() {
       const peerId = `u${m.userId}`;
       // Use vcVideoStreams for remote video (stored by ontrack handler)
       const remoteVideoStream = vcVideoStreams[peerId];
-      const hasRemoteVideo = remoteVideoStream?.getVideoTracks().some(t => t.readyState === "live");
+      /* readyState alone is true from the moment the transceiver opens,
+         which is why every remote member used to show a blank Camera
+         tile. */
+      const hasRemoteVideo = vcHasLiveVideo(remoteVideoStream);
       // Remote camera replaces avatar; screenshare is an extra tile
       if (hasRemoteVideo) {
         tiles.push({ type:"camera", member:m, stream:remoteVideoStream });
@@ -22634,6 +22639,35 @@ function refreshChannelListVc() {
   }
 }
 
+/* Is this stream actually carrying video right now?
+   Peers are created with addTransceiver("video", {direction:"sendrecv"})
+   so either side can start sending later without renegotiating — which
+   means a RECEIVING track exists from the moment the connection opens,
+   with readyState "live", long before anyone shares. Only `muted` says
+   whether frames are arriving. Checking readyState alone makes every
+   peer in the room look like they are sharing a black rectangle.
+
+   One answer, used by every renderer, so they cannot disagree. */
+function vcHasLiveVideo(stream) {
+  if (!stream || typeof stream.getVideoTracks !== "function") return false;
+  return stream.getVideoTracks().some(t => t.readyState === "live" && !t.muted);
+}
+window.vcHasLiveVideo = vcHasLiveVideo;
+
+/* The one place that says the call's media changed.
+   The VC panel re-renders here exactly as it always did; the difference
+   is that it is no longer the only thing that finds out. Anything else
+   drawing the call — the queue table, and whatever comes after it —
+   listens for the event instead of being called by name from inside
+   this module. `alsoPip` is false at the sites that historically
+   re-rendered the grid alone, so the PiP's behaviour is unchanged. */
+function vcMediaChanged(alsoPip) {
+  renderVcGrid();
+  if (alsoPip !== false) renderVcPip();
+  try { document.dispatchEvent(new CustomEvent("vc-media")); } catch (e) {}
+}
+window.vcMediaChanged = vcMediaChanged;
+
 // Helper: find the video sender on a PC (may have null track from sendrecv transceiver)
 function findVideoSender(pc) {
   let sender = pc.getSenders().find(s => s.track?.kind === "video");
@@ -22686,13 +22720,15 @@ function createVcPeerConnection(peerId, opts = {}) {
     }
     if (e.track.kind === "video") {
       vcVideoStreams[peerId] = stream;
-      // Re-render when track state changes
-      e.track.onended  = () => { delete vcVideoStreams[peerId]; renderVcGrid(); renderVcPip(); };
-      e.track.onmute   = () => { renderVcGrid(); renderVcPip(); };
-      e.track.onunmute = () => { renderVcGrid(); renderVcPip(); };
+      /* onunmute is the moment a share actually becomes visible: the
+         track has existed since the connection opened and only now
+         starts carrying frames. Everything that draws the call needs
+         this, not just the VC panel. */
+      e.track.onended  = () => { delete vcVideoStreams[peerId]; vcMediaChanged(); };
+      e.track.onmute   = () => { vcMediaChanged(); };
+      e.track.onunmute = () => { vcMediaChanged(); };
     }
-    renderVcGrid();
-    renderVcPip();
+    vcMediaChanged();
   };
   pc.onconnectionstatechange = () => {
     if (["disconnected","failed","closed"].includes(pc.connectionState)) {
@@ -22883,7 +22919,7 @@ document.addEventListener("DOMContentLoaded", () => {
     btn?.classList.remove("active");
     const lbl = document.getElementById("vcCamBtnLabel");
     if (lbl) lbl.textContent = "Camera";
-    renderVcGrid(); renderVcPip();
+    vcMediaChanged();
   }
 
   async function startCamera(quality) {
@@ -22903,7 +22939,7 @@ document.addEventListener("DOMContentLoaded", () => {
       document.getElementById("vcCamBtn")?.classList.add("active");
       const lbl = document.getElementById("vcCamBtnLabel");
       if (lbl) lbl.textContent = "Stop";
-      renderVcGrid(); renderVcPip();
+      vcMediaChanged();
     } catch(e) {
       showToast("Could not access camera: " + e.message, "error");
     }
@@ -23007,8 +23043,7 @@ document.addEventListener("DOMContentLoaded", () => {
       document.getElementById("vcScreenBtn")?.classList.add("active");
       document.getElementById("vcScreenBtnLabel") && (document.getElementById("vcScreenBtnLabel").textContent = "Stop");
       document.getElementById("vcPipScreen")?.classList.add("active");
-      renderVcGrid();
-      renderVcPip();
+      vcMediaChanged();
 
       screenTrack.onended = stopScreenShare;
     } catch(e) { console.error("VC screen share:", e); showToast("Screen share failed: " + e.message, "error"); }
@@ -78584,10 +78619,15 @@ body.q-max #queueOverlay{ padding:0 !important; }
     },
     sharing: function (){ return !!vcScreen(); },
     members: function (){ return vcRoster()[V.id()] || []; },
+    /* A stream only counts if frames are actually arriving. Returning
+       the transceiver's placeholder made every seated member look like a
+       sharer, which is what filled the table with black rectangles. */
     streamFor: function (uid){
       var m = ME();
-      if (m && uid === m.id) return vcScreen();
-      return vcVideo()['u' + uid] || null;
+      var s = (m && uid === m.id) ? vcScreen() : (vcVideo()['u' + uid] || null);
+      var live = window.vcHasLiveVideo;
+      if (typeof live !== 'function') return s || null;
+      return live(s) ? s : null;
     },
     /* joinVoiceChannel opens the VC panel on its way through. We let it
        -- editing it would put every lounge call at risk for a cosmetic
@@ -80936,6 +80976,16 @@ body.q-max #queueOverlay{ padding:0 !important; }
   function sharing(){
     return seated().some(function (m){ return !!V.streamFor(m.userId); });
   }
+
+  /* Somebody starting or stopping a share does not touch the room
+     record, so nothing in the table's own data changes and it would go
+     on drawing whatever it last drew. The voice module announces the
+     change once and this listens for it, rather than the voice module
+     reaching in here by name. paint() is hoisted, so registering above
+     its declaration is fine. */
+  document.addEventListener('vc-media', function (){
+    try { paint(true); } catch (e) {}
+  });
 
   function paint(force){
     var el = host();
