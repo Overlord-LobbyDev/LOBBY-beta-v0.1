@@ -82183,7 +82183,7 @@ body.q-max #queueOverlay{ padding:0 !important; }
       <div class="tp-body">
 
         <!-- ── Left rail: what is on ────────────────────────────────── -->
-        <aside class="tp-rail">
+        <aside class="tp-rail tp-rail-l">
           <div class="tp-rail-b">
             <div class="hub-sec tp-sec-l">
               <div class="hub-sec-t">On air</div>
@@ -82367,8 +82367,11 @@ body.q-max #queueOverlay{ padding:0 !important; }
      under it uses the left one. Nothing on this page sets a column
      width of its own, so no edge can drift out of line with the edge
      above it. */
-  --tp-rail-l:340px;
-  --tp-rail-r:392px;
+  /* Equal, or the middle column is not the middle of the page and the
+     picture sits off-centre however well it is centred in its own
+     column. */
+  --tp-rail-l:366px;
+  --tp-rail-r:366px;
   --tp-gap:26px;
   --tp-pad:40px;
   /* Straight edges, decided once. Every card and panel on the page
@@ -82505,8 +82508,15 @@ body.q-max #queueOverlay{ padding:0 !important; }
   margin:0 calc(var(--tp-bleed) * -1) 30px;
   padding:0 var(--tp-bleed);
   background:var(--tp-well);
-  border-bottom:1px solid var(--tp-edge);
   box-shadow:inset 0 1px 0 var(--tp-lip);
+}
+/* The band used to stop on a 1px line, which is how a document ends a
+   section. It runs on past its content and dissolves instead, so the
+   brackets begin rather than start. */
+.tp-body::after{
+  content:''; position:absolute; left:0; right:0; top:100%; height:78px;
+  z-index:0; pointer-events:none;
+  background:linear-gradient(180deg, var(--tp-well), transparent);
 }
 /* Above the tint, which is a positioned pseudo-element at z-index 0. */
 .tp-body > *{ position:relative; z-index:1 }
@@ -82530,6 +82540,9 @@ body.q-max #queueOverlay{ padding:0 !important; }
      mud unless it is held well back. */
   filter:blur(64px) saturate(1.25) brightness(.62);
   opacity:.38;
+  /* Fades out with the band rather than stopping square at its edge. */
+  -webkit-mask-image:linear-gradient(180deg, #000 58%, transparent 100%);
+  mask-image:linear-gradient(180deg, #000 58%, transparent 100%);
 }
 /* Nothing to tint from, and the page keeps its own ground. */
 #tournamentsPage:not([style*="--tp-art"]) .tp-body::before{ opacity:0 }
@@ -82552,6 +82565,22 @@ body.q-max #queueOverlay{ padding:0 !important; }
   min-width:0; padding:15px;
   display:grid; grid-template-rows:auto minmax(0,1fr);
 }
+/* The left rail's box is pulled out to the glass so its cards can reach
+   it. The band bleeding is the SURFACE arriving at the edge; the cards
+   arriving there too is a separate thing, and both are wanted. The
+   padding gives back exactly what the offset takes, so the head does not
+   move. */
+.tp-rail-l .tp-rail-b{
+  left:calc(var(--tp-bleed) * -1);
+  padding-left:calc(var(--tp-bleed) + 15px);
+}
+/* The negative margin is on the SCROLLING column, never on a card: the
+   column is overflow-y:auto, and a box cannot be visible on one axis and
+   auto on the other, so a card pulled out by a margin would be clipped
+   or would grow a horizontal scrollbar inside the rail. */
+.tp-rail-l .tp-scroll-col{ margin-left:calc((var(--tp-bleed) + 15px) * -1); padding-left:0 }
+.tp-rail-l .tp-air{ padding-left:calc(var(--tp-bleed) + 23px) }
+
 /* Whatever the head is followed by — the list, or the calendar — takes
    the remaining height and scrolls inside it. */
 .tp-rail-b > :last-child{ min-height:0; overflow-y:auto;
@@ -82588,6 +82617,9 @@ body.q-max #queueOverlay{ padding:0 !important; }
   /* Rows, not columns: nothing is filling anything, so the rails go
      back into flow and measure themselves again. */
   .tp-rail{ position:static }
+  .tp-rail-l .tp-rail-b{ left:auto; padding-left:15px }
+  .tp-rail-l .tp-scroll-col{ margin-left:0 }
+  .tp-rail-l .tp-air{ padding-left:8px }
   .tp-rail-b{
     position:static; inset:auto; overflow:visible;
     height:auto; padding:15px;
@@ -82598,7 +82630,7 @@ body.q-max #queueOverlay{ padding:0 !important; }
   .tp-rail-b .tp-scroll-col{ max-height:474px; overflow-y:auto }
 }
 @media (max-width:1700px){
-  #tournamentsPage{ --tp-rail-l:290px; --tp-rail-r:330px; --tp-gap:20px; }
+  #tournamentsPage{ --tp-rail-l:310px; --tp-rail-r:310px; --tp-gap:20px; }
 }
 /* Below this the stream leads and the rails share the row under it: a
    290px column beside a picture is a column of clipped words. The two
