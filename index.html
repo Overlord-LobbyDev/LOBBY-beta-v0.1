@@ -7535,6 +7535,16 @@
     .tba-pill.tba-status   { --tba-color: 74,209,125; color:#4ad17d; }
     .tba-pill.tba-help     { --tba-color: 200,155,60; color:#f6b450; }
     .tba-pill.tba-whatsnew { --tba-color: 255,211,61; color:#ffd33d; }
+    /* The Friends pill is a toggle now, so it stays lit while the rail
+       it opens is open — the same signal the hub pills give. The colour
+       is written into this rule rather than onto the pill, so the
+       resting appearance is unchanged. */
+    body.rail-dm #tbaFriendsBtn {
+      background: rgba(138,150,255,.16) !important;
+      border-color: rgba(138,150,255,.5) !important;
+      box-shadow: 0 0 0 1px rgba(138,150,255,.22),
+                  0 6px 18px -8px rgba(138,150,255,.6);
+    }
 
     /* ── Profile pill ──────────────────────────────────────── */
     .tba-pill.tba-profile {
@@ -14380,7 +14390,7 @@
     <span class="tba-label">Inbox</span>
     <span class="tba-badge" id="tbaInboxBadge"></span>
   </button>
-  <button class="tba-pill tba-friends-nav" id="tbaFriendsBtn" onclick="window.openFriendsPage()" title="Friends" aria-label="Friends">
+  <button class="tba-pill tba-friends-nav" id="tbaFriendsBtn" onclick="window.openFriendsSidebar()" title="Friends and messages" aria-label="Friends and messages">
     <span class="tba-ico">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
     </span>
@@ -52269,6 +52279,13 @@ body.dock-sidebar:not(.dock-feed)  #phFeedToggleBtn .ph-fb-dot {
     if (document.body.classList.contains('rail-dm')) close(); else open();
   }
   window.lobbyRailDM = { open: open, close: close, toggle: toggle };
+
+  /* The top bar's Friends pill opens this rail rather than the
+     standalone friends page. Declared here, inside the rail's own
+     closure, so it cannot be called before the rail exists — and it
+     calls the same toggle the header's Messages button does, so the two
+     behave identically rather than nearly so. */
+  window.openFriendsSidebar = function (){ toggle(); };
 
   /* ── Data ───────────────────────────────────────────────────── */
   function loadFriends(){
