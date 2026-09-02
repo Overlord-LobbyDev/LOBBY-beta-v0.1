@@ -1230,11 +1230,17 @@ app.patch("/profile/password", requireAuth, async (req, res) => {
   if (!currentPassword || !newPassword) return res.status(400).json({ error: "Both passwords required" });
   if (newPassword.length < 6) return res.status(400).json({ error: "Password must be at least 6 characters" });
   try {
-    const r = await pool.query("SELECT password FROM users WHERE id = $1", [req.userId]);
-    const match = await bcrypt.compare(currentPassword, r.rows[0].password);
+    /* password_hash, not password. The column is created as
+       password_hash in db.js, register INSERTs into it and login
+       compares against it; this route was the only one calling it
+       something else, so every attempt answered with a Postgres
+       "column does not exist". */
+    const r = await pool.query("SELECT password_hash FROM users WHERE id = $1", [req.userId]);
+    if (!r.rows[0]) return res.status(404).json({ error: "User not found" });
+    const match = await bcrypt.compare(currentPassword, r.rows[0].password_hash);
     if (!match) return res.status(401).json({ error: "Current password is incorrect" });
     const hash = await bcrypt.hash(newPassword, SALT_ROUNDS);
-    await pool.query("UPDATE users SET password = $1 WHERE id = $2", [hash, req.userId]);
+    await pool.query("UPDATE users SET password_hash = $1 WHERE id = $2", [hash, req.userId]);
     res.json({ success: true });
   } catch(err) { console.error("API error at line " + 211 + ":", err.message || err); res.status(500).json({ error: "Server error: " + (err.message || "unknown") }); }
 });
@@ -2128,9 +2134,27 @@ app.patch("/admin/users/:id/unban", requireAuth, requireAdmin, async (req, res) 
 app.patch("/admin/users/:id/password", requireAuth, requireAdmin, async (req, res) => {
   const { newPassword } = req.body;
   if (!newPassword || newPassword.length < 6) return res.status(400).json({ error: "Password too short" });
-  const hash = await bcrypt.hash(newPassword, SALT_ROUNDS);
-  await pool.query("UPDATE users SET password=$1 WHERE id=$2", [hash, parseInt(req.params.id)]);
-  res.json({ success: true });
+  const id = parseInt(req.params.id, 10);
+  if (!id || isNaN(id)) return res.status(400).json({ error: "Invalid user ID" });
+  /* Wrapped, unlike before. Without it a throw reached Express's
+     default handler, which answers with an HTML error page — the
+     admin panel then called res.json() on HTML, that threw too, and
+     the only thing that reached the screen was a generic "Server
+     error". The reason never got out. */
+  try {
+    const hash = await bcrypt.hash(newPassword, SALT_ROUNDS);
+    /* password_hash, not password: that is the column register writes
+       and login compares against. */
+    const r = await pool.query(
+      "UPDATE users SET password_hash=$1 WHERE id=$2", [hash, id]);
+    /* Without this, resetting the password of a user who is not there
+       answers success. */
+    if (!r.rowCount) return res.status(404).json({ error: "User not found" });
+    res.json({ success: true });
+  } catch (err) {
+    console.error("[admin/password]", err.message || err);
+    res.status(500).json({ error: "Server error: " + (err.message || "unknown") });
+  }
 });
 
 app.patch("/admin/users/:id/username", requireAuth, requireAdmin, async (req, res) => {
