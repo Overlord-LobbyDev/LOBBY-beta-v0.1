@@ -7249,7 +7249,7 @@
       -webkit-app-region: no-drag !important;
       pointer-events: auto !important;
 
-      /* Layout — sized to fit the wordmark + BETA tag. */
+      /* Layout — sized to fit the wordmark + version tag. */
       position: relative;
       display: inline-flex; align-items: center; gap: 4px;
       height: 72px; padding: 0 22px;
@@ -7330,13 +7330,18 @@
       100% { background-position: 200% 50%; }
     }
     .lobby-logo-beta {
-      font-size: 8px; font-weight: 900; letter-spacing: 2px;
+      font-size: 8px; font-weight: 900; letter-spacing: 1.4px;
       color: var(--accent);
       text-transform: uppercase;
-      writing-mode: vertical-rl;
-      transform: rotate(180deg);
+      /* Was vertical-rl with a 180 rotation, which stacked BETA down the
+         side of the wordmark. A dotted version cannot stack: a rotated
+         full stop sits at the top of its cell, so it would read as V3
+         with two dots floating beside it. */
+      writing-mode: horizontal-tb;
+      transform: none;
       opacity: .7;
       align-self: center;
+      padding-top: 2px;
       transition: opacity .55s ease, color .55s ease, text-shadow .55s ease;
     }
     #lobbyLogoFixed:hover .lobby-logo-beta {
@@ -14318,7 +14323,7 @@
   <button id="lobbyLogoFixed" type="button" onclick="window.goHome()"
           title="Go home" aria-label="Go to home">
     <span class="lobby-logo-text">LOBBY</span>
-    <span class="lobby-logo-beta">BETA</span>
+    <span class="lobby-logo-beta">V3.0.0</span>
   </button>
 </div>
 
@@ -15498,7 +15503,7 @@
 <div id="whatsNewPanel" class="tba-popover" style="display:none;min-width:340px;max-width:380px;padding:0">
   <div style="padding:14px 16px;border-bottom:1px solid rgba(255,255,255,.06);display:flex;align-items:center;gap:8px">
     <div style="font-size:13px;font-weight:800;color:var(--text-1);letter-spacing:.5px;text-transform:uppercase">✨ What's New</div>
-    <div style="margin-left:auto;font-size:10px;color:var(--text-3)">v0.1 BETA</div>
+    <div style="margin-left:auto;font-size:10px;color:var(--text-3)">v3.0.0</div>
   </div>
   <div style="padding:6px;max-height:420px;overflow-y:auto" id="whatsNewList"></div>
 </div>
@@ -41985,7 +41990,7 @@ setTimeout(() => { updateMyStatusUI(); }, 100);
         verEl.textContent = "v" + v;
       }).catch(() => { verEl.textContent = "unknown"; });
     } else {
-      verEl.textContent = "v1.0.0";
+      verEl.textContent = "v3.0.0";
     }
 
     checkBtn.addEventListener("click", async () => {
