@@ -82162,7 +82162,7 @@ body.q-max #queueOverlay{ padding:0 !important; }
                    onkeydown="if(event.key==='Enter')window.tpJoinCode()">
             <button type="button" onclick="window.tpJoinCode()">Join</button>
           </div>
-          <button class="gt-cta-primary tp-cta" type="button" onclick="window.openCreateTournament()">
+          <button class="gt-cta-primary" type="button" onclick="window.openCreateTournament()">
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor"
                  stroke-width="2.8" stroke-linecap="round" aria-hidden="true">
               <line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
@@ -82181,7 +82181,31 @@ body.q-max #queueOverlay{ padding:0 !important; }
            sits under it — so the whole right edge is "what am I looking
            at", and the left is "what is there". -->
       <div class="tp-body">
-        <div class="tp-left">
+
+        <!-- ── Left rail: what is on ────────────────────────────────── -->
+        <aside class="tp-rail">
+          <div class="tp-rail-b">
+            <div class="hub-sec tp-sec-l">
+              <div class="hub-sec-t">On air</div>
+              <div class="hub-sec-bar"></div>
+              <div class="hub-sec-k">
+                <span>Broadcasts</span><span class="sep">&middot;</span><span class="dot"></span>
+                <b id="tpOnAirN">0</b> <span id="tpOnAirW">live now</span>
+              </div>
+              <div class="tp-find">
+                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                     stroke-width="2.6" stroke-linecap="round" aria-hidden="true">
+                  <circle cx="11" cy="11" r="7"/><line x1="21" y1="21" x2="16.5" y2="16.5"/></svg>
+                <input id="tpFind" type="text" placeholder="Search what&rsquo;s on&hellip;"
+                       aria-label="Search broadcasts" oninput="window.tpSearch(this.value)">
+                <button type="button" id="tpFindX" onclick="window.tpSearch('')" aria-label="Clear search">&#10005;</button>
+              </div>
+            </div>
+            <div class="tp-scroll-col tp-air-list" id="tpLive"></div>
+          </div>
+        </aside>
+
+        <div class="tp-stage-col">
 
           <!-- The carousel: the neighbours peek in either side, so it
                reads as one of many rather than as a single embed with
@@ -82211,9 +82235,35 @@ body.q-max #queueOverlay{ padding:0 !important; }
               <div class="tp-now" id="tpBar"></div>
             </div>
           </section>
+        </div>
 
-          <!-- ── Three columns ──────────────────────────────────────── -->
-          <section class="tp-tri">
+        <!-- ── Right rail: when, and what you picked ────────────────── -->
+        <aside class="tp-rail">
+          <div class="tp-rail-b">
+            <div class="hub-sec tp-sec-l">
+              <div class="hub-sec-t">The calendar</div>
+              <div class="hub-sec-bar"></div>
+              <div class="hub-sec-k">
+                <span>Scheduled</span><span class="sep">&middot;</span><span class="dot"></span>
+                <b id="tpCalN">0</b> <span id="tpCalW">dates</span>
+              </div>
+            </div>
+            <div id="tpCal"></div>
+          </div>
+
+          <div class="tp-rail-b">
+            <div class="hub-sec tp-sec-l">
+              <div class="hub-sec-t">The bracket</div>
+              <div class="hub-sec-bar"></div>
+              <div class="hub-sec-k"><span id="tpPrevK">Preview</span></div>
+            </div>
+            <div id="tpPreview"></div>
+          </div>
+        </aside>
+      </div>
+
+      <!-- ── Three columns ──────────────────────────────────────────── -->
+      <section class="tp-tri">
 
             <div class="tp-col">
               <div class="hub-sec tp-sec-l">
@@ -82229,7 +82279,7 @@ body.q-max #queueOverlay{ padding:0 !important; }
             </div>
 
             <!-- Wider, because it is the thing the page is for. -->
-            <div class="tp-col tp-col-mid">
+            <div class="tp-col">
               <div class="hub-sec tp-sec-l">
                 <div class="hub-sec-t">Run your own</div>
                 <div class="hub-sec-bar"></div>
@@ -82277,43 +82327,7 @@ body.q-max #queueOverlay{ padding:0 !important; }
               <div class="tp-scroll-col" id="tpUpcoming"></div>
             </div>
 
-          </section>
-        </div>
-
-        <!-- ── The right rail ───────────────────────────────────────── -->
-        <aside class="tp-rail">
-
-          <div class="tp-rail-b">
-            <div class="hub-sec tp-sec-l">
-              <div class="hub-sec-t">On air</div>
-              <div class="hub-sec-bar"></div>
-              <div class="hub-sec-k">
-                <span>Broadcasts</span><span class="sep">&middot;</span><span class="dot"></span>
-                <b id="tpOnAirN">0</b> <span id="tpOnAirW">live now</span>
-              </div>
-              <div class="tp-find">
-                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor"
-                     stroke-width="2.6" stroke-linecap="round" aria-hidden="true">
-                  <circle cx="11" cy="11" r="7"/><line x1="21" y1="21" x2="16.5" y2="16.5"/></svg>
-                <input id="tpFind" type="text" placeholder="Search what&rsquo;s on&hellip;"
-                       aria-label="Search broadcasts" oninput="window.tpSearch(this.value)">
-                <button type="button" id="tpFindX" onclick="window.tpSearch('')" aria-label="Clear search">&#10005;</button>
-              </div>
-            </div>
-            <div class="tp-scroll-col tp-air-list" id="tpLive"></div>
-          </div>
-
-          <div class="tp-rail-b">
-            <div class="hub-sec tp-sec-l">
-              <div class="hub-sec-t">The bracket</div>
-              <div class="hub-sec-bar"></div>
-              <div class="hub-sec-k"><span id="tpPrevK">Preview</span></div>
-            </div>
-            <div id="tpPreview"></div>
-          </div>
-
-        </aside>
-      </div>
+      </section>
 
       <!-- ── Your run ──────────────────────────────────────────────── -->
       <div class="hub-sec">
@@ -82330,27 +82344,12 @@ body.q-max #queueOverlay{ padding:0 !important; }
       </div>
       <div id="tpYours"></div>
 
-      <!-- ── The calendar ──────────────────────────────────────────── -->
-      <div class="hub-sec">
-        <div class="hub-sec-t">The calendar</div>
-        <div class="hub-sec-bar"></div>
-        <div class="hub-sec-k">
-          <span>05</span><span class="sep">/</span>
-          <svg viewBox="0 0 24 24" width="11" height="11" fill="none" stroke="currentColor"
-               stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-            <rect x="3" y="5" width="18" height="16" rx="2.5"/><path d="M3 10h18M8 3v4M16 3v4"/></svg>
-          <span>Scheduled</span><span class="sep">&middot;</span><span class="dot"></span>
-          <b id="tpCalN">0</b> <span id="tpCalW">dates</span>
-        </div>
-      </div>
-      <div id="tpCal"></div>
-
       <!-- ── Brackets ──────────────────────────────────────────────── -->
       <div class="hub-sec">
         <div class="hub-sec-t">Brackets</div>
         <div class="hub-sec-bar"></div>
         <div class="hub-sec-k">
-          <span>06</span><span class="sep">/</span>
+          <span>05</span><span class="sep">/</span>
           <svg viewBox="0 0 24 24" width="11" height="11" fill="none" stroke="currentColor"
                stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
             <path d="M3 5h6v6H3zM3 13h6v6H3zM15 9h6v6h-6z"/><path d="M9 8h3v8h3"/></svg>
@@ -82494,18 +82493,24 @@ body.q-max #queueOverlay{ padding:0 !important; }
 .tp-measure{ max-width:var(--tp-measure); margin:0 auto; padding:24px 40px 64px }
 
 /* ── Body: stage + columns on the left, rail on the right ──────── */
+/* What is on, what is playing, when things are. */
 .tp-body{
-  display:grid; gap:28px; align-items:start;
-  grid-template-columns:minmax(0,1fr) minmax(0,440px);
+  display:grid; gap:26px; align-items:start; margin-bottom:30px;
+  grid-template-columns:minmax(0,340px) minmax(0,1fr) minmax(0,392px);
 }
-.tp-left{ min-width:0; display:grid; gap:26px; align-content:start }
+.tp-stage-col{ min-width:0 }
 .tp-rail{ min-width:0; display:grid; gap:22px; align-content:start }
 .tp-rail-b{ min-width:0 }
-@media (max-width:1240px){
-  .tp-body{ grid-template-columns:minmax(0,1fr) }
-  .tp-rail{ grid-template-columns:minmax(0,1fr) minmax(0,1fr); gap:26px }
+@media (max-width:1700px){
+  .tp-body{ grid-template-columns:minmax(0,290px) minmax(0,1fr) minmax(0,330px); gap:20px }
 }
-@media (max-width:820px){ .tp-rail{ grid-template-columns:minmax(0,1fr) } }
+/* Below this the stream leads and the two rails share the row under it:
+   a 290px column beside a picture is a column of clipped words. */
+@media (max-width:1240px){
+  .tp-body{ grid-template-columns:minmax(0,1fr) minmax(0,1fr) }
+  .tp-stage-col{ grid-column:1/-1; order:-1 }
+}
+@media (max-width:820px){ .tp-body{ grid-template-columns:minmax(0,1fr) } }
 
 /* ── The carousel ──────────────────────────────────────────────── */
 /* The neighbours peek in either side. That is the whole difference
@@ -82918,107 +82923,117 @@ body.q-max #queueOverlay{ padding:0 !important; }
 .tp-c.on{ border-color:color-mix(in srgb, var(--hub-accent) 62%, transparent) }
 
 /* ── The calendar ──────────────────────────────────────────────── */
-.tp-cal{ display:grid; gap:13px }
-.tp-cal-h{ display:flex; align-items:center; gap:11px; justify-content:center }
+/* A day is a square with dots, not a box with chips: at rail width a
+   chip is a clipped word, and a dot is still a dot. The month reads as
+   a shape — which weeks are busy — and the names live in the list. */
+.tp-cal{
+  display:grid; gap:12px; padding:14px;
+  border-radius:15px; border:1px solid var(--tp-line);
+  background:linear-gradient(160deg, rgba(255,255,255,.035), rgba(255,255,255,.01));
+}
+.tp-cal-h{ display:flex; align-items:center; gap:6px }
 .tp-cal-t{
-  font-family:'Archivo', var(--font), sans-serif; font-size:15px; font-weight:900;
-  letter-spacing:1.6px; text-transform:uppercase; margin:0; min-width:230px; text-align:center;
+  font-family:'Archivo', var(--font), sans-serif; font-size:13px; font-weight:900;
+  letter-spacing:1.5px; text-transform:uppercase; margin:0; flex:1; color:#fff;
 }
 .tp-nav{
-  width:30px; height:30px; border-radius:8px; cursor:pointer; padding:0;
+  width:26px; height:26px; border-radius:8px; cursor:pointer; padding:0;
+  display:grid; place-content:center;
   background:rgba(255,255,255,.05); border:1px solid var(--tp-line);
-  color:var(--text-2); font-size:15px; line-height:1;
+  color:var(--text-2); font-size:14px; line-height:1;
 }
 .tp-nav:hover{ background:rgba(255,255,255,.13); color:var(--text-1) }
 .tp-today{
-  height:30px; padding:0 13px; border-radius:8px; cursor:pointer;
+  height:26px; padding:0 11px; border-radius:8px; cursor:pointer;
   background:rgba(255,255,255,.05); border:1px solid var(--tp-line); color:var(--text-2);
   font-family:'JetBrains Mono', ui-monospace, monospace;
-  font-size:9.5px; font-weight:700; letter-spacing:1.3px; text-transform:uppercase;
+  font-size:9px; font-weight:700; letter-spacing:1.2px; text-transform:uppercase;
 }
 .tp-today:hover{ background:rgba(255,255,255,.13); color:var(--text-1) }
 .tp-dow{
-  display:grid; grid-template-columns:repeat(7,1fr); gap:7px;
-  font-family:'JetBrains Mono', ui-monospace, monospace; font-size:9px; font-weight:700;
-  letter-spacing:1.4px; text-transform:uppercase; color:var(--text-3); text-align:center;
+  display:grid; grid-template-columns:repeat(7,1fr); gap:4px;
+  font-family:'JetBrains Mono', ui-monospace, monospace; font-size:8.5px; font-weight:700;
+  letter-spacing:.8px; text-transform:uppercase; color:var(--text-3); text-align:center;
 }
-.tp-month{ display:grid; grid-template-columns:repeat(7,1fr); gap:7px }
+.tp-month{ display:grid; grid-template-columns:repeat(7,1fr); gap:4px }
 .tp-d{
-  min-height:104px; border-radius:11px; padding:8px 8px 9px; text-align:left;
-  background:rgba(255,255,255,.022); border:1px solid rgba(255,255,255,.05);
-  display:grid; grid-template-rows:auto 1fr; gap:6px; align-content:start;
-  font-family:inherit; cursor:default; overflow:hidden;
+  position:relative; aspect-ratio:1; border-radius:10px; padding:0;
+  display:grid; grid-template-rows:1fr auto; align-items:center; justify-items:center;
+  gap:1px; padding-bottom:5px;
+  background:transparent; border:1px solid transparent;
+  font-family:inherit; cursor:default; min-width:0;
+  transition:background .14s ease, border-color .14s ease;
 }
-.tp-d.dim{ opacity:.34 }
 .tp-d-n{
   font-family:'JetBrains Mono', ui-monospace, monospace; font-size:12px; font-weight:700;
-  color:var(--text-3); font-variant-numeric:tabular-nums;
+  color:var(--text-3); font-variant-numeric:tabular-nums; align-self:end;
 }
-.tp-d.today{ border-color:rgba(255,255,255,.26) }
-.tp-d.today .tp-d-n{ color:#fff }
-.tp-d.today .tp-d-n::after{
-  content:''; display:inline-block; width:4px; height:4px; border-radius:50%;
-  background:#fff; margin-left:6px; vertical-align:middle;
-}
-.tp-d.has{
-  cursor:pointer;
-  background:linear-gradient(160deg, color-mix(in srgb, var(--hub-accent) 11%, transparent), rgba(255,255,255,.02));
-  border-color:color-mix(in srgb, var(--hub-accent) 26%, transparent);
-}
-.tp-d.has:hover{ border-color:color-mix(in srgb, var(--hub-accent) 55%, transparent) }
+.tp-d.dim .tp-d-n{ opacity:.3 }
+/* Anything on this day lifts it out of the background. */
+.tp-d.has{ cursor:pointer; background:rgba(255,255,255,.055) }
 .tp-d.has .tp-d-n{ color:var(--text-1) }
+.tp-d.has:hover{ background:rgba(255,255,255,.12) }
+/* Today is ringed rather than filled, so it never competes with the
+   day you actually picked. */
+.tp-d.today{ border-color:rgba(255,255,255,.3) }
+.tp-d.today .tp-d-n{ color:#fff }
 .tp-d.sel{
-  border-color:var(--hub-accent);
-  box-shadow:0 0 0 1px color-mix(in srgb, var(--hub-accent) 40%, transparent),
-             0 0 24px -8px color-mix(in srgb, var(--hub-accent) 80%, transparent);
+  background:var(--hub-accent); border-color:var(--hub-accent);
+  box-shadow:0 0 20px -6px color-mix(in srgb, var(--hub-accent) 90%, transparent);
 }
-.tp-d-evs{ display:grid; gap:4px; align-content:start; min-width:0 }
-.tp-ev{
-  display:flex; align-items:center; gap:6px; min-width:0;
-  padding:4px 6px; border-radius:5px; font-size:10.5px; line-height:1.25;
-  background:rgba(255,255,255,.05); color:var(--text-2);
+.tp-d.sel .tp-d-n{ color:#fff }
+.tp-d.sel .tp-dot{ background:rgba(255,255,255,.9) }
+.tp-d:focus-visible{ outline:2px solid var(--tp); outline-offset:2px }
+@media (prefers-reduced-motion:reduce){ .tp-d{ transition:none } }
+/* One dot per thing, capped at three — past that the count stops being
+   readable and the row of dots just becomes a line. */
+.tp-d-dots{ display:flex; gap:3px; align-items:center; height:5px }
+.tp-dot{ width:5px; height:5px; border-radius:50%; background:var(--text-3) }
+.tp-dot.major{ background:var(--hub-accent) }
+.tp-dot.tourney{ background:#f0b429 }
+
+.tp-cal-l{
+  display:grid; gap:6px; padding-top:12px;
+  border-top:1px solid rgba(255,255,255,.07);
 }
-.tp-ev i{ width:4px; height:4px; border-radius:50%; flex:0 0 auto; background:var(--text-3) }
-.tp-ev span{ overflow:hidden; text-overflow:ellipsis; white-space:nowrap }
-.tp-ev.major{ background:color-mix(in srgb, var(--hub-accent) 20%, transparent); color:#ffc2d1 }
-.tp-ev.major i{ background:var(--hub-accent) }
-.tp-ev.tourney{ background:rgba(240,180,41,.16); color:#f7d08a }
-.tp-ev.tourney i{ background:#f0b429 }
-.tp-ev-more{ font-size:9px; color:var(--text-3); padding-left:6px;
-  font-family:'JetBrains Mono', ui-monospace, monospace }
-@media (max-width:820px){
-  .tp-d{ min-height:66px }
-  .tp-ev span{ display:none }
-  .tp-ev{ padding:3px }
+.tp-cal-lh{
+  display:flex; align-items:center; gap:8px;
+  font-family:'JetBrains Mono', ui-monospace, monospace; font-size:8.5px; font-weight:700;
+  letter-spacing:1.5px; text-transform:uppercase; color:var(--text-3);
 }
-.tp-agenda-h{
-  display:flex; align-items:center; gap:10px; margin-top:2px;
-  font-family:'Archivo', var(--font), sans-serif; font-size:11px; font-weight:900;
-  letter-spacing:1.6px; text-transform:uppercase; color:var(--text-2);
-}
-.tp-agenda-h .clear{
+.tp-cal-lh .clear{
   margin-left:auto; background:none; border:none; cursor:pointer; padding:0;
-  color:var(--text-3); font-family:'JetBrains Mono', ui-monospace, monospace;
-  font-size:9.5px; font-weight:700; letter-spacing:1.2px; text-transform:uppercase;
+  color:var(--hub-accent); font:inherit; letter-spacing:1.2px;
 }
-.tp-agenda-h .clear:hover{ color:var(--hub-accent) }
-.tp-agenda{ display:grid; gap:9px; grid-template-columns:repeat(auto-fill,minmax(288px,1fr)) }
+.tp-cal-rows{ display:grid; gap:5px; max-height:216px; overflow-y:auto;
+  scrollbar-width:thin; scrollbar-color:rgba(255,255,255,.14) transparent }
+.tp-cal-rows::-webkit-scrollbar{ width:5px }
+.tp-cal-rows::-webkit-scrollbar-thumb{ background:rgba(255,255,255,.14); border-radius:99px }
 .tp-a{
-  display:grid; grid-template-columns:48px minmax(0,1fr); gap:11px; align-items:center;
-  padding:10px 11px; text-align:left; cursor:pointer; font-family:inherit;
+  display:grid; grid-template-columns:auto minmax(0,1fr); gap:9px; align-items:center;
+  padding:8px 9px; border-radius:9px; text-align:left; cursor:pointer; font-family:inherit;
+  background:rgba(255,255,255,.028); border:1px solid rgba(255,255,255,.055);
+  transition:background .14s ease, border-color .14s ease;
 }
-.tp-a-w{ display:grid; justify-items:center; gap:1px;
-  font-family:'JetBrains Mono', ui-monospace, monospace }
-.tp-a-w b{ font-size:16px; font-weight:700; color:var(--text-1); line-height:1 }
-.tp-a-w small{ font-size:8px; letter-spacing:.8px; text-transform:uppercase; color:var(--text-3) }
-.tp-a-w.live i{ width:10px; height:10px; border-radius:50%; background:var(--tp);
-  animation:tpP 1.7s ease-in-out infinite }
-.tp-a-w.live small{ color:#ffa3b6; font-weight:700 }
-.tp-a-b{ min-width:0; display:grid; gap:3px }
-.tp-a-t{ font-size:13px; font-weight:700; color:var(--text-1);
+.tp-a:hover{ background:rgba(255,255,255,.075);
+  border-color:color-mix(in srgb, var(--hub-accent) 40%, transparent) }
+@media (prefers-reduced-motion:reduce){ .tp-a{ transition:none } }
+.tp-a-w{
+  font-family:'JetBrains Mono', ui-monospace, monospace; font-size:10px; font-weight:700;
+  color:var(--text-2); white-space:nowrap; font-variant-numeric:tabular-nums;
+  display:flex; align-items:center; gap:5px;
+}
+.tp-a-w i{ width:5px; height:5px; border-radius:50%; background:var(--text-3) }
+.tp-a-w i.major{ background:var(--hub-accent) }
+.tp-a-w i.tourney{ background:#f0b429 }
+.tp-a-w.live{ color:#ffa3b6 }
+.tp-a-w.live i{ background:var(--tp); animation:tpP 1.7s ease-in-out infinite }
+.tp-a-b{ min-width:0; display:grid; gap:2px }
+.tp-a-t{ font-size:11.5px; font-weight:700; color:var(--text-1);
   overflow:hidden; text-overflow:ellipsis; white-space:nowrap }
-.tp-a-s{ font-size:11px; color:var(--text-3);
+.tp-a-s{ font-size:10px; color:var(--text-3);
   overflow:hidden; text-overflow:ellipsis; white-space:nowrap }
+.tp-cal-none{ font-size:11px; color:var(--text-3); line-height:1.5; padding:2px 0 }
 
 /* A card that is a button must not inherit a button's centred text. */
 #tournamentsPage button.hub-card{ display:grid }
@@ -83714,8 +83729,8 @@ body.q-max #queueOverlay{ padding:0 !important; }
     setText('tpCalN', String(Object.keys(byDay).length));
     setText('tpCalW', Object.keys(byDay).length === 1 ? 'date' : 'dates');
 
-    /* Grid starts on the Monday on or before the 1st and runs whole
-       weeks until the month is covered. */
+    /* Whole weeks from the Monday on or before the 1st until the month
+       is covered. */
     var first = new Date(monthAt.getFullYear(), monthAt.getMonth(), 1);
     var start = new Date(first);
     start.setDate(start.getDate() - ((start.getDay() + 6) % 7));
@@ -83730,15 +83745,18 @@ body.q-max #queueOverlay{ padding:0 !important; }
       if (k === dayKey(now)) cls.push('today');
       if (day.length) cls.push('has');
       if (selDay === k) cls.push('sel');
-      var evHtml = day.slice(0, 2).map(function (e){
-        return '<span class="tp-ev ' + (e.kind === 'tourney' ? 'tourney' : 'major') + '">' +
-          '<i></i><span>' + esc(e.name) + '</span></span>';
+      /* A dot each, capped at three: past that a row of dots stops being
+         countable and just becomes a line. */
+      var dots = day.slice(0, 3).map(function (e){
+        return '<i class="tp-dot ' + (e.kind === 'tourney' ? 'tourney' : 'major') + '"></i>';
       }).join('');
-      if (day.length > 2) evHtml += '<span class="tp-ev-more">+' + (day.length - 2) + ' more</span>';
       grid += '<button type="button" class="' + cls.join(' ') + '"' +
-        (day.length ? ' onclick="window.tpDay(\'' + k + '\')"' : ' disabled') + '>' +
+        (day.length
+          ? ' onclick="window.tpDay(\'' + k + '\')" title="' + day.length +
+            (day.length === 1 ? ' event' : ' events') + '"'
+          : ' disabled') + '>' +
         '<span class="tp-d-n">' + d.getDate() + '</span>' +
-        '<span class="tp-d-evs">' + evHtml + '</span></button>';
+        '<span class="tp-d-dots">' + dots + '</span></button>';
     }
 
     /* Guarded the same way the list is: a reload can leave the selected
@@ -83747,41 +83765,43 @@ body.q-max #queueOverlay{ padding:0 !important; }
     if (selDay && !picked) selDay = null;
     var live = evs.filter(function (e){ return e.live; });
     var soon = evs.filter(function (e){ return !e.live && e.at >= new Date(now.getTime() - 36e5); });
-    var list = picked || live.concat(soon).slice(0, 8);
+    var list = picked || live.concat(soon).slice(0, 6);
     var label = picked
-      ? new Date(picked[0].at).toLocaleDateString([], { weekday:'long', day:'numeric', month:'long' })
+      ? new Date(picked[0].at).toLocaleDateString([], { weekday:'long', day:'numeric', month:'short' })
       : 'On now and next';
 
     host.innerHTML =
       '<div class="tp-cal">' +
         '<div class="tp-cal-h">' +
-          '<button class="tp-nav" type="button" onclick="window.tpMonth(-1)" aria-label="Previous month">&lsaquo;</button>' +
           '<h3 class="tp-cal-t">' + esc(monthAt.toLocaleDateString([], { month:'long', year:'numeric' })) + '</h3>' +
-          '<button class="tp-nav" type="button" onclick="window.tpMonth(1)" aria-label="Next month">&rsaquo;</button>' +
           '<button class="tp-today" type="button" onclick="window.tpToday()">Today</button>' +
+          '<button class="tp-nav" type="button" onclick="window.tpMonth(-1)" aria-label="Previous month">&lsaquo;</button>' +
+          '<button class="tp-nav" type="button" onclick="window.tpMonth(1)" aria-label="Next month">&rsaquo;</button>' +
         '</div>' +
-        '<div class="tp-dow"><span>Mon</span><span>Tue</span><span>Wed</span><span>Thu</span>' +
-          '<span>Fri</span><span>Sat</span><span>Sun</span></div>' +
+        '<div class="tp-dow"><span>M</span><span>T</span><span>W</span><span>T</span>' +
+          '<span>F</span><span>S</span><span>S</span></div>' +
         '<div class="tp-month">' + grid + '</div>' +
-        '<div class="tp-agenda-h"><span>' + esc(label) + '</span>' +
-          (selDay ? '<button class="clear" type="button" onclick="window.tpDay(\'' + esc(selDay) + '\')">Clear</button>' : '') +
+        '<div class="tp-cal-l">' +
+          '<div class="tp-cal-lh"><span>' + esc(label) + '</span>' +
+            (selDay ? '<button class="clear" type="button" onclick="window.tpDay(\'' + esc(selDay) + '\')">Clear</button>' : '') +
+          '</div>' +
+          (list.length
+            ? '<div class="tp-cal-rows">' + list.map(function (e){
+                var kind = e.kind === 'tourney' ? 'tourney' : 'major';
+                var w = e.live ? 'Live'
+                     : e.at.toLocaleTimeString([], { hour:'2-digit', minute:'2-digit' });
+                var sub = picked ? e.sub
+                        : (e.live ? e.sub : e.at.toLocaleDateString([], { day:'numeric', month:'short' }) + ' · ' + e.sub);
+                return '<button type="button" class="tp-a" ' +
+                  'onclick="window.tpEvent(\'' + e.kind + '\',\'' + esc(e.id) + '\')">' +
+                  '<span class="tp-a-w' + (e.live ? ' live' : '') + '">' +
+                    '<i class="' + kind + '"></i>' + esc(w) + '</span>' +
+                  '<span class="tp-a-b"><span class="tp-a-t">' + esc(e.name) + '</span>' +
+                  '<span class="tp-a-s">' + esc(sub) + '</span></span></button>';
+              }).join('') + '</div>'
+            : '<p class="tp-cal-none">Nothing scheduled. Majors and any bracket with a start ' +
+              'time both land here.</p>') +
         '</div>' +
-        (list.length
-          ? '<div class="tp-agenda">' + list.map(function (e){
-              return '<button type="button" class="tp-a hub-card" ' +
-                'onclick="window.tpEvent(\'' + e.kind + '\',\'' + esc(e.id) + '\')">' +
-                (e.live
-                  ? '<span class="tp-a-w live"><i></i><small>Live</small></span>'
-                  : '<span class="tp-a-w"><b>' + e.at.getDate() + '</b><small>' +
-                    esc(e.at.toLocaleDateString([], { month:'short' })) + '</small></span>') +
-                '<span class="tp-a-b"><span class="tp-a-t">' + esc(e.name) + '</span>' +
-                '<span class="tp-a-s">' + esc(e.sub) +
-                  (e.live ? ' · on now'
-                          : ' · ' + e.at.toLocaleTimeString([], { hour:'2-digit', minute:'2-digit' })) +
-                '</span></span></button>';
-            }).join('') + '</div>'
-          : '<p class="hub-sec-s" style="margin:0">Nothing scheduled. Published majors and any ' +
-            'tournament with a start time both land here.</p>') +
       '</div>';
   }
   window.tpMonth = function (n){
