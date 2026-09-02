@@ -82220,7 +82220,7 @@ body.q-max #queueOverlay{ padding:0 !important; }
         </div>
 
         <!-- ── Right rail: when things are ──────────────────────────── -->
-        <aside class="tp-rail tp-rail-r">
+        <aside class="tp-rail">
           <div class="tp-rail-b">
             <div class="hub-sec tp-sec-l">
               <div class="hub-sec-t">The calendar</div>
@@ -82350,8 +82350,15 @@ body.q-max #queueOverlay{ padding:0 !important; }
   --hub-accent:#ff3d6e;
   --tp:#ff3d6e;
   --tp-dim:rgba(255,61,110,.14);
-  --tp-line:rgba(255,255,255,.08);
-  --tp-surf:rgba(255,255,255,.03);
+  /* Set INTO the page, not laid on it. The fill is darker than the
+     ground, the outline is a dark cut rather than a light edge, and the
+     only lit part is a single line along the top inner edge — a light
+     line at the top with shadow below reads as recessed, the same line
+     at the bottom reads as raised. */
+  --tp-line:rgba(0,0,0,.42);
+  --tp-surf:rgba(0,0,0,.24);
+  --tp-well:rgba(0,0,0,.24);
+  --tp-lip:rgba(255,255,255,.055);
   /* Full-bleed with 40px of padding, which is what Discover,
      Speedrun and the legacy hub all do. The cap is only so an
      ultra-wide monitor does not stretch a row of text to a metre. */
@@ -82367,7 +82374,7 @@ body.q-max #queueOverlay{ padding:0 !important; }
   /* Straight edges, decided once. Every card and panel on the page
      reads this, so the choice cannot half-apply. */
   --tp-r:0px;
-  --tp-edge:rgba(255,255,255,.11);
+  --tp-edge:rgba(0,0,0,.46);
   /* How far a rail must travel to reach the glass. The page is capped
      and centred, so on a monitor wider than the cap that is half the
      leftover plus the padding; on anything narrower it is just the
@@ -82480,8 +82487,9 @@ body.q-max #queueOverlay{ padding:0 !important; }
    two blocks rather than as loose contents on the page ground. */
 .tp-rail-b{
   min-width:0; padding:15px; border-radius:16px;
-  background:rgba(255,255,255,.018);
-  border:1px solid rgba(255,255,255,.06);
+  background:var(--tp-well);
+  border:1px solid var(--tp-edge);
+  box-shadow:inset 0 1px 0 var(--tp-lip);
 }
 
 /* ── The rails are anchored to the window ──────────────────────────
@@ -82493,14 +82501,9 @@ body.q-max #queueOverlay{ padding:0 !important; }
   margin-left:calc(var(--tp-bleed) * -1);
   padding-left:calc(var(--tp-bleed) + 15px);
   border-left:0; border-top-left-radius:0; border-bottom-left-radius:0;
-  background:linear-gradient(90deg, rgba(255,255,255,.032), rgba(255,255,255,.014) 60%);
+  background:linear-gradient(90deg, rgba(0,0,0,.34), var(--tp-well) 60%);
 }
-.tp-rail-r .tp-rail-b{
-  margin-right:calc(var(--tp-bleed) * -1);
-  padding-right:calc(var(--tp-bleed) + 15px);
-  border-right:0; border-top-right-radius:0; border-bottom-right-radius:0;
-  background:linear-gradient(270deg, rgba(255,255,255,.032), rgba(255,255,255,.014) 60%);
-}
+
 
 /* The cards go out with it. The negative margin is on the SCROLLING
    column, not on the cards: .tp-scroll-col is overflow-y:auto, and a box
@@ -82514,24 +82517,17 @@ body.q-max #queueOverlay{ padding:0 !important; }
   padding-left:calc(var(--tp-bleed) + 23px);
   border-left:0; border-top-left-radius:0; border-bottom-left-radius:0;
 }
-.tp-rail-r .tp-cal-rows{ margin-right:calc((var(--tp-bleed) + 15px) * -1); padding-right:0 }
-.tp-rail-r .tp-a{
-  padding-right:calc(var(--tp-bleed) + 24px);
-  border-right:0; border-top-right-radius:0; border-bottom-right-radius:0;
-}
 
 /* Stacked, neither rail is against an edge any more, so the whole
    thing stands down rather than pulling into the middle of the page. */
 @media (max-width:1240px){
-  .tp-rail-l .tp-rail-b, .tp-rail-r .tp-rail-b{
-    margin:0; padding:15px; border-radius:16px;
-    border:1px solid rgba(255,255,255,.06);
-    background:rgba(255,255,255,.018);
+  .tp-rail-l .tp-rail-b{
+    margin:0; padding:15px;
+    border:1px solid var(--tp-edge);
+    background:var(--tp-well);
   }
   .tp-rail-l .tp-scroll-col{ margin-left:0; padding-right:5px }
-  .tp-rail-r .tp-cal-rows{ margin-right:0 }
-  .tp-rail-l .tp-air{ padding:8px; border-radius:12px; border-left-width:1px }
-  .tp-rail-r .tp-a{ padding:8px 9px; border-radius:9px; border-right-width:1px }
+  .tp-rail-l .tp-air{ padding:8px; border-left-width:1px }
 }
 @media (max-width:1700px){
   #tournamentsPage{ --tp-rail-l:290px; --tp-rail-r:330px; --tp-gap:20px; }
@@ -82553,7 +82549,7 @@ body.q-max #queueOverlay{ padding:0 !important; }
    and as tall as the window can spare. */
 .tp-frame{
   min-width:0; width:100%; margin:0 auto; display:grid; gap:12px;
-  max-width:calc(56vh * 16 / 9);
+  max-width:calc(50vh * 16 / 9);
 }
 .tp-player{
   position:relative; width:100%; aspect-ratio:16/9;
@@ -82767,9 +82763,7 @@ body.q-max #queueOverlay{ padding:0 !important; }
      overlapping one. Needs align-self:start to have room to stick in. */
   position:sticky; top:16px; align-self:start; min-width:0;
   border-radius:16px; padding:15px;
-  background:linear-gradient(160deg,#191b28,#12131c);
-  border:1px solid rgba(255,255,255,.1);
-  box-shadow:-24px 0 60px -34px #000;
+  border:1px solid var(--tp-edge);
   display:grid; gap:12px; align-content:start;
   max-height:none;
 }
@@ -82879,8 +82873,9 @@ body.q-max #queueOverlay{ padding:0 !important; }
 .tp-make{
   display:grid; gap:11px; align-content:start;
   padding:16px; border-radius:16px;
-  background:linear-gradient(160deg, rgba(255,61,110,.07), rgba(255,255,255,.016));
-  border:1px solid color-mix(in srgb, var(--hub-accent) 24%, transparent);
+  background:linear-gradient(160deg, rgba(255,61,110,.09), rgba(0,0,0,.3));
+  border:1px solid color-mix(in srgb, var(--hub-accent) 22%, transparent);
+  box-shadow:inset 0 1px 0 var(--tp-lip);
 }
 .tp-make-i{
   width:40px; height:40px; border-radius:11px; display:grid; place-content:center;
@@ -82908,8 +82903,7 @@ body.q-max #queueOverlay{ padding:0 !important; }
    along it is — without having to enter it first. */
 .tp-p{
   border-radius:15px; overflow:hidden;
-  background:linear-gradient(135deg, rgba(255,255,255,.04), rgba(255,255,255,.012));
-  border:1px solid var(--tp-line);
+  border:1px solid var(--tp-edge);
 }
 .tp-p-art{ position:relative; height:126px; background:#14151d center/cover }
 .tp-p-art::after{ content:''; position:absolute; inset:0;
@@ -83034,7 +83028,7 @@ body.q-max #queueOverlay{ padding:0 !important; }
 }
 .tp-cal-jump{
   width:100%; padding:9px 11px; cursor:pointer; text-align:left;
-  background:rgba(255,255,255,.03); border:1px solid var(--tp-edge);
+  border:1px solid var(--tp-edge);
   color:var(--text-2); font-family:var(--font); font-size:11.5px;
 }
 .tp-cal-jump:hover:not(:disabled){
@@ -83069,9 +83063,9 @@ body.q-max #queueOverlay{ padding:0 !important; }
 }
 .tp-d.dim .tp-d-n{ opacity:.3 }
 /* Anything on this day lifts it out of the background. */
-.tp-d.has{ cursor:pointer; background:rgba(255,255,255,.055) }
+.tp-d.has{ cursor:pointer; background:rgba(0,0,0,.3); box-shadow:inset 0 1px 0 var(--tp-lip) }
 .tp-d.has .tp-d-n{ color:var(--text-1) }
-.tp-d.has:hover{ background:rgba(255,255,255,.12) }
+.tp-d.has:hover{ background:rgba(0,0,0,.44) }
 /* Today is ringed rather than filled, so it never competes with the
    day you actually picked. */
 .tp-d.today{ border-color:rgba(255,255,255,.3) }
@@ -83111,10 +83105,11 @@ body.q-max #queueOverlay{ padding:0 !important; }
 .tp-a{
   display:grid; grid-template-columns:auto minmax(0,1fr); gap:9px; align-items:center;
   padding:8px 9px; border-radius:9px; text-align:left; cursor:pointer; font-family:inherit;
-  background:rgba(255,255,255,.028); border:1px solid rgba(255,255,255,.055);
+  background:var(--tp-well); border:1px solid var(--tp-edge);
+  box-shadow:inset 0 1px 0 var(--tp-lip);
   transition:background .14s ease, border-color .14s ease;
 }
-.tp-a:hover{ background:rgba(255,255,255,.075);
+.tp-a:hover{ background:rgba(0,0,0,.12);
   border-color:color-mix(in srgb, var(--hub-accent) 40%, transparent) }
 @media (prefers-reduced-motion:reduce){ .tp-a{ transition:none } }
 .tp-a-w{
@@ -83158,17 +83153,31 @@ body.q-max #queueOverlay{ padding:0 !important; }
 #tournamentsPage .tp-p-empty{
   border-radius:var(--tp-r);
 }
+/* One declaration for every surface on the page, so none is left as
+   glass. Border-colour is kept as the mechanism rather than replaced by
+   a ring, because hover and selection already work by changing it. */
 #tournamentsPage .hub-card,
 #tournamentsPage .tp-rail-b,
-#tournamentsPage .tp-cmd-b{
+#tournamentsPage .tp-cmd-b,
+#tournamentsPage .tp-sheet,
+#tournamentsPage .tp-p,
+#tournamentsPage .tp-now,
+#tournamentsPage .tp-cal-jump{
+  background:var(--tp-well);
   border-color:var(--tp-edge);
+  box-shadow:inset 0 1px 0 var(--tp-lip);
+}
+/* A lift is the opposite of embedded: the hover brightens the cut and
+   the lip instead of raising the card off the page. */
+#tournamentsPage .hub-card:hover{
+  transform:none !important;
+  box-shadow:inset 0 1px 0 rgba(255,255,255,.09) !important;
+  border-color:color-mix(in srgb, var(--hub-accent) 55%, transparent) !important;
 }
 /* The rails keep their square outer edge and lose the inner rounding
    with everything else. */
 #tournamentsPage .tp-rail-l .tp-rail-b,
-#tournamentsPage .tp-rail-r .tp-rail-b,
-#tournamentsPage .tp-rail-l .tp-air,
-#tournamentsPage .tp-rail-r .tp-a{
+#tournamentsPage .tp-rail-l .tp-air{
   border-radius:0;
 }
 /* The cut corner is a diagonal on a rounded box; on a square one it is
