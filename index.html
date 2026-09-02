@@ -82212,25 +82212,7 @@ body.q-max #queueOverlay{ padding:0 !important; }
                two buttons next to it. -->
           <section class="tp-stage">
             <div class="tp-frame">
-              <!-- Only the three panels are in this row, so stretching
-                   makes the peeks exactly the picture's height. -->
-              <div class="tp-carousel">
-                <button type="button" class="tp-peek prev" id="tpPrev"
-                        onclick="window.tpStep(-1)" aria-label="Previous broadcast">
-                  <span class="tp-peek-art" id="tpPeekPrev"><span class="tp-peek-i">&lsaquo;</span></span>
-                  <span class="tp-peek-l">Previous</span>
-                  <span class="tp-peek-t" id="tpPeekPrevT"></span>
-                </button>
-
-                <div class="tp-player" id="tpPlayer"></div>
-
-                <button type="button" class="tp-peek next" id="tpNext"
-                        onclick="window.tpStep(1)" aria-label="Next broadcast">
-                  <span class="tp-peek-art" id="tpPeekNext"><span class="tp-peek-i">&rsaquo;</span></span>
-                  <span class="tp-peek-l">Next</span>
-                  <span class="tp-peek-t" id="tpPeekNextT"></span>
-                </button>
-              </div>
+              <div class="tp-player" id="tpPlayer"></div>
               <div class="tp-pager" id="tpPager"></div>
               <div class="tp-now" id="tpBar"></div>
             </div>
@@ -82382,6 +82364,10 @@ body.q-max #queueOverlay{ padding:0 !important; }
   --tp-rail-r:392px;
   --tp-gap:26px;
   --tp-pad:40px;
+  /* Straight edges, decided once. Every card and panel on the page
+     reads this, so the choice cannot half-apply. */
+  --tp-r:0px;
+  --tp-edge:rgba(255,255,255,.11);
   /* How far a rail must travel to reach the glass. The page is capped
      and centred, so on a monitor wider than the cap that is half the
      leftover plus the padding; on anything narrower it is just the
@@ -82563,70 +82549,12 @@ body.q-max #queueOverlay{ padding:0 !important; }
 /* The neighbours peek in either side. That is the whole difference
    between "a carousel" and "an embed with two buttons next to it": you
    can see there is something before and after this one. */
-.tp-carousel{
-  display:grid; grid-template-columns:196px minmax(0,1fr) 196px; gap:18px;
-  align-items:center;
-}
-/* Sized from the WINDOW HEIGHT, not a fixed width: the stage grows to
-   fill what it is given but never pushes the three columns off the
-   bottom. A max-height cannot do this — on a box with an aspect-ratio it
-   only stops the box being 16:9 and letterboxes the picture inside it —
-   so the height budget is turned into a width. 428px is both peeks and
-   both gaps. */
+/* No gutters any more, so the picture is as wide as its column allows
+   and as tall as the window can spare. */
 .tp-frame{
   min-width:0; width:100%; margin:0 auto; display:grid; gap:12px;
-  max-width:calc(52vh * 16 / 9 + 428px);
+  max-width:calc(56vh * 16 / 9);
 }
-/* A peek is a CARD, not a sliver. Cropping a 16:9 thumbnail into a
-   64px-wide full-height strip magnifies the middle of the image until
-   it is unreadable fragments; at the thumbnail's own ratio it is simply
-   the next broadcast, legible, with its name under it. */
-.tp-peek{
-  display:grid; align-content:center; gap:8px; padding:0; min-width:0;
-  background:none; border:none; cursor:pointer; text-align:left;
-}
-.tp-peek:disabled{ opacity:.2; cursor:default; pointer-events:none }
-.tp-peek:focus-visible{ outline:2px solid var(--tp); outline-offset:4px; border-radius:12px }
-.tp-peek-art{
-  position:relative; width:100%; aspect-ratio:16/9; border-radius:11px;
-  background:#14151d center/cover; overflow:hidden;
-  border:1px solid var(--tp-line); opacity:.7;
-  transition:opacity .16s ease, border-color .16s ease;
-}
-.tp-peek:hover .tp-peek-art{
-  opacity:1; border-color:color-mix(in srgb, var(--hub-accent) 60%, transparent);
-}
-.tp-peek-i{
-  position:absolute; inset:0; margin:auto; display:grid; place-content:center;
-  width:38px; height:38px; border-radius:11px;
-  background:rgba(8,9,14,.74); border:1px solid rgba(255,255,255,.22);
-  color:#fff; font-size:19px; line-height:1;
-  transition:background .16s ease, border-color .16s ease;
-}
-.tp-peek:hover .tp-peek-i{ background:var(--tp); border-color:var(--tp) }
-.tp-peek-l{
-  font-family:'JetBrains Mono', ui-monospace, monospace; font-size:8.5px; font-weight:700;
-  letter-spacing:1.6px; text-transform:uppercase; color:var(--text-3);
-}
-.tp-peek.next{ text-align:right }
-.tp-peek-t{
-  font-size:11.5px; font-weight:600; color:var(--text-2); line-height:1.35;
-  display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical; overflow:hidden;
-}
-@media (prefers-reduced-motion:reduce){
-  .tp-peek-art, .tp-peek-i{ transition:none }
-}
-@media (max-width:1400px){
-  .tp-carousel{ grid-template-columns:112px minmax(0,1fr) 112px; gap:12px }
-  .tp-frame{ max-width:calc(52vh * 16 / 9 + 248px) }
-  .tp-peek-t, .tp-peek-l{ display:none }
-}
-@media (max-width:900px){
-  .tp-carousel{ grid-template-columns:48px minmax(0,1fr) 48px; gap:8px }
-  .tp-frame{ max-width:calc(52vh * 16 / 9 + 112px) }
-  .tp-peek-art{ aspect-ratio:1 }
-}
-
 .tp-player{
   position:relative; width:100%; aspect-ratio:16/9;
   border-radius:16px; overflow:hidden; border:1px solid rgba(255,255,255,.1);
@@ -83097,6 +83025,23 @@ body.q-max #queueOverlay{ padding:0 !important; }
   color:var(--text-2); font-size:14px; line-height:1;
 }
 .tp-nav:hover{ background:rgba(255,255,255,.13); color:var(--text-1) }
+/* A dot when there is something that way, so an empty month does not
+   look like the end of the list. */
+.tp-nav{ position:relative }
+.tp-nav.has::after{
+  content:''; position:absolute; top:3px; right:3px;
+  width:4px; height:4px; border-radius:50%; background:var(--hub-accent);
+}
+.tp-cal-jump{
+  width:100%; padding:9px 11px; cursor:pointer; text-align:left;
+  background:rgba(255,255,255,.03); border:1px solid var(--tp-edge);
+  color:var(--text-2); font-family:var(--font); font-size:11.5px;
+}
+.tp-cal-jump:hover:not(:disabled){
+  background:rgba(255,255,255,.08); color:var(--text-1);
+  border-color:color-mix(in srgb, var(--hub-accent) 45%, transparent);
+}
+.tp-cal-jump:disabled{ cursor:default; color:var(--text-3) }
 .tp-today{
   height:26px; padding:0 11px; border-radius:8px; cursor:pointer;
   background:rgba(255,255,255,.05); border:1px solid var(--tp-line); color:var(--text-2);
@@ -83191,6 +83136,44 @@ body.q-max #queueOverlay{ padding:0 !important; }
 
 /* A card that is a button must not inherit a button's centred text. */
 #tournamentsPage button.hub-card{ display:grid }
+
+/* ── Straight edges ────────────────────────────────────────────────
+   Applied in one place rather than by editing every rule, so nothing is
+   left half-rounded. The border is firmer than the .06 the panels were
+   using: at zero radius a faint edge reads as a smudge, where a defined
+   one reads as a card. */
+#tournamentsPage .hub-card,
+#tournamentsPage .tp-rail-b,
+#tournamentsPage .tp-cmd-b,
+#tournamentsPage .tp-make,
+#tournamentsPage .tp-sheet,
+#tournamentsPage .tp-p,
+#tournamentsPage .tp-air,
+#tournamentsPage .tp-a,
+#tournamentsPage .tp-c,
+#tournamentsPage .tp-air-th,
+#tournamentsPage .tp-nx-art,
+#tournamentsPage .tp-player,
+#tournamentsPage .tp-now,
+#tournamentsPage .tp-p-empty{
+  border-radius:var(--tp-r);
+}
+#tournamentsPage .hub-card,
+#tournamentsPage .tp-rail-b,
+#tournamentsPage .tp-cmd-b{
+  border-color:var(--tp-edge);
+}
+/* The rails keep their square outer edge and lose the inner rounding
+   with everything else. */
+#tournamentsPage .tp-rail-l .tp-rail-b,
+#tournamentsPage .tp-rail-r .tp-rail-b,
+#tournamentsPage .tp-rail-l .tp-air,
+#tournamentsPage .tp-rail-r .tp-a{
+  border-radius:0;
+}
+/* The cut corner is a diagonal on a rounded box; on a square one it is
+   just a notch out of the corner, which fights the straight edge. */
+#tournamentsPage .hub-card::after{ display:none }
 </style>
 
 <script>
@@ -83324,7 +83307,7 @@ body.q-max #queueOverlay{ padding:0 !important; }
         '<h3>Nothing on right now</h3>' +
         '<p>The moment a watched channel goes live it plays here, and when none is, ' +
         'whatever starts next takes the stage.</p></div>';
-      paintBar(); paintPager(); paintPeeks();
+      paintBar(); paintPager();
       return;
     }
     if (idx >= streams.length) idx = 0;
@@ -83336,7 +83319,7 @@ body.q-max #queueOverlay{ padding:0 !important; }
         '<button type="button" class="tp-play" onclick="window.tpPop()" aria-label="Open on YouTube">' +
         '<svg viewBox="0 0 24 24" width="24" height="24" fill="currentColor">' +
         '<path d="M8 5v14l11-7z"/></svg></button>';
-    paintBar(); paintPager(); paintPeeks();
+    paintBar(); paintPager();
   }
 
   var SPK_ON = '<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" ' +
@@ -83381,7 +83364,12 @@ body.q-max #queueOverlay{ padding:0 !important; }
         '<button type="button" class="tp-cbtn" title="Pop out" aria-label="Pop out" ' +
           'onclick="window.tpPop()">' + POP_ICO + '</button>' +
         (streams.length > 1
-          ? '<span class="tp-count">' + (idx + 1) + '/' + streams.length + '</span>' : '') +
+          ? '<button type="button" class="tp-cbtn" title="Previous broadcast" ' +
+              'aria-label="Previous broadcast" onclick="window.tpStep(-1)">&lsaquo;</button>' +
+            '<span class="tp-count">' + (idx + 1) + '/' + streams.length + '</span>' +
+            '<button type="button" class="tp-cbtn" title="Next broadcast" ' +
+              'aria-label="Next broadcast" onclick="window.tpStep(1)">&rsaquo;</button>'
+          : '') +
       '</span>';
   }
 
@@ -83396,31 +83384,6 @@ body.q-max #queueOverlay{ padding:0 !important; }
         '" onclick="window.tpPick(' + i + ')" title="' + esc(m.name) +
         '" aria-label="' + esc(m.name) + '"></button>';
     }).join('');
-  }
-
-  /* The neighbours, showing through either side. This is what makes it
-     read as a carousel rather than as an embed with two buttons beside
-     it: you can see there is something before and after this one. */
-  function paintPeeks(){
-    var pv = $('tpPrev'), nx = $('tpNext');
-    var pa = $('tpPeekPrev'), na = $('tpPeekNext');
-    var many = streams.length > 1;
-    if (pv) pv.disabled = !many;
-    if (nx) nx.disabled = !many;
-    if (!many){
-      if (pa) pa.style.backgroundImage = '';
-      if (na) na.style.backgroundImage = '';
-      setText('tpPeekPrevT', ''); setText('tpPeekNextT', '');
-      return;
-    }
-    var p = streams[(idx - 1 + streams.length) % streams.length];
-    var n = streams[(idx + 1) % streams.length];
-    if (pa) pa.style.backgroundImage = p && p.art ? 'url("' + p.art + '")' : '';
-    if (na) na.style.backgroundImage = n && n.art ? 'url("' + n.art + '")' : '';
-    setText('tpPeekPrevT', p ? (p.name || '') : '');
-    setText('tpPeekNextT', n ? (n.name || '') : '');
-    if (pv && p) pv.title = 'Previous · ' + p.name;
-    if (nx && n) nx.title = 'Next · ' + n.name;
   }
 
   /* ── On air list ─────────────────────────────────────────────── */
@@ -83912,8 +83875,22 @@ body.q-max #queueOverlay{ padding:0 !important; }
       if (e.live) return;               // no start time to mark a day with
       (byDay[dayKey(e.at)] = byDay[dayKey(e.at)] || []).push(e);
     });
-    setText('tpCalN', String(Object.keys(byDay).length));
-    setText('tpCalW', Object.keys(byDay).length === 1 ? 'date' : 'dates');
+    /* Count THIS month, not all time. A header reading "8 dates" over a
+       month showing six is the reading that gets reported as a bug. */
+    var mStart = new Date(monthAt.getFullYear(), monthAt.getMonth(), 1).getTime();
+    var mEnd = new Date(monthAt.getFullYear(), monthAt.getMonth() + 1, 1).getTime();
+    var stamps = evs.filter(function (e){ return !e.live; })
+                    .map(function (e){ return e.at.getTime(); })
+                    .sort(function (a, b){ return a - b; });
+    var thisMonth = Object.keys(byDay).filter(function (k){
+      var d = byDay[k][0].at.getTime();
+      return d >= mStart && d < mEnd;
+    }).length;
+    var back = stamps.filter(function (t){ return t < mStart; }).pop() || null;
+    var fwd = null;
+    for (var q = 0; q < stamps.length; q++){ if (stamps[q] >= mEnd){ fwd = stamps[q]; break; } }
+    setText('tpCalN', String(thisMonth));
+    setText('tpCalW', 'this month');
 
     /* Whole weeks from the Monday on or before the 1st until the month
        is covered. */
@@ -83961,12 +83938,24 @@ body.q-max #queueOverlay{ padding:0 !important; }
         '<div class="tp-cal-h">' +
           '<h3 class="tp-cal-t">' + esc(monthAt.toLocaleDateString([], { month:'long', year:'numeric' })) + '</h3>' +
           '<button class="tp-today" type="button" onclick="window.tpToday()">Today</button>' +
-          '<button class="tp-nav" type="button" onclick="window.tpMonth(-1)" aria-label="Previous month">&lsaquo;</button>' +
-          '<button class="tp-nav" type="button" onclick="window.tpMonth(1)" aria-label="Next month">&rsaquo;</button>' +
+          '<button class="tp-nav' + (back ? ' has' : '') + '" type="button" ' +
+            'onclick="window.tpMonth(-1)" aria-label="Previous month">&lsaquo;</button>' +
+          '<button class="tp-nav' + (fwd ? ' has' : '') + '" type="button" ' +
+            'onclick="window.tpMonth(1)" aria-label="Next month">&rsaquo;</button>' +
         '</div>' +
         '<div class="tp-dow"><span>M</span><span>T</span><span>W</span><span>T</span>' +
           '<span>F</span><span>S</span><span>S</span></div>' +
         '<div class="tp-month">' + grid + '</div>' +
+        /* An empty month should say where the next one is rather than
+           leave you clicking the arrow to find out. */
+        (thisMonth === 0
+          ? '<button type="button" class="tp-cal-jump"' +
+            (fwd ? ' onclick="window.tpJumpTo(' + fwd + ')"' : ' disabled') + '>' +
+            (fwd
+              ? 'Nothing this month &mdash; next on ' +
+                esc(new Date(fwd).toLocaleDateString([], { day:'numeric', month:'long' }))
+              : 'Nothing scheduled in either direction') + '</button>'
+          : '') +
         '<div class="tp-cal-l">' +
           '<div class="tp-cal-lh"><span>' + esc(label) + '</span>' +
             (selDay ? '<button class="clear" type="button" onclick="window.tpDay(\'' + esc(selDay) + '\')">Clear</button>' : '') +
@@ -84000,6 +83989,14 @@ body.q-max #queueOverlay{ padding:0 !important; }
     selDay = null; paintCal();
   };
   window.tpDay = function (k){ selDay = (selDay === k ? null : k); paintCal(); };
+  /* Jump the month to a timestamp and select the day it lands on. */
+  window.tpJumpTo = function (ts){
+    var d = new Date(Number(ts));
+    if (isNaN(d)) return;
+    monthAt = new Date(d.getFullYear(), d.getMonth(), 1);
+    selDay = dayKey(d);
+    paintCal();
+  };
   window.tpEvent = function (kind, id){
     /* A bracket goes to the preview, not straight into the bracket. A
        broadcast goes to the stage. */
