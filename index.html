@@ -81242,12 +81242,41 @@ body.q-max #queueOverlay{ padding:0 !important; }
   /* Steam is asked to run it; the app cannot know whether it is
      installed, so the honest thing is to offer the link and let Steam
      answer that question itself. */
-  window.qrLaunch = function (){
-    var id = appId();
+  /* The same path Recently Played uses, not a second one.
+     electronAPI.launchSteamGame() hands an app id to a validated IPC
+     handler which builds the steam:// URL in the main process and calls
+     shell.openExternal. The renderer never names the URL: openExternal
+     will open file:// and every other registered protocol, and this
+     window renders other people's lobby names.
+
+     What it must NOT do is assign location.href. That hands the whole
+     document to the OS handler; in Electron the page is torn down, the
+     websocket goes with it, and the person who pressed Launch is
+     dropped from the table. That was the bug, and the try/catch around
+     it never fired because navigating away is not an exception. */
+  window.qrLaunch = async function (){
+    var id = String(appId() == null ? '' : appId()).replace(/[^0-9]/g, '');
     if (!id) return;
-    try { window.location.href = 'steam://run/' + id; }
-    catch (e) { toast('Could not reach Steam', 'warn'); }
-    note('You launched the game.');
+
+    var bridge = window.electronAPI;
+    if (bridge && typeof bridge.launchSteamGame === 'function'){
+      var r = null;
+      try { r = await bridge.launchSteamGame(id); } catch (e) {}
+      if (r && r.ok === false){
+        return toast('Steam would not take that request', 'warn');
+      }
+    } else {
+      /* No bridge — a browser build. The protocol is registered with the
+         OS regardless of who asks, so this reaches Steam the same way,
+         and there is no renderer here to lose. */
+      try { window.location.href = 'steam://rungameid/' + id; }
+      catch (e) { return toast('Could not reach Steam', 'warn'); }
+    }
+
+    /* Deliberately not "You launched the game". Nothing reports back,
+       and if the title is not installed what opens is Steam's install
+       prompt — both are the right answer and neither is visible here. */
+    note('You asked Steam to start the game.');
   };
 
   window.qrCopy = function (el){
