@@ -82131,9 +82131,8 @@ body.q-max #queueOverlay{ padding:0 !important; }
      style="background:radial-gradient(1200px 600px at 80% -10%, rgba(255,61,110,.17) 0%, transparent 60%), radial-gradient(900px 500px at 10% 110%, rgba(255,107,107,.11) 0%, transparent 60%), linear-gradient(160deg,var(--bg-0) 0%,var(--bg-1) 100%)">
 
   <!-- ── The bar ───────────────────────────────────────────────────
-       Identity hard left, the things you came to do hard right. It does
-       not scroll, so the way in and the way to make one are always
-       reachable; everything else lives in the page below it. -->
+       Identity hard left, the two ways in hard right. It does not
+       scroll, so both stay reachable from anywhere on the page. -->
   <header class="tp-top">
     <div class="tp-top-in">
       <div class="tp-id">
@@ -82177,85 +82176,170 @@ body.q-max #queueOverlay{ padding:0 !important; }
   <div id="tpScroll">
     <div class="tp-measure">
 
-      <!-- ── The stage ───────────────────────────────────────────────
-           A true carousel: one broadcast at a time, centred, stepped by
-           the arrows either side of it, with a pager under the caption
-           that says how many there are and which one this is. -->
-      <section class="tp-stage">
-        <div class="tp-stage-in">
-          <button type="button" class="spotlight-carousel-btn prev" id="tpPrev"
-                  onclick="window.tpStep(-1)" aria-label="Previous broadcast">&lsaquo;</button>
-          <div class="tp-frame">
-            <div class="tp-player" id="tpPlayer"></div>
-            <div class="tp-now" id="tpBar"></div>
-            <div class="tp-pager" id="tpPager"></div>
-          </div>
-          <button type="button" class="spotlight-carousel-btn next" id="tpNext"
-                  onclick="window.tpStep(1)" aria-label="Next broadcast">&rsaquo;</button>
+      <!-- ── Stage and columns, with a rail down the right ───────────
+           On air sits beside the stream it changes, and the preview
+           sits under it — so the whole right edge is "what am I looking
+           at", and the left is "what is there". -->
+      <div class="tp-body">
+        <div class="tp-left">
+
+          <!-- The carousel: the neighbours peek in either side, so it
+               reads as one of many rather than as a single embed with
+               two buttons next to it. -->
+          <section class="tp-stage">
+            <div class="tp-frame">
+              <!-- Only the three panels are in this row, so stretching
+                   makes the peeks exactly the picture's height. -->
+              <div class="tp-carousel">
+                <button type="button" class="tp-peek prev" id="tpPrev"
+                        onclick="window.tpStep(-1)" aria-label="Previous broadcast">
+                  <span class="tp-peek-art" id="tpPeekPrev"></span>
+                  <span class="tp-peek-i">&lsaquo;</span>
+                </button>
+
+                <div class="tp-player" id="tpPlayer"></div>
+
+                <button type="button" class="tp-peek next" id="tpNext"
+                        onclick="window.tpStep(1)" aria-label="Next broadcast">
+                  <span class="tp-peek-art" id="tpPeekNext"></span>
+                  <span class="tp-peek-i">&rsaquo;</span>
+                </button>
+              </div>
+              <div class="tp-now" id="tpBar"></div>
+              <div class="tp-pager" id="tpPager"></div>
+            </div>
+          </section>
+
+          <!-- ── Three columns ──────────────────────────────────────── -->
+          <section class="tp-tri">
+
+            <div class="tp-col">
+              <div class="hub-sec tp-sec-l">
+                <div class="hub-sec-t">Ongoing</div>
+                <div class="hub-sec-bar"></div>
+                <div class="hub-sec-k">
+                  <span>01</span><span class="sep">/</span>
+                  <span>In progress</span><span class="sep">&middot;</span><span class="dot"></span>
+                  <b id="tpOnN">0</b> <span id="tpOnW">brackets</span>
+                </div>
+                <div class="hub-sec-s">Being played right now. Pick one to see it on the right.</div>
+              </div>
+              <div class="tp-scroll-col" id="tpOngoing"></div>
+            </div>
+
+            <!-- Wider, because it is the thing the page is for. -->
+            <div class="tp-col tp-col-mid">
+              <div class="hub-sec tp-sec-l">
+                <div class="hub-sec-t">Run your own</div>
+                <div class="hub-sec-bar"></div>
+                <div class="hub-sec-k">
+                  <span>02</span><span class="sep">/</span>
+                  <span>Host</span>
+                </div>
+              </div>
+              <div class="tp-make">
+                <div class="tp-make-i" aria-hidden="true">
+                  <svg viewBox="0 0 24 24" width="26" height="26" fill="none" stroke="currentColor"
+                       stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+                    <path d="M3 5h6v6H3zM3 13h6v6H3zM15 9h6v6h-6z"/><path d="M9 8h3v8h3"/></svg>
+                </div>
+                <h3>Build a bracket</h3>
+                <p>Pick a game, a format and a size. Make it public so anyone on Lobby can enter, or
+                   private with a code &mdash; four letters and four digits &mdash; that you hand out
+                   yourself. Neither has anything to do with a Lobby&rsquo;s own tournaments, which
+                   stay inside that Lobby.</p>
+                <ol class="tp-steps">
+                  <li><b>01</b><span>Game and format</span></li>
+                  <li><b>02</b><span>Bracket size</span></li>
+                  <li><b>03</b><span>Publish, or share the code</span></li>
+                </ol>
+                <div class="tp-make-do">
+                  <button class="gt-cta-primary" type="button" onclick="window.openCreateTournament()">
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                         stroke-width="2.8" stroke-linecap="round" aria-hidden="true">
+                      <line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+                    <span>Create tournament</span>
+                  </button>
+                  <button class="tp-ghost" type="button" onclick="window.openMyTournaments()">See the ones you host</button>
+                </div>
+              </div>
+            </div>
+
+            <div class="tp-col">
+              <div class="hub-sec tp-sec-l">
+                <div class="hub-sec-t">Upcoming</div>
+                <div class="hub-sec-bar"></div>
+                <div class="hub-sec-k">
+                  <span>03</span><span class="sep">/</span>
+                  <span>Not started</span><span class="sep">&middot;</span><span class="dot"></span>
+                  <b id="tpUpN">0</b> <span id="tpUpW">brackets</span>
+                </div>
+                <div class="hub-sec-s">Soonest first. The ones with no date sit at the bottom.</div>
+              </div>
+              <div class="tp-scroll-col" id="tpUpcoming"></div>
+            </div>
+
+          </section>
         </div>
-      </section>
 
-      <!-- ── Three columns ─────────────────────────────────────────── -->
-      <section class="tp-tri">
+        <!-- ── The right rail ───────────────────────────────────────── -->
+        <aside class="tp-rail">
 
-        <!-- What is on. Picking one puts it on the stage. -->
-        <div class="tp-col">
-          <div class="hub-sec tp-sec-l">
-            <div class="hub-sec-t">On air</div>
-            <div class="hub-sec-bar"></div>
-            <div class="hub-sec-k">
-              <span>01</span><span class="sep">/</span>
-              <span>Broadcasts</span><span class="sep">&middot;</span><span class="dot"></span>
-              <b id="tpOnAirN">0</b> <span id="tpOnAirW">live now</span>
+          <div class="tp-rail-b">
+            <div class="hub-sec tp-sec-l">
+              <div class="hub-sec-t">On air</div>
+              <div class="hub-sec-bar"></div>
+              <div class="hub-sec-k">
+                <span>Broadcasts</span><span class="sep">&middot;</span><span class="dot"></span>
+                <b id="tpOnAirN">0</b> <span id="tpOnAirW">live now</span>
+              </div>
+              <div class="tp-find">
+                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                     stroke-width="2.6" stroke-linecap="round" aria-hidden="true">
+                  <circle cx="11" cy="11" r="7"/><line x1="21" y1="21" x2="16.5" y2="16.5"/></svg>
+                <input id="tpFind" type="text" placeholder="Search what&rsquo;s on&hellip;"
+                       aria-label="Search broadcasts" oninput="window.tpSearch(this.value)">
+                <button type="button" id="tpFindX" onclick="window.tpSearch('')" aria-label="Clear search">&#10005;</button>
+              </div>
             </div>
-            <div class="tp-find">
-              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor"
-                   stroke-width="2.6" stroke-linecap="round" aria-hidden="true">
-                <circle cx="11" cy="11" r="7"/><line x1="21" y1="21" x2="16.5" y2="16.5"/></svg>
-              <input id="tpFind" type="text" placeholder="Search what&rsquo;s on&hellip;"
-                     aria-label="Search broadcasts" oninput="window.tpSearch(this.value)">
-              <button type="button" id="tpFindX" onclick="window.tpSearch('')" aria-label="Clear search">&#10005;</button>
-            </div>
+            <div class="tp-scroll-col tp-air-list" id="tpLive"></div>
           </div>
-          <div class="tp-scroll-col" id="tpLive"></div>
-        </div>
 
-        <!-- Where you are in everything you have entered. -->
-        <div class="tp-col">
-          <div class="hub-sec tp-sec-l">
-            <div class="hub-sec-t">Your run</div>
-            <div class="hub-sec-bar"></div>
-            <div class="hub-sec-k">
-              <span>02</span><span class="sep">/</span>
-              <span>Entered</span><span class="sep">&middot;</span><span class="dot"></span>
-              <b id="tpYoursN">0</b> <span id="tpYoursW">brackets</span>
+          <div class="tp-rail-b">
+            <div class="hub-sec tp-sec-l">
+              <div class="hub-sec-t">The bracket</div>
+              <div class="hub-sec-bar"></div>
+              <div class="hub-sec-k"><span id="tpPrevK">Preview</span></div>
             </div>
-            <div class="hub-sec-s">Pick one to see it on the right without entering it.</div>
+            <div id="tpPreview"></div>
           </div>
-          <div class="tp-scroll-col" id="tpYours"></div>
-        </div>
 
-        <!-- The bracket you picked, without having to open it. -->
-        <aside class="tp-col tp-col-p">
-          <div class="hub-sec tp-sec-l">
-            <div class="hub-sec-t">The bracket</div>
-            <div class="hub-sec-bar"></div>
-            <div class="hub-sec-k">
-              <span>03</span><span class="sep">/</span>
-              <span id="tpPrevK">Preview</span>
-            </div>
-          </div>
-          <div id="tpPreview"></div>
         </aside>
+      </div>
 
-      </section>
+      <!-- ── Your run ──────────────────────────────────────────────── -->
+      <div class="hub-sec">
+        <div class="hub-sec-t">Your run</div>
+        <div class="hub-sec-bar"></div>
+        <div class="hub-sec-k">
+          <span>04</span><span class="sep">/</span>
+          <svg viewBox="0 0 24 24" width="11" height="11" fill="none" stroke="currentColor"
+               stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+            <path d="M8 21h8M12 17v4M7 4h10v5a5 5 0 0 1-10 0z"/></svg>
+          <span>Entered</span><span class="sep">&middot;</span><span class="dot"></span>
+          <b id="tpYoursN">0</b> <span id="tpYoursW">brackets</span>
+        </div>
+        <div class="hub-sec-s">Where you are in every bracket you have entered. Pick one to see it
+          in the panel on the right without entering it.</div>
+      </div>
+      <div id="tpYours"></div>
 
       <!-- ── The calendar ──────────────────────────────────────────── -->
       <div class="hub-sec">
         <div class="hub-sec-t">The calendar</div>
         <div class="hub-sec-bar"></div>
         <div class="hub-sec-k">
-          <span>04</span><span class="sep">/</span>
+          <span>05</span><span class="sep">/</span>
           <svg viewBox="0 0 24 24" width="11" height="11" fill="none" stroke="currentColor"
                stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
             <rect x="3" y="5" width="18" height="16" rx="2.5"/><path d="M3 10h18M8 3v4M16 3v4"/></svg>
@@ -82272,7 +82356,7 @@ body.q-max #queueOverlay{ padding:0 !important; }
         <div class="hub-sec-t">Brackets</div>
         <div class="hub-sec-bar"></div>
         <div class="hub-sec-k">
-          <span>05</span><span class="sep">/</span>
+          <span>06</span><span class="sep">/</span>
           <svg viewBox="0 0 24 24" width="11" height="11" fill="none" stroke="currentColor"
                stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
             <path d="M3 5h6v6H3zM3 13h6v6H3zM15 9h6v6h-6z"/><path d="M9 8h3v8h3"/></svg>
@@ -82285,117 +82369,86 @@ body.q-max #queueOverlay{ padding:0 !important; }
       </div>
       <div id="tpBrowse"></div>
 
-      <!-- ── Run your own ──────────────────────────────────────────── -->
-      <div class="hub-sec">
-        <div class="hub-sec-t">Run your own</div>
-        <div class="hub-sec-bar"></div>
-        <div class="hub-sec-k">
-          <span>06</span><span class="sep">/</span>
-          <span>Host</span>
-        </div>
-        <div class="hub-sec-s">Anyone can run one. It takes about a minute.</div>
-      </div>
-
-      <div class="tp-make">
-        <div class="tp-make-copy">
-          <h3>Build a bracket</h3>
-          <p>Pick a game, a format and a size. Make it public so anyone on Lobby can enter, or
-             private with a code &mdash; four letters and four digits &mdash; that you hand out
-             yourself. Neither has anything to do with a Lobby&rsquo;s own tournaments, which stay
-             inside that Lobby.</p>
-          <ol class="tp-steps">
-            <li><b>01</b><span>Game and format</span></li>
-            <li><b>02</b><span>Bracket size</span></li>
-            <li><b>03</b><span>Publish, or share the code</span></li>
-          </ol>
-        </div>
-        <div class="tp-make-do">
-          <button class="gt-cta-primary tp-cta" type="button" onclick="window.openCreateTournament()">
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor"
-                 stroke-width="2.8" stroke-linecap="round" aria-hidden="true">
-              <line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
-            <span>Create tournament</span>
-          </button>
-          <button class="tp-ghost" type="button" onclick="window.openMyTournaments()">See the ones you host</button>
-        </div>
-      </div>
-
     </div>
   </div>
 </div>
 
 <style>
 /* ══════════════════════════════════════════════════════════════════
-   TOURNAMENTS — bar, stage, three columns, then the long stuff
+   TOURNAMENTS — bar, carousel + rail, three columns, then the shelves
 
-   Built out of the app's own parts and nothing else: the hub title and
-   eyebrow (.gt-hero-title / .gt-hero-accent / .gt-hero-eyebrow), the
-   hub figures (.gt-hero-stats), the primary CTA (.gt-cta-primary), the
-   numbered section header (.hub-sec + bar + kicker), the card, the chip,
-   the filter rail, the empty state and the home carousel's arrows.
+   Built out of the app's own parts: the hub title, eyebrow, figures and
+   primary CTA (.gt-hero-*, .gt-cta-primary), the numbered section header
+   (.hub-sec + bar + kicker + sub), the card, the chip, the filter rail
+   and the empty state.
 
    The shape:
 
-     a bar that does not scroll — identity hard left, the code box and
-       Create hard right, so the two ways in are always reachable
-     the stage, centred, a true carousel: one broadcast, arrows either
-       side of the picture, a pager under the caption
-     three columns — what is on, where you are, and the bracket you
-       picked shown WITHOUT having to enter it
-     then the long-form shelves that want the full width: the month,
-       the public brackets, and hosting
+     a bar that does not scroll — identity left, the code box and Create
+       right, so both ways in stay reachable
+     the stage, with the next and previous broadcasts PEEKING in either
+       side, which is what makes it read as a carousel rather than as an
+       embed with two buttons beside it
+     a rail down the right: what is on above, and the bracket you picked
+       below — so the whole right edge answers "what am I looking at"
+     three columns: what is running, how to start one (wider, because it
+       is what the page is for), and what is coming
+     then the shelves that want the full width
 
    The section header is the shared one throughout; in a column it takes
-   .tp-sec-l, which only left-aligns and shrinks it. Same component.
+   .tp-sec-l, which only left-aligns and rescales it. Same component.
+
+   Everything is a step larger than it was: the measure, the picture, the
+   rows and the type. On a large display the page was reading as a small
+   app in a big window.
    ══════════════════════════════════════════════════════════════════ */
 #tournamentsPage{
   /* Every shared hub rule reads --hub-accent. Setting it is what makes
-     this page part of the system rather than a lookalike, and the value
-     is the colour its own top-bar pill already lights. */
+     this page part of the system rather than a lookalike. */
   --hub-accent:#ff3d6e;
   --tp:#ff3d6e;
   --tp-dim:rgba(255,61,110,.14);
-  --tp-line:rgba(255,255,255,.075);
+  --tp-line:rgba(255,255,255,.08);
   --tp-surf:rgba(255,255,255,.03);
+  --tp-measure:1680px;
   flex-direction:column;
 }
 
 /* ── The bar ───────────────────────────────────────────────────── */
 .tp-top{
   flex:0 0 auto; position:relative; z-index:2;
-  padding:16px 0 14px;
+  padding:18px 0 16px;
   border-bottom:1px solid rgba(255,255,255,.06);
   background:
-    radial-gradient(820px 260px at 14% 120%, rgba(255,61,110,.16) 0%, transparent 62%),
+    radial-gradient(900px 280px at 14% 120%, rgba(255,61,110,.16) 0%, transparent 62%),
     linear-gradient(180deg, rgba(0,0,0,.34) 0%, rgba(0,0,0,0) 100%);
 }
-/* The same measure the page below uses, so the title's left edge and the
-   Create button's right edge line up with the content, not the window. */
 .tp-top-in{
-  max-width:1248px; margin:0 auto; padding:0 36px;
-  display:flex; align-items:flex-end; gap:26px; flex-wrap:wrap;
+  max-width:var(--tp-measure); margin:0 auto; padding:0 40px;
+  display:flex; align-items:flex-end; gap:28px; flex-wrap:wrap;
 }
 .tp-id{ min-width:0 }
-/* Bar-sized, not hero-sized: this band is chrome, not a landing page.
-   Higher specificity than the shared rule, which is !important. */
+/* Bar-sized, not hero-sized: this band is chrome. Higher specificity
+   than the shared rule, which is !important. */
 #tournamentsPage .gt-hero-title{
-  font-size:clamp(26px, 2.9vw, 42px) !important;
-  letter-spacing:1.8px !important;
-  margin:9px 0 0 !important;
+  font-size:clamp(30px, 3.1vw, 48px) !important;
+  letter-spacing:2px !important;
+  margin:10px 0 0 !important;
 }
-.tp-top-r{ margin-left:auto; display:grid; gap:11px; justify-items:end }
-#tournamentsPage .gt-hero-stats{ margin:0; gap:16px; justify-content:flex-end }
-#tournamentsPage .gt-hero-stat{ padding:2px 14px 2px 0 }
+.tp-top-r{ margin-left:auto; display:grid; gap:13px; justify-items:end }
+#tournamentsPage .gt-hero-stats{ margin:0; gap:20px; justify-content:flex-end }
+#tournamentsPage .gt-hero-stat{ padding:2px 18px 2px 0 }
 /* Figures get the mono treatment the rest of the app gives to numbers. */
 #tournamentsPage .gt-hero-stat-num{
   font-family:'JetBrains Mono', ui-monospace, monospace;
   font-variant-numeric:tabular-nums;
-  font-size:19px; letter-spacing:.4px;
+  font-size:22px; letter-spacing:.4px;
 }
-.tp-acts{ display:flex; align-items:center; gap:10px; flex-wrap:wrap; justify-content:flex-end }
+#tournamentsPage .gt-hero-stat-lbl{ font-size:10px }
+.tp-acts{ display:flex; align-items:center; gap:11px; flex-wrap:wrap; justify-content:flex-end }
 #tournamentsPage .gt-cta-primary{
   background:linear-gradient(135deg, #ff5a83 0%, var(--tp) 60%, #e02659 100%);
-  color:#fff; padding:11px 20px !important;
+  color:#fff; padding:12px 22px !important; font-size:11px !important;
   box-shadow:0 1px 0 rgba(255,255,255,.3) inset,
              0 12px 30px -8px rgba(255,61,110,.6);
 }
@@ -82408,18 +82461,18 @@ body.q-max #queueOverlay{ padding:0 !important; }
 
 /* Join by code. Mono, because a code is read character by character. */
 .tp-code{
-  display:inline-flex; align-items:center; gap:7px;
-  padding:5px 6px 5px 13px; border-radius:99px;
+  display:inline-flex; align-items:center; gap:8px;
+  padding:5px 6px 5px 14px; border-radius:99px;
   background:rgba(255,255,255,.04); border:1px solid var(--tp-line);
 }
 .tp-code-l{
-  font-size:10px; font-weight:800; letter-spacing:1.2px; text-transform:uppercase;
+  font-size:10.5px; font-weight:800; letter-spacing:1.2px; text-transform:uppercase;
   color:var(--text-3); white-space:nowrap;
 }
 @media (max-width:860px){ .tp-code-l{ display:none } }
 .tp-code input{
-  width:100px; height:30px; border:none; background:none; color:var(--text-1);
-  font-family:'JetBrains Mono', ui-monospace, monospace; font-size:12px;
+  width:108px; height:32px; border:none; background:none; color:var(--text-1);
+  font-family:'JetBrains Mono', ui-monospace, monospace; font-size:13px;
   font-weight:700; letter-spacing:1.8px; text-transform:uppercase; padding:0;
 }
 .tp-code input::placeholder{ color:rgba(255,255,255,.22) }
@@ -82430,85 +82483,124 @@ body.q-max #queueOverlay{ padding:0 !important; }
 }
 .tp-code.bad{ border-color:rgba(255,120,120,.75) }
 .tp-code button{
-  height:30px; padding:0 15px; border-radius:99px; cursor:pointer;
+  height:32px; padding:0 16px; border-radius:99px; cursor:pointer;
   background:rgba(255,255,255,.07); border:1px solid var(--tp-line); color:var(--text-1);
   font-family:'Archivo', var(--font), sans-serif;
-  font-size:9.5px; font-weight:900; letter-spacing:1.2px; text-transform:uppercase;
+  font-size:10px; font-weight:900; letter-spacing:1.2px; text-transform:uppercase;
 }
 .tp-code button:hover{ background:var(--tp); border-color:var(--tp); color:#fff }
 
 /* ── Scroller ──────────────────────────────────────────────────── */
 #tpScroll{ flex:1; min-height:0; overflow-y:auto; overflow-x:hidden;
   scrollbar-width:thin; scrollbar-color:rgba(255,255,255,.14) transparent }
-#tpScroll::-webkit-scrollbar{ width:9px }
+#tpScroll::-webkit-scrollbar{ width:10px }
 #tpScroll::-webkit-scrollbar-thumb{ background:rgba(255,255,255,.14); border-radius:99px }
-.tp-measure{ max-width:1320px; margin:0 auto; padding:22px 36px 60px }
+.tp-measure{ max-width:var(--tp-measure); margin:0 auto; padding:24px 40px 64px }
 
-/* ── The stage ─────────────────────────────────────────────────── */
-/* Centred, with the arrows in the gutter either side rather than laid
-   over the picture — over it they land where YouTube draws its own
-   controls, and one of the two always loses. */
-.tp-stage{ margin-bottom:8px }
-.tp-stage-in{ position:relative; display:grid; justify-items:center }
-.tp-frame{ width:100%; max-width:880px; display:grid; gap:9px }
+/* ── Body: stage + columns on the left, rail on the right ──────── */
+.tp-body{
+  display:grid; gap:26px; align-items:start;
+  grid-template-columns:minmax(0,1fr) minmax(0,392px);
+}
+.tp-left{ min-width:0; display:grid; gap:26px; align-content:start }
+.tp-rail{ min-width:0; display:grid; gap:22px; align-content:start }
+.tp-rail-b{ min-width:0 }
+@media (max-width:1240px){
+  .tp-body{ grid-template-columns:minmax(0,1fr) }
+  .tp-rail{ grid-template-columns:minmax(0,1fr) minmax(0,1fr); gap:26px }
+}
+@media (max-width:820px){ .tp-rail{ grid-template-columns:minmax(0,1fr) } }
+
+/* ── The carousel ──────────────────────────────────────────────── */
+/* The neighbours peek in either side. That is the whole difference
+   between "a carousel" and "an embed with two buttons next to it": you
+   can see there is something before and after this one. */
+.tp-carousel{
+  display:grid; grid-template-columns:64px minmax(0,1fr) 64px; gap:12px;
+  /* Stretch, not start: the peeks take the picture's height because the
+     picture is the only thing in this row setting one. */
+  align-items:stretch;
+}
+/* 940 for the picture plus both peeks and both gaps. */
+.tp-frame{ min-width:0; max-width:1092px; margin:0 auto; width:100%; display:grid; gap:11px }
+.tp-peek{
+  position:relative; padding:0; cursor:pointer; overflow:hidden;
+  height:100%; border-radius:12px;
+  background:#0e0f16; border:1px solid var(--tp-line);
+  display:grid; place-content:center;
+  transition:border-color .16s ease;
+}
+.tp-peek:hover{ border-color:color-mix(in srgb, var(--hub-accent) 55%, transparent) }
+.tp-peek:hover .tp-peek-art{ opacity:.62 }
+.tp-peek:disabled{ opacity:.25; cursor:default; pointer-events:none }
+.tp-peek:focus-visible{ outline:2px solid var(--tp); outline-offset:3px }
+@media (prefers-reduced-motion:reduce){ .tp-peek{ transition:none } }
+/* The neighbour's own artwork, cropped hard and dimmed — enough to say
+   "there is another one this way", not enough to compete with the
+   picture that is actually playing. */
+.tp-peek-art{
+  position:absolute; inset:0; background:#14151d center/cover;
+  opacity:.4; transition:opacity .16s ease;
+}
+.tp-peek-i{
+  position:relative; z-index:2; display:grid; place-content:center;
+  width:34px; height:34px; border-radius:10px;
+  background:rgba(8,9,14,.76); border:1px solid rgba(255,255,255,.22);
+  color:#fff; font-size:18px; line-height:1;
+}
+.tp-peek:hover .tp-peek-i{ background:var(--tp); border-color:var(--tp) }
+@media (max-width:900px){
+  .tp-carousel{ grid-template-columns:44px minmax(0,1fr) 44px; gap:8px }
+  .tp-peek-i{ width:28px; height:28px; font-size:15px }
+}
+
 .tp-player{
   position:relative; width:100%; aspect-ratio:16/9;
-  border-radius:15px; overflow:hidden; border:1px solid rgba(255,255,255,.1);
+  border-radius:16px; overflow:hidden; border:1px solid rgba(255,255,255,.1);
   background:radial-gradient(120% 130% at 50% -30%, rgba(255,61,110,.16) 0%, transparent 62%),
              linear-gradient(165deg,#14101a 0%,#0a0810 60%,#07060b 100%);
-  box-shadow:0 30px 70px -32px rgba(0,0,0,.94);
+  box-shadow:0 34px 78px -34px rgba(0,0,0,.95);
 }
 .tp-player iframe{ position:absolute; inset:0; width:100%; height:100%; border:0 }
 .tp-fill{ position:absolute; inset:0; background-size:cover; background-position:center }
 .tp-player:fullscreen{ max-width:none; border-radius:0; background:#000 }
-#tournamentsPage .spotlight-carousel-btn{
-  width:38px; height:38px; font-size:17px; border-radius:10px;
-  top:calc(50% - 44px);   /* centred on the picture, not on picture+caption */
-}
-#tournamentsPage .spotlight-carousel-btn:hover{ background:var(--tp); border-color:var(--tp) }
-#tournamentsPage .spotlight-carousel-btn.prev{ left:0 }
-#tournamentsPage .spotlight-carousel-btn.next{ right:0 }
-@media (max-width:1080px){
-  #tournamentsPage .spotlight-carousel-btn.prev{ left:6px }
-  #tournamentsPage .spotlight-carousel-btn.next{ right:6px }
-}
 
-/* The pager: how many there are, which this is, and a way to any of
-   them. The app's own carousel says this with segment bars. */
-.tp-pager{ display:flex; gap:4px; align-items:center }
+/* The pager: how many, which one, and a click straight to any of them. */
+.tp-pager{ display:flex; gap:5px; align-items:center }
 .tp-pbar{
-  flex:1; height:3px; min-width:6px; border-radius:99px; padding:0; cursor:pointer;
+  flex:1; height:4px; min-width:7px; border-radius:99px; padding:0; cursor:pointer;
   background:rgba(255,255,255,.16); border:none;
   transition:background .18s ease;
 }
 .tp-pbar:hover{ background:rgba(255,255,255,.34) }
 .tp-pbar.on{
   background:linear-gradient(90deg, color-mix(in srgb, var(--hub-accent) 70%, #fff), var(--hub-accent));
-  box-shadow:0 0 12px -2px color-mix(in srgb, var(--hub-accent) 85%, transparent);
+  box-shadow:0 0 14px -2px color-mix(in srgb, var(--hub-accent) 85%, transparent);
 }
-.tp-pbar.live{ background:rgba(255,255,255,.3) }
+.tp-pbar.live{ background:rgba(255,255,255,.32) }
 .tp-pbar:focus-visible{ outline:2px solid var(--tp); outline-offset:3px }
 @media (prefers-reduced-motion:reduce){ .tp-pbar{ transition:none } }
 
-/* Caption and controls sit UNDER the picture. */
+/* Caption and controls sit UNDER the picture — over it they land where
+   YouTube draws its own and one of the two always loses. */
 .tp-now{
-  display:flex; align-items:center; gap:11px; min-height:44px;
-  padding:8px 11px; border-radius:11px;
+  display:flex; align-items:center; gap:12px; min-height:48px;
+  padding:9px 13px; border-radius:12px;
   background:var(--tp-surf); border:1px solid var(--tp-line);
 }
-.tp-now-b{ min-width:0; flex:1; display:grid; gap:2px }
+.tp-now-b{ min-width:0; flex:1; display:grid; gap:3px }
 .tp-now-t{
-  font-size:13px; font-weight:700; color:var(--text-1);
+  font-size:14px; font-weight:700; color:var(--text-1);
   overflow:hidden; text-overflow:ellipsis; white-space:nowrap;
 }
-.tp-now-m{ font-size:11px; color:var(--text-3); display:flex; gap:6px; flex-wrap:wrap; align-items:center }
+.tp-now-m{ font-size:11.5px; color:var(--text-3); display:flex; gap:7px; flex-wrap:wrap; align-items:center }
 .tp-now-m b{ color:var(--text-2); font-weight:700 }
 .tp-now-m i{ font-style:normal; opacity:.45 }
 @media (max-width:700px){ .tp-now-m{ display:none } }
 .tp-badge{
   display:inline-flex; align-items:center; gap:5px; flex:0 0 auto;
-  padding:4px 8px; border-radius:5px;
-  font-family:'Archivo', var(--font), sans-serif; font-size:8.5px; font-weight:900;
+  padding:5px 9px; border-radius:5px;
+  font-family:'Archivo', var(--font), sans-serif; font-size:9px; font-weight:900;
   letter-spacing:1.4px; text-transform:uppercase; background:rgba(255,255,255,.13); color:#fff;
 }
 .tp-badge.live{ background:var(--tp) }
@@ -82516,25 +82608,25 @@ body.q-max #queueOverlay{ padding:0 !important; }
 @keyframes tpP{ 0%,100%{opacity:1} 50%{opacity:.25} }
 /* Always visible: a mute button you have to hover to find is a mute
    button nobody finds. */
-.tp-ctl{ display:flex; align-items:center; gap:5px; flex:0 0 auto }
+.tp-ctl{ display:flex; align-items:center; gap:6px; flex:0 0 auto }
 .tp-cbtn{
-  width:29px; height:29px; border-radius:7px; cursor:pointer; padding:0;
+  width:32px; height:32px; border-radius:8px; cursor:pointer; padding:0;
   display:grid; place-content:center;
   background:rgba(255,255,255,.05); border:1px solid var(--tp-line);
-  color:var(--text-1); font-size:15px; line-height:1;
+  color:var(--text-1); font-size:16px; line-height:1;
 }
 .tp-cbtn:hover{ background:rgba(255,255,255,.12); border-color:rgba(255,255,255,.28) }
 .tp-cbtn:focus-visible{ outline:2px solid var(--tp); outline-offset:2px }
 .tp-count{
-  font-family:'JetBrains Mono', ui-monospace, monospace; font-size:10px;
+  font-family:'JetBrains Mono', ui-monospace, monospace; font-size:11px;
   color:var(--text-3); background:rgba(255,255,255,.05); border:1px solid var(--tp-line);
-  border-radius:7px; padding:0 8px; height:29px; display:grid; place-content:center;
+  border-radius:8px; padding:0 9px; height:32px; display:grid; place-content:center;
   font-variant-numeric:tabular-nums;
 }
 /* A scheduled broadcast shows its poster, which needs an affordance. */
 .tp-play{
   position:absolute; top:50%; left:50%; transform:translate(-50%,-50%); z-index:2;
-  width:56px; height:56px; border-radius:50%; cursor:pointer; padding:0;
+  width:60px; height:60px; border-radius:50%; cursor:pointer; padding:0;
   display:grid; place-content:center;
   background:rgba(8,9,14,.72); border:1px solid rgba(255,255,255,.24); color:#fff;
   transition:background .16s ease, transform .16s ease;
@@ -82542,50 +82634,49 @@ body.q-max #queueOverlay{ padding:0 !important; }
 .tp-play:hover{ background:var(--tp); border-color:var(--tp); transform:translate(-50%,-50%) scale(1.06) }
 .tp-play:focus-visible{ outline:2px solid var(--tp); outline-offset:3px }
 @media (prefers-reduced-motion:reduce){ .tp-play{ transition:none } .tp-play:hover{ transform:translate(-50%,-50%) } }
-.tp-blank{ position:absolute; inset:0; display:grid; place-content:center; gap:8px; text-align:center; padding:24px }
+.tp-blank{ position:absolute; inset:0; display:grid; place-content:center; gap:9px; text-align:center; padding:26px }
 .tp-blank-i{
-  width:46px; height:46px; border-radius:13px; display:grid; place-content:center; margin:0 auto;
+  width:50px; height:50px; border-radius:14px; display:grid; place-content:center; margin:0 auto;
   background:rgba(255,255,255,.04); border:1px solid rgba(255,255,255,.08); color:rgba(255,255,255,.4);
 }
-.tp-blank h3{ margin:0; font-size:15px; font-weight:800 }
-.tp-blank p{ margin:0; font-size:12px; color:var(--text-3); max-width:46ch; line-height:1.6 }
+.tp-blank h3{ margin:0; font-size:16px; font-weight:800 }
+.tp-blank p{ margin:0; font-size:13px; color:var(--text-3); max-width:46ch; line-height:1.6 }
 
 /* ── Three columns ─────────────────────────────────────────────── */
+/* The middle is wider: starting one is what the page is for, and the
+   two lists either side are things you scan. */
 .tp-tri{
-  display:grid; gap:22px; align-items:start; margin:14px 0 6px;
-  grid-template-columns:minmax(0,1fr) minmax(0,1fr) minmax(0,400px);
+  display:grid; gap:24px; align-items:start;
+  grid-template-columns:minmax(0,1fr) minmax(0,1.34fr) minmax(0,1fr);
 }
-@media (max-width:1180px){
-  .tp-tri{ grid-template-columns:minmax(0,1fr) minmax(0,1fr) }
-  .tp-col-p{ grid-column:1/-1 }
-}
-@media (max-width:760px){ .tp-tri{ grid-template-columns:minmax(0,1fr) } .tp-col-p{ grid-column:auto } }
+@media (max-width:1080px){ .tp-tri{ grid-template-columns:minmax(0,1fr) } }
 .tp-col{ min-width:0 }
 /* The shared section header, left-aligned and column-sized. Only the
    alignment and the scale change; it is the same component. */
 #tournamentsPage .hub-sec.tp-sec-l{
-  align-items:flex-start; text-align:left; margin:0 0 12px;
+  align-items:flex-start; text-align:left; margin:0 0 13px;
 }
-#tournamentsPage .hub-sec.tp-sec-l .hub-sec-t{ font-size:16px; letter-spacing:1.8px }
-#tournamentsPage .hub-sec.tp-sec-l .hub-sec-bar{ margin:8px 0; width:44px }
-#tournamentsPage .hub-sec.tp-sec-l .hub-sec-s{ margin-top:8px; font-size:11.5px }
-/* A column of rows is scrolled inside itself rather than making the page
-   as tall as its longest column. */
+#tournamentsPage .hub-sec.tp-sec-l .hub-sec-t{ font-size:18px; letter-spacing:1.9px }
+#tournamentsPage .hub-sec.tp-sec-l .hub-sec-bar{ margin:9px 0; width:48px }
+#tournamentsPage .hub-sec.tp-sec-l .hub-sec-s{ margin-top:9px; font-size:12px; max-width:none }
+/* A column of rows scrolls inside itself rather than making the page as
+   tall as its longest column. */
 .tp-scroll-col{
-  display:grid; gap:8px; align-content:start;
-  max-height:452px; overflow-y:auto; padding-right:4px;
+  display:grid; gap:9px; align-content:start;
+  max-height:474px; overflow-y:auto; padding-right:5px;
   scrollbar-width:thin; scrollbar-color:rgba(255,255,255,.14) transparent;
 }
+.tp-air-list{ max-height:560px }
 .tp-scroll-col::-webkit-scrollbar{ width:6px }
 .tp-scroll-col::-webkit-scrollbar-thumb{ background:rgba(255,255,255,.14); border-radius:99px }
 
-/* The search belongs to the column it filters. */
-.tp-find{ position:relative; display:flex; align-items:center; margin-top:10px; width:100% }
-.tp-find svg{ position:absolute; left:11px; color:var(--text-3); pointer-events:none }
+/* The search belongs to the list it filters. */
+.tp-find{ position:relative; display:flex; align-items:center; margin-top:11px; width:100% }
+.tp-find svg{ position:absolute; left:12px; color:var(--text-3); pointer-events:none }
 .tp-find input{
-  width:100%; height:30px; border-radius:99px; padding:0 28px 0 29px;
+  width:100%; height:33px; border-radius:99px; padding:0 30px 0 31px;
   background:rgba(255,255,255,.045); border:1px solid var(--tp-line);
-  color:var(--text-1); font-family:var(--font); font-size:12px;
+  color:var(--text-1); font-family:var(--font); font-size:13px;
   transition:border-color .15s ease, box-shadow .15s ease;
 }
 .tp-find input::placeholder{ color:var(--text-3) }
@@ -82595,7 +82686,7 @@ body.q-max #queueOverlay{ padding:0 !important; }
   box-shadow:0 0 0 3px color-mix(in srgb, var(--hub-accent) 14%, transparent);
 }
 .tp-find button{
-  position:absolute; right:6px; width:18px; height:18px; border-radius:50%;
+  position:absolute; right:7px; width:19px; height:19px; border-radius:50%;
   display:none; place-content:center; cursor:pointer; padding:0;
   background:rgba(255,255,255,.1); border:none; color:var(--text-2); font-size:9px; line-height:1;
 }
@@ -82603,60 +82694,64 @@ body.q-max #queueOverlay{ padding:0 !important; }
 
 /* ── On air rows ───────────────────────────────────────────────── */
 .tp-air{
-  display:grid; grid-template-columns:82px minmax(0,1fr); gap:10px; align-items:center;
-  padding:7px; text-align:left; cursor:pointer; font-family:inherit;
+  display:grid; grid-template-columns:96px minmax(0,1fr); gap:11px; align-items:center;
+  padding:8px; text-align:left; cursor:pointer; font-family:inherit;
 }
 .tp-air-th{
-  position:relative; width:82px; aspect-ratio:16/9; border-radius:7px;
+  position:relative; width:96px; aspect-ratio:16/9; border-radius:8px;
   background:#0d0e14 center/cover; overflow:hidden;
 }
 .tp-air-live{
-  position:absolute; top:3px; left:3px; padding:2px 5px; border-radius:3px;
+  position:absolute; top:4px; left:4px; padding:2px 6px; border-radius:3px;
   display:inline-flex; align-items:center; gap:3px;
-  font-family:'Archivo', var(--font), sans-serif; font-size:6.5px; font-weight:900;
+  font-family:'Archivo', var(--font), sans-serif; font-size:7px; font-weight:900;
   letter-spacing:.9px; text-transform:uppercase; background:var(--tp); color:#fff;
 }
 .tp-air-live i{ width:3px; height:3px; border-radius:50%; background:#fff; animation:tpP 1.7s ease-in-out infinite }
 .tp-air-soon{
-  position:absolute; top:3px; left:3px; padding:2px 5px; border-radius:3px;
-  font-family:'JetBrains Mono', ui-monospace, monospace; font-size:7px; font-weight:700;
+  position:absolute; top:4px; left:4px; padding:2px 6px; border-radius:3px;
+  font-family:'JetBrains Mono', ui-monospace, monospace; font-size:7.5px; font-weight:700;
   background:rgba(0,0,0,.74); color:#fff;
 }
-.tp-air-b{ min-width:0; display:grid; gap:2px }
-.tp-air-t{ font-size:11.5px; font-weight:700; color:var(--text-1); line-height:1.3;
+.tp-air-b{ min-width:0; display:grid; gap:3px }
+.tp-air-t{ font-size:12.5px; font-weight:700; color:var(--text-1); line-height:1.3;
   overflow:hidden; text-overflow:ellipsis; white-space:nowrap }
-.tp-air-s{ font-size:9.5px; color:var(--text-3);
+.tp-air-s{ font-size:10.5px; color:var(--text-3);
   overflow:hidden; text-overflow:ellipsis; white-space:nowrap }
 .tp-air.on{
   border-color:color-mix(in srgb, var(--hub-accent) 62%, transparent);
   box-shadow:0 0 0 1px color-mix(in srgb, var(--hub-accent) 32%, transparent);
 }
 
-/* ── Your run rows ─────────────────────────────────────────────── */
+/* ── Bracket rows ──────────────────────────────────────────────── */
 .tp-m{
-  display:grid; grid-template-columns:44px minmax(0,1fr); gap:10px;
-  padding:10px; text-align:left; cursor:pointer; font-family:inherit; align-items:start;
+  display:grid; grid-template-columns:50px minmax(0,1fr); gap:12px;
+  padding:11px; text-align:left; cursor:pointer; font-family:inherit; align-items:start;
 }
 .tp-m-art{
-  width:44px; height:44px; border-radius:9px; background:#14151d center/cover;
+  width:50px; height:50px; border-radius:10px; background:#14151d center/cover;
   display:grid; place-content:center;
-  font-family:'Archivo', var(--font), sans-serif; font-size:15px; font-weight:900;
+  font-family:'Archivo', var(--font), sans-serif; font-size:17px; font-weight:900;
   color:rgba(255,255,255,.32);
 }
-.tp-m-b{ min-width:0; display:grid; gap:6px }
-.tp-m-top{ display:flex; align-items:center; gap:7px; min-width:0 }
-.tp-m-n{ font-size:12.5px; font-weight:800; overflow:hidden; text-overflow:ellipsis;
+.tp-m-b{ min-width:0; display:grid; gap:7px }
+.tp-m-top{ display:flex; align-items:center; gap:8px; min-width:0 }
+.tp-m-n{ font-size:13.5px; font-weight:800; overflow:hidden; text-overflow:ellipsis;
   white-space:nowrap; flex:1; min-width:0 }
 .tp-m.on{
   border-color:color-mix(in srgb, var(--hub-accent) 62%, transparent);
   box-shadow:0 0 0 1px color-mix(in srgb, var(--hub-accent) 32%, transparent);
 }
+.tp-m-when{
+  font-family:'JetBrains Mono', ui-monospace, monospace; font-size:10px;
+  color:var(--hub-accent); white-space:nowrap;
+}
 /* The bracket, made visible. "Round 2" is a number; a rail of rounds
    says how far in it is and how much is left. */
 .tp-pips{ display:flex; align-items:center; gap:3px; flex-wrap:wrap }
 .tp-pip{
-  font-family:'JetBrains Mono', ui-monospace, monospace; font-size:8px; font-weight:700;
-  letter-spacing:.5px; padding:3px 6px; border-radius:4px;
+  font-family:'JetBrains Mono', ui-monospace, monospace; font-size:8.5px; font-weight:700;
+  letter-spacing:.5px; padding:3px 7px; border-radius:4px;
   background:rgba(255,255,255,.045); border:1px solid rgba(255,255,255,.07);
   color:var(--text-3);
 }
@@ -82667,137 +82762,180 @@ body.q-max #queueOverlay{ padding:0 !important; }
   color:#fff;
   box-shadow:0 0 14px -4px color-mix(in srgb, var(--hub-accent) 80%, transparent);
 }
-.tp-pip-sep{ color:rgba(255,255,255,.16); font-size:8px }
-.tp-m-chips{ display:flex; gap:5px; flex-wrap:wrap }
+.tp-pip-sep{ color:rgba(255,255,255,.16); font-size:8.5px }
+.tp-m-chips{ display:flex; gap:6px; flex-wrap:wrap }
+
+/* ── Run your own ──────────────────────────────────────────────── */
+.tp-make{
+  display:grid; gap:11px; align-content:start;
+  padding:20px 20px 21px; border-radius:16px;
+  background:
+    radial-gradient(560px 260px at 82% -10%, rgba(255,61,110,.22) 0%, transparent 64%),
+    linear-gradient(160deg, rgba(255,61,110,.13), rgba(255,255,255,.018));
+  border:1px solid color-mix(in srgb, var(--hub-accent) 30%, transparent);
+  box-shadow:0 24px 60px -34px rgba(255,61,110,.55);
+}
+.tp-make-i{
+  width:48px; height:48px; border-radius:13px; display:grid; place-content:center;
+  background:color-mix(in srgb, var(--hub-accent) 18%, transparent);
+  border:1px solid color-mix(in srgb, var(--hub-accent) 34%, transparent);
+  color:#fff;
+}
+.tp-make h3{
+  margin:0; font-family:'Archivo', var(--font), sans-serif;
+  font-size:21px; font-weight:900; letter-spacing:1.2px; text-transform:uppercase; color:#fff;
+  text-shadow:0 1px 0 rgba(0,0,0,.5), 0 0 30px color-mix(in srgb, var(--hub-accent) 40%, transparent);
+}
+.tp-make p{ margin:0; font-size:13px; color:var(--text-2); line-height:1.62 }
+.tp-steps{ list-style:none; margin:3px 0 0; padding:0; display:grid; gap:7px }
+.tp-steps li{
+  display:flex; align-items:center; gap:9px; padding:8px 12px; border-radius:9px;
+  background:rgba(0,0,0,.24); border:1px solid rgba(255,255,255,.07);
+  font-size:12px; color:var(--text-2);
+}
+.tp-steps b{
+  font-family:'JetBrains Mono', ui-monospace, monospace; font-size:9.5px; font-weight:700;
+  color:var(--hub-accent); letter-spacing:.8px;
+}
+.tp-make-do{ display:grid; gap:9px; margin-top:3px }
+.tp-make-do .gt-cta-primary{ width:100%; justify-content:center }
+.tp-ghost{
+  height:36px; padding:0 16px; border-radius:99px; cursor:pointer;
+  background:rgba(255,255,255,.05); border:1px solid rgba(255,255,255,.12); color:var(--text-2);
+  font-family:'Archivo', var(--font), sans-serif;
+  font-size:10px; font-weight:900; letter-spacing:1.2px; text-transform:uppercase;
+}
+.tp-ghost:hover{ background:rgba(255,255,255,.11); color:var(--text-1) }
 
 /* ── The preview ───────────────────────────────────────────────── */
-/* The whole point of it: see the bracket -- when it is, who is in it,
-   how far along it is -- without having to enter it first. */
+/* The point of it: see the bracket — when it is, who is in it, how far
+   along it is — without having to enter it first. */
 .tp-p{
-  border-radius:14px; overflow:hidden;
+  border-radius:15px; overflow:hidden;
   background:linear-gradient(135deg, rgba(255,255,255,.04), rgba(255,255,255,.012));
   border:1px solid var(--tp-line);
 }
-.tp-p-art{ position:relative; height:112px; background:#14151d center/cover }
+.tp-p-art{ position:relative; height:126px; background:#14151d center/cover }
 .tp-p-art::after{ content:''; position:absolute; inset:0;
   background:linear-gradient(0deg, rgba(10,11,17,.96), rgba(10,11,17,.2) 70%) }
 .tp-p-fb{ position:absolute; inset:0; display:grid; place-content:center;
-  font-family:'Archivo', var(--font), sans-serif; font-size:34px; font-weight:900;
+  font-family:'Archivo', var(--font), sans-serif; font-size:38px; font-weight:900;
   color:rgba(255,255,255,.2) }
-.tp-p-head{ position:absolute; left:14px; right:14px; bottom:11px; z-index:2; display:grid; gap:6px }
-.tp-p-n{ font-family:'Archivo', var(--font), sans-serif; font-size:16px; font-weight:900;
+.tp-p-head{ position:absolute; left:15px; right:15px; bottom:12px; z-index:2; display:grid; gap:7px }
+.tp-p-n{ font-family:'Archivo', var(--font), sans-serif; font-size:18px; font-weight:900;
   letter-spacing:.4px; color:#fff; line-height:1.2;
   text-shadow:0 1px 4px rgba(0,0,0,.8);
   display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical; overflow:hidden }
-.tp-p-chips{ display:flex; gap:5px; flex-wrap:wrap }
-.tp-p-b{ padding:13px 14px 14px; display:grid; gap:12px }
-.tp-p-sec{ display:grid; gap:7px }
+.tp-p-chips{ display:flex; gap:6px; flex-wrap:wrap }
+.tp-p-b{ padding:15px 16px 16px; display:grid; gap:14px }
+.tp-p-sec{ display:grid; gap:8px }
 .tp-p-lab{
-  font-family:'JetBrains Mono', ui-monospace, monospace; font-size:8.5px; font-weight:700;
+  font-family:'JetBrains Mono', ui-monospace, monospace; font-size:9px; font-weight:700;
   letter-spacing:1.5px; text-transform:uppercase; color:var(--text-3);
 }
 /* Facts as a two-column table: a label you can skip and a value you
    cannot miss. */
-.tp-p-facts{ display:grid; grid-template-columns:auto minmax(0,1fr); gap:6px 14px; font-size:11.5px }
+.tp-p-facts{ display:grid; grid-template-columns:auto minmax(0,1fr); gap:7px 16px; font-size:12.5px }
 .tp-p-facts dt{ color:var(--text-3); white-space:nowrap }
 .tp-p-facts dd{ color:var(--text-1); font-weight:700; margin:0;
   overflow:hidden; text-overflow:ellipsis }
 .tp-p-facts dd.mono{ font-family:'JetBrains Mono', ui-monospace, monospace; letter-spacing:1.2px }
-.tp-faces{ display:flex; align-items:center; gap:-4px }
+.tp-faces{ display:flex; align-items:center }
 .tp-face{
-  width:28px; height:28px; border-radius:50%; margin-right:-7px;
+  width:32px; height:32px; border-radius:50%; margin-right:-8px;
   border:2px solid #0f1017; background:#22242e center/cover;
   display:grid; place-content:center;
-  font-size:10px; font-weight:800; color:var(--text-2);
+  font-size:11px; font-weight:800; color:var(--text-2);
 }
 .tp-face-more{
-  margin-left:14px; font-family:'JetBrains Mono', ui-monospace, monospace;
-  font-size:10px; color:var(--text-3);
+  margin-left:16px; font-family:'JetBrains Mono', ui-monospace, monospace;
+  font-size:11px; color:var(--text-3);
 }
-.tp-p-fill{ height:5px; border-radius:99px; background:rgba(255,255,255,.08); overflow:hidden }
+.tp-p-fill{ height:6px; border-radius:99px; background:rgba(255,255,255,.08); overflow:hidden }
 .tp-p-fill span{ display:block; height:100%; border-radius:99px;
   background:linear-gradient(90deg, color-mix(in srgb, var(--hub-accent) 70%, #fff), var(--hub-accent)) }
 .tp-p-fill.full span{ background:linear-gradient(90deg,#f0b429,#f7d774) }
-.tp-p-do{ display:grid; gap:7px }
+.tp-p-do{ display:grid; gap:8px }
 .tp-p-do .gt-cta-primary{ width:100%; justify-content:center }
 .tp-p-empty{
-  padding:34px 18px; text-align:center; display:grid; gap:8px; justify-items:center;
-  border:1px dashed rgba(255,255,255,.1); border-radius:14px;
+  padding:38px 20px; text-align:center; display:grid; gap:9px; justify-items:center;
+  border:1px dashed rgba(255,255,255,.1); border-radius:15px;
 }
-.tp-p-empty h4{ margin:0; font-size:13px; font-weight:800; color:var(--text-2) }
-.tp-p-empty p{ margin:0; font-size:11.5px; color:var(--text-3); line-height:1.55; max-width:34ch }
+.tp-p-empty h4{ margin:0; font-size:14px; font-weight:800; color:var(--text-2) }
+.tp-p-empty p{ margin:0; font-size:12.5px; color:var(--text-3); line-height:1.55; max-width:34ch }
 
-/* ── Brackets ──────────────────────────────────────────────────── */
-.tp-grid{ display:grid; gap:14px; grid-template-columns:repeat(auto-fill,minmax(238px,1fr)) }
+/* ── Your run and Brackets grids ───────────────────────────────── */
+.tp-mine{ display:grid; gap:13px; grid-template-columns:repeat(auto-fill,minmax(354px,1fr)) }
+.tp-grid{ display:grid; gap:16px; grid-template-columns:repeat(auto-fill,minmax(262px,1fr)) }
 .tp-c{ cursor:pointer; text-align:left; padding:0; font-family:inherit;
-  display:grid; grid-template-rows:104px auto }
+  display:grid; grid-template-rows:116px auto }
 .tp-c-art{ position:relative; background:#14151d center/cover }
 .tp-c-art::after{ content:''; position:absolute; inset:0;
   background:linear-gradient(0deg,rgba(10,11,17,.92),transparent 68%) }
 .tp-c-badge{
-  position:absolute; top:8px; left:8px; z-index:2; padding:3px 8px; border-radius:4px;
-  font-family:'Archivo', var(--font), sans-serif; font-size:7.5px; font-weight:900;
+  position:absolute; top:9px; left:9px; z-index:2; padding:4px 9px; border-radius:4px;
+  font-family:'Archivo', var(--font), sans-serif; font-size:8px; font-weight:900;
   letter-spacing:1.1px; text-transform:uppercase; background:rgba(0,0,0,.7); color:#fff;
 }
 .tp-c-badge.live{ background:var(--tp) }
 .tp-c-badge.open{ background:#f0b429; color:#241a00 }
 .tp-c-fb{ position:absolute; inset:0; display:grid; place-content:center;
-  font-family:'Archivo', var(--font), sans-serif; font-size:26px; font-weight:900;
+  font-family:'Archivo', var(--font), sans-serif; font-size:29px; font-weight:900;
   color:rgba(255,255,255,.26) }
-.tp-c-b{ padding:11px 12px 12px; display:grid; gap:7px }
-.tp-c-t{ font-size:13px; font-weight:800; line-height:1.25;
+.tp-c-b{ padding:12px 13px 13px; display:grid; gap:8px }
+.tp-c-t{ font-size:14px; font-weight:800; line-height:1.25;
   display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical; overflow:hidden }
-.tp-c-chips{ display:flex; gap:5px; flex-wrap:wrap }
-.tp-fillbar{ height:4px; border-radius:99px; background:rgba(255,255,255,.08); overflow:hidden }
+.tp-c-chips{ display:flex; gap:6px; flex-wrap:wrap }
+.tp-fillbar{ height:5px; border-radius:99px; background:rgba(255,255,255,.08); overflow:hidden }
 .tp-fillbar span{ display:block; height:100%; border-radius:99px;
   background:linear-gradient(90deg, color-mix(in srgb, var(--hub-accent) 70%, #fff), var(--hub-accent)) }
 .tp-fillbar.full span{ background:linear-gradient(90deg,#f0b429,#f7d774) }
-.tp-c-seats{ font-size:9.5px; color:var(--text-3);
+.tp-c-seats{ font-size:10.5px; color:var(--text-3);
   font-family:'JetBrains Mono', ui-monospace, monospace; font-variant-numeric:tabular-nums }
 .tp-c.on{ border-color:color-mix(in srgb, var(--hub-accent) 62%, transparent) }
 
 /* ── The calendar ──────────────────────────────────────────────── */
-.tp-cal{ display:grid; gap:12px }
-.tp-cal-h{ display:flex; align-items:center; gap:10px; justify-content:center }
+.tp-cal{ display:grid; gap:13px }
+.tp-cal-h{ display:flex; align-items:center; gap:11px; justify-content:center }
 .tp-cal-t{
-  font-family:'Archivo', var(--font), sans-serif; font-size:14px; font-weight:900;
-  letter-spacing:1.6px; text-transform:uppercase; margin:0; min-width:210px; text-align:center;
+  font-family:'Archivo', var(--font), sans-serif; font-size:15px; font-weight:900;
+  letter-spacing:1.6px; text-transform:uppercase; margin:0; min-width:230px; text-align:center;
 }
 .tp-nav{
-  width:28px; height:28px; border-radius:8px; cursor:pointer; padding:0;
+  width:30px; height:30px; border-radius:8px; cursor:pointer; padding:0;
   background:rgba(255,255,255,.05); border:1px solid var(--tp-line);
-  color:var(--text-2); font-size:14px; line-height:1;
+  color:var(--text-2); font-size:15px; line-height:1;
 }
 .tp-nav:hover{ background:rgba(255,255,255,.13); color:var(--text-1) }
 .tp-today{
-  height:28px; padding:0 12px; border-radius:8px; cursor:pointer;
+  height:30px; padding:0 13px; border-radius:8px; cursor:pointer;
   background:rgba(255,255,255,.05); border:1px solid var(--tp-line); color:var(--text-2);
   font-family:'JetBrains Mono', ui-monospace, monospace;
-  font-size:9px; font-weight:700; letter-spacing:1.3px; text-transform:uppercase;
+  font-size:9.5px; font-weight:700; letter-spacing:1.3px; text-transform:uppercase;
 }
 .tp-today:hover{ background:rgba(255,255,255,.13); color:var(--text-1) }
 .tp-dow{
-  display:grid; grid-template-columns:repeat(7,1fr); gap:6px;
-  font-family:'JetBrains Mono', ui-monospace, monospace; font-size:8.5px; font-weight:700;
+  display:grid; grid-template-columns:repeat(7,1fr); gap:7px;
+  font-family:'JetBrains Mono', ui-monospace, monospace; font-size:9px; font-weight:700;
   letter-spacing:1.4px; text-transform:uppercase; color:var(--text-3); text-align:center;
 }
-.tp-month{ display:grid; grid-template-columns:repeat(7,1fr); gap:6px }
+.tp-month{ display:grid; grid-template-columns:repeat(7,1fr); gap:7px }
 .tp-d{
-  min-height:88px; border-radius:10px; padding:7px 7px 8px; text-align:left;
+  min-height:104px; border-radius:11px; padding:8px 8px 9px; text-align:left;
   background:rgba(255,255,255,.022); border:1px solid rgba(255,255,255,.05);
-  display:grid; grid-template-rows:auto 1fr; gap:5px; align-content:start;
+  display:grid; grid-template-rows:auto 1fr; gap:6px; align-content:start;
   font-family:inherit; cursor:default; overflow:hidden;
 }
 .tp-d.dim{ opacity:.34 }
 .tp-d-n{
-  font-family:'JetBrains Mono', ui-monospace, monospace; font-size:11px; font-weight:700;
+  font-family:'JetBrains Mono', ui-monospace, monospace; font-size:12px; font-weight:700;
   color:var(--text-3); font-variant-numeric:tabular-nums;
 }
 .tp-d.today{ border-color:rgba(255,255,255,.26) }
 .tp-d.today .tp-d-n{ color:#fff }
 .tp-d.today .tp-d-n::after{
   content:''; display:inline-block; width:4px; height:4px; border-radius:50%;
-  background:#fff; margin-left:5px; vertical-align:middle;
+  background:#fff; margin-left:6px; vertical-align:middle;
 }
 .tp-d.has{
   cursor:pointer;
@@ -82811,10 +82949,10 @@ body.q-max #queueOverlay{ padding:0 !important; }
   box-shadow:0 0 0 1px color-mix(in srgb, var(--hub-accent) 40%, transparent),
              0 0 24px -8px color-mix(in srgb, var(--hub-accent) 80%, transparent);
 }
-.tp-d-evs{ display:grid; gap:3px; align-content:start; min-width:0 }
+.tp-d-evs{ display:grid; gap:4px; align-content:start; min-width:0 }
 .tp-ev{
-  display:flex; align-items:center; gap:5px; min-width:0;
-  padding:3px 5px; border-radius:5px; font-size:9.5px; line-height:1.25;
+  display:flex; align-items:center; gap:6px; min-width:0;
+  padding:4px 6px; border-radius:5px; font-size:10.5px; line-height:1.25;
   background:rgba(255,255,255,.05); color:var(--text-2);
 }
 .tp-ev i{ width:4px; height:4px; border-radius:50%; flex:0 0 auto; background:var(--text-3) }
@@ -82823,77 +82961,41 @@ body.q-max #queueOverlay{ padding:0 !important; }
 .tp-ev.major i{ background:var(--hub-accent) }
 .tp-ev.tourney{ background:rgba(240,180,41,.16); color:#f7d08a }
 .tp-ev.tourney i{ background:#f0b429 }
-.tp-ev-more{ font-size:8.5px; color:var(--text-3); padding-left:5px;
+.tp-ev-more{ font-size:9px; color:var(--text-3); padding-left:6px;
   font-family:'JetBrains Mono', ui-monospace, monospace }
 @media (max-width:820px){
-  .tp-d{ min-height:62px }
+  .tp-d{ min-height:66px }
   .tp-ev span{ display:none }
   .tp-ev{ padding:3px }
 }
 .tp-agenda-h{
-  display:flex; align-items:center; gap:9px; margin-top:2px;
-  font-family:'Archivo', var(--font), sans-serif; font-size:10px; font-weight:900;
+  display:flex; align-items:center; gap:10px; margin-top:2px;
+  font-family:'Archivo', var(--font), sans-serif; font-size:11px; font-weight:900;
   letter-spacing:1.6px; text-transform:uppercase; color:var(--text-2);
 }
 .tp-agenda-h .clear{
   margin-left:auto; background:none; border:none; cursor:pointer; padding:0;
   color:var(--text-3); font-family:'JetBrains Mono', ui-monospace, monospace;
-  font-size:9px; font-weight:700; letter-spacing:1.2px; text-transform:uppercase;
+  font-size:9.5px; font-weight:700; letter-spacing:1.2px; text-transform:uppercase;
 }
 .tp-agenda-h .clear:hover{ color:var(--hub-accent) }
-.tp-agenda{ display:grid; gap:8px; grid-template-columns:repeat(auto-fill,minmax(268px,1fr)) }
+.tp-agenda{ display:grid; gap:9px; grid-template-columns:repeat(auto-fill,minmax(288px,1fr)) }
 .tp-a{
-  display:grid; grid-template-columns:44px minmax(0,1fr); gap:10px; align-items:center;
-  padding:9px 10px; text-align:left; cursor:pointer; font-family:inherit;
+  display:grid; grid-template-columns:48px minmax(0,1fr); gap:11px; align-items:center;
+  padding:10px 11px; text-align:left; cursor:pointer; font-family:inherit;
 }
 .tp-a-w{ display:grid; justify-items:center; gap:1px;
   font-family:'JetBrains Mono', ui-monospace, monospace }
-.tp-a-w b{ font-size:15px; font-weight:700; color:var(--text-1); line-height:1 }
-.tp-a-w small{ font-size:7.5px; letter-spacing:.8px; text-transform:uppercase; color:var(--text-3) }
-.tp-a-w.live i{ width:9px; height:9px; border-radius:50%; background:var(--tp);
+.tp-a-w b{ font-size:16px; font-weight:700; color:var(--text-1); line-height:1 }
+.tp-a-w small{ font-size:8px; letter-spacing:.8px; text-transform:uppercase; color:var(--text-3) }
+.tp-a-w.live i{ width:10px; height:10px; border-radius:50%; background:var(--tp);
   animation:tpP 1.7s ease-in-out infinite }
 .tp-a-w.live small{ color:#ffa3b6; font-weight:700 }
 .tp-a-b{ min-width:0; display:grid; gap:3px }
-.tp-a-t{ font-size:12px; font-weight:700; color:var(--text-1);
+.tp-a-t{ font-size:13px; font-weight:700; color:var(--text-1);
   overflow:hidden; text-overflow:ellipsis; white-space:nowrap }
-.tp-a-s{ font-size:10px; color:var(--text-3);
+.tp-a-s{ font-size:11px; color:var(--text-3);
   overflow:hidden; text-overflow:ellipsis; white-space:nowrap }
-
-/* ── Host banner ───────────────────────────────────────────────── */
-.tp-make{
-  display:grid; grid-template-columns:minmax(0,1fr) auto; gap:26px; align-items:center;
-  padding:22px 24px; border-radius:16px;
-  background:
-    radial-gradient(700px 240px at 88% 50%, rgba(255,61,110,.22) 0%, transparent 64%),
-    linear-gradient(160deg, rgba(255,61,110,.13), rgba(255,255,255,.018));
-  border:1px solid color-mix(in srgb, var(--hub-accent) 30%, transparent);
-  box-shadow:0 24px 60px -34px rgba(255,61,110,.55);
-}
-@media (max-width:820px){ .tp-make{ grid-template-columns:minmax(0,1fr) } }
-.tp-make h3{
-  margin:0 0 7px; font-family:'Archivo', var(--font), sans-serif;
-  font-size:19px; font-weight:900; letter-spacing:1.2px; text-transform:uppercase; color:#fff;
-  text-shadow:0 1px 0 rgba(0,0,0,.5), 0 0 30px color-mix(in srgb, var(--hub-accent) 40%, transparent);
-}
-.tp-make p{ margin:0; font-size:12.5px; color:var(--text-2); line-height:1.62; max-width:64ch }
-.tp-steps{ list-style:none; margin:14px 0 0; padding:0; display:flex; gap:10px; flex-wrap:wrap }
-.tp-steps li{
-  display:inline-flex; align-items:center; gap:7px; padding:6px 11px; border-radius:8px;
-  background:rgba(0,0,0,.24); border:1px solid rgba(255,255,255,.07);
-  font-size:11px; color:var(--text-2);
-}
-.tp-steps b{
-  font-family:'JetBrains Mono', ui-monospace, monospace; font-size:9px; font-weight:700;
-  color:var(--hub-accent); letter-spacing:.8px;
-}
-.tp-make-do{ display:grid; gap:9px; justify-items:stretch }
-.tp-ghost{
-  height:34px; padding:0 16px; border-radius:99px; cursor:pointer;
-  background:rgba(255,255,255,.05); border:1px solid rgba(255,255,255,.12); color:var(--text-2);
-  font-family:'Archivo', var(--font), sans-serif;
-  font-size:9.5px; font-weight:900; letter-spacing:1.2px; text-transform:uppercase;
-}
-.tp-ghost:hover{ background:rgba(255,255,255,.11); color:var(--text-1) }
 
 /* A card that is a button must not inherit a button's centred text. */
 #tournamentsPage button.hub-card{ display:grid }
@@ -82948,6 +83050,10 @@ body.q-max #queueOverlay{ padding:0 !important; }
     var u = everything();
     for (var i = 0; i < u.length; i++) if (String(u[i].id) === String(id)) return u[i];
     return null;
+  }
+  function isMine(id){
+    for (var i = 0; i < mine.length; i++) if (String(mine[i].id) === String(id)) return true;
+    return false;
   }
 
   function paintTop(){
@@ -83017,14 +83123,14 @@ body.q-max #queueOverlay{ padding:0 !important; }
     if (!streams.length){
       host.innerHTML =
         '<div class="tp-blank"><span class="tp-blank-i" aria-hidden="true">' +
-        '<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" ' +
+        '<svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" ' +
         'stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">' +
         '<rect x="2" y="5" width="20" height="14" rx="2.5"/>' +
         '<path d="M10 10.2v3.6l3.2-1.8z" fill="currentColor" stroke="none"/></svg></span>' +
         '<h3>Nothing on right now</h3>' +
         '<p>The moment a watched channel goes live it plays here, and when none is, ' +
         'whatever starts next takes the stage.</p></div>';
-      paintBar(); paintPager();
+      paintBar(); paintPager(); paintPeeks();
       return;
     }
     if (idx >= streams.length) idx = 0;
@@ -83034,23 +83140,23 @@ body.q-max #queueOverlay{ padding:0 !important; }
         'allowfullscreen title="' + esc(m.name) + '"></iframe>'
       : '<div class="tp-fill" style="background-image:url(\'' + esc(m.art || '') + '\')"></div>' +
         '<button type="button" class="tp-play" onclick="window.tpPop()" aria-label="Open on YouTube">' +
-        '<svg viewBox="0 0 24 24" width="22" height="22" fill="currentColor">' +
+        '<svg viewBox="0 0 24 24" width="24" height="24" fill="currentColor">' +
         '<path d="M8 5v14l11-7z"/></svg></button>';
-    paintBar(); paintPager();
+    paintBar(); paintPager(); paintPeeks();
   }
 
-  var SPK_ON = '<svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" ' +
+  var SPK_ON = '<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" ' +
     'stroke-width="2" stroke-linecap="round" stroke-linejoin="round">' +
     '<path d="M11 5 6 9H2v6h4l5 4z"/><path d="M15.5 8.5a5 5 0 0 1 0 7"/>' +
     '<path d="M18.5 5.5a9 9 0 0 1 0 13"/></svg>';
-  var SPK_OFF = '<svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" ' +
+  var SPK_OFF = '<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" ' +
     'stroke-width="2" stroke-linecap="round" stroke-linejoin="round">' +
     '<path d="M11 5 6 9H2v6h4l5 4z"/><line x1="22" y1="9" x2="16" y2="15"/>' +
     '<line x1="16" y1="9" x2="22" y2="15"/></svg>';
-  var FULL_ICO = '<svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" ' +
+  var FULL_ICO = '<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" ' +
     'stroke-width="2" stroke-linecap="round" stroke-linejoin="round">' +
     '<path d="M8 3H3v5M16 3h5v5M8 21H3v-5M16 21h5v-5"/></svg>';
-  var POP_ICO = '<svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" ' +
+  var POP_ICO = '<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" ' +
     'stroke-width="2" stroke-linecap="round" stroke-linejoin="round">' +
     '<path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/>' +
     '<path d="M15 3h6v6"/><path d="M10 14 21 3"/></svg>';
@@ -83085,12 +83191,10 @@ body.q-max #queueOverlay{ padding:0 !important; }
       '</span>';
   }
 
-  /* How many there are, which this is, and a way straight to any of
+  /* How many there are, which this is, and a click straight to any of
      them — the segment bars the app's own carousels page with. */
   function paintPager(){
-    var host = $('tpPager'), pv = $('tpPrev'), nx = $('tpNext');
-    if (pv) pv.disabled = streams.length < 2;
-    if (nx) nx.disabled = streams.length < 2;
+    var host = $('tpPager');
     if (!host) return;
     if (streams.length < 2){ host.innerHTML = ''; return; }
     host.innerHTML = streams.map(function (m, i){
@@ -83100,7 +83204,29 @@ body.q-max #queueOverlay{ padding:0 !important; }
     }).join('');
   }
 
-  /* ── On air column ───────────────────────────────────────────── */
+  /* The neighbours, showing through either side. This is what makes it
+     read as a carousel rather than as an embed with two buttons beside
+     it: you can see there is something before and after this one. */
+  function paintPeeks(){
+    var pv = $('tpPrev'), nx = $('tpNext');
+    var pa = $('tpPeekPrev'), na = $('tpPeekNext');
+    var many = streams.length > 1;
+    if (pv) pv.disabled = !many;
+    if (nx) nx.disabled = !many;
+    if (!many){
+      if (pa) pa.style.backgroundImage = '';
+      if (na) na.style.backgroundImage = '';
+      return;
+    }
+    var p = streams[(idx - 1 + streams.length) % streams.length];
+    var n = streams[(idx + 1) % streams.length];
+    if (pa) pa.style.backgroundImage = p && p.art ? 'url("' + p.art + '")' : '';
+    if (na) na.style.backgroundImage = n && n.art ? 'url("' + n.art + '")' : '';
+    if (pv && p) pv.title = 'Previous · ' + p.name;
+    if (nx && n) nx.title = 'Next · ' + n.name;
+  }
+
+  /* ── On air list ─────────────────────────────────────────────── */
   function paintLive(){
     var host = $('tpLive');
     if (!host) return;
@@ -83233,13 +83359,73 @@ body.q-max #queueOverlay{ padding:0 !important; }
     return '<span class="tp-pips">' + out.join('<span class="tp-pip-sep">›</span>') + '</span>';
   }
 
-  /* ── Your run column ─────────────────────────────────────────── */
+  /* One row, used by Ongoing, Upcoming and Your run. */
+  function bracketRow(t, extra){
+    var s = stageOf(t), g = gameOf(t.game), art = g && (g.cover || g.header);
+    var chips = [];
+    if (g && g.name) chips.push(chip(g.name));
+    if (t.entrants) chips.push(chip(t.entrants + ' in'));
+    if (t.isHost) chips.push(chip('You host', 'gold'));
+    else if (isMine(t.id)) chips.push(chip('You are in', 'on'));
+    var w = extra === 'when' ? when(t.startTime) : '';
+    return '<button type="button" class="tp-m hub-card' +
+        (String(t.id) === String(selId) ? ' on' : '') + '" ' +
+      'onclick="window.tpSelect(\'' + esc(t.id) + '\')">' +
+      '<span class="tp-m-art"' + (art ? ' style="background-image:url(\'' + esc(art) + '\')"' : '') + '>' +
+        (art ? '' : esc((t.name || '?').slice(0,1).toUpperCase())) + '</span>' +
+      '<span class="tp-m-b">' +
+        '<span class="tp-m-top"><span class="tp-m-n">' + esc(t.name || 'Tournament') + '</span>' +
+          (w ? '<span class="tp-m-when">' + esc(w) + '</span>'
+             : chip(s.l, s.k === 'live' ? 'live' : s.k === 'reg' ? 'gold' : '')) + '</span>' +
+        (s.of > 1 ? pips(s) : '') +
+        '<span class="tp-m-chips">' + chips.join('') + '</span>' +
+      '</span></button>';
+  }
+
+  /* ── Ongoing ─────────────────────────────────────────────────── */
+  function paintOngoing(){
+    var host = $('tpOngoing');
+    if (!host) return;
+    var list = everything().filter(isLive).sort(function (a, b){
+      return (Number(b.entrants) || 0) - (Number(a.entrants) || 0);
+    });
+    setText('tpOnN', String(list.length));
+    setText('tpOnW', list.length === 1 ? 'bracket' : 'brackets');
+    host.innerHTML = list.length
+      ? list.map(function (t){ return bracketRow(t); }).join('')
+      : empty({ icon:'bolt', title:'Nothing in progress',
+                sub:'When a bracket starts it moves here, round by round, until someone wins it.' });
+  }
+
+  /* ── Upcoming ────────────────────────────────────────────────── */
+  function paintUpcoming(){
+    var host = $('tpUpcoming');
+    if (!host) return;
+    /* Soonest first; the ones with no date at all sit at the bottom
+       rather than pretending to be imminent. */
+    var list = everything().filter(function (t){ return !isLive(t) && !isDone(t); })
+      .sort(function (a, b){
+        var ta = a.startTime ? new Date(a.startTime).getTime() : Infinity;
+        var tb = b.startTime ? new Date(b.startTime).getTime() : Infinity;
+        if (ta !== tb) return ta - tb;
+        return (Number(b.entrants) || 0) - (Number(a.entrants) || 0);
+      });
+    setText('tpUpN', String(list.length));
+    setText('tpUpW', list.length === 1 ? 'bracket' : 'brackets');
+    host.innerHTML = list.length
+      ? list.map(function (t){ return bracketRow(t, t.startTime ? 'when' : null); }).join('')
+      : empty({ icon:'timer', title:'Nothing scheduled',
+                sub:'Brackets taking entries appear here as soon as one exists.',
+                actions:'<button class="hub-chip on" style="cursor:pointer" ' +
+                        'onclick="window.openCreateTournament()">Create a tournament</button>' });
+  }
+
+  /* ── Your run ────────────────────────────────────────────────── */
   function paintYours(){
     var host = $('tpYours');
     if (!host) return;
     setText('tpYoursN', String(mine.length));
     setText('tpYoursW', mine.length === 1 ? 'bracket' : 'brackets');
-
     if (!mine.length){
       host.innerHTML = empty({
         icon:'trophy', title:'You are not in a bracket yet',
@@ -83249,24 +83435,8 @@ body.q-max #queueOverlay{ padding:0 !important; }
       });
       return;
     }
-    host.innerHTML = mine.map(function (t){
-      var s = stageOf(t), g = gameOf(t.game), art = g && (g.cover || g.header);
-      var chips = [];
-      if (g && g.name) chips.push(chip(g.name));
-      if (t.entrants) chips.push(chip(t.entrants + ' in'));
-      if (t.isHost) chips.push(chip('You host', 'gold'));
-      return '<button type="button" class="tp-m hub-card' +
-          (String(t.id) === String(selId) ? ' on' : '') + '" ' +
-        'onclick="window.tpSelect(\'' + esc(t.id) + '\')">' +
-        '<span class="tp-m-art"' + (art ? ' style="background-image:url(\'' + esc(art) + '\')"' : '') + '>' +
-          (art ? '' : esc((t.name || '?').slice(0,1).toUpperCase())) + '</span>' +
-        '<span class="tp-m-b">' +
-          '<span class="tp-m-top"><span class="tp-m-n">' + esc(t.name || 'Tournament') + '</span>' +
-            chip(s.l, s.k === 'live' ? 'live' : s.k === 'reg' ? 'gold' : '') + '</span>' +
-          (s.of > 1 ? pips(s) : '') +
-          '<span class="tp-m-chips">' + chips.join('') + '</span>' +
-        '</span></button>';
-    }).join('');
+    host.innerHTML = '<div class="tp-mine">' +
+      mine.map(function (t){ return bracketRow(t); }).join('') + '</div>';
   }
 
   /* ── The preview ─────────────────────────────────────────────── */
@@ -83275,7 +83445,7 @@ body.q-max #queueOverlay{ padding:0 !important; }
      entering was the point of asking for a preview at all. */
   window.tpSelect = function (id){
     selId = String(id);
-    paintPreview(); paintYours(); paintBrowse();
+    paintPreview(); paintOngoing(); paintUpcoming(); paintYours(); paintBrowse();
     var el = $('tpPreview');
     if (el && el.scrollIntoView) el.scrollIntoView({ block:'nearest', behavior:'smooth' });
   };
@@ -83319,7 +83489,7 @@ body.q-max #queueOverlay{ padding:0 !important; }
       setText('tpPrevK', 'Preview');
       host.innerHTML =
         '<div class="tp-p-empty"><h4>Nothing picked</h4>' +
-        '<p>Choose a bracket from either column, the calendar or the shelf below, and it opens ' +
+        '<p>Choose a bracket from any column, the calendar or the shelf below, and it opens ' +
         'here &mdash; who is in it, how far along it is and when it runs &mdash; without entering it.</p></div>';
       return;
     }
@@ -83333,6 +83503,7 @@ body.q-max #queueOverlay{ padding:0 !important; }
     var chips = [chip(s.l, s.k === 'live' ? 'live' : s.k === 'reg' ? 'gold' : '')];
     if (g && g.name) chips.push(chip(g.name));
     if (t.visibility === 'private' || t.hasCode) chips.push(chip('Private'));
+    if (isMine(t.id)) chips.push(chip(t.isHost ? 'You host' : 'You are in', 'gold'));
 
     var rows = '';
     var fact = function (k, v, mono){
@@ -83612,14 +83783,12 @@ body.q-max #queueOverlay{ padding:0 !important; }
 
   /* ── Loading ─────────────────────────────────────────────────── */
   function skeletons(){
-    var l = $('tpLive');
-    if (l && !l.innerHTML && typeof window.hubSkeletons === 'function') l.innerHTML = window.hubSkeletons(5, 62);
-    var y = $('tpYours');
-    if (y && !y.innerHTML && typeof window.hubSkeletons === 'function') y.innerHTML = window.hubSkeletons(4, 84);
+    if (typeof window.hubSkeletons !== 'function') return;
+    var l = $('tpLive');    if (l && !l.innerHTML) l.innerHTML = window.hubSkeletons(5, 70);
+    var o = $('tpOngoing'); if (o && !o.innerHTML) o.innerHTML = window.hubSkeletons(3, 92);
+    var u = $('tpUpcoming');if (u && !u.innerHTML) u.innerHTML = window.hubSkeletons(3, 92);
     var b = $('tpBrowse');
-    if (b && !b.innerHTML && typeof window.hubSkeletons === 'function'){
-      b.innerHTML = '<div class="tp-grid">' + window.hubSkeletons(8, 190) + '</div>';
-    }
+    if (b && !b.innerHTML) b.innerHTML = '<div class="tp-grid">' + window.hubSkeletons(8, 210) + '</div>';
   }
 
   async function load(){
@@ -83640,7 +83809,13 @@ body.q-max #queueOverlay{ padding:0 !important; }
     var m = await api('/me/tournaments').catch(function (){ return null; });
     mine = Array.isArray(m) ? m : [];
 
-    paintTop(); paintYours(); paintBrowse(); paintPreview(); paintCal();
+    paintTop(); paintOngoing(); paintUpcoming(); paintYours();
+    paintBrowse(); paintPreview(); paintCal();
+  }
+
+  function paintAll(){
+    paintPlayer(); paintLive(); paintOngoing(); paintUpcoming();
+    paintYours(); paintBrowse(); paintPreview(); paintCal(); paintTop();
   }
 
   /* Hiding an overlay does not stop an iframe inside it. Watch the
@@ -83669,9 +83844,7 @@ body.q-max #queueOverlay{ padding:0 !important; }
 
   window.openTournamentsPage = function (){
     if (typeof window.showOverlay !== 'function') return;
-    window.showOverlay('tournamentsPage', function (){
-      paintPlayer(); paintLive(); paintYours(); paintBrowse(); paintPreview(); paintCal(); paintTop();
-    });
+    window.showOverlay('tournamentsPage', paintAll);
     watchVisibility();
     /* The bar is fixed and only the page scrolls, so a second visit must
        not open halfway down the calendar. */
