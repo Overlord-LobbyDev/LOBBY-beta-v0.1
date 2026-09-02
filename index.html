@@ -82258,15 +82258,23 @@ body.q-max #queueOverlay{ padding:0 !important; }
            itself with this, and the page lost it when the numbered
            shelves came out. -->
       <div class="tp-break">
-        <div class="hub-sec">
-          <div class="hub-sec-t">The brackets</div>
-          <div class="hub-sec-bar"></div>
-          <div class="hub-sec-k">
-            <svg viewBox="0 0 24 24" width="11" height="11" fill="none" stroke="currentColor"
-                 stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-              <path d="M3 5h6v6H3zM3 13h6v6H3zM15 9h6v6h-6z"/><path d="M9 8h3v8h3"/></svg>
-            <span>Run one, or enter one</span><span class="sep">&middot;</span><span class="dot"></span>
-            <b id="tpAllN">0</b> <span id="tpAllW">in total</span>
+        <div class="tp-break-in">
+          <div class="tp-break-l"><div id="tpTabs"></div></div>
+          <div class="hub-sec">
+            <div class="hub-sec-t">The brackets</div>
+            <div class="hub-sec-bar"></div>
+            <div class="hub-sec-k">
+              <svg viewBox="0 0 24 24" width="11" height="11" fill="none" stroke="currentColor"
+                   stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                <path d="M3 5h6v6H3zM3 13h6v6H3zM15 9h6v6h-6z"/><path d="M9 8h3v8h3"/></svg>
+              <span>Run one, or enter one</span><span class="sep">&middot;</span><span class="dot"></span>
+              <b id="tpAllN">0</b> <span id="tpAllW">in total</span>
+            </div>
+          </div>
+          <div class="tp-break-r">
+            <span class="tp-browse-k">
+              <b id="tpBrowseN">0</b> <span id="tpBrowseW">brackets</span>
+            </span>
           </div>
         </div>
       </div>
@@ -82303,13 +82311,6 @@ body.q-max #queueOverlay{ padding:0 !important; }
         </aside>
 
         <div class="tp-browse-wrap" id="tpBrowseWrap">
-          <div class="tp-browse-h">
-            <div id="tpTabs"></div>
-            <span class="tp-browse-k">
-              <b id="tpBrowseN">0</b> <span id="tpBrowseW">brackets</span>
-            </span>
-          </div>
-
           <div id="tpBrowse"></div>
 
           <aside class="tp-sheet" id="tpSheet" hidden>
@@ -82678,6 +82679,21 @@ body.q-max #queueOverlay{ padding:0 !important; }
     color-mix(in srgb, var(--hub-accent) 80%, transparent), transparent);
 }
 .tp-break .hub-sec{ margin:0 }
+/* Tabs left, title centred, count right — all on the breaker, so the
+   two columns underneath start on the same line and the first card sits
+   level with the top of Run one. */
+.tp-break-in{
+  display:grid; grid-template-columns:minmax(0,1fr) auto minmax(0,1fr);
+  align-items:center; gap:20px;
+}
+.tp-break-l{ justify-self:start; min-width:0 }
+.tp-break-r{ justify-self:end }
+.tp-break-l .hub-rail{ margin:0; justify-content:flex-start }
+@media (max-width:1180px){
+  .tp-break-in{ grid-template-columns:minmax(0,1fr); justify-items:center; gap:14px }
+  .tp-break-l, .tp-break-r{ justify-self:center }
+  .tp-break-l .hub-rail{ justify-content:center }
+}
 
 /* ── Below the stage ───────────────────────────────────────────── */
 /* Left: what you do, and it stays put. Right: what there is. */
@@ -82742,14 +82758,7 @@ body.q-max #queueOverlay{ padding:0 !important; }
 
 /* ── The grid, and the sheet over it ───────────────────────────── */
 .tp-browse-wrap{ position:relative; min-width:0 }
-.tp-browse-h{
-  display:flex; align-items:center; gap:14px; flex-wrap:wrap;
-  margin-bottom:18px; padding-bottom:14px;
-  border-bottom:1px solid rgba(255,255,255,.07);
-}
-.tp-browse-h .hub-rail{ margin:0; justify-content:flex-start }
 .tp-browse-k{
-  margin-left:auto;
   font-family:'JetBrains Mono', ui-monospace, monospace; font-size:9.5px; font-weight:700;
   letter-spacing:1.6px; text-transform:uppercase; color:var(--text-3);
   padding:6px 13px; border-radius:99px;
@@ -83126,7 +83135,7 @@ body.q-max #queueOverlay{ padding:0 !important; }
     ? window.hubEmpty(o)
     : '<div class="hub-empty"><div class="hub-empty-t">' + esc(o.title) + '</div></div>'; }
 
-  var streams = [], idx = 0, rot = null, mine = [], all = [], filt = 'upcoming';
+  var streams = [], idx = 0, rot = null, mine = [], all = [], lobbyRows = [], filt = 'upcoming';
   /* Muted by default because autoplay demands it; remembered so a viewer
      who turned sound on does not have to every visit. */
   var muted = true;
@@ -83146,7 +83155,7 @@ body.q-max #queueOverlay{ padding:0 !important; }
   /* The public list and the ones you are in, deduplicated. */
   function everything(){
     var seen = {}, out = [];
-    all.concat(mine).forEach(function (r){
+    all.concat(mine, lobbyRows).forEach(function (r){
       var k = String(r && r.id);
       if (!r || seen[k]) return;
       seen[k] = 1; out.push(r);
@@ -83566,7 +83575,12 @@ body.q-max #queueOverlay{ padding:0 !important; }
   }
 
   /* ── The grid ────────────────────────────────────────────────── */
+  /* A Lobby bracket is private to its Lobby, so it never joins the
+     three hub tabs — it has its own, and the hub tabs exclude it. */
+  function inLobby(r){ return String(r && r.scope) === 'lobby'; }
   function keep(r){
+    if (filt === 'lobby') return inLobby(r);
+    if (inLobby(r)) return false;
     if (filt === 'ongoing') return isLive(r);
     if (filt === 'finished') return isDone(r);
     return !isLive(r) && !isDone(r);          // upcoming
@@ -83577,10 +83591,12 @@ body.q-max #queueOverlay{ padding:0 !important; }
     var u = everything();
 
     if (tabs){
+      var hub = u.filter(function (r){ return !inLobby(r); });
       var items = [
-        { id:'upcoming', label:'Upcoming', count:u.filter(function (r){ return !isLive(r) && !isDone(r); }).length },
-        { id:'ongoing',  label:'Ongoing',  count:u.filter(isLive).length },
-        { id:'finished', label:'Finished', count:u.filter(isDone).length }
+        { id:'upcoming', label:'Upcoming', count:hub.filter(function (r){ return !isLive(r) && !isDone(r); }).length },
+        { id:'ongoing',  label:'Ongoing',  count:hub.filter(isLive).length },
+        { id:'finished', label:'Finished', count:hub.filter(isDone).length },
+        { id:'lobby',    label:'Lobby',    count:u.filter(inLobby).length }
       ];
       tabs.innerHTML = typeof window.hubRail === 'function'
         ? window.hubRail(items, filt, 'window.tpFilter')
@@ -83612,12 +83628,15 @@ body.q-max #queueOverlay{ padding:0 !important; }
         icon: filt === 'ongoing' ? 'bolt' : filt === 'finished' ? 'trophy' : 'grid',
         title: filt === 'ongoing' ? 'Nothing in progress'
              : filt === 'finished' ? 'Nothing finished yet'
+             : filt === 'lobby' ? 'No Lobby brackets'
              : 'Nothing coming up',
         sub: filt === 'ongoing'
           ? 'When a bracket starts it moves here, round by round, until someone wins it.'
           : filt === 'finished'
             ? 'Completed brackets keep their results and land here.'
-            : 'Be the first to run one. Pick a game, a format and a size — it takes about a minute.',
+            : filt === 'lobby'
+              ? 'Tournaments running inside the Lobbies you are in appear here. They stay private to their Lobby and are never listed publicly.'
+              : 'Be the first to run one. Pick a game, a format and a size — it takes about a minute.',
         actions:'<button class="hub-chip on" style="cursor:pointer" ' +
                 'onclick="window.openCreateTournament()">Create a tournament</button>'
       });
@@ -83635,6 +83654,9 @@ body.q-max #queueOverlay{ padding:0 !important; }
       if (g && g.name) chips.push(chip(g.name));
       if (r.prize) chips.push(chip(r.prize, 'gold'));
       if (isMine(r.id)) chips.push(chip(r.isHost ? 'You host' : 'You are in', 'on'));
+      /* Which Lobby it belongs to, so the source of a row is never a
+         guess once the Lobby tab is showing. */
+      if (inLobby(r)) chips.push(chip(r.lobbyName || 'Lobby'));
       var w = when(r.startTime);
       return '<button type="button" class="tp-c hub-card' +
           (String(r.id) === String(selId) ? ' on' : '') + '" ' +
@@ -83936,6 +83958,10 @@ body.q-max #queueOverlay{ padding:0 !important; }
     all = Array.isArray(t) ? t : [];
     var m = await api('/me/tournaments').catch(function (){ return null; });
     mine = Array.isArray(m) ? m : [];
+    /* Brackets inside the Lobbies you are in. The route decides who may
+       see each one; this is only the list it hands back. */
+    var lb = await api('/me/lobby-tournaments').catch(function (){ return null; });
+    lobbyRows = Array.isArray(lb) ? lb : [];
 
     paintTop(); paintCmd(); paintBrowse(); paintPreview(); paintCal();
   }

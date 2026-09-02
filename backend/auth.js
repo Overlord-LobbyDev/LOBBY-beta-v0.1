@@ -5936,6 +5936,40 @@ app.get("/me/tournaments", requireAuth, async (req, res) => {
   }
 });
 
+// GET /me/lobby-tournaments — brackets inside the Lobbies you are in.
+//
+// Deliberately NOT folded into /tournaments/global. That list is the
+// public hub and must stay "scope = 'global' AND visibility = 'public'";
+// widening it is exactly the bug that once put a private lobby's
+// bracket in front of strangers via /featured/tournaments.
+//
+// The entitlement is the EXISTS below, not anything the caller sends.
+// There is no parameter that relaxes it, so no client mistake can turn
+// this into a public list.
+app.get("/me/lobby-tournaments", requireAuth, async (req, res) => {
+  try {
+    const { limit, offset } = _page(req);
+    const r = await pool.query(_TOURNEY_SELECT +
+      ` WHERE t.scope = 'lobby'
+           AND t.lobby_id IS NOT NULL
+           AND EXISTS (SELECT 1 FROM server_members sm
+                        WHERE sm.server_id::text = t.lobby_id
+                          AND sm.user_id = $1)
+         ORDER BY (t.status = 'in-progress') DESC, entrants DESC, t.created_at DESC
+         LIMIT $2 OFFSET $3`,
+      [req.userId, limit, offset]);
+    /* Membership lets you SEE it; it does not hand you the code. The
+       host gets it here, entrants get it from /me/tournaments, and that
+       is the whole list of people who should have it. */
+    res.json(r.rows.map((row) => Object.assign(
+      _tourneyCardFor(row, req.userId, false), { isHost: row.host_id === req.userId }
+    )));
+  } catch (e) {
+    console.error("[me/lobby-tournaments]", e.message);
+    res.json([]);
+  }
+});
+
 // How many live tournaments a free account may host at once. The client
 // shows this; the server is what enforces it.
 const TOURNAMENT_FREE_CAP = Number(process.env.TOURNAMENT_FREE_CAP) || 3;
