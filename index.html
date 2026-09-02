@@ -73046,7 +73046,11 @@ async function reactComment(ev, id, btn){
   window.hubRail = function (items, active, fnName) {
     return '<div class="hub-rail">' + (items || []).map(function (it) {
       return '<button type="button" class="' + (it.id === active ? 'on' : '') + '" ' +
-        'onclick="' + fnName + '(' + JSON.stringify(String(it.id)) + ')">' +
+        /* Escaped: JSON.stringify quotes the id with double quotes, and
+           this attribute is already delimited by them — unescaped, the
+           parser ends the attribute early and every button in the rail
+           is dead. &quot; reaches the JS parser as a real quote. */
+        'onclick="' + fnName + '(' + esc(JSON.stringify(String(it.id))) + ')">' +
         esc(it.label) +
         (it.count != null ? '<b>' + esc(it.count) + '</b>' : '') +
       '</button>';
@@ -82124,147 +82128,298 @@ body.q-max #queueOverlay{ padding:0 !important; }
      and simply unused; openGlobalTournaments points here.
      ══════════════════════════════════════════════════════════════ -->
 <div id="tournamentsPage" class="lobby-overlay"
-     style="background:radial-gradient(1200px 560px at 78% -14%, rgba(255,61,110,.17) 0%, transparent 62%), linear-gradient(163deg,var(--bg-0) 0%,var(--bg-1) 100%)">
+     style="background:radial-gradient(1200px 600px at 80% -10%, rgba(255,61,110,.17) 0%, transparent 60%), radial-gradient(900px 500px at 10% 110%, rgba(255,107,107,.11) 0%, transparent 60%), linear-gradient(160deg,var(--bg-0) 0%,var(--bg-1) 100%)">
 
-  <header id="tpTop">
-    <h1 class="tp-mark">Tourna<b>ments</b></h1>
-    <div class="tp-stats" id="tpStats"></div>
-    <span class="tp-sp"></span>
-    <div class="tp-code">
-      <input id="tpCode" maxlength="9" placeholder="ABCD1234" aria-label="Tournament code"
-             onkeydown="if(event.key==='Enter')window.tpJoinCode()">
-      <button type="button" onclick="window.tpJoinCode()">Join</button>
+  <!-- ── Hero ──────────────────────────────────────────────────────
+       The app's hero band, in the shape it already has: identity and
+       actions on the left, a card on the right. The legacy hub put a
+       "premium player card" in that right slot; this page puts the
+       actual live stream there, which is what the slot was always
+       describing. It means the stream is in the first screenful WITH
+       the title, the stats and the create button rather than pushing
+       all of them below the fold. -->
+  <div class="gt-hero tp-hero">
+    <div class="gt-hero-inner tp-hero-inner">
+
+      <div class="tp-hero-copy">
+        <div class="gt-hero-eyebrow">
+          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+               stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+            <path d="M8 21h8M12 17v4M7 4h10v5a5 5 0 0 1-10 0z"/>
+            <path d="M17 5h3v2a3 3 0 0 1-3 3M7 5H4v2a3 3 0 0 0 3 3"/></svg>
+          <span>Majors &middot; Public brackets &middot; Private codes</span>
+        </div>
+
+        <h1 class="gt-hero-title">GLOBAL <span class="gt-hero-accent">TOURNAMENTS</span></h1>
+
+        <div class="gt-hero-stats" id="tpStats">
+          <div class="gt-hero-stat"><div class="gt-hero-stat-num" id="tpStatAir">&mdash;</div><div class="gt-hero-stat-lbl">On air</div></div>
+          <div class="gt-hero-stat"><div class="gt-hero-stat-num" id="tpStatLive">&mdash;</div><div class="gt-hero-stat-lbl">Live now</div></div>
+          <div class="gt-hero-stat"><div class="gt-hero-stat-num" id="tpStatOpen">&mdash;</div><div class="gt-hero-stat-lbl">Open to enter</div></div>
+          <div class="gt-hero-stat"><div class="gt-hero-stat-num" id="tpStatPlayers">&mdash;</div><div class="gt-hero-stat-lbl">Competing</div></div>
+        </div>
+
+        <div class="gt-hero-actions">
+          <button class="gt-cta-primary tp-cta" type="button" onclick="window.openCreateTournament()">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                 stroke-width="2.8" stroke-linecap="round" aria-hidden="true">
+              <line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+            <span>Create tournament</span>
+          </button>
+
+          <!-- A private bracket is reached by a code and nothing else, so
+               the way in belongs beside the way to make one. -->
+          <div class="tp-code">
+            <span class="tp-code-l">Have a code?</span>
+            <input id="tpCode" maxlength="9" placeholder="ABCD1234" aria-label="Tournament code"
+                   onkeydown="if(event.key==='Enter')window.tpJoinCode()">
+            <button type="button" onclick="window.tpJoinCode()">Join</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- The stage. Muted autoplay, controls under the picture. -->
+      <div class="tp-stage">
+        <div class="tp-player" id="tpPlayer"></div>
+        <div class="tp-now" id="tpBar"></div>
+      </div>
+
     </div>
-    <button class="tp-new" type="button" onclick="window.openCreateTournament()">
-      <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor"
-           stroke-width="3" stroke-linecap="round"><line x1="12" y1="5" x2="12" y2="19"/>
-        <line x1="5" y1="12" x2="19" y2="12"/></svg>
-      Create tournament
-    </button>
-  </header>
+  </div>
 
   <div id="tpScroll">
     <div class="tp-measure">
 
-      <section class="tp-stage">
-        <div class="tp-player" id="tpPlayer"></div>
-        <div class="tp-now" id="tpBar"></div>
-        <div class="tp-reel">
-          <div class="tp-reel-head">
-            <h2>What&rsquo;s on</h2>
-            <span id="tpReelCount"></span>
-            <div class="tp-find">
-              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor"
-                   stroke-width="2.6" stroke-linecap="round" aria-hidden="true">
-                <circle cx="11" cy="11" r="7"/><line x1="21" y1="21" x2="16.5" y2="16.5"/></svg>
-              <input id="tpFind" type="text" placeholder="Search…"
-                     aria-label="Search streams" oninput="window.tpSearch(this.value)">
-              <button type="button" id="tpFindX" onclick="window.tpSearch('')" aria-label="Clear search">&#10005;</button>
-            </div>
-          </div>
-          <div class="spotlight-carousel-wrap">
-            <button type="button" class="spotlight-carousel-btn prev" id="tpReelPrev"
-                    onclick="window.tpReel(-1)" aria-label="Scroll left">&lsaquo;</button>
-            <div class="tp-channels" id="tpChannels"></div>
-            <button type="button" class="spotlight-carousel-btn next" id="tpReelNext"
-                    onclick="window.tpReel(1)" aria-label="Scroll right">&rsaquo;</button>
+      <!-- ── 01 · On air ─────────────────────────────────────────── -->
+      <div class="hub-sec">
+        <div class="hub-sec-t">On air</div>
+        <div class="hub-sec-bar"></div>
+        <div class="hub-sec-k">
+          <span>01</span><span class="sep">/</span>
+          <svg viewBox="0 0 24 24" width="11" height="11" fill="none" stroke="currentColor"
+               stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+            <rect x="2" y="5" width="20" height="14" rx="2.5"/><path d="M10 10.2v3.6l3.2-1.8z" fill="currentColor" stroke="none"/></svg>
+          <span>Broadcasts</span><span class="sep">&middot;</span><span class="dot"></span>
+          <b id="tpOnAirN">0</b> <span id="tpOnAirW">channels</span>
+        </div>
+        <div class="hub-sec-s">Every major we can see, from the fighting game circuit to the
+          shooters, the strategy scene and the board. Pick one and it takes the stage above.</div>
+        <div class="hub-sec-act">
+          <div class="tp-find">
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                 stroke-width="2.6" stroke-linecap="round" aria-hidden="true">
+              <circle cx="11" cy="11" r="7"/><line x1="21" y1="21" x2="16.5" y2="16.5"/></svg>
+            <input id="tpFind" type="text" placeholder="Search what&rsquo;s on&hellip;"
+                   aria-label="Search streams" oninput="window.tpSearch(this.value)">
+            <button type="button" id="tpFindX" onclick="window.tpSearch('')" aria-label="Clear search">&#10005;</button>
           </div>
         </div>
-      </section>
+      </div>
 
-      <section class="tp-cols">
-        <div class="tp-main">
-          <div id="tpYours"></div>
-          <div id="tpBrowse"></div>
+      <div class="tp-reel-wrap">
+        <button type="button" class="spotlight-carousel-btn prev" id="tpReelPrev"
+                onclick="window.tpReel(-1)" aria-label="Scroll left">&lsaquo;</button>
+        <div class="tp-channels" id="tpChannels"></div>
+        <button type="button" class="spotlight-carousel-btn next" id="tpReelNext"
+                onclick="window.tpReel(1)" aria-label="Scroll right">&rsaquo;</button>
+      </div>
+
+      <!-- ── 02 · Your run ───────────────────────────────────────── -->
+      <div class="hub-sec" id="tpYoursHead">
+        <div class="hub-sec-t">Your run</div>
+        <div class="hub-sec-bar"></div>
+        <div class="hub-sec-k">
+          <span>02</span><span class="sep">/</span>
+          <svg viewBox="0 0 24 24" width="11" height="11" fill="none" stroke="currentColor"
+               stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+            <path d="M8 21h8M12 17v4M7 4h10v5a5 5 0 0 1-10 0z"/></svg>
+          <span>Entered</span><span class="sep">&middot;</span><span class="dot"></span>
+          <b id="tpYoursN">0</b> <span id="tpYoursW">brackets</span>
         </div>
-        <aside class="tp-side">
-          <div class="tp-cal" id="tpCal"></div>
-          <div class="tp-make" id="tpMake"></div>
-        </aside>
-      </section>
+        <div class="hub-sec-s">Where you are in every bracket you have entered, and what has to
+          happen next.</div>
+      </div>
+      <div id="tpYours"></div>
+
+      <!-- ── 03 · The calendar ───────────────────────────────────── -->
+      <div class="hub-sec">
+        <div class="hub-sec-t">The calendar</div>
+        <div class="hub-sec-bar"></div>
+        <div class="hub-sec-k">
+          <span>03</span><span class="sep">/</span>
+          <svg viewBox="0 0 24 24" width="11" height="11" fill="none" stroke="currentColor"
+               stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+            <rect x="3" y="5" width="18" height="16" rx="2.5"/><path d="M3 10h18M8 3v4M16 3v4"/></svg>
+          <span>Scheduled</span><span class="sep">&middot;</span><span class="dot"></span>
+          <b id="tpCalN">0</b> <span id="tpCalW">dates</span>
+        </div>
+        <div class="hub-sec-s">Majors, qualifiers and every bracket with a start time, on one
+          month. Pick a day to see it.</div>
+      </div>
+      <div id="tpCal"></div>
+
+      <!-- ── 04 · Brackets ───────────────────────────────────────── -->
+      <div class="hub-sec">
+        <div class="hub-sec-t">Brackets</div>
+        <div class="hub-sec-bar"></div>
+        <div class="hub-sec-k">
+          <span>04</span><span class="sep">/</span>
+          <svg viewBox="0 0 24 24" width="11" height="11" fill="none" stroke="currentColor"
+               stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+            <path d="M3 5h6v6H3zM3 13h6v6H3zM15 9h6v6h-6z"/><path d="M9 8h3v8h3"/></svg>
+          <span>Public</span><span class="sep">&middot;</span><span class="dot"></span>
+          <b id="tpBrowseN">0</b> <span id="tpBrowseW">tournaments</span>
+        </div>
+        <div class="hub-sec-s">Open to anyone on Lobby. Private brackets never appear here &mdash;
+          they are reached with their code.</div>
+        <div class="hub-sec-act" id="tpRail"></div>
+      </div>
+      <div id="tpBrowse"></div>
+
+      <!-- ── 05 · Run your own ───────────────────────────────────── -->
+      <div class="hub-sec">
+        <div class="hub-sec-t">Run your own</div>
+        <div class="hub-sec-bar"></div>
+        <div class="hub-sec-k">
+          <span>05</span><span class="sep">/</span>
+          <svg viewBox="0 0 24 24" width="11" height="11" fill="none" stroke="currentColor"
+               stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+            <path d="M12 5v14M5 12h14"/></svg>
+          <span>Host</span>
+        </div>
+        <div class="hub-sec-s">Anyone can run one. It takes about a minute.</div>
+      </div>
+
+      <div class="tp-make">
+        <div class="tp-make-copy">
+          <h3>Build a bracket</h3>
+          <p>Pick a game, a format and a size. Make it public so anyone on Lobby can enter, or
+             private with a code &mdash; four letters and four digits &mdash; that you hand out
+             yourself. Neither has anything to do with a Lobby&rsquo;s own tournaments, which stay
+             inside that Lobby.</p>
+          <ol class="tp-steps">
+            <li><b>01</b><span>Game and format</span></li>
+            <li><b>02</b><span>Bracket size</span></li>
+            <li><b>03</b><span>Publish, or share the code</span></li>
+          </ol>
+        </div>
+        <div class="tp-make-do">
+          <button class="gt-cta-primary tp-cta" type="button" onclick="window.openCreateTournament()">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                 stroke-width="2.8" stroke-linecap="round" aria-hidden="true">
+              <line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+            <span>Create tournament</span>
+          </button>
+          <button class="tp-ghost" type="button" onclick="window.openMyTournaments()">See the ones you host</button>
+        </div>
+      </div>
 
     </div>
   </div>
 </div>
 
 <style>
+/* ══════════════════════════════════════════════════════════════════
+   TOURNAMENTS — built out of the app's own parts
+
+   The previous version invented its own chrome: a 56px bar with a small
+   wordmark, a left/right column split and a 300px sidebar. None of that
+   exists anywhere else in Lobby, which is exactly why it read as a
+   different product bolted on.
+
+   This is the same page in the app's grammar and nothing else:
+
+     .gt-hero / .gt-hero-inner / .gt-hero-title / .gt-hero-stats /
+     .gt-cta-primary          the hero band every other hub opens with
+     .hub-sec / .hub-sec-bar / .hub-sec-k / .hub-sec-s
+                              the numbered, centred section header the
+                              front page uses to rule off a shelf
+     .hub-card / .hub-chip / .hub-rail / .hub-empty
+                              the card, the fact-pill, the filter row
+                              and the "nothing here, and why" state
+     .spotlight-carousel-btn  the home carousel's own arrows
+
+   What is defined below is only the parts this page has and no other
+   page does: the stage, the reel of channels, the bracket-stage rail,
+   the month calendar and the host banner.
+   ══════════════════════════════════════════════════════════════════ */
 #tournamentsPage{
-  --tp:#ff3d6e; --tp-dim:rgba(255,61,110,.14); --tp-line:rgba(255,255,255,.075);
-  --tp-surf:rgba(255,255,255,.03);
-  /* The variable every other hub theming rule reads. Setting it is what
-     makes this page part of the same system rather than a lookalike. */
+  /* Every shared hub rule reads --hub-accent. Setting it is what makes
+     this page part of the system rather than a lookalike, and the value
+     is the colour its own top-bar pill already lights (--tba-color
+     255,107,107 on .tba-tourney). */
   --hub-accent:#ff3d6e;
+  --tp:#ff3d6e;
+  --tp-dim:rgba(255,61,110,.14);
+  --tp-line:rgba(255,255,255,.075);
+  --tp-surf:rgba(255,255,255,.03);
   flex-direction:column;
 }
-#tpTop{
-  flex:0 0 56px; display:flex; align-items:center; gap:14px; padding:0 24px;
-  z-index:3; border-bottom:1px solid rgba(255,255,255,.06);
-  /* Layered like the app's other chrome: a breath of the hub accent at
-     the top edge over an opaque ground, with a hairline accent seam. */
+
+/* ── Hero ──────────────────────────────────────────────────────── */
+/* The base .gt-hero paints an indigo wash and its CTA carries an indigo
+   shadow, both hard-coded for the legacy hub. Re-pointed at this page's
+   accent; everything else about the band is inherited. */
+#tournamentsPage .gt-hero{
+  padding:26px 36px 22px;
   background:
-    radial-gradient(70% 180% at 22% -60%, color-mix(in srgb, var(--hub-accent) 13%, transparent) 0%, transparent 70%),
-    linear-gradient(180deg, rgba(255,255,255,.045) 0%, rgba(255,255,255,.012) 40%, rgba(0,0,0,.28) 100%),
-    #0c0910;
-  box-shadow:0 1px 0 rgba(255,255,255,.05) inset, 0 10px 26px -18px rgba(0,0,0,.9);
+    radial-gradient(820px 300px at 88% 50%, rgba(255,61,110,.20) 0%, transparent 62%),
+    linear-gradient(180deg, rgba(0,0,0,.34) 0%, rgba(0,0,0,0) 100%);
 }
-/* The same treatment as every other hub title -- Archivo 900, caps, cut
-   rather than printed: light above, shadow below, one soft lift and an
-   ambient glow in this hub's accent. Bar-sized instead of hero-sized,
-   so the page keeps its identity without spending a screen on it. */
-.tp-mark{
-  font-family:'Archivo', var(--font), sans-serif;
-  font-size:17px; font-weight:900; letter-spacing:2px; line-height:1;
-  text-transform:uppercase; margin:0; white-space:nowrap; color:#fff;
-  text-shadow:
-    0 -1px 0 rgba(255,255,255,.30),
-    0 1px 0 rgba(0,0,0,.55),
-    0 2px 6px rgba(0,0,0,.45),
-    0 0 28px color-mix(in srgb, var(--hub-accent) 40%, transparent);
+#tournamentsPage .gt-hero-inner{
+  grid-template-columns:minmax(0,1fr) minmax(0,520px);
+  gap:30px;
 }
-.tp-mark b{ color:var(--tp); font-weight:900 }
-.tp-stats{ display:flex; gap:6px }
-.tp-st{
-  display:inline-flex; align-items:center; gap:6px; height:24px; padding:0 9px;
-  border-radius:6px; background:rgba(255,255,255,.045); border:1px solid var(--tp-line);
-  font-size:10.5px; color:var(--text-3); white-space:nowrap;
+#tournamentsPage .gt-hero-stats{ gap:18px; margin-top:16px }
+/* Figures get the mono treatment the rest of the app gives to numbers. */
+#tournamentsPage .gt-hero-stat-num{
+  font-family:'JetBrains Mono', ui-monospace, monospace;
+  font-variant-numeric:tabular-nums;
+  font-size:20px; letter-spacing:.4px;
 }
-.tp-st b{ color:var(--text-1); font-weight:800; font-variant-numeric:tabular-nums }
-.tp-st.on{ background:var(--tp-dim); border-color:rgba(255,61,110,.32); color:#ffa3b6 }
-.tp-st.on b{ color:#fff }
-.tp-st.on i{ width:5px; height:5px; border-radius:50%; background:var(--tp); animation:tpP 1.7s ease-in-out infinite }
-@keyframes tpP{ 0%,100%{opacity:1} 50%{opacity:.25} }
-.tp-sp{ flex:1 }
-.tp-code{ display:flex; gap:5px }
+#tournamentsPage .gt-cta-primary{
+  background:linear-gradient(135deg, #ff5a83 0%, var(--tp) 60%, #e02659 100%);
+  color:#fff;
+  box-shadow:0 1px 0 rgba(255,255,255,.3) inset,
+             0 12px 30px -8px rgba(255,61,110,.6);
+}
+#tournamentsPage .gt-hero-actions{ margin-top:18px; gap:12px }
+
+/* Join by code. Mono, because a code is read character by character. */
+.tp-code{
+  display:inline-flex; align-items:center; gap:7px;
+  padding:5px 6px 5px 13px; border-radius:99px;
+  background:rgba(255,255,255,.04); border:1px solid var(--tp-line);
+}
+.tp-code-l{
+  font-size:10px; font-weight:800; letter-spacing:1.2px; text-transform:uppercase;
+  color:var(--text-3); white-space:nowrap;
+}
+@media (max-width:900px){ .tp-code-l{ display:none } }
 .tp-code input{
-  width:104px; height:30px; border-radius:7px; padding:0 9px;
-  background:rgba(255,255,255,.045); border:1px solid var(--tp-line); color:var(--text-1);
-  font-family:"JetBrains Mono",ui-monospace,monospace; font-size:11px;
-  font-weight:700; letter-spacing:1.6px; text-transform:uppercase;
+  width:100px; height:30px; border:none; background:none; color:var(--text-1);
+  font-family:'JetBrains Mono', ui-monospace, monospace; font-size:12px;
+  font-weight:700; letter-spacing:1.8px; text-transform:uppercase; padding:0;
 }
-.tp-code input:focus{ outline:none; border-color:rgba(255,61,110,.55) }
+.tp-code input::placeholder{ color:rgba(255,255,255,.22) }
+.tp-code input:focus{ outline:none }
+.tp-code:focus-within{
+  border-color:color-mix(in srgb, var(--hub-accent) 55%, transparent);
+  box-shadow:0 0 0 3px color-mix(in srgb, var(--hub-accent) 14%, transparent);
+}
+.tp-code.bad{ border-color:rgba(255,120,120,.75) }
 .tp-code button{
-  height:30px; padding:0 12px; border-radius:7px; cursor:pointer;
-  background:rgba(255,255,255,.05); border:1px solid var(--tp-line); color:var(--text-1);
-  font-family:var(--font); font-size:9.5px; font-weight:800; letter-spacing:1.1px; text-transform:uppercase;
+  height:30px; padding:0 15px; border-radius:99px; cursor:pointer;
+  background:rgba(255,255,255,.07); border:1px solid var(--tp-line); color:var(--text-1);
+  font-family:'Archivo', var(--font), sans-serif;
+  font-size:9.5px; font-weight:900; letter-spacing:1.2px; text-transform:uppercase;
 }
-.tp-code button:hover{ background:rgba(255,255,255,.1) }
-.tp-new{
-  display:inline-flex; align-items:center; gap:7px; height:30px; padding:0 14px;
-  border-radius:7px; cursor:pointer; border:none; background:var(--tp); color:#fff;
-  font-family:var(--font); font-size:9.5px; font-weight:900; letter-spacing:1.1px; text-transform:uppercase;
-}
-.tp-new:hover{ filter:brightness(1.12) }
+.tp-code button:hover{ background:var(--tp); border-color:var(--tp); color:#fff }
 
-#tpScroll{ flex:1; min-height:0; overflow-y:auto; overflow-x:hidden;
-  scrollbar-width:thin; scrollbar-color:rgba(255,255,255,.14) transparent }
-#tpScroll::-webkit-scrollbar{ width:9px }
-#tpScroll::-webkit-scrollbar-thumb{ background:rgba(255,255,255,.14); border-radius:99px }
-.tp-measure{ max-width:1460px; margin:0 auto; padding:18px 24px 60px; display:grid; gap:20px }
-
-/* ── Stage ─────────────────────────────────────────────────────── */
-.tp-stage{ display:grid; justify-items:center; gap:11px }
+/* ── The stage ─────────────────────────────────────────────────── */
+.tp-stage{ display:grid; gap:9px; align-content:start; min-width:0 }
 .tp-player{
-  position:relative; width:100%; max-width:900px; aspect-ratio:16/9; max-height:352px;
+  position:relative; width:100%; aspect-ratio:16/9;
   border-radius:14px; overflow:hidden; border:1px solid rgba(255,255,255,.1);
   background:radial-gradient(120% 130% at 50% -30%, rgba(255,61,110,.16) 0%, transparent 62%),
              linear-gradient(165deg,#14101a 0%,#0a0810 60%,#07060b 100%);
@@ -82272,48 +82427,40 @@ body.q-max #queueOverlay{ padding:0 !important; }
 }
 .tp-player iframe{ position:absolute; inset:0; width:100%; height:100%; border:0 }
 .tp-fill{ position:absolute; inset:0; background-size:cover; background-position:center }
-/* The caption and controls live UNDER the player now. Drawing them over
-   it put them exactly where YouTube draws its own, and one of the two
-   always lost. */
-/* .tp-now, NOT .tp-bar: that name was already the entrant progress bar
-   on a tournament card (height:3px, overflow:hidden, with .tp-bar span
-   painting a filled block). Reusing it meant the later rule won and
-   crushed this caption to three pixels with pink blocks inside it. */
+/* Fullscreen paints the element itself, so it needs a ground of its own. */
+.tp-player:fullscreen{ border-radius:0; background:#000 }
+/* Caption and controls live UNDER the picture. Drawn over it they land
+   exactly where YouTube draws its own, and one of the two always lost.
+   Named .tp-now, not .tp-bar: that name is the entrant progress bar on a
+   card (height:3px), and the later rule would crush this to 3 pixels. */
 .tp-now{
-  width:100%; max-width:900px; display:flex; align-items:center; gap:11px;
-  padding:9px 12px; border-radius:10px;
+  display:flex; align-items:center; gap:11px; min-height:44px;
+  padding:8px 11px; border-radius:11px;
   background:var(--tp-surf); border:1px solid var(--tp-line);
 }
 .tp-now-b{ min-width:0; flex:1; display:grid; gap:2px }
 .tp-now-t{
-  font-size:13px; font-weight:700; color:var(--text-1);
+  font-size:12.5px; font-weight:700; color:var(--text-1);
   overflow:hidden; text-overflow:ellipsis; white-space:nowrap;
 }
-.tp-now-m{ font-size:11px; color:var(--text-3); display:flex; gap:6px; flex-wrap:wrap; align-items:center }
+.tp-now-m{ font-size:10.5px; color:var(--text-3); display:flex; gap:6px; flex-wrap:wrap; align-items:center }
 .tp-now-m b{ color:var(--text-2); font-weight:700 }
 .tp-now-m i{ font-style:normal; opacity:.45 }
-@media (max-width:620px){ .tp-now-m{ display:none } }
+@media (max-width:1240px){ .tp-now-m{ display:none } }
 .tp-badge{
-  display:inline-flex; align-items:center; gap:5px; width:fit-content;
-  flex:0 0 auto; padding:3px 8px;
-  border-radius:4px; font-family:var(--font); font-size:8.5px; font-weight:900;
-  letter-spacing:1.4px; text-transform:uppercase; background:rgba(255,255,255,.15); color:#fff;
+  display:inline-flex; align-items:center; gap:5px; flex:0 0 auto;
+  padding:4px 8px; border-radius:5px;
+  font-family:'Archivo', var(--font), sans-serif; font-size:8.5px; font-weight:900;
+  letter-spacing:1.4px; text-transform:uppercase; background:rgba(255,255,255,.13); color:#fff;
 }
 .tp-badge.live{ background:var(--tp) }
 .tp-badge.live i{ width:5px; height:5px; border-radius:50%; background:#fff; animation:tpP 1.7s ease-in-out infinite }
-.tp-title{ font-family:var(--font); font-size:18px; font-weight:800; letter-spacing:-.3px;
-  line-height:1.16; margin:0; color:#fff;
-  display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical; overflow:hidden }
-.tp-meta{ display:flex; flex-wrap:wrap; gap:10px; font-size:11px; color:rgba(255,255,255,.72) }
-.tp-meta b{ color:#fff; font-weight:700 }
-/* Controls sit above the caption gradient and stay reachable — the
-   overlay itself is pointer-events:none so it never eats a click meant
-   for the video. */
+@keyframes tpP{ 0%,100%{opacity:1} 50%{opacity:.25} }
 /* Always visible: a mute button you have to hover to discover is a mute
    button nobody finds. */
 .tp-ctl{ display:flex; align-items:center; gap:5px; flex:0 0 auto }
 .tp-cbtn{
-  width:30px; height:30px; border-radius:7px; cursor:pointer; padding:0;
+  width:29px; height:29px; border-radius:7px; cursor:pointer; padding:0;
   display:grid; place-content:center;
   background:rgba(255,255,255,.05); border:1px solid var(--tp-line);
   color:var(--text-1); font-size:15px; line-height:1;
@@ -82321,18 +82468,15 @@ body.q-max #queueOverlay{ padding:0 !important; }
 .tp-cbtn:hover{ background:rgba(255,255,255,.12); border-color:rgba(255,255,255,.28) }
 .tp-cbtn:focus-visible{ outline:2px solid var(--tp); outline-offset:2px }
 .tp-count{
-  font-family:"JetBrains Mono",ui-monospace,monospace; font-size:10.5px;
+  font-family:'JetBrains Mono', ui-monospace, monospace; font-size:10px;
   color:var(--text-3); background:rgba(255,255,255,.05); border:1px solid var(--tp-line);
-  border-radius:7px; padding:0 8px; height:30px; display:grid; place-content:center;
+  border-radius:7px; padding:0 8px; height:29px; display:grid; place-content:center;
   font-variant-numeric:tabular-nums;
 }
-/* Fullscreen paints the element itself, so it needs a ground of its own. */
-.tp-player:fullscreen{ max-width:none; max-height:none; border-radius:0; background:#000 }
-/* On a scheduled broadcast the poster is not clickable-looking on its
-   own, so it gets an affordance. */
+/* A scheduled broadcast shows its poster, which needs an affordance. */
 .tp-play{
   position:absolute; top:50%; left:50%; transform:translate(-50%,-50%); z-index:2;
-  width:56px; height:56px; border-radius:50%; cursor:pointer; padding:0;
+  width:54px; height:54px; border-radius:50%; cursor:pointer; padding:0;
   display:grid; place-content:center;
   background:rgba(8,9,14,.72); border:1px solid rgba(255,255,255,.24); color:#fff;
   transition:background .16s ease, transform .16s ease;
@@ -82340,209 +82484,347 @@ body.q-max #queueOverlay{ padding:0 !important; }
 .tp-play:hover{ background:var(--tp); border-color:var(--tp); transform:translate(-50%,-50%) scale(1.06) }
 .tp-play:focus-visible{ outline:2px solid var(--tp); outline-offset:3px }
 @media (prefers-reduced-motion:reduce){ .tp-play{ transition:none } .tp-play:hover{ transform:translate(-50%,-50%) } }
-.tp-blank{ position:absolute; inset:0; display:grid; place-content:center; gap:8px; text-align:center; padding:24px }
+.tp-blank{ position:absolute; inset:0; display:grid; place-content:center; gap:8px; text-align:center; padding:22px }
 .tp-blank-i{
-  width:46px; height:46px; border-radius:13px; display:grid; place-content:center; margin:0 auto;
+  width:44px; height:44px; border-radius:13px; display:grid; place-content:center; margin:0 auto;
   background:rgba(255,255,255,.04); border:1px solid rgba(255,255,255,.08); color:rgba(255,255,255,.4);
 }
-.tp-blank h3{ margin:0; font-size:15px; font-weight:800 }
-.tp-blank p{ margin:0; font-size:12px; color:var(--text-3); max-width:46ch; line-height:1.6 }
+.tp-blank h3{ margin:0; font-size:14px; font-weight:800 }
+.tp-blank p{ margin:0; font-size:11.5px; color:var(--text-3); max-width:42ch; line-height:1.6 }
 
-/* Search ─────────────────────────────────────────────────────── */
-/* A filter, not a landing search: it belongs beside what it filters,
-   sized accordingly. It grows on focus so a long query is still
-   readable without a permanent slab across the page. */
-.tp-find{ position:relative; margin-left:auto; display:flex; align-items:center }
-.tp-find svg{ position:absolute; left:9px; color:var(--text-3); pointer-events:none }
+/* A short window pays for the fixed hero out of the shelves below it.
+   The player's height follows its column's width through the 16/9 ratio,
+   so narrowing the column is what shortens the band — a max-height would
+   only stop the box being 16/9 and letterbox the picture inside it. */
+@media (max-height:860px){
+  #tournamentsPage .gt-hero-inner{ grid-template-columns:minmax(0,1fr) minmax(0,460px) }
+}
+@media (max-height:760px){
+  #tournamentsPage .gt-hero{ padding:18px 36px 16px }
+  #tournamentsPage .gt-hero-inner{ grid-template-columns:minmax(0,1fr) minmax(0,392px) }
+  #tournamentsPage .gt-hero-stats{ margin-top:12px }
+}
+
+/* Stacked, the stream leads: it is the thing that is happening now. */
+@media (max-width:1080px){
+  #tournamentsPage .gt-hero-inner{ grid-template-columns:minmax(0,1fr) }
+  #tournamentsPage .tp-stage{ order:-1; max-width:640px }
+}
+
+/* ── Scroller ──────────────────────────────────────────────────── */
+#tpScroll{ flex:1; min-height:0; overflow-y:auto; overflow-x:hidden;
+  scrollbar-width:thin; scrollbar-color:rgba(255,255,255,.14) transparent }
+#tpScroll::-webkit-scrollbar{ width:9px }
+#tpScroll::-webkit-scrollbar-thumb{ background:rgba(255,255,255,.14); border-radius:99px }
+.tp-measure{ max-width:1320px; margin:0 auto; padding:4px 36px 60px }
+
+/* The search belongs to the shelf it filters, so it sits in that
+   shelf's action row rather than as a slab across the page. */
+.tp-find{ position:relative; display:flex; align-items:center }
+.tp-find svg{ position:absolute; left:11px; color:var(--text-3); pointer-events:none }
 .tp-find input{
-  width:150px; height:28px; border-radius:99px; padding:0 26px 0 26px;
+  width:230px; height:30px; border-radius:99px; padding:0 28px 0 29px;
   background:rgba(255,255,255,.045); border:1px solid var(--tp-line);
-  color:var(--text-1); font-family:inherit; font-size:12px;
-  transition:width .18s ease, border-color .15s ease;
+  color:var(--text-1); font-family:var(--font); font-size:12px;
+  transition:width .18s ease, border-color .15s ease, box-shadow .15s ease;
 }
 .tp-find input::placeholder{ color:var(--text-3) }
-.tp-find input:focus{ outline:none; width:220px; border-color:color-mix(in srgb, var(--hub-accent) 55%, transparent) }
+.tp-find input:focus{
+  outline:none; width:300px;
+  border-color:color-mix(in srgb, var(--hub-accent) 55%, transparent);
+  box-shadow:0 0 0 3px color-mix(in srgb, var(--hub-accent) 14%, transparent);
+}
 @media (prefers-reduced-motion:reduce){ .tp-find input{ transition:none } }
 .tp-find button{
-  position:absolute; right:5px; width:18px; height:18px; border-radius:50%;
+  position:absolute; right:6px; width:18px; height:18px; border-radius:50%;
   display:none; place-content:center; cursor:pointer; padding:0;
-  background:rgba(255,255,255,.1); border:none;
-  color:var(--text-2); font-size:9px; line-height:1;
+  background:rgba(255,255,255,.1); border:none; color:var(--text-2); font-size:9px; line-height:1;
 }
 .tp-find button:hover{ background:rgba(255,255,255,.2); color:var(--text-1) }
 
-/* Cards ──────────────────────────────────────────────────────── */
-/* One row, scrolled by the arrows. A wrapping grid put four ragged rows
-   of thumbnails under the player and buried everything below it. */
-.tp-reel{ width:100%; max-width:900px; display:grid; gap:9px }
-.tp-reel-head{ display:flex; align-items:center; gap:10px }
-.tp-reel-head h2{
-  font-family:var(--font); font-size:10.5px; font-weight:900; letter-spacing:1.7px;
-  text-transform:uppercase; margin:0; color:var(--text-2);
-}
-.tp-reel-head > span{ font-size:10.5px; color:var(--text-3) }
+/* ── The reel ──────────────────────────────────────────────────── */
+/* One scrolling row with the home page's own arrows. A wrapping grid put
+   four ragged rows of thumbnails here and buried everything below. */
+.tp-reel-wrap{ position:relative; margin-bottom:4px }
 .tp-channels{
-  display:flex; gap:9px; overflow-x:auto; scroll-behavior:smooth;
-  padding:1px 0 2px;
-  /* The scrollbar would sit under the arrows and fight them. */
-  scrollbar-width:none;
+  display:flex; gap:12px; overflow-x:auto; scroll-behavior:smooth;
+  padding:2px 0 4px;
+  scrollbar-width:none;   /* it would sit under the arrows and fight them */
 }
 .tp-channels::-webkit-scrollbar{ display:none }
-.tp-card{ flex:0 0 168px }
+/* hub-empty is written for a grid (grid-column:1/-1), and the reel is a
+   flex row — without this it sizes to its own text instead of the row. */
+#tournamentsPage .tp-channels .hub-empty{ flex:1 1 100%; min-width:0 }
+#tournamentsPage .tp-channels .hub-skel{ flex:0 0 214px }
 @media (prefers-reduced-motion:reduce){ .tp-channels{ scroll-behavior:auto } }
+#tournamentsPage .spotlight-carousel-btn{ width:34px; height:34px }
+#tournamentsPage .spotlight-carousel-btn:hover{ background:var(--tp); border-color:var(--tp) }
+#tournamentsPage .spotlight-carousel-btn.prev{ left:-10px }
+#tournamentsPage .spotlight-carousel-btn.next{ right:-10px }
+
 .tp-card{
-  display:grid; grid-template-rows:auto auto; gap:0; padding:0; cursor:pointer;
-  text-align:left; font-family:inherit; overflow:hidden; border-radius:9px;
-  background:var(--tp-surf); border:1px solid var(--tp-line);
-  transition:border-color .15s ease, background .15s ease;
+  flex:0 0 214px; display:grid; grid-template-rows:auto auto; padding:0; cursor:pointer;
+  text-align:left; font-family:inherit; overflow:hidden;
 }
-.tp-card:hover{ background:rgba(255,255,255,.07); border-color:rgba(255,255,255,.2) }
-.tp-card.on{ border-color:var(--tp); background:var(--tp-dim) }
-.tp-card:focus-visible{ outline:2px solid var(--tp); outline-offset:2px }
-@media (prefers-reduced-motion:reduce){ .tp-card{ transition:none } }
 .tp-card-th{
   position:relative; aspect-ratio:16/9; background:#0d0e14 center/cover;
   border-bottom:1px solid var(--tp-line);
 }
-.tp-card-live{
-  position:absolute; top:5px; left:5px; padding:2px 6px; border-radius:3px;
-  font-family:var(--font); font-size:7.5px; font-weight:900; letter-spacing:1px;
-  text-transform:uppercase; background:var(--tp); color:#fff;
+.tp-card-th::after{
+  content:''; position:absolute; inset:0;
+  background:linear-gradient(0deg, rgba(9,10,16,.72), transparent 58%);
 }
-.tp-card-b{ padding:7px 8px 8px; display:grid; gap:2px; min-width:0 }
+.tp-card-live{
+  position:absolute; top:6px; left:6px; z-index:2; padding:3px 7px; border-radius:4px;
+  display:inline-flex; align-items:center; gap:4px;
+  font-family:'Archivo', var(--font), sans-serif; font-size:7.5px; font-weight:900;
+  letter-spacing:1.1px; text-transform:uppercase; background:var(--tp); color:#fff;
+}
+.tp-card-live i{ width:4px; height:4px; border-radius:50%; background:#fff; animation:tpP 1.7s ease-in-out infinite }
+.tp-card-when{
+  position:absolute; top:6px; left:6px; z-index:2; padding:3px 7px; border-radius:4px;
+  font-family:'JetBrains Mono', ui-monospace, monospace; font-size:8px; font-weight:700;
+  letter-spacing:.6px; text-transform:uppercase; background:rgba(0,0,0,.72); color:#fff;
+}
+.tp-card-eyes{
+  position:absolute; right:6px; bottom:6px; z-index:2;
+  font-family:'JetBrains Mono', ui-monospace, monospace; font-size:9px; font-weight:700;
+  color:#fff; text-shadow:0 1px 3px rgba(0,0,0,.9);
+}
+.tp-card-b{ padding:8px 10px 10px; display:grid; gap:3px; min-width:0 }
 .tp-card-t{
-  font-size:11px; font-weight:700; color:var(--text-1); line-height:1.3;
+  font-size:11.5px; font-weight:700; color:var(--text-1); line-height:1.3;
   display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical; overflow:hidden;
 }
-.tp-card-s{ font-size:9.5px; color:var(--text-2); overflow:hidden; text-overflow:ellipsis; white-space:nowrap }
-.tp-card-f{ font-size:9.5px; color:var(--text-3) }
+.tp-card-s{ font-size:9.5px; color:var(--text-3); overflow:hidden; text-overflow:ellipsis; white-space:nowrap }
+.tp-card.on{
+  border-color:color-mix(in srgb, var(--hub-accent) 62%, transparent);
+  box-shadow:0 0 0 1px color-mix(in srgb, var(--hub-accent) 34%, transparent),
+             0 0 26px -10px color-mix(in srgb, var(--hub-accent) 70%, transparent);
+}
+.tp-card:focus-visible{ outline:2px solid var(--tp); outline-offset:2px }
 
-/* ── Columns ───────────────────────────────────────────────────── */
-.tp-cols{ display:grid; gap:20px; grid-template-columns:minmax(0,1fr) 300px; align-items:start }
-.tp-main{ display:grid; gap:20px; min-width:0 }
-.tp-side{ display:grid; gap:14px }
-@media (max-width:1120px){ .tp-cols{ grid-template-columns:minmax(0,1fr) } }
-
-.tp-h{ display:flex; align-items:baseline; gap:9px; margin:0 0 10px }
-.tp-h h2{ font-family:var(--font); font-size:10.5px; font-weight:900; letter-spacing:1.7px;
-  text-transform:uppercase; margin:0 }
-.tp-h span{ font-size:10.5px; color:var(--text-3) }
-.tp-h .more{ margin-left:auto; background:none; border:none; cursor:pointer; padding:0;
-  color:var(--text-3); font-family:var(--font); font-size:9.5px; font-weight:800;
-  letter-spacing:1.1px; text-transform:uppercase }
-.tp-h .more:hover{ color:var(--tp) }
-.tp-note{ font-size:11.5px; color:var(--text-3); line-height:1.55; margin:0 }
-
-/* ── Yours ─────────────────────────────────────────────────────── */
-.tp-mine{ display:grid; gap:8px; grid-template-columns:repeat(auto-fill,minmax(316px,1fr)) }
+/* ── Your run ──────────────────────────────────────────────────── */
+.tp-mine{ display:grid; gap:12px; grid-template-columns:repeat(auto-fill,minmax(340px,1fr)) }
 .tp-m{
-  display:grid; grid-template-columns:50px minmax(0,1fr) auto; gap:11px; align-items:center;
-  padding:9px 12px 9px 9px; border-radius:10px; text-align:left; cursor:pointer;
-  background:var(--tp-surf); border:1px solid var(--tp-line); font-family:inherit;
+  display:grid; grid-template-columns:56px minmax(0,1fr); gap:12px;
+  padding:12px; text-align:left; cursor:pointer; font-family:inherit; align-items:start;
 }
-.tp-m:hover{ background:rgba(255,255,255,.065); border-color:rgba(255,255,255,.15) }
-.tp-m-art{ width:50px; height:50px; border-radius:8px; background:#14151d center/cover;
-  display:grid; place-content:center; font-family:var(--font); font-size:16px;
-  font-weight:900; color:rgba(255,255,255,.35) }
-.tp-m-b{ min-width:0; display:grid; gap:5px }
-.tp-m-n{ font-size:13px; font-weight:800; overflow:hidden; text-overflow:ellipsis; white-space:nowrap }
-.tp-m-line{ display:flex; align-items:center; gap:7px }
-.tp-track{ flex:1; min-width:36px; height:4px; border-radius:99px; background:rgba(255,255,255,.08); overflow:hidden }
-.tp-track span{ display:block; height:100%; border-radius:99px; background:var(--tp) }
-.tp-round{ font-family:"JetBrains Mono",ui-monospace,monospace; font-size:9.5px;
-  color:var(--text-3); white-space:nowrap; font-variant-numeric:tabular-nums }
-.tp-m-s{ font-size:10.5px; color:var(--text-3); overflow:hidden; text-overflow:ellipsis; white-space:nowrap }
-.tp-stage-tag{
-  font-family:var(--font); font-size:8px; font-weight:900; letter-spacing:1.1px;
-  text-transform:uppercase; padding:4px 8px; border-radius:5px;
-  background:rgba(255,255,255,.07); color:var(--text-2);
+.tp-m-art{
+  width:56px; height:56px; border-radius:10px; background:#14151d center/cover;
+  display:grid; place-content:center;
+  font-family:'Archivo', var(--font), sans-serif; font-size:18px; font-weight:900;
+  color:rgba(255,255,255,.32);
 }
-.tp-stage-tag.live{ background:var(--tp-dim); color:#ffa3b6 }
-.tp-stage-tag.reg{ background:rgba(240,180,41,.15); color:#f0b429 }
+.tp-m-b{ min-width:0; display:grid; gap:7px }
+.tp-m-top{ display:flex; align-items:center; gap:8px; min-width:0 }
+.tp-m-n{ font-size:13.5px; font-weight:800; overflow:hidden; text-overflow:ellipsis;
+  white-space:nowrap; flex:1; min-width:0 }
+/* The bracket, made visible. A column of rows that says "Round 2" tells
+   you a number; a rail of rounds tells you how far through it is and how
+   much is left, which is the thing you actually want to know. */
+.tp-pips{ display:flex; align-items:center; gap:3px; flex-wrap:wrap }
+.tp-pip{
+  font-family:'JetBrains Mono', ui-monospace, monospace; font-size:8px; font-weight:700;
+  letter-spacing:.5px; padding:3px 6px; border-radius:4px;
+  background:rgba(255,255,255,.045); border:1px solid rgba(255,255,255,.07);
+  color:var(--text-3);
+}
+.tp-pip.done{ background:rgba(255,255,255,.1); color:var(--text-2) }
+.tp-pip.now{
+  background:color-mix(in srgb, var(--hub-accent) 22%, transparent);
+  border-color:color-mix(in srgb, var(--hub-accent) 55%, transparent);
+  color:#fff;
+  box-shadow:0 0 14px -4px color-mix(in srgb, var(--hub-accent) 80%, transparent);
+}
+.tp-pip-sep{ color:rgba(255,255,255,.16); font-size:8px }
+.tp-m-chips{ display:flex; gap:5px; flex-wrap:wrap }
+.tp-next{
+  display:flex; align-items:center; gap:7px; padding:6px 8px; border-radius:7px;
+  background:rgba(255,255,255,.03); border:1px solid rgba(255,255,255,.06);
+  font-size:10.5px; color:var(--text-2); min-width:0;
+}
+.tp-next b{ color:#fff; font-weight:700 }
+.tp-next .t{ overflow:hidden; text-overflow:ellipsis; white-space:nowrap }
+.tp-next .c{
+  margin-left:auto; flex:0 0 auto;
+  font-family:'JetBrains Mono', ui-monospace, monospace; font-size:10px;
+  color:var(--hub-accent); font-variant-numeric:tabular-nums;
+}
 
-/* ── Browse ────────────────────────────────────────────────────── */
-.tp-filters{ display:flex; gap:6px; flex-wrap:wrap; margin-left:auto }
-.tp-f{ height:26px; padding:0 11px; border-radius:99px; cursor:pointer;
-  background:rgba(255,255,255,.04); border:1px solid var(--tp-line); color:var(--text-3);
-  font-family:var(--font); font-size:9.5px; font-weight:800; letter-spacing:1px; text-transform:uppercase }
-.tp-f:hover{ color:var(--text-1) }
-.tp-f.on{ background:var(--tp-dim); border-color:rgba(255,61,110,.4); color:#ffa3b6 }
-.tp-f b{ font-variant-numeric:tabular-nums; opacity:.7; margin-left:5px }
-.tp-grid{ display:grid; gap:12px; grid-template-columns:repeat(auto-fill,minmax(208px,1fr)) }
-.tp-c{ border-radius:11px; overflow:hidden; cursor:pointer; text-align:left; padding:0;
-  background:var(--tp-surf); border:1px solid var(--tp-line); font-family:inherit;
-  display:grid; grid-template-rows:90px auto; transition:transform .16s ease, border-color .16s ease }
-.tp-c:hover{ border-color:rgba(255,255,255,.2); transform:translateY(-2px) }
-@media (prefers-reduced-motion:reduce){ .tp-c{ transition:none } .tp-c:hover{ transform:none } }
+/* ── Brackets ──────────────────────────────────────────────────── */
+.tp-grid{ display:grid; gap:14px; grid-template-columns:repeat(auto-fill,minmax(238px,1fr)) }
+.tp-c{ cursor:pointer; text-align:left; padding:0; font-family:inherit;
+  display:grid; grid-template-rows:104px auto }
 .tp-c-art{ position:relative; background:#14151d center/cover }
-.tp-c-art::after{ content:''; position:absolute; inset:0; background:linear-gradient(0deg,rgba(10,11,17,.9),transparent 70%) }
-.tp-c-badge{ position:absolute; top:7px; left:7px; z-index:2; padding:3px 7px; border-radius:4px;
-  font-family:var(--font); font-size:7.5px; font-weight:900; letter-spacing:1.1px;
-  text-transform:uppercase; background:rgba(0,0,0,.66); color:#fff }
+.tp-c-art::after{ content:''; position:absolute; inset:0;
+  background:linear-gradient(0deg,rgba(10,11,17,.92),transparent 68%) }
+.tp-c-badge{
+  position:absolute; top:8px; left:8px; z-index:2; padding:3px 8px; border-radius:4px;
+  font-family:'Archivo', var(--font), sans-serif; font-size:7.5px; font-weight:900;
+  letter-spacing:1.1px; text-transform:uppercase; background:rgba(0,0,0,.7); color:#fff;
+}
 .tp-c-badge.live{ background:var(--tp) }
 .tp-c-badge.open{ background:#f0b429; color:#241a00 }
 .tp-c-fb{ position:absolute; inset:0; display:grid; place-content:center;
-  font-family:var(--font); font-size:23px; font-weight:900; color:rgba(255,255,255,.28) }
-.tp-c-b{ padding:10px 11px 11px; display:grid; gap:6px }
-.tp-c-t{ font-size:12.5px; font-weight:800; line-height:1.25;
+  font-family:'Archivo', var(--font), sans-serif; font-size:26px; font-weight:900;
+  color:rgba(255,255,255,.26) }
+.tp-c-b{ padding:11px 12px 12px; display:grid; gap:7px }
+.tp-c-t{ font-size:13px; font-weight:800; line-height:1.25;
   display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical; overflow:hidden }
-.tp-c-m{ font-size:10.5px; color:var(--text-3); display:flex; gap:6px; flex-wrap:wrap }
-.tp-bar{ height:3px; border-radius:99px; background:rgba(255,255,255,.08); overflow:hidden }
-.tp-bar span{ display:block; height:100%; background:var(--tp) }
-.tp-empty{ border:1px dashed rgba(255,255,255,.12); border-radius:12px; padding:32px 20px;
-  text-align:center; display:grid; gap:8px; justify-items:center }
-.tp-empty h3{ margin:0; font-size:14.5px; font-weight:800 }
-.tp-empty p{ margin:0; font-size:12px; color:var(--text-3); max-width:46ch; line-height:1.6 }
+.tp-c-chips{ display:flex; gap:5px; flex-wrap:wrap }
+.tp-fillbar{ height:4px; border-radius:99px; background:rgba(255,255,255,.08); overflow:hidden }
+.tp-fillbar span{ display:block; height:100%; border-radius:99px;
+  background:linear-gradient(90deg, color-mix(in srgb, var(--hub-accent) 70%, #fff), var(--hub-accent)) }
+.tp-fillbar.full span{ background:linear-gradient(90deg,#f0b429,#f7d774) }
+.tp-c-seats{ font-size:9.5px; color:var(--text-3);
+  font-family:'JetBrains Mono', ui-monospace, monospace; font-variant-numeric:tabular-nums }
 
-/* ── Calendar + create ─────────────────────────────────────────── */
-.tp-cal, .tp-make{ border:1px solid var(--tp-line); border-radius:12px; background:var(--tp-surf); padding:12px }
-.tp-cal{ display:grid; gap:9px; align-content:start }
-.tp-cal-h{ display:flex; align-items:center; gap:6px }
-.tp-cal-t{ font-family:var(--font); font-size:10px; font-weight:900; letter-spacing:1.4px;
-  text-transform:uppercase; margin:0; flex:1 }
-.tp-nav{ width:20px; height:20px; border-radius:5px; cursor:pointer; padding:0;
-  background:rgba(255,255,255,.06); border:1px solid var(--tp-line); color:var(--text-2); font-size:11px; line-height:1 }
-.tp-nav:hover{ background:rgba(255,255,255,.14); color:var(--text-1) }
-.tp-week{ display:grid; grid-template-columns:repeat(7,1fr); gap:3px }
-.tp-d{ border-radius:6px; padding:5px 0 6px; border:1px solid transparent; cursor:default;
-  background:rgba(255,255,255,.02); display:grid; gap:2px; justify-items:center }
-.tp-d small{ font-size:7.5px; letter-spacing:.5px; text-transform:uppercase; color:var(--text-3) }
-.tp-d b{ font-size:11.5px; font-weight:700; color:var(--text-3); font-variant-numeric:tabular-nums }
-.tp-d.today{ border-color:rgba(255,255,255,.22) } .tp-d.today b{ color:var(--text-1) }
-.tp-d.has{ cursor:pointer; background:var(--tp-dim); border-color:rgba(255,61,110,.3) }
-.tp-d.has b{ color:var(--text-1) }
-.tp-d.sel{ outline:2px solid var(--tp); outline-offset:-2px }
-.tp-d i{ width:4px; height:4px; border-radius:50%; background:var(--tp) }
-.tp-d i.ghost{ background:transparent }
-.tp-agenda{ display:grid; gap:5px; max-height:196px; overflow-y:auto; scrollbar-width:thin }
-.tp-agenda::-webkit-scrollbar{ width:6px }
-.tp-agenda::-webkit-scrollbar-thumb{ background:rgba(255,255,255,.12); border-radius:99px }
-.tp-a{ display:grid; grid-template-columns:34px minmax(0,1fr); gap:8px; align-items:center;
-  padding:6px 7px; border-radius:7px; cursor:pointer; text-align:left; font-family:inherit;
-  background:rgba(255,255,255,.03); border:1px solid rgba(255,255,255,.06) }
-.tp-a:hover{ background:rgba(255,255,255,.075) }
-.tp-a-w{ display:grid; justify-items:center; font-family:"JetBrains Mono",ui-monospace,monospace }
-.tp-a-w b{ font-size:12px; font-weight:700; color:var(--text-1); line-height:1.1 }
-.tp-a-w small{ font-size:7px; letter-spacing:.6px; text-transform:uppercase; color:var(--text-3) }
-.tp-a-b{ min-width:0; display:grid; gap:1px }
-.tp-a-t{ font-size:11px; font-weight:700; color:var(--text-1); overflow:hidden; text-overflow:ellipsis; white-space:nowrap }
-.tp-a-s{ font-size:9.5px; color:var(--text-3); overflow:hidden; text-overflow:ellipsis; white-space:nowrap }
-.tp-a.on{ border-color:rgba(255,61,110,.4); background:var(--tp-dim) }
-.tp-a-w.live{ gap:3px }
-.tp-a-w.live i{
-  width:7px; height:7px; border-radius:50%; background:var(--tp);
-  animation:tpP 1.7s ease-in-out infinite;
+/* ── The calendar ──────────────────────────────────────────────── */
+/* A month, full width, with what is on written into the day. The old one
+   was a seven-square strip in a 300px rail: you could see that something
+   was on and nothing about what. */
+.tp-cal{ display:grid; gap:12px }
+.tp-cal-h{ display:flex; align-items:center; gap:10px; justify-content:center }
+.tp-cal-t{
+  font-family:'Archivo', var(--font), sans-serif; font-size:14px; font-weight:900;
+  letter-spacing:1.6px; text-transform:uppercase; margin:0; min-width:210px; text-align:center;
 }
-.tp-a-w.live small{ color:#ffa3b6; font-weight:700 }
+.tp-nav{
+  width:28px; height:28px; border-radius:8px; cursor:pointer; padding:0;
+  background:rgba(255,255,255,.05); border:1px solid var(--tp-line);
+  color:var(--text-2); font-size:14px; line-height:1;
+}
+.tp-nav:hover{ background:rgba(255,255,255,.13); color:var(--text-1) }
+.tp-today{
+  height:28px; padding:0 12px; border-radius:8px; cursor:pointer;
+  background:rgba(255,255,255,.05); border:1px solid var(--tp-line); color:var(--text-2);
+  font-family:'JetBrains Mono', ui-monospace, monospace;
+  font-size:9px; font-weight:700; letter-spacing:1.3px; text-transform:uppercase;
+}
+.tp-today:hover{ background:rgba(255,255,255,.13); color:var(--text-1) }
+.tp-dow{
+  display:grid; grid-template-columns:repeat(7,1fr); gap:6px;
+  font-family:'JetBrains Mono', ui-monospace, monospace; font-size:8.5px; font-weight:700;
+  letter-spacing:1.4px; text-transform:uppercase; color:var(--text-3); text-align:center;
+}
+.tp-month{ display:grid; grid-template-columns:repeat(7,1fr); gap:6px }
+.tp-d{
+  min-height:88px; border-radius:10px; padding:7px 7px 8px; text-align:left;
+  background:rgba(255,255,255,.022); border:1px solid rgba(255,255,255,.05);
+  display:grid; grid-template-rows:auto 1fr; gap:5px; align-content:start;
+  font-family:inherit; cursor:default; overflow:hidden;
+}
+.tp-d.dim{ opacity:.34 }
+.tp-d-n{
+  font-family:'JetBrains Mono', ui-monospace, monospace; font-size:11px; font-weight:700;
+  color:var(--text-3); font-variant-numeric:tabular-nums;
+}
+.tp-d.today{ border-color:rgba(255,255,255,.26) }
+.tp-d.today .tp-d-n{ color:#fff }
+.tp-d.today .tp-d-n::after{
+  content:''; display:inline-block; width:4px; height:4px; border-radius:50%;
+  background:#fff; margin-left:5px; vertical-align:middle;
+}
+.tp-d.has{
+  cursor:pointer;
+  background:linear-gradient(160deg, color-mix(in srgb, var(--hub-accent) 11%, transparent), rgba(255,255,255,.02));
+  border-color:color-mix(in srgb, var(--hub-accent) 26%, transparent);
+}
+.tp-d.has:hover{ border-color:color-mix(in srgb, var(--hub-accent) 55%, transparent) }
+.tp-d.has .tp-d-n{ color:var(--text-1) }
+.tp-d.sel{
+  border-color:var(--hub-accent);
+  box-shadow:0 0 0 1px color-mix(in srgb, var(--hub-accent) 40%, transparent),
+             0 0 24px -8px color-mix(in srgb, var(--hub-accent) 80%, transparent);
+}
+.tp-d-evs{ display:grid; gap:3px; align-content:start; min-width:0 }
+.tp-ev{
+  display:flex; align-items:center; gap:5px; min-width:0;
+  padding:3px 5px; border-radius:5px; font-size:9.5px; line-height:1.25;
+  background:rgba(255,255,255,.05); color:var(--text-2);
+}
+.tp-ev i{ width:4px; height:4px; border-radius:50%; flex:0 0 auto; background:var(--text-3) }
+.tp-ev span{ overflow:hidden; text-overflow:ellipsis; white-space:nowrap }
+.tp-ev.major{ background:color-mix(in srgb, var(--hub-accent) 20%, transparent); color:#ffc2d1 }
+.tp-ev.major i{ background:var(--hub-accent) }
+.tp-ev.tourney{ background:rgba(240,180,41,.16); color:#f7d08a }
+.tp-ev.tourney i{ background:#f0b429 }
+.tp-ev-more{ font-size:8.5px; color:var(--text-3); padding-left:5px;
+  font-family:'JetBrains Mono', ui-monospace, monospace }
+@media (max-width:820px){
+  .tp-d{ min-height:62px }
+  .tp-ev span{ display:none }
+  .tp-ev{ padding:3px }
+}
 
-.tp-make{ display:grid; gap:7px; background:linear-gradient(160deg, rgba(255,61,110,.16), rgba(255,61,110,.04));
-  border-color:rgba(255,61,110,.32) }
-.tp-make h3{ margin:0; font-size:13px; font-weight:900 }
-.tp-make p{ margin:0; font-size:11px; color:var(--text-2); line-height:1.5 }
-.tp-make button{ margin-top:4px; height:34px; border-radius:8px; border:none; cursor:pointer;
-  background:var(--tp); color:#fff; font-family:var(--font); font-size:10px;
-  font-weight:900; letter-spacing:1.2px; text-transform:uppercase }
-.tp-make button:hover{ filter:brightness(1.1) }
+.tp-agenda-h{
+  display:flex; align-items:center; gap:9px; margin-top:2px;
+  font-family:'Archivo', var(--font), sans-serif; font-size:10px; font-weight:900;
+  letter-spacing:1.6px; text-transform:uppercase; color:var(--text-2);
+}
+.tp-agenda-h .clear{
+  margin-left:auto; background:none; border:none; cursor:pointer; padding:0;
+  color:var(--text-3); font-family:'JetBrains Mono', ui-monospace, monospace;
+  font-size:9px; font-weight:700; letter-spacing:1.2px; text-transform:uppercase;
+}
+.tp-agenda-h .clear:hover{ color:var(--hub-accent) }
+.tp-agenda{ display:grid; gap:8px; grid-template-columns:repeat(auto-fill,minmax(268px,1fr)) }
+.tp-a{
+  display:grid; grid-template-columns:44px minmax(0,1fr); gap:10px; align-items:center;
+  padding:9px 10px; text-align:left; cursor:pointer; font-family:inherit;
+}
+.tp-a-w{ display:grid; justify-items:center; gap:1px;
+  font-family:'JetBrains Mono', ui-monospace, monospace }
+.tp-a-w b{ font-size:15px; font-weight:700; color:var(--text-1); line-height:1 }
+.tp-a-w small{ font-size:7.5px; letter-spacing:.8px; text-transform:uppercase; color:var(--text-3) }
+.tp-a-w.live i{ width:9px; height:9px; border-radius:50%; background:var(--tp);
+  animation:tpP 1.7s ease-in-out infinite }
+.tp-a-w.live small{ color:#ffa3b6; font-weight:700 }
+.tp-a-b{ min-width:0; display:grid; gap:3px }
+.tp-a-t{ font-size:12px; font-weight:700; color:var(--text-1);
+  overflow:hidden; text-overflow:ellipsis; white-space:nowrap }
+.tp-a-s{ font-size:10px; color:var(--text-3);
+  overflow:hidden; text-overflow:ellipsis; white-space:nowrap }
+
+/* ── Host banner ───────────────────────────────────────────────── */
+.tp-make{
+  display:grid; grid-template-columns:minmax(0,1fr) auto; gap:26px; align-items:center;
+  padding:22px 24px; border-radius:16px;
+  background:
+    radial-gradient(700px 240px at 88% 50%, rgba(255,61,110,.22) 0%, transparent 64%),
+    linear-gradient(160deg, rgba(255,61,110,.13), rgba(255,255,255,.018));
+  border:1px solid color-mix(in srgb, var(--hub-accent) 30%, transparent);
+  box-shadow:0 24px 60px -34px rgba(255,61,110,.55);
+}
+@media (max-width:820px){ .tp-make{ grid-template-columns:minmax(0,1fr) } }
+.tp-make h3{
+  margin:0 0 7px; font-family:'Archivo', var(--font), sans-serif;
+  font-size:19px; font-weight:900; letter-spacing:1.2px; text-transform:uppercase; color:#fff;
+  text-shadow:0 1px 0 rgba(0,0,0,.5), 0 0 30px color-mix(in srgb, var(--hub-accent) 40%, transparent);
+}
+.tp-make p{ margin:0; font-size:12.5px; color:var(--text-2); line-height:1.62; max-width:64ch }
+.tp-steps{ list-style:none; margin:14px 0 0; padding:0; display:flex; gap:10px; flex-wrap:wrap }
+.tp-steps li{
+  display:inline-flex; align-items:center; gap:7px; padding:6px 11px; border-radius:8px;
+  background:rgba(0,0,0,.24); border:1px solid rgba(255,255,255,.07);
+  font-size:11px; color:var(--text-2);
+}
+.tp-steps b{
+  font-family:'JetBrains Mono', ui-monospace, monospace; font-size:9px; font-weight:700;
+  color:var(--hub-accent); letter-spacing:.8px;
+}
+.tp-make-do{ display:grid; gap:9px; justify-items:stretch }
+.tp-ghost{
+  height:34px; padding:0 16px; border-radius:99px; cursor:pointer;
+  background:rgba(255,255,255,.05); border:1px solid rgba(255,255,255,.12); color:var(--text-2);
+  font-family:'Archivo', var(--font), sans-serif;
+  font-size:9.5px; font-weight:900; letter-spacing:1.2px; text-transform:uppercase;
+}
+.tp-ghost:hover{ background:rgba(255,255,255,.11); color:var(--text-1) }
+
+/* A card that is a button must not inherit a button's centred text. */
+#tournamentsPage button.hub-card{ display:grid }
 </style>
 
 <script>
@@ -82552,50 +82834,61 @@ body.q-max #queueOverlay{ padding:0 !important; }
     .replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); };
   var $ = function (id){ return document.getElementById(id); };
   function api(p, o){ return (typeof window.api === 'function') ? window.api(p, o) : Promise.reject(); }
+  /* The shared hub helpers. Guarded because this script can run before
+     the block that defines them. */
+  function chip(t, k){ return typeof window.hubChip === 'function'
+    ? window.hubChip(t, k)
+    : '<span class="hub-chip' + (k ? ' ' + k : '') + '">' + esc(t) + '</span>'; }
+  function num(n){ return typeof window.hubNum === 'function' ? window.hubNum(n) : String(n || 0); }
+  function empty(o){ return typeof window.hubEmpty === 'function'
+    ? window.hubEmpty(o)
+    : '<div class="hub-empty"><div class="hub-empty-t">' + esc(o.title) + '</div></div>'; }
 
   var streams = [], idx = 0, rot = null, mine = [], all = [], filt = 'all';
-  /* Muted by default because autoplay demands it; remembered so a
-     viewer who turned sound on does not have to every visit. */
+  /* Muted by default because autoplay demands it; remembered so a viewer
+     who turned sound on does not have to every visit. */
   var muted = true;
   try { muted = localStorage.getItem('tp_muted') !== '0'; } catch (e) {}
-  var weekStart = null, selDay = null;
+  var monthAt = null, selDay = null, findQ = '';
 
   function gameOf(id){
     try { if (typeof window._gtGame === 'function') return window._gtGame(id) || null; } catch (e) {}
     return null;
   }
   function stat(r){ return String(r && r.status || 'OPEN').toUpperCase(); }
+  function isLive(r){ return stat(r) === 'LIVE'; }
+  function isOpen(r){ var s = stat(r); return s === 'OPEN' || s === 'REGISTRATION' || s === 'STARTING'; }
+  function isDone(r){ var s = stat(r); return s === 'DONE' || s === 'COMPLETED'; }
+  function setText(id, v){ var el = $(id); if (el) el.textContent = v; }
 
-  /* ── Header ──────────────────────────────────────────────────── */
+  /* ── Hero figures ────────────────────────────────────────────── */
   function paintTop(){
-    var host = $('tpStats');
-    if (!host) return;
-    var live = all.filter(function (r){ return stat(r) === 'LIVE'; }).length;
-    var open = all.filter(function (r){ var x = stat(r); return x === 'OPEN' || x === 'REGISTRATION' || x === 'STARTING'; }).length;
-    var air = streams.filter(function (x){ return x.live; }).length;
-    host.innerHTML =
-      (air ? '<span class="tp-st on"><i></i><b>' + air + '</b> on air</span>' : '') +
-      '<span class="tp-st"><b>' + live + '</b> live</span>' +
-      '<span class="tp-st"><b>' + open + '</b> open</span>' +
-      (mine.length ? '<span class="tp-st"><b>' + mine.length + '</b> yours</span>' : '');
+    setText('tpStatAir', String(streams.filter(function (x){ return x.live; }).length));
+    setText('tpStatLive', String(all.filter(isLive).length));
+    setText('tpStatOpen', String(all.filter(isOpen).length));
+    setText('tpStatPlayers', num(all.reduce(function (n, r){ return n + (Number(r.entrants) || 0); }, 0)));
   }
 
   window.tpJoinCode = async function (){
     var el = $('tpCode');
     if (!el) return;
+    var wrap = el.parentNode;
     var raw = String(el.value || '').toUpperCase().replace(/[^A-Z0-9]/g, '');
     var fail = function (m){
-      el.style.borderColor = 'rgba(255,120,120,.75)';
+      if (wrap) wrap.classList.add('bad');
       if (window.showToast) window.showToast(m, 'error');
     };
+    if (wrap) wrap.classList.remove('bad');
+    /* Four letters then four digits — this page's own code shape, kept
+       deliberately distinct from every other code in the app. */
     if (!/^[A-Z]{4}[0-9]{4}$/.test(raw)) return fail('Four letters, then four digits.');
     var r = await api('/tournaments/code/' + raw).catch(function (){ return null; });
     if (!r || !r.id || r.error) return fail('No tournament with that code.');
-    el.style.borderColor = ''; el.value = '';
+    el.value = '';
     if (typeof window.gtJoin === 'function') window.gtJoin(String(r.id));
   };
 
-  /* ── Stage ───────────────────────────────────────────────────── */
+  /* ── The stage ───────────────────────────────────────────────── */
   function ytId(u){
     var m = String(u || '').match(/(?:youtube\.com\/(?:watch\?v=|live\/|embed\/)|youtu\.be\/)([\w-]{6,})/);
     return m ? m[1] : null;
@@ -82606,8 +82899,8 @@ body.q-max #queueOverlay{ padding:0 !important; }
   }
   function embed(m){
     /* A scheduled broadcast has no stream yet, and YouTube's player for
-       one spins forever rather than telling you so. Showing its poster
-       is instant and true; embedding it is neither. */
+       one spins forever rather than saying so. Showing its poster is
+       instant and true; embedding it is neither. */
     if (!m.live) return null;
     var mu = muted ? '1' : '0';
     var v = m.videoId || ytId(m.streamUrl) || ytId(m.url);
@@ -82623,7 +82916,8 @@ body.q-max #queueOverlay{ padding:0 !important; }
     var ms = new Date(iso).getTime() - Date.now();
     if (!isFinite(ms) || ms <= 0) return '';
     var mn = Math.round(ms / 60000);
-    return mn < 60 ? 'in ' + mn + 'm' : mn < 1440 ? 'in ' + Math.round(mn / 60) + 'h' : 'in ' + Math.round(mn / 1440) + 'd';
+    return mn < 60 ? 'in ' + mn + 'm' : mn < 1440 ? 'in ' + Math.round(mn / 60) + 'h'
+                                                  : 'in ' + Math.round(mn / 1440) + 'd';
   }
 
   function paintPlayer(){
@@ -82632,35 +82926,45 @@ body.q-max #queueOverlay{ padding:0 !important; }
     if (!streams.length){
       host.innerHTML =
         '<div class="tp-blank"><span class="tp-blank-i" aria-hidden="true">' +
-        '<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" ' +
+        '<svg width="21" height="21" viewBox="0 0 24 24" fill="none" stroke="currentColor" ' +
         'stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">' +
         '<rect x="2" y="5" width="20" height="14" rx="2.5"/>' +
         '<path d="M10 10.2v3.6l3.2-1.8z" fill="currentColor" stroke="none"/></svg></span>' +
         '<h3>Nothing on right now</h3>' +
         '<p>The moment a watched channel goes live it plays here, and when none is, ' +
         'whatever starts next takes the stage.</p></div>';
-      /* The bar describes the current stream, so an empty stage must
-         clear it rather than leave the last one captioned underneath. */
+      /* The caption describes the current stream, so an empty stage has
+         to clear it rather than leave the last one written underneath. */
       paintBar();
       return;
     }
     if (idx >= streams.length) idx = 0;
-    var m = streams[idx], src = embed(m), meta = [];
-    if (m.game) meta.push('<span><b>' + esc(m.game) + '</b></span>');
-    if (m.organiser) meta.push('<span>' + esc(m.organiser) + '</span>');
-    if (m.viewers) meta.push('<span><b>' + Number(m.viewers).toLocaleString() + '</b> watching</span>');
-    if (!m.live){ var w = inText(m.startsAt); if (w) meta.push('<span>starts ' + esc(w) + '</span>'); }
-    host.innerHTML =
-      (src ? '<iframe src="' + esc(src) + '" allow="autoplay; encrypted-media; picture-in-picture" ' +
-             'allowfullscreen title="' + esc(m.name) + '"></iframe>'
-           : '<div class="tp-fill" style="background-image:url(\'' + esc(m.art || '') + '\')"></div>' +
-             '<button type="button" class="tp-play" onclick="window.tpPop()" ' +
-               'aria-label="Open on YouTube">' +
-               '<svg viewBox="0 0 24 24" width="22" height="22" fill="currentColor">' +
-               '<path d="M8 5v14l11-7z"/></svg></button>') +
-      '';   /* nothing of ours over the video — see paintBar */
+    var m = streams[idx], src = embed(m);
+    host.innerHTML = src
+      ? '<iframe src="' + esc(src) + '" allow="autoplay; encrypted-media; picture-in-picture" ' +
+        'allowfullscreen title="' + esc(m.name) + '"></iframe>'
+      : '<div class="tp-fill" style="background-image:url(\'' + esc(m.art || '') + '\')"></div>' +
+        '<button type="button" class="tp-play" onclick="window.tpPop()" aria-label="Open on YouTube">' +
+        '<svg viewBox="0 0 24 24" width="22" height="22" fill="currentColor">' +
+        '<path d="M8 5v14l11-7z"/></svg></button>';
     paintBar();
   }
+
+  var SPK_ON = '<svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" ' +
+    'stroke-width="2" stroke-linecap="round" stroke-linejoin="round">' +
+    '<path d="M11 5 6 9H2v6h4l5 4z"/><path d="M15.5 8.5a5 5 0 0 1 0 7"/>' +
+    '<path d="M18.5 5.5a9 9 0 0 1 0 13"/></svg>';
+  var SPK_OFF = '<svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" ' +
+    'stroke-width="2" stroke-linecap="round" stroke-linejoin="round">' +
+    '<path d="M11 5 6 9H2v6h4l5 4z"/><line x1="22" y1="9" x2="16" y2="15"/>' +
+    '<line x1="16" y1="9" x2="22" y2="15"/></svg>';
+  var FULL_ICO = '<svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" ' +
+    'stroke-width="2" stroke-linecap="round" stroke-linejoin="round">' +
+    '<path d="M8 3H3v5M16 3h5v5M8 21H3v-5M16 21h5v-5"/></svg>';
+  var POP_ICO = '<svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" ' +
+    'stroke-width="2" stroke-linecap="round" stroke-linejoin="round">' +
+    '<path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/>' +
+    '<path d="M15 3h6v6"/><path d="M10 14 21 3"/></svg>';
 
   /* Everything that used to sit on top of the player. Under it there is
      no competition for the same pixels, and no reason to hide the
@@ -82669,8 +82973,7 @@ body.q-max #queueOverlay{ padding:0 !important; }
     var host = $('tpBar');
     if (!host) return;
     if (!streams.length){ host.innerHTML = ''; return; }
-    var m = streams[idx] || {};
-    var meta = [];
+    var m = streams[idx] || {}, meta = [];
     if (m.game) meta.push('<span><b>' + esc(m.game) + '</b></span>');
     if (m.organiser) meta.push('<span>' + esc(m.organiser) + '</span>');
     if (m.viewers) meta.push('<span>' + Number(m.viewers).toLocaleString() + ' watching</span>');
@@ -82681,7 +82984,7 @@ body.q-max #queueOverlay{ padding:0 !important; }
         (m.live ? '<i></i>Live' : esc(m.tier || 'Next up')) + '</span>' +
       '<span class="tp-now-b">' +
         '<span class="tp-now-t">' + esc(m.name || '') + '</span>' +
-        (meta.length ? '<span class="tp-now-m">' + meta.join('<i>\u00b7</i>') + '</span>' : '') +
+        (meta.length ? '<span class="tp-now-m">' + meta.join('<i>·</i>') + '</span>' : '') +
       '</span>' +
       '<span class="tp-ctl">' +
         (streams.length > 1
@@ -82701,60 +83004,64 @@ body.q-max #queueOverlay{ padding:0 !important; }
       '</span>';
   }
 
-  /* Everything that is on, as cards you can look through, rather than
-     the first four as a strip. Filtered by the search box above it. */
-  var findQ = '';
-
+  /* ── The reel ────────────────────────────────────────────────── */
   function paintChannels(){
     var host = $('tpChannels');
     if (!host) return;
     var x = $('tpFindX');
     if (x) x.style.display = findQ ? 'grid' : 'none';
 
+    var liveN = streams.filter(function (m){ return m.live; }).length;
+    /* The count says what it is counting: live channels when any are
+       live, otherwise how many are queued up. */
+    setText('tpOnAirN', String(liveN || streams.length));
+    setText('tpOnAirW', liveN ? 'live now' : 'scheduled');
+
     var q = findQ.toLowerCase();
-    /* The index is carried on the card, because filtering changes
-       position and tpPick works on the real one. */
+    /* The index travels on the card: filtering changes position, and
+       tpPick works on the real one. */
     var rows = streams.map(function (m, i){ return { m:m, i:i }; }).filter(function (r){
       if (!q) return true;
-      var hay = [r.m.name, r.m.game, r.m.organiser].join(' ').toLowerCase();
-      return hay.indexOf(q) >= 0;
+      return [r.m.name, r.m.game, r.m.organiser].join(' ').toLowerCase().indexOf(q) >= 0;
     });
 
-    if (!streams.length){ host.innerHTML = ''; return; }
-    if (!rows.length){
-      host.innerHTML = '<p class="tp-note" style="padding:6px 2px">Nothing on matches “' +
-        esc(findQ) + '”.</p>';
+    if (!streams.length){
+      host.innerHTML = empty({
+        icon:'bolt', title:'No broadcasts found',
+        sub:'Nothing is streaming and nothing is scheduled on the channels we watch. ' +
+            'The moment one goes live it appears here and takes the stage above.'
+      });
       return;
     }
-
-    var cnt = $('tpReelCount');
-    if (cnt){
-      var liveN = streams.filter(function (m){ return m.live; }).length;
-      cnt.textContent = findQ
-        ? rows.length + ' of ' + streams.length
-        : (liveN ? liveN + ' live' : streams.length + ' scheduled');
+    if (!rows.length){
+      host.innerHTML = empty({
+        icon:'search', title:'Nothing on matches that',
+        sub:'No broadcast matches “' + findQ + '”. Try the game, or the organiser.',
+        actions:'<button class="hub-chip on" style="cursor:pointer" onclick="window.tpSearch(\'\')">Clear search</button>'
+      });
+      return;
     }
 
     host.innerHTML = rows.map(function (r){
       var m = r.m;
-      var foot = m.live
-        ? (m.viewers ? Number(m.viewers).toLocaleString() + ' watching' : 'Live now')
-        : (inText(m.startsAt) || 'Scheduled');
       var line = [m.game, m.organiser].filter(Boolean).join(' · ');
-      return '<button type="button" class="tp-card' + (r.i === idx ? ' on' : '') + '" ' +
+      var flag = m.live
+        ? '<span class="tp-card-live"><i></i>Live</span>'
+        : '<span class="tp-card-when">' + esc(inText(m.startsAt) || 'Soon') + '</span>';
+      var eyes = m.live && m.viewers
+        ? '<span class="tp-card-eyes">' + num(m.viewers) + '</span>' : '';
+      return '<button type="button" class="tp-card hub-card' + (r.i === idx ? ' on' : '') + '" ' +
         'onclick="window.tpPick(' + r.i + ')" title="' + esc(m.name) + '">' +
         '<span class="tp-card-th" style="background-image:url(\'' + esc(m.art || '') + '\')">' +
-          (m.live ? '<span class="tp-card-live">Live</span>' : '') +
-        '</span>' +
+          flag + eyes + '</span>' +
         '<span class="tp-card-b">' +
           '<span class="tp-card-t">' + esc(m.name) + '</span>' +
           (line ? '<span class="tp-card-s">' + esc(line) + '</span>' : '') +
-          '<span class="tp-card-f">' + esc(foot) + '</span>' +
         '</span></button>';
     }).join('');
 
-    /* After the row is rebuilt its width has changed, so the arrows have
-       to be re-evaluated -- and again as it is scrolled. */
+    /* The row's width has changed, so the arrows have to be
+       re-evaluated — and again as it is scrolled. */
     if (!host.__tpBound){
       host.__tpBound = true;
       host.addEventListener('scroll', syncReel, { passive:true });
@@ -82770,17 +83077,14 @@ body.q-max #queueOverlay{ padding:0 !important; }
     paintChannels();
   };
 
-  /* The same arrows the home page carousel uses, scrolling the track
-     rather than stepping an index -- the card count changes with the
-     search, and an offset can drift out of sync with a list that
-     changes underneath it. */
+  /* The home carousel's own arrows, scrolling the track rather than
+     stepping an index — the card count changes with the search, and an
+     offset drifts out of sync with a list that changes underneath it. */
   window.tpReel = function (dir){
     var t = $('tpChannels');
     if (!t) return;
-    t.scrollBy({ left: dir * Math.max(200, t.clientWidth - 80), behavior:'smooth' });
+    t.scrollBy({ left: dir * Math.max(220, t.clientWidth - 90), behavior:'smooth' });
   };
-
-  /* Arrows only when there is somewhere to go. */
   function syncReel(){
     var t = $('tpChannels'), pv = $('tpReelPrev'), nx = $('tpReelNext');
     if (!t || !pv || !nx) return;
@@ -82789,26 +83093,8 @@ body.q-max #queueOverlay{ padding:0 !important; }
     nx.disabled = !over || t.scrollLeft >= t.scrollWidth - t.clientWidth - 2;
   }
   window.tpSyncReel = syncReel;
-  var SPK_ON = '<svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" ' +
-    'stroke-width="2" stroke-linecap="round" stroke-linejoin="round">' +
-    '<path d="M11 5 6 9H2v6h4l5 4z"/><path d="M15.5 8.5a5 5 0 0 1 0 7"/>' +
-    '<path d="M18.5 5.5a9 9 0 0 1 0 13"/></svg>';
-  var SPK_OFF = '<svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" ' +
-    'stroke-width="2" stroke-linecap="round" stroke-linejoin="round">' +
-    '<path d="M11 5 6 9H2v6h4l5 4z"/><line x1="22" y1="9" x2="16" y2="15"/>' +
-    '<line x1="16" y1="9" x2="22" y2="15"/></svg>';
-  var FULL_ICO = '<svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" ' +
-    'stroke-width="2" stroke-linecap="round" stroke-linejoin="round">' +
-    '<path d="M8 3H3v5M16 3h5v5M8 21H3v-5M16 21h5v-5"/></svg>';
-  var POP_ICO = '<svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" ' +
-    'stroke-width="2" stroke-linecap="round" stroke-linejoin="round">' +
-    '<path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/>' +
-    '<path d="M15 3h6v6"/><path d="M10 14 21 3"/></svg>';
 
   window.tpPick = function (i){ idx = i; paintPlayer(); paintChannels(); rotate(); };
-
-  /* Cycling, as a control rather than a list. Wraps both ways so it
-     never dead-ends. */
   window.tpStep = function (d){
     if (!streams.length) return;
     idx = (idx + d + streams.length) % streams.length;
@@ -82824,17 +83110,14 @@ body.q-max #queueOverlay{ padding:0 !important; }
     try { localStorage.setItem('tp_muted', muted ? '1' : '0'); } catch (e) {}
     paintPlayer();
   };
-
   window.tpFull = function (){
     var el = $('tpPlayer');
     if (!el) return;
     if (document.fullscreenElement) document.exitFullscreen();
     else if (el.requestFullscreen) el.requestFullscreen();
   };
-
   /* Pops into its own always-on-top window, which is how a stream keeps
-     playing once this page stops rendering it. Falls back to the browser
-     when that bridge is not there. */
+     playing once this page stops rendering it. */
   window.tpPop = function (){
     var m = streams[idx];
     if (!m) return;
@@ -82857,119 +83140,166 @@ body.q-max #queueOverlay{ padding:0 !important; }
     }, 60000);
   }
 
-  /* ── Yours ───────────────────────────────────────────────────── */
+  /* ── Your run ────────────────────────────────────────────────── */
   function stageOf(t){
+    if (isDone(t)) return { k:'done', l:'Finished', at:0, of:0 };
     var s = stat(t);
-    if (s === 'DONE' || s === 'COMPLETED') return { k:'done', l:'Finished', at:1, of:1, pct:100 };
-    if (s === 'STARTING') return { k:'reg', l:'Starting', at:0, of:0, pct:0 };
-    if (s === 'OPEN' || s === 'REGISTRATION') return { k:'reg', l:'Registration', at:0, of:0, pct:0 };
+    if (s === 'STARTING') return { k:'reg', l:'Starting', at:0, of:0 };
+    if (s === 'OPEN' || s === 'REGISTRATION') return { k:'reg', l:'Registration', at:0, of:0 };
     var n = Math.max(2, Number(t.entrants) || 2);
-    var of = Math.max(1, Math.ceil(Math.log(n) / Math.log(2)));
-    var at = Math.min(of, Number(t.round) || 1);
-    return { k:'live', l:(at >= of ? 'Final' : at === of - 1 ? 'Semi-final' : 'Round ' + at),
-             at:at, of:of, pct:Math.round(at / of * 100) };
+    var of = Math.max(1, Math.min(8, Math.ceil(Math.log(n) / Math.log(2))));
+    var at = Math.min(of, Math.max(1, Number(t.round) || 1));
+    return { k:'live', l:(at >= of ? 'Final' : at === of - 1 ? 'Semi-final' : 'Round ' + at), at:at, of:of };
+  }
+  /* The bracket, made visible. "Round 2" is a number; a rail of rounds
+     says how far in it is and how much is left, which is the thing
+     anyone actually wants to know. */
+  function pips(s){
+    if (s.of < 2) return '';
+    var out = [];
+    for (var i = 1; i <= s.of; i++){
+      var back = s.of - i;
+      var lbl = back === 0 ? 'F' : back === 1 ? 'SF' : back === 2 ? 'QF' : 'R' + i;
+      out.push('<span class="tp-pip' + (i < s.at ? ' done' : i === s.at ? ' now' : '') + '">' + lbl + '</span>');
+    }
+    return '<span class="tp-pips">' + out.join('<span class="tp-pip-sep">›</span>') + '</span>';
   }
 
   function paintYours(){
     var host = $('tpYours');
     if (!host) return;
+    setText('tpYoursN', String(mine.length));
+    setText('tpYoursW', mine.length === 1 ? 'bracket' : 'brackets');
+
     if (!mine.length){
-      host.innerHTML = '<div class="tp-h"><h2>Your tournaments</h2><span>none yet</span></div>' +
-        '<p class="tp-note">Enter one below, or run your own.</p>';
+      host.innerHTML = empty({
+        icon:'trophy', title:'You are not in a bracket yet',
+        sub:'Enter a public one below, join a private one with its code, or run your own.',
+        actions:'<button class="hub-chip on" style="cursor:pointer" ' +
+                'onclick="window.openCreateTournament()">Create a tournament</button>'
+      });
       return;
     }
-    host.innerHTML =
-      '<div class="tp-h"><h2>Your tournaments</h2><span>' + mine.length + ' entered</span>' +
-        (mine.length > 6 ? '<button class="more" type="button" onclick="window.openMyTournaments()">See all</button>' : '') +
-      '</div><div class="tp-mine">' + mine.slice(0, 6).map(function (t){
-        var s = stageOf(t), g = gameOf(t.game), art = g && (g.cover || g.header), sub = [];
-        if (t.entrants) sub.push(t.entrants + ' entrants');
-        if (t.format) sub.push(t.format);
-        if (t.isHost) sub.push('you host');
-        if (t.joinCode) sub.push(t.joinCode);
-        return '<button type="button" class="tp-m" onclick="window.gtJoin(\'' + esc(t.id) + '\')">' +
-          '<span class="tp-m-art"' + (art ? ' style="background-image:url(\'' + esc(art) + '\')"' : '') + '>' +
-            (art ? '' : esc((t.name || '?').slice(0,1).toUpperCase())) + '</span>' +
-          '<span class="tp-m-b"><span class="tp-m-n">' + esc(t.name || 'Tournament') + '</span>' +
-            (s.of > 1 ? '<span class="tp-m-line"><span class="tp-track"><span style="width:' + s.pct + '%"></span></span>' +
-              '<span class="tp-round">' + s.at + '/' + s.of + '</span></span>' : '') +
-            '<span class="tp-m-s">' + esc(sub.join(' · ')) + '</span></span>' +
-          '<span class="tp-stage-tag ' + s.k + '">' + esc(s.l) + '</span></button>';
-      }).join('') + '</div>';
+    host.innerHTML = '<div class="tp-mine">' + mine.map(function (t){
+      var s = stageOf(t), g = gameOf(t.game), art = g && (g.cover || g.header);
+      var chips = [];
+      if (g && g.name) chips.push(chip(g.name));
+      if (t.format) chips.push(chip(t.format));
+      if (t.entrants) chips.push(chip(t.entrants + ' in'));
+      if (t.isHost) chips.push(chip('You host', 'gold'));
+      if (t.joinCode) chips.push(chip(t.joinCode, 'on'));
+      var when = typeof window.hubWhen === 'function' ? window.hubWhen(t.startTime) : '';
+      var next = isLive(t)
+        ? '<span class="tp-next"><b>' + esc(s.l) + '</b>' +
+          '<span class="t">' + esc(t.nextOpponent ? 'vs ' + t.nextOpponent : 'in progress') + '</span>' +
+          (when ? '<span class="c">' + esc(when) + '</span>' : '') + '</span>'
+        : (t.startTime && !isDone(t)
+            ? '<span class="tp-next"><b>Starts</b><span class="t">' +
+              esc(new Date(t.startTime).toLocaleString([], { weekday:'short', hour:'2-digit', minute:'2-digit' })) +
+              '</span>' + (when ? '<span class="c">' + esc(when) + '</span>' : '') + '</span>'
+            : '');
+      return '<button type="button" class="tp-m hub-card" onclick="window.gtJoin(\'' + esc(t.id) + '\')">' +
+        '<span class="tp-m-art"' + (art ? ' style="background-image:url(\'' + esc(art) + '\')"' : '') + '>' +
+          (art ? '' : esc((t.name || '?').slice(0,1).toUpperCase())) + '</span>' +
+        '<span class="tp-m-b">' +
+          '<span class="tp-m-top"><span class="tp-m-n">' + esc(t.name || 'Tournament') + '</span>' +
+            chip(s.l, s.k === 'live' ? 'live' : s.k === 'reg' ? 'gold' : '') + '</span>' +
+          (s.of > 1 ? pips(s) : '') +
+          '<span class="tp-m-chips">' + chips.join('') + '</span>' +
+          next +
+        '</span></button>';
+    }).join('') + '</div>';
   }
 
-  /* ── Browse ──────────────────────────────────────────────────── */
+  /* ── Brackets ────────────────────────────────────────────────── */
   function keep(r){
-    var s = stat(r);
-    if (filt === 'live') return s === 'LIVE';
-    if (filt === 'soon') return s === 'STARTING';
-    if (filt === 'open') return s !== 'LIVE' && s !== 'STARTING' && s !== 'DONE' && s !== 'COMPLETED';
-    if (filt === 'done') return s === 'DONE' || s === 'COMPLETED';
+    if (filt === 'live') return isLive(r);
+    if (filt === 'open') return isOpen(r) && !isLive(r);
+    if (filt === 'done') return isDone(r);
     return true;
   }
   function paintBrowse(){
-    var host = $('tpBrowse');
+    var host = $('tpBrowse'), rail = $('tpRail');
     if (!host) return;
-    var c = {
-      all: all.length,
-      live: all.filter(function (r){ return stat(r) === 'LIVE'; }).length,
-      soon: all.filter(function (r){ return stat(r) === 'STARTING'; }).length,
-      open: all.filter(function (r){ var x = stat(r); return x !== 'LIVE' && x !== 'STARTING' && x !== 'DONE' && x !== 'COMPLETED'; }).length,
-      done: all.filter(function (r){ var x = stat(r); return x === 'DONE' || x === 'COMPLETED'; }).length
-    };
-    function f(id, label){
-      return '<button type="button" class="tp-f' + (filt === id ? ' on' : '') + '" ' +
-        'onclick="window.tpFilter(\'' + id + '\')">' + label + '<b>' + c[id] + '</b></button>';
+
+    if (rail){
+      var items = [
+        { id:'all',  label:'All',      count:all.length },
+        { id:'live', label:'Live',     count:all.filter(isLive).length },
+        { id:'open', label:'Open',     count:all.filter(function (r){ return isOpen(r) && !isLive(r); }).length },
+        { id:'done', label:'Finished', count:all.filter(isDone).length }
+      ];
+      rail.innerHTML = typeof window.hubRail === 'function'
+        ? window.hubRail(items, filt, 'window.tpFilter')
+        : '';
     }
+
     var list = all.filter(keep);
+    setText('tpBrowseN', String(list.length));
+    setText('tpBrowseW', list.length === 1 ? 'tournament' : 'tournaments');
+
+    /* Live first, then what is filling up: the two things that make
+       somebody act now. */
     var rank = { LIVE:0, STARTING:1, OPEN:2, REGISTRATION:2 };
-    list.sort(function (a, b){
+    list = list.slice().sort(function (a, b){
       var ra = rank[stat(a)], rb = rank[stat(b)];
       ra = ra == null ? 3 : ra; rb = rb == null ? 3 : rb;
       if (ra !== rb) return ra - rb;
       return (Number(b.entrants) || 0) - (Number(a.entrants) || 0);
     });
-    host.innerHTML =
-      '<div class="tp-h"><h2>Brackets</h2><span>' + list.length +
-        (list.length === 1 ? ' tournament' : ' tournaments') + '</span>' +
-        '<span class="tp-filters">' + f('all','All') + f('live','Live') + f('soon','Starting') +
-          f('open','Open') + f('done','Finished') + '</span></div>' +
-      (list.length
-        ? '<div class="tp-grid">' + list.map(function (r){
-            var g = gameOf(r.game), art = g && (g.header || g.cover), s = stat(r);
-            var cap = Number(r.maxPlayers || r.max_players) || 0, ent = Number(r.entrants) || 0;
-            var badge = s === 'LIVE' ? '<span class="tp-c-badge live">Live</span>'
-                      : (s === 'DONE' || s === 'COMPLETED') ? '<span class="tp-c-badge">Finished</span>'
-                      : '<span class="tp-c-badge open">' + (cap ? Math.max(0, cap - ent) + ' seats' : 'Open') + '</span>';
-            var meta = [];
-            if (g && g.name) meta.push(esc(g.name));
-            if (r.format) meta.push(esc(r.format));
-            meta.push(cap ? ent + '/' + cap : ent + ' in');
-            return '<button type="button" class="tp-c" onclick="window.gtJoin(\'' + esc(r.id) + '\')">' +
-              '<span class="tp-c-art"' + (art ? ' style="background-image:url(\'' + esc(art) + '\')"' : '') + '>' +
-              badge + (art ? '' : '<span class="tp-c-fb">' + esc((r.name || '?').slice(0,1).toUpperCase()) + '</span>') +
-              '</span><span class="tp-c-b"><span class="tp-c-t">' + esc(r.name || 'Tournament') + '</span>' +
-              '<span class="tp-c-m">' + meta.join('<span>·</span>') + '</span>' +
-              (cap ? '<span class="tp-bar"><span style="width:' + Math.min(100, Math.round(ent/cap*100)) + '%"></span></span>' : '') +
-              '</span></button>';
-          }).join('') + '</div>'
-        : '<div class="tp-empty"><h3>' + (filt === 'all' ? 'No tournaments yet' : 'Nothing under that filter') + '</h3>' +
-          '<p>' + (filt === 'all' ? 'Be the first to run one. It takes about a minute.'
-                                  : 'There may be brackets under a different heading.') + '</p></div>');
-  }
-  window.tpFilter = function (id){ filt = (filt === id && id !== 'all') ? 'all' : id; paintBrowse(); };
 
-  /* ── Calendar ────────────────────────────────────────────────── */
-  function sow(d){ var x = new Date(d.getFullYear(), d.getMonth(), d.getDate());
-    x.setDate(x.getDate() - ((x.getDay() + 6) % 7)); return x; }
-  function key(d){ return d.getFullYear() + '-' + (d.getMonth()+1) + '-' + d.getDate(); }
+    if (!list.length){
+      host.innerHTML = empty({
+        icon:'grid',
+        title: filt === 'all' ? 'No public tournaments yet' : 'Nothing under that filter',
+        sub: filt === 'all'
+          ? 'Be the first to run one. Pick a game, a format and a size — it takes about a minute.'
+          : 'There may be brackets under a different heading. Private ones are never listed here; they are reached with their code.',
+        actions: filt === 'all'
+          ? '<button class="hub-chip on" style="cursor:pointer" onclick="window.openCreateTournament()">Create a tournament</button>'
+          : '<button class="hub-chip on" style="cursor:pointer" onclick="window.tpFilter(\'all\')">Show all</button>'
+      });
+      return;
+    }
+
+    host.innerHTML = '<div class="tp-grid">' + list.map(function (r){
+      var g = gameOf(r.game), art = g && (g.header || g.cover);
+      var cap = Number(r.maxPlayers || r.max_players) || 0, ent = Number(r.entrants) || 0;
+      var pct = cap ? Math.min(100, Math.round(ent / cap * 100)) : 0;
+      var badge = isLive(r) ? '<span class="tp-c-badge live">Live</span>'
+                : isDone(r) ? '<span class="tp-c-badge">Finished</span>'
+                : '<span class="tp-c-badge open">' + (cap ? Math.max(0, cap - ent) + ' seats' : 'Open') + '</span>';
+      var chips = [];
+      if (g && g.name) chips.push(chip(g.name));
+      if (r.format) chips.push(chip(r.format));
+      if (r.prize) chips.push(chip(r.prize, 'gold'));
+      var when = typeof window.hubWhen === 'function' ? window.hubWhen(r.startTime) : '';
+      if (when && !isDone(r)) chips.push(chip(when));
+      return '<button type="button" class="tp-c hub-card" onclick="window.gtJoin(\'' + esc(r.id) + '\')">' +
+        '<span class="tp-c-art"' + (art ? ' style="background-image:url(\'' + esc(art) + '\')"' : '') + '>' +
+          badge + (art ? '' : '<span class="tp-c-fb">' + esc((r.name || '?').slice(0,1).toUpperCase()) + '</span>') +
+        '</span>' +
+        '<span class="tp-c-b">' +
+          '<span class="tp-c-t">' + esc(r.name || 'Tournament') + '</span>' +
+          '<span class="tp-c-chips">' + chips.join('') + '</span>' +
+          (cap
+            ? '<span class="tp-fillbar' + (pct >= 100 ? ' full' : '') + '"><span style="width:' + pct + '%"></span></span>' +
+              '<span class="tp-c-seats">' + ent + ' / ' + cap + ' entrants</span>'
+            : '<span class="tp-c-seats">' + ent + ' entrants</span>') +
+        '</span></button>';
+    }).join('') + '</div>';
+  }
+  window.tpFilter = function (id){ filt = id; paintBrowse(); };
+
+  /* ── The calendar ────────────────────────────────────────────── */
+  function dayKey(d){ return d.getFullYear() + '-' + (d.getMonth()+1) + '-' + d.getDate(); }
   function events(){
     var out = [];
     streams.forEach(function (m){
       if (m.live){
         /* On now. It has no future start to place on a day, so it is
-           flagged rather than dated — the agenda puts it first and the
-           week grid leaves it out. */
+           flagged rather than dated: the agenda leads with it and the
+           month grid leaves it out. */
         out.push({ at:new Date(), live:true, kind:'event', id:m.id, name:m.name,
                    sub:m.game || m.organiser || 'Live now' });
         return;
@@ -82986,85 +83316,135 @@ body.q-max #queueOverlay{ padding:0 !important; }
     });
     return out.filter(function (e){ return !isNaN(e.at); }).sort(function (a,b){ return a.at - b.at; });
   }
+
   function paintCal(){
     var host = $('tpCal');
     if (!host) return;
     var now = new Date();
-    if (!weekStart) weekStart = sow(now);
+    if (!monthAt) monthAt = new Date(now.getFullYear(), now.getMonth(), 1);
+
     var evs = events(), byDay = {};
-    /* Dated entries only: a live stream has no start time to mark, and
-       putting it on today would say it begins later. */
     evs.forEach(function (e){
-      if (e.live) return;
-      (byDay[key(e.at)] = byDay[key(e.at)] || []).push(e);
+      if (e.live) return;               // no start time to mark a day with
+      (byDay[dayKey(e.at)] = byDay[dayKey(e.at)] || []).push(e);
     });
-    var days = '';
-    for (var i = 0; i < 7; i++){
-      var d = new Date(weekStart); d.setDate(weekStart.getDate() + i);
-      var k = key(d), has = !!byDay[k], cls = ['tp-d'];
-      if (k === key(now)) cls.push('today');
-      if (has) cls.push('has');
+    setText('tpCalN', String(Object.keys(byDay).length));
+    setText('tpCalW', Object.keys(byDay).length === 1 ? 'date' : 'dates');
+
+    /* Grid starts on the Monday on or before the 1st and runs whole
+       weeks until the month is covered. */
+    var first = new Date(monthAt.getFullYear(), monthAt.getMonth(), 1);
+    var start = new Date(first);
+    start.setDate(start.getDate() - ((start.getDay() + 6) % 7));
+    var last = new Date(monthAt.getFullYear(), monthAt.getMonth() + 1, 0);
+    var cells = Math.ceil((((last - start) / 864e5) + 1) / 7) * 7;
+
+    var grid = '';
+    for (var i = 0; i < cells; i++){
+      var d = new Date(start); d.setDate(start.getDate() + i);
+      var k = dayKey(d), day = byDay[k] || [], cls = ['tp-d'];
+      if (d.getMonth() !== monthAt.getMonth()) cls.push('dim');
+      if (k === dayKey(now)) cls.push('today');
+      if (day.length) cls.push('has');
       if (selDay === k) cls.push('sel');
-      days += '<button type="button" class="' + cls.join(' ') + '"' +
-        (has ? ' onclick="window.tpDay(\'' + k + '\')"' : ' disabled') + '>' +
-        '<small>' + ['M','T','W','T','F','S','S'][i] + '</small><b>' + d.getDate() + '</b>' +
-        '<i class="' + (has ? '' : 'ghost') + '"></i></button>';
+      var evHtml = day.slice(0, 2).map(function (e){
+        return '<span class="tp-ev ' + (e.kind === 'tourney' ? 'tourney' : 'major') + '">' +
+          '<i></i><span>' + esc(e.name) + '</span></span>';
+      }).join('');
+      if (day.length > 2) evHtml += '<span class="tp-ev-more">+' + (day.length - 2) + ' more</span>';
+      grid += '<button type="button" class="' + cls.join(' ') + '"' +
+        (day.length ? ' onclick="window.tpDay(\'' + k + '\')"' : ' disabled') + '>' +
+        '<span class="tp-d-n">' + d.getDate() + '</span>' +
+        '<span class="tp-d-evs">' + evHtml + '</span></button>';
     }
+
     /* Picking a day shows that day. Otherwise: what is on now, then what
-       is next — because the thing playing above this panel is the most
-       relevant line in it, and leaving it out was why the list read as
-       though nothing were happening. */
+       is next — the thing playing above is the most relevant line here,
+       and leaving it out was why the list read as though nothing were
+       happening. */
     var live = evs.filter(function (e){ return e.live; });
-    var soon = evs.filter(function (e){
-      return !e.live && e.at >= new Date(now.getTime() - 36e5);
-    });
-    var list = selDay && byDay[selDay] ? byDay[selDay]
-             : live.concat(soon).slice(0, 8);
+    var soon = evs.filter(function (e){ return !e.live && e.at >= new Date(now.getTime() - 36e5); });
+
+    var list = picked || live.concat(soon).slice(0, 8);
+    /* Guarded the same way the list beside it is: a reload can leave
+       the selected day with no events, and reading [0] of nothing
+       throws while the list quietly falls back. */
+    var picked = selDay && byDay[selDay] && byDay[selDay].length ? byDay[selDay] : null;
+    if (selDay && !picked) selDay = null;
+    var label = picked
+      ? new Date(picked[0].at).toLocaleDateString([], { weekday:'long', day:'numeric', month:'long' })
+      : 'On now and next';
+
     host.innerHTML =
-      '<div class="tp-cal-h"><h3 class="tp-cal-t">' +
-        esc(weekStart.toLocaleDateString(undefined, { month:'long', year:'numeric' })) + '</h3>' +
-        '<button class="tp-nav" type="button" onclick="window.tpWeek(-1)" aria-label="Previous week">&lsaquo;</button>' +
-        '<button class="tp-nav" type="button" onclick="window.tpWeek(1)" aria-label="Next week">&rsaquo;</button></div>' +
-      '<div class="tp-week">' + days + '</div>' +
-      '<div class="tp-h" style="margin:2px 0 0"><h2>' + (selDay ? 'That day' : 'Coming up') + '</h2></div>' +
-      (list.length
-        ? '<div class="tp-agenda">' + list.map(function (e){
-            return '<button type="button" class="tp-a' + (e.live ? ' on' : '') + '" ' +
-              'onclick="window.tpEvent(\'' + e.kind + '\',\'' + esc(e.id) + '\')">' +
-              (e.live
-                ? '<span class="tp-a-w live"><i></i><small>Live</small></span>'
-                : '<span class="tp-a-w"><b>' + e.at.getDate() + '</b><small>' +
-                  e.at.toLocaleDateString(undefined, { month:'short' }) + '</small></span>') +
-              '<span class="tp-a-b"><span class="tp-a-t">' + esc(e.name) + '</span>' +
-              '<span class="tp-a-s">' + esc(e.sub) +
-                (e.live ? ' · on now'
-                        : ' · ' + e.at.toLocaleTimeString([], { hour:'2-digit', minute:'2-digit' })) +
-              '</span></span></button>';
-          }).join('') + '</div>'
-        : '<p class="tp-note">Nothing scheduled. Tournaments with a start time and published events both land here.</p>');
+      '<div class="tp-cal">' +
+        '<div class="tp-cal-h">' +
+          '<button class="tp-nav" type="button" onclick="window.tpMonth(-1)" aria-label="Previous month">&lsaquo;</button>' +
+          '<h3 class="tp-cal-t">' + esc(monthAt.toLocaleDateString([], { month:'long', year:'numeric' })) + '</h3>' +
+          '<button class="tp-nav" type="button" onclick="window.tpMonth(1)" aria-label="Next month">&rsaquo;</button>' +
+          '<button class="tp-today" type="button" onclick="window.tpToday()">Today</button>' +
+        '</div>' +
+        '<div class="tp-dow"><span>Mon</span><span>Tue</span><span>Wed</span><span>Thu</span>' +
+          '<span>Fri</span><span>Sat</span><span>Sun</span></div>' +
+        '<div class="tp-month">' + grid + '</div>' +
+        '<div class="tp-agenda-h"><span>' + esc(label) + '</span>' +
+          (selDay ? '<button class="clear" type="button" onclick="window.tpDay(\'' + esc(selDay) + '\')">Clear</button>' : '') +
+        '</div>' +
+        (list.length
+          ? '<div class="tp-agenda">' + list.map(function (e){
+              return '<button type="button" class="tp-a hub-card" ' +
+                'onclick="window.tpEvent(\'' + e.kind + '\',\'' + esc(e.id) + '\')">' +
+                (e.live
+                  ? '<span class="tp-a-w live"><i></i><small>Live</small></span>'
+                  : '<span class="tp-a-w"><b>' + e.at.getDate() + '</b><small>' +
+                    esc(e.at.toLocaleDateString([], { month:'short' })) + '</small></span>') +
+                '<span class="tp-a-b"><span class="tp-a-t">' + esc(e.name) + '</span>' +
+                '<span class="tp-a-s">' + esc(e.sub) +
+                  (e.live ? ' · on now'
+                          : ' · ' + e.at.toLocaleTimeString([], { hour:'2-digit', minute:'2-digit' })) +
+                '</span></span></button>';
+            }).join('') + '</div>'
+          : '<p class="hub-sec-s" style="margin:0">Nothing scheduled. Published majors and any ' +
+            'tournament with a start time both land here.</p>') +
+      '</div>';
   }
-  window.tpWeek = function (n){ weekStart = new Date(weekStart); weekStart.setDate(weekStart.getDate() + n*7); selDay = null; paintCal(); };
+  window.tpMonth = function (n){
+    monthAt = new Date(monthAt.getFullYear(), monthAt.getMonth() + n, 1);
+    selDay = null; paintCal();
+  };
+  window.tpToday = function (){
+    var n = new Date();
+    monthAt = new Date(n.getFullYear(), n.getMonth(), 1);
+    selDay = null; paintCal();
+  };
   window.tpDay = function (k){ selDay = (selDay === k ? null : k); paintCal(); };
   window.tpEvent = function (kind, id){
     if (kind === 'tourney'){ if (window.gtJoin) window.gtJoin(String(id)); return; }
-    var i = streams.findIndex(function (x){ return String(x.id) === String(id); });
-    if (i >= 0) window.tpPick(i);
+    var i = -1;
+    for (var j = 0; j < streams.length; j++){ if (String(streams[j].id) === String(id)){ i = j; break; } }
+    if (i >= 0){
+      window.tpPick(i);
+      var p = $('tpPlayer');
+      if (p && p.scrollIntoView) p.scrollIntoView({ block:'nearest', behavior:'smooth' });
+    }
   };
 
-  function paintMake(){
-    var host = $('tpMake');
-    if (!host) return;
-    host.innerHTML =
-      '<h3>Run your own</h3>' +
-      '<p>Pick a game, a format and a size. Public, or private with a code you hand out.</p>' +
-      '<button type="button" onclick="window.openCreateTournament()">Create tournament</button>';
+  /* ── Loading ─────────────────────────────────────────────────── */
+  function skeletons(){
+    var host = $('tpChannels');
+    if (host && !host.innerHTML && typeof window.hubSkeletons === 'function'){
+      host.innerHTML = '<div class="hub-skel" style="flex:0 0 214px;height:172px"></div>'.repeat(6);
+    }
+    var b = $('tpBrowse');
+    if (b && !b.innerHTML && typeof window.hubSkeletons === 'function'){
+      b.innerHTML = '<div class="tp-grid">' + window.hubSkeletons(8, 190) + '</div>';
+    }
   }
 
-  /* ── Loading ─────────────────────────────────────────────────── */
   async function load(){
-    /* Its own fetches. The previous builds read _gtRowsCache, which is
-       filled by a renderer on the legacy overlay — so this page depended
-       on a page it had replaced. */
+    /* Its own fetches. Earlier builds read _gtRowsCache, which is filled
+       by a renderer on the legacy overlay — so this page depended on the
+       page it had replaced. */
+    skeletons();
     var s = await api('/arena/stage').catch(function (){ return null; });
     if (!Array.isArray(s) || !s.length){
       var mj = await api('/majors').catch(function (){ return null; });
@@ -83083,17 +83463,17 @@ body.q-max #queueOverlay{ padding:0 !important; }
 
   /* Hiding an overlay does not stop an iframe inside it. Watch the
      overlay's own class so this cannot be defeated by a call site that
-     forgets to tell us -- Escape, the hub manager cross-fade, and a
-     deep link all just change that class. */
+     forgets to tell us — Escape, the hub manager cross-fade and a deep
+     link all just change that class. */
   function watchVisibility(){
     var ov = $('tournamentsPage');
     if (!ov || ov.__tpWatched) return;
     ov.__tpWatched = true;
     new MutationObserver(function (){
       var open = ov.classList.contains('open');
-      if (open === !!ov.__tpOpen) return;   // only act on a real change
+      if (open === !!ov.__tpOpen) return;         // only act on a real change
       ov.__tpOpen = open;
-      if (open) { paintPlayer(); paintChannels(); }
+      if (open){ paintPlayer(); paintChannels(); }
       else {
         clearInterval(rot);
         var host = $('tpPlayer');
@@ -83108,9 +83488,13 @@ body.q-max #queueOverlay{ padding:0 !important; }
   window.openTournamentsPage = function (){
     if (typeof window.showOverlay !== 'function') return;
     window.showOverlay('tournamentsPage', function (){
-      paintMake(); paintPlayer(); paintChannels(); paintYours(); paintBrowse(); paintCal(); paintTop();
+      paintPlayer(); paintChannels(); paintYours(); paintBrowse(); paintCal(); paintTop();
     });
     watchVisibility();
+    /* The hero is fixed and only the shelves scroll, so a second visit
+       must not open halfway down the calendar. */
+    var sc = $('tpScroll');
+    if (sc) sc.scrollTop = 0;
     load();
   };
   window.closeTournamentsPage = function (){
@@ -83124,9 +83508,9 @@ body.q-max #queueOverlay{ padding:0 !important; }
 
   /* Every entry point — the top-bar pill, the hub manager, deep links —
      goes through openGlobalTournaments, so that is the one thing to
-     repoint. The legacy overlay is left in the DOM, untouched and
-     unused, rather than deleted: three other modules still reference its
-     nodes and would throw on a missing element. */
+     repoint. The legacy overlay stays in the DOM, untouched and unused,
+     rather than deleted: other modules still reference its nodes and
+     would throw on a missing element. */
   function adopt(){
     if (typeof window.showOverlay !== 'function'){ setTimeout(adopt, 250); return; }
     window.openGlobalTournaments = window.openTournamentsPage;
