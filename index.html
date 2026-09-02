@@ -82253,6 +82253,24 @@ body.q-max #queueOverlay{ padding:0 !important; }
         </aside>
       </div>
 
+      <!-- The app's own section breaker: a centred title, an accent
+           rule and a live count. Every other page in Lobby divides
+           itself with this, and the page lost it when the numbered
+           shelves came out. -->
+      <div class="tp-break">
+        <div class="hub-sec">
+          <div class="hub-sec-t">The brackets</div>
+          <div class="hub-sec-bar"></div>
+          <div class="hub-sec-k">
+            <svg viewBox="0 0 24 24" width="11" height="11" fill="none" stroke="currentColor"
+                 stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+              <path d="M3 5h6v6H3zM3 13h6v6H3zM15 9h6v6h-6z"/><path d="M9 8h3v8h3"/></svg>
+            <span>Run one, or enter one</span><span class="sep">&middot;</span><span class="dot"></span>
+            <b id="tpAllN">0</b> <span id="tpAllW">in total</span>
+          </div>
+        </div>
+      </div>
+
       <!-- ── Below the stage ────────────────────────────────────────
            Split by what it is for, not by tournament state. The column
            on the left is everything you act on and it does not scroll
@@ -82397,12 +82415,16 @@ body.q-max #queueOverlay{ padding:0 !important; }
 }
 #tournamentsPage .gt-hero-stat-lbl{ font-size:10px }
 .tp-acts{ display:flex; align-items:center; gap:11px; flex-wrap:wrap; justify-content:flex-end }
+/* One flat accent with a hairline highlight along the top edge. The
+   three-stop gradient and the 30px coloured glow under every primary
+   button were most of why the page read as gaudy. */
 #tournamentsPage .gt-cta-primary{
-  background:linear-gradient(135deg, #ff5a83 0%, var(--tp) 60%, #e02659 100%);
+  background:var(--tp);
   color:#fff; padding:12px 22px !important; font-size:11px !important;
-  box-shadow:0 1px 0 rgba(255,255,255,.3) inset,
-             0 12px 30px -8px rgba(255,61,110,.6);
+  box-shadow:0 1px 0 rgba(255,255,255,.22) inset,
+             0 6px 16px -10px rgba(0,0,0,.9);
 }
+#tournamentsPage .gt-cta-primary:hover{ background:#ff5578 }
 @media (max-width:1100px){
   .tp-top-in{ align-items:flex-start }
   .tp-top-r{ margin-left:0; justify-items:start; width:100% }
@@ -82460,8 +82482,14 @@ body.q-max #queueOverlay{ padding:0 !important; }
   margin-bottom:30px;
 }
 .tp-stage-col{ min-width:0 }
-.tp-rail{ min-width:0; display:grid; gap:22px; align-content:start }
-.tp-rail-b{ min-width:0 }
+.tp-rail{ min-width:0; display:grid; gap:20px; align-content:start }
+/* Each rail block sits on a surface, so On air and the calendar read as
+   two blocks rather than as loose contents on the page ground. */
+.tp-rail-b{
+  min-width:0; padding:15px; border-radius:16px;
+  background:rgba(255,255,255,.018);
+  border:1px solid rgba(255,255,255,.06);
+}
 @media (max-width:1700px){
   #tournamentsPage{ --tp-rail-l:290px; --tp-rail-r:330px; --tp-gap:20px; }
 }
@@ -82632,6 +82660,25 @@ body.q-max #queueOverlay{ padding:0 !important; }
 .tp-blank h3{ margin:0; font-size:16px; font-weight:800 }
 .tp-blank p{ margin:0; font-size:13px; color:var(--text-3); max-width:46ch; line-height:1.6 }
 
+/* ── Breakers ──────────────────────────────────────────────────── */
+/* A ruled line the full width of the page with the shared section head
+   sitting on it. This is the thing that says "a different part of the
+   page starts here", and nothing else on the page was saying it. */
+.tp-break{
+  margin:34px 0 26px; padding-top:30px;
+  border-top:1px solid rgba(255,255,255,.08);
+  position:relative;
+}
+/* A short accent length centred on the rule, so the break reads as
+   deliberate rather than as a table edge. */
+.tp-break::before{
+  content:''; position:absolute; top:-1px; left:50%; transform:translateX(-50%);
+  width:120px; height:1px;
+  background:linear-gradient(90deg, transparent,
+    color-mix(in srgb, var(--hub-accent) 80%, transparent), transparent);
+}
+.tp-break .hub-sec{ margin:0 }
+
 /* ── Below the stage ───────────────────────────────────────────── */
 /* Left: what you do, and it stays put. Right: what there is. */
 .tp-below{ grid-template-columns:minmax(0,var(--tp-rail-l)) minmax(0,1fr) }
@@ -82696,7 +82743,9 @@ body.q-max #queueOverlay{ padding:0 !important; }
 /* ── The grid, and the sheet over it ───────────────────────────── */
 .tp-browse-wrap{ position:relative; min-width:0 }
 .tp-browse-h{
-  display:flex; align-items:center; gap:14px; flex-wrap:wrap; margin-bottom:16px;
+  display:flex; align-items:center; gap:14px; flex-wrap:wrap;
+  margin-bottom:18px; padding-bottom:14px;
+  border-bottom:1px solid rgba(255,255,255,.07);
 }
 .tp-browse-h .hub-rail{ margin:0; justify-content:flex-start }
 .tp-browse-k{
@@ -82711,12 +82760,15 @@ body.q-max #queueOverlay{ padding:0 !important; }
    should swap what it shows rather than make you close it first. */
 .tp-browse-wrap.sheet-open #tpBrowse{ opacity:.42; transition:opacity .18s ease }
 @media (prefers-reduced-motion:reduce){ .tp-browse-wrap.sheet-open #tpBrowse{ transition:none } }
+/* An author display beats the user agent's [hidden] rule outright, so
+   the attribute needs saying again here or el.hidden does nothing. */
+.tp-sheet[hidden]{ display:none }
 .tp-sheet{
   position:absolute; top:0; right:0; width:min(420px, 100%);
   border-radius:16px; padding:15px;
   background:linear-gradient(160deg,#191b28,#12131c);
-  border:1px solid color-mix(in srgb, var(--hub-accent) 34%, transparent);
-  box-shadow:-30px 0 80px -30px #000, 0 0 0 1px rgba(255,255,255,.04) inset;
+  border:1px solid rgba(255,255,255,.1);
+  box-shadow:-24px 0 60px -34px #000;
   display:grid; gap:12px; align-content:start;
   max-height:none;
 }
@@ -82821,25 +82873,24 @@ body.q-max #queueOverlay{ padding:0 !important; }
 .tp-pip-sep{ color:rgba(255,255,255,.16); font-size:8.5px }
 
 /* ── Run your own ──────────────────────────────────────────────── */
+/* A dark surface with an accent edge, not a pink block. The button
+   inside it is already the accent; the panel does not need to be too. */
 .tp-make{
   display:grid; gap:11px; align-content:start;
-  padding:18px; border-radius:16px;
-  background:
-    radial-gradient(560px 260px at 82% -10%, rgba(255,61,110,.22) 0%, transparent 64%),
-    linear-gradient(160deg, rgba(255,61,110,.13), rgba(255,255,255,.018));
-  border:1px solid color-mix(in srgb, var(--hub-accent) 30%, transparent);
-  box-shadow:0 24px 60px -34px rgba(255,61,110,.55);
+  padding:16px; border-radius:16px;
+  background:linear-gradient(160deg, rgba(255,61,110,.07), rgba(255,255,255,.016));
+  border:1px solid color-mix(in srgb, var(--hub-accent) 24%, transparent);
 }
 .tp-make-i{
-  width:48px; height:48px; border-radius:13px; display:grid; place-content:center;
-  background:color-mix(in srgb, var(--hub-accent) 18%, transparent);
-  border:1px solid color-mix(in srgb, var(--hub-accent) 34%, transparent);
-  color:#fff;
+  width:40px; height:40px; border-radius:11px; display:grid; place-content:center;
+  background:color-mix(in srgb, var(--hub-accent) 14%, transparent);
+  border:1px solid color-mix(in srgb, var(--hub-accent) 26%, transparent);
+  color:var(--hub-accent);
 }
 .tp-make h3{
   margin:0; font-family:'Archivo', var(--font), sans-serif;
-  font-size:21px; font-weight:900; letter-spacing:1.2px; text-transform:uppercase; color:#fff;
-  text-shadow:0 1px 0 rgba(0,0,0,.5), 0 0 30px color-mix(in srgb, var(--hub-accent) 40%, transparent);
+  font-size:19px; font-weight:900; letter-spacing:1.2px; text-transform:uppercase; color:#fff;
+  text-shadow:0 1px 0 rgba(0,0,0,.5);
 }
 .tp-make p{ margin:0; font-size:13px; color:var(--text-2); line-height:1.62 }
 .tp-make .gt-cta-primary{ width:100%; justify-content:center }
@@ -82912,7 +82963,14 @@ body.q-max #queueOverlay{ padding:0 !important; }
 .tp-grid{ display:grid; gap:16px; grid-template-columns:repeat(auto-fill,minmax(330px,1fr)) }
 .tp-c{ cursor:pointer; text-align:left; padding:0; font-family:inherit;
   display:grid; grid-template-rows:132px auto }
-.tp-c-art{ position:relative; background:#14151d center/cover }
+/* Most brackets have no game art, and 132px of flat grey is what makes
+   a grid of them look unfinished. The ground is a quiet gradient so an
+   artless card still reads as a card. */
+.tp-c-art{
+  position:relative; background:#14151d center/cover;
+  background-image:linear-gradient(150deg, #23202f, #15161f);
+}
+.tp-c-art[style*="background-image"]{ background-image:none }
 .tp-c-art::after{ content:''; position:absolute; inset:0;
   background:linear-gradient(0deg,rgba(10,11,17,.92),transparent 68%) }
 .tp-c-badge{
@@ -82941,11 +82999,7 @@ body.q-max #queueOverlay{ padding:0 !important; }
 /* A day is a square with dots, not a box with chips: at rail width a
    chip is a clipped word, and a dot is still a dot. The month reads as
    a shape — which weeks are busy — and the names live in the list. */
-.tp-cal{
-  display:grid; gap:12px; padding:14px;
-  border-radius:15px; border:1px solid var(--tp-line);
-  background:linear-gradient(160deg, rgba(255,255,255,.035), rgba(255,255,255,.01));
-}
+.tp-cal{ display:grid; gap:12px }
 .tp-cal-h{ display:flex; align-items:center; gap:6px }
 .tp-cal-t{
   font-family:'Archivo', var(--font), sans-serif; font-size:13px; font-weight:900;
@@ -83532,6 +83586,11 @@ body.q-max #queueOverlay{ padding:0 !important; }
         ? window.hubRail(items, filt, 'window.tpFilter')
         : '';
     }
+
+    /* The breaker above counts everything the grid can hold; the pill
+       beside the tabs counts what the current tab is showing. */
+    setText('tpAllN', String(u.length));
+    setText('tpAllW', u.length === 1 ? 'in total' : 'in total');
 
     var list = u.filter(keep);
     setText('tpBrowseN', String(list.length));
