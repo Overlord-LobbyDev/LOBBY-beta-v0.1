@@ -7827,7 +7827,12 @@
       border-radius: 12px;
       box-shadow: 0 16px 40px rgba(0,0,0,.5), 0 0 0 1px rgba(0,0,0,.2);
       padding: 6px;
-      z-index: 9999;
+      /* Above #phHotbarRow (99996) and #topBarActions (99997), which is
+         what these dropdowns hang off — at 9999 they opened underneath
+         the Messages / Feed / Quick access row. Below #winControls
+         (99999) on purpose: a menu covering minimise and close would be
+         a worse bug than the one this fixes. */
+      z-index: 99998;
       -webkit-app-region: no-drag;
       opacity: 0; transform: translateY(-4px) scale(.98);
       transition: opacity .18s ease, transform .22s cubic-bezier(0.22,1,0.36,1);
