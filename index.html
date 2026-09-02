@@ -82406,6 +82406,11 @@ body.q-max #queueOverlay{ padding:0 !important; }
      Speedrun and the legacy hub all do. The cap is only so an
      ultra-wide monitor does not stretch a row of text to a metre. */
   --tp-measure:2560px;
+  /* The page's columns, declared once. The top row (on air / stage /
+     calendar) and the row under it (ongoing / run your own / upcoming)
+     both read these, so their edges cannot drift apart. */
+  --tp-cols:minmax(0,340px) minmax(0,1fr) minmax(0,392px);
+  --tp-gap:26px;
   flex-direction:column;
 }
 
@@ -82493,22 +82498,31 @@ body.q-max #queueOverlay{ padding:0 !important; }
 .tp-measure{ max-width:var(--tp-measure); margin:0 auto; padding:24px 40px 64px }
 
 /* ── Body: stage + columns on the left, rail on the right ──────── */
-/* What is on, what is playing, when things are. */
-.tp-body{
-  display:grid; gap:26px; align-items:start; margin-bottom:30px;
-  grid-template-columns:minmax(0,340px) minmax(0,1fr) minmax(0,392px);
+/* Row one: what is on, what is playing, when things are.
+   Row two: what is running, how to start one, what is coming.
+   Same columns, so every edge lines up down the page. */
+.tp-body, .tp-tri{
+  display:grid; align-items:start;
+  grid-template-columns:var(--tp-cols);
+  gap:var(--tp-gap);
 }
+.tp-body{ margin-bottom:30px }
 .tp-stage-col{ min-width:0 }
 .tp-rail{ min-width:0; display:grid; gap:22px; align-content:start }
 .tp-rail-b{ min-width:0 }
 @media (max-width:1700px){
-  .tp-body{ grid-template-columns:minmax(0,290px) minmax(0,1fr) minmax(0,330px); gap:20px }
+  #tournamentsPage{
+    --tp-cols:minmax(0,290px) minmax(0,1fr) minmax(0,330px);
+    --tp-gap:20px;
+  }
 }
-/* Below this the stream leads and the two rails share the row under it:
-   a 290px column beside a picture is a column of clipped words. */
+/* Below this the stream leads and the rails share the row under it: a
+   290px column beside a picture is a column of clipped words. The two
+   rows stop matching here because they are no longer three across. */
 @media (max-width:1240px){
   .tp-body{ grid-template-columns:minmax(0,1fr) minmax(0,1fr) }
   .tp-stage-col{ grid-column:1/-1; order:-1 }
+  .tp-tri{ grid-template-columns:minmax(0,1fr) }
 }
 @media (max-width:820px){ .tp-body{ grid-template-columns:minmax(0,1fr) } }
 
@@ -82671,13 +82685,9 @@ body.q-max #queueOverlay{ padding:0 !important; }
 .tp-blank p{ margin:0; font-size:13px; color:var(--text-3); max-width:46ch; line-height:1.6 }
 
 /* ── Three columns ─────────────────────────────────────────────── */
-/* The middle is wider: starting one is what the page is for, and the
-   two lists either side are things you scan. */
-.tp-tri{
-  display:grid; gap:24px; align-items:start;
-  grid-template-columns:minmax(0,1fr) minmax(0,1.34fr) minmax(0,1fr);
-}
-@media (max-width:1080px){ .tp-tri{ grid-template-columns:minmax(0,1fr) } }
+/* The middle column is the stage's column, which is already wider than
+   the rails either side of it — so "wider in the middle" falls out of
+   the shared grid instead of being a second number to keep in step. */
 .tp-col{ min-width:0 }
 /* The shared section header, left-aligned and column-sized. Only the
    alignment and the scale change; it is the same component. */
@@ -83005,7 +83015,7 @@ body.q-max #queueOverlay{ padding:0 !important; }
   margin-left:auto; background:none; border:none; cursor:pointer; padding:0;
   color:var(--hub-accent); font:inherit; letter-spacing:1.2px;
 }
-.tp-cal-rows{ display:grid; gap:5px; max-height:216px; overflow-y:auto;
+.tp-cal-rows{ display:grid; gap:5px; max-height:156px; overflow-y:auto;
   scrollbar-width:thin; scrollbar-color:rgba(255,255,255,.14) transparent }
 .tp-cal-rows::-webkit-scrollbar{ width:5px }
 .tp-cal-rows::-webkit-scrollbar-thumb{ background:rgba(255,255,255,.14); border-radius:99px }
