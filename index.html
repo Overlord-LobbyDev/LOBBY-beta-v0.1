@@ -7249,7 +7249,7 @@
       -webkit-app-region: no-drag !important;
       pointer-events: auto !important;
 
-      /* Layout — sized to fit the wordmark + version tag. */
+      /* Layout — sized to fit the wordmark + BETA tag. */
       position: relative;
       display: inline-flex; align-items: center; gap: 4px;
       height: 72px; padding: 0 22px;
@@ -7330,18 +7330,13 @@
       100% { background-position: 200% 50%; }
     }
     .lobby-logo-beta {
-      font-size: 8px; font-weight: 900; letter-spacing: 1.4px;
+      font-size: 8px; font-weight: 900; letter-spacing: 2px;
       color: var(--accent);
       text-transform: uppercase;
-      /* Was vertical-rl with a 180 rotation, which stacked BETA down the
-         side of the wordmark. A dotted version cannot stack: a rotated
-         full stop sits at the top of its cell, so it would read as V3
-         with two dots floating beside it. */
-      writing-mode: horizontal-tb;
-      transform: none;
+      writing-mode: vertical-rl;
+      transform: rotate(180deg);
       opacity: .7;
       align-self: center;
-      padding-top: 2px;
       transition: opacity .55s ease, color .55s ease, text-shadow .55s ease;
     }
     #lobbyLogoFixed:hover .lobby-logo-beta {
@@ -14323,7 +14318,7 @@
   <button id="lobbyLogoFixed" type="button" onclick="window.goHome()"
           title="Go home" aria-label="Go to home">
     <span class="lobby-logo-text">LOBBY</span>
-    <span class="lobby-logo-beta">V3.0.0</span>
+    <span class="lobby-logo-beta">BETA</span>
   </button>
 </div>
 
