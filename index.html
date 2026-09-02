@@ -82183,7 +82183,7 @@ body.q-max #queueOverlay{ padding:0 !important; }
       <div class="tp-body">
 
         <!-- ── Left rail: what is on ────────────────────────────────── -->
-        <aside class="tp-rail">
+        <aside class="tp-rail tp-rail-l">
           <div class="tp-rail-b">
             <div class="hub-sec tp-sec-l">
               <div class="hub-sec-t">On air</div>
@@ -82237,8 +82237,8 @@ body.q-max #queueOverlay{ padding:0 !important; }
           </section>
         </div>
 
-        <!-- ── Right rail: when, and what you picked ────────────────── -->
-        <aside class="tp-rail">
+        <!-- ── Right rail: when things are ──────────────────────────── -->
+        <aside class="tp-rail tp-rail-r">
           <div class="tp-rail-b">
             <div class="hub-sec tp-sec-l">
               <div class="hub-sec-t">The calendar</div>
@@ -82381,6 +82381,12 @@ body.q-max #queueOverlay{ padding:0 !important; }
   --tp-rail-l:340px;
   --tp-rail-r:392px;
   --tp-gap:26px;
+  --tp-pad:40px;
+  /* How far a rail must travel to reach the glass. The page is capped
+     and centred, so on a monitor wider than the cap that is half the
+     leftover plus the padding; on anything narrower it is just the
+     padding, which is what max() settles. */
+  --tp-bleed:max(var(--tp-pad), calc((100vw - var(--tp-measure)) / 2 + var(--tp-pad)));
   flex-direction:column;
 }
 
@@ -82394,7 +82400,7 @@ body.q-max #queueOverlay{ padding:0 !important; }
     linear-gradient(180deg, rgba(0,0,0,.34) 0%, rgba(0,0,0,0) 100%);
 }
 .tp-top-in{
-  max-width:var(--tp-measure); margin:0 auto; padding:0 40px;
+  max-width:var(--tp-measure); margin:0 auto; padding:0 var(--tp-pad);
   display:flex; align-items:flex-end; gap:28px; flex-wrap:wrap;
 }
 .tp-id{ min-width:0 }
@@ -82469,7 +82475,7 @@ body.q-max #queueOverlay{ padding:0 !important; }
   scrollbar-width:thin; scrollbar-color:rgba(255,255,255,.14) transparent }
 #tpScroll::-webkit-scrollbar{ width:10px }
 #tpScroll::-webkit-scrollbar-thumb{ background:rgba(255,255,255,.14); border-radius:99px }
-.tp-measure{ max-width:var(--tp-measure); margin:0 auto; padding:24px 40px 64px }
+.tp-measure{ max-width:var(--tp-measure); margin:0 auto; padding:24px var(--tp-pad) 64px }
 
 /* ── Body: stage + columns on the left, rail on the right ──────── */
 /* Row one: what is on, what is playing, when things are.
@@ -82490,6 +82496,56 @@ body.q-max #queueOverlay{ padding:0 !important; }
   min-width:0; padding:15px; border-radius:16px;
   background:rgba(255,255,255,.018);
   border:1px solid rgba(255,255,255,.06);
+}
+
+/* ── The rails are anchored to the window ──────────────────────────
+   Each surface runs off its own side of the glass: square on that edge,
+   rounded only on the inside one, and no border where there is no edge
+   to draw. The padding is increased by exactly what the margin pulls
+   back, so nothing inside moves — only the surface grows outward. */
+.tp-rail-l .tp-rail-b{
+  margin-left:calc(var(--tp-bleed) * -1);
+  padding-left:calc(var(--tp-bleed) + 15px);
+  border-left:0; border-top-left-radius:0; border-bottom-left-radius:0;
+  background:linear-gradient(90deg, rgba(255,255,255,.032), rgba(255,255,255,.014) 60%);
+}
+.tp-rail-r .tp-rail-b{
+  margin-right:calc(var(--tp-bleed) * -1);
+  padding-right:calc(var(--tp-bleed) + 15px);
+  border-right:0; border-top-right-radius:0; border-bottom-right-radius:0;
+  background:linear-gradient(270deg, rgba(255,255,255,.032), rgba(255,255,255,.014) 60%);
+}
+
+/* The cards go out with it. The negative margin is on the SCROLLING
+   column, not on the cards: .tp-scroll-col is overflow-y:auto, and a box
+   cannot be visible on one axis and auto on the other, so a card pulled
+   out by a negative margin would have been clipped or grown a
+   horizontal scrollbar inside the rail. The column reaches the edge and
+   the cards simply fill it, their padding putting the content back
+   where it was. */
+.tp-rail-l .tp-scroll-col{ margin-left:calc((var(--tp-bleed) + 15px) * -1); padding-left:0 }
+.tp-rail-l .tp-air{
+  padding-left:calc(var(--tp-bleed) + 23px);
+  border-left:0; border-top-left-radius:0; border-bottom-left-radius:0;
+}
+.tp-rail-r .tp-cal-rows{ margin-right:calc((var(--tp-bleed) + 15px) * -1); padding-right:0 }
+.tp-rail-r .tp-a{
+  padding-right:calc(var(--tp-bleed) + 24px);
+  border-right:0; border-top-right-radius:0; border-bottom-right-radius:0;
+}
+
+/* Stacked, neither rail is against an edge any more, so the whole
+   thing stands down rather than pulling into the middle of the page. */
+@media (max-width:1240px){
+  .tp-rail-l .tp-rail-b, .tp-rail-r .tp-rail-b{
+    margin:0; padding:15px; border-radius:16px;
+    border:1px solid rgba(255,255,255,.06);
+    background:rgba(255,255,255,.018);
+  }
+  .tp-rail-l .tp-scroll-col{ margin-left:0; padding-right:5px }
+  .tp-rail-r .tp-cal-rows{ margin-right:0 }
+  .tp-rail-l .tp-air{ padding:8px; border-radius:12px; border-left-width:1px }
+  .tp-rail-r .tp-a{ padding:8px 9px; border-radius:9px; border-right-width:1px }
 }
 @media (max-width:1700px){
   #tournamentsPage{ --tp-rail-l:290px; --tp-rail-r:330px; --tp-gap:20px; }
