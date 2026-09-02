@@ -82149,15 +82149,27 @@ body.q-max #queueOverlay{ padding:0 !important; }
       <section class="tp-stage">
         <div class="tp-player" id="tpPlayer"></div>
         <div class="tp-now" id="tpBar"></div>
-        <div class="tp-find">
-          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor"
-               stroke-width="2.4" stroke-linecap="round" aria-hidden="true">
-            <circle cx="11" cy="11" r="7"/><line x1="21" y1="21" x2="16.5" y2="16.5"/></svg>
-          <input id="tpFind" type="text" placeholder="Search what's on — game, event, organiser…"
-                 aria-label="Search streams" oninput="window.tpSearch(this.value)">
-          <button type="button" id="tpFindX" onclick="window.tpSearch('')" aria-label="Clear">&#10005;</button>
+        <div class="tp-reel">
+          <div class="tp-reel-head">
+            <h2>What&rsquo;s on</h2>
+            <span id="tpReelCount"></span>
+            <div class="tp-find">
+              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                   stroke-width="2.6" stroke-linecap="round" aria-hidden="true">
+                <circle cx="11" cy="11" r="7"/><line x1="21" y1="21" x2="16.5" y2="16.5"/></svg>
+              <input id="tpFind" type="text" placeholder="Search…"
+                     aria-label="Search streams" oninput="window.tpSearch(this.value)">
+              <button type="button" id="tpFindX" onclick="window.tpSearch('')" aria-label="Clear search">&#10005;</button>
+            </div>
+          </div>
+          <div class="spotlight-carousel-wrap">
+            <button type="button" class="spotlight-carousel-btn prev" id="tpReelPrev"
+                    onclick="window.tpReel(-1)" aria-label="Scroll left">&lsaquo;</button>
+            <div class="tp-channels" id="tpChannels"></div>
+            <button type="button" class="spotlight-carousel-btn next" id="tpReelNext"
+                    onclick="window.tpReel(1)" aria-label="Scroll right">&rsaquo;</button>
+          </div>
         </div>
-        <div class="tp-channels" id="tpChannels"></div>
       </section>
 
       <section class="tp-cols">
@@ -82176,15 +82188,40 @@ body.q-max #queueOverlay{ padding:0 !important; }
 </div>
 
 <style>
-#tournamentsPage{ --tp:#ff3d6e; --tp-dim:rgba(255,61,110,.14); --tp-line:rgba(255,255,255,.075);
-  --tp-surf:rgba(255,255,255,.03); flex-direction:column; }
-#tpTop{
-  flex:0 0 52px; display:flex; align-items:center; gap:13px; padding:0 24px;
-  background:#0d0a10; border-bottom:1px solid var(--tp-line); z-index:3;
+#tournamentsPage{
+  --tp:#ff3d6e; --tp-dim:rgba(255,61,110,.14); --tp-line:rgba(255,255,255,.075);
+  --tp-surf:rgba(255,255,255,.03);
+  /* The variable every other hub theming rule reads. Setting it is what
+     makes this page part of the same system rather than a lookalike. */
+  --hub-accent:#ff3d6e;
+  flex-direction:column;
 }
-.tp-mark{ font-family:var(--font); font-size:13.5px; font-weight:900; letter-spacing:2.4px;
-  text-transform:uppercase; margin:0; white-space:nowrap }
-.tp-mark b{ color:var(--tp) }
+#tpTop{
+  flex:0 0 56px; display:flex; align-items:center; gap:14px; padding:0 24px;
+  z-index:3; border-bottom:1px solid rgba(255,255,255,.06);
+  /* Layered like the app's other chrome: a breath of the hub accent at
+     the top edge over an opaque ground, with a hairline accent seam. */
+  background:
+    radial-gradient(70% 180% at 22% -60%, color-mix(in srgb, var(--hub-accent) 13%, transparent) 0%, transparent 70%),
+    linear-gradient(180deg, rgba(255,255,255,.045) 0%, rgba(255,255,255,.012) 40%, rgba(0,0,0,.28) 100%),
+    #0c0910;
+  box-shadow:0 1px 0 rgba(255,255,255,.05) inset, 0 10px 26px -18px rgba(0,0,0,.9);
+}
+/* The same treatment as every other hub title -- Archivo 900, caps, cut
+   rather than printed: light above, shadow below, one soft lift and an
+   ambient glow in this hub's accent. Bar-sized instead of hero-sized,
+   so the page keeps its identity without spending a screen on it. */
+.tp-mark{
+  font-family:'Archivo', var(--font), sans-serif;
+  font-size:17px; font-weight:900; letter-spacing:2px; line-height:1;
+  text-transform:uppercase; margin:0; white-space:nowrap; color:#fff;
+  text-shadow:
+    0 -1px 0 rgba(255,255,255,.30),
+    0 1px 0 rgba(0,0,0,.55),
+    0 2px 6px rgba(0,0,0,.45),
+    0 0 28px color-mix(in srgb, var(--hub-accent) 40%, transparent);
+}
+.tp-mark b{ color:var(--tp); font-weight:900 }
 .tp-stats{ display:flex; gap:6px }
 .tp-st{
   display:inline-flex; align-items:center; gap:6px; height:24px; padding:0 9px;
@@ -82312,33 +82349,47 @@ body.q-max #queueOverlay{ padding:0 !important; }
 .tp-blank p{ margin:0; font-size:12px; color:var(--text-3); max-width:46ch; line-height:1.6 }
 
 /* Search ─────────────────────────────────────────────────────── */
-.tp-find{
-  position:relative; width:100%; max-width:900px; display:flex; align-items:center;
-}
-.tp-find svg{ position:absolute; left:11px; color:var(--text-3); pointer-events:none }
+/* A filter, not a landing search: it belongs beside what it filters,
+   sized accordingly. It grows on focus so a long query is still
+   readable without a permanent slab across the page. */
+.tp-find{ position:relative; margin-left:auto; display:flex; align-items:center }
+.tp-find svg{ position:absolute; left:9px; color:var(--text-3); pointer-events:none }
 .tp-find input{
-  width:100%; height:34px; border-radius:9px; padding:0 34px 0 32px;
-  background:var(--tp-surf); border:1px solid var(--tp-line);
-  color:var(--text-1); font-family:inherit; font-size:12.5px;
+  width:150px; height:28px; border-radius:99px; padding:0 26px 0 26px;
+  background:rgba(255,255,255,.045); border:1px solid var(--tp-line);
+  color:var(--text-1); font-family:inherit; font-size:12px;
+  transition:width .18s ease, border-color .15s ease;
 }
-.tp-find input:focus{ outline:none; border-color:rgba(255,61,110,.55) }
+.tp-find input::placeholder{ color:var(--text-3) }
+.tp-find input:focus{ outline:none; width:220px; border-color:color-mix(in srgb, var(--hub-accent) 55%, transparent) }
+@media (prefers-reduced-motion:reduce){ .tp-find input{ transition:none } }
 .tp-find button{
-  position:absolute; right:7px; width:22px; height:22px; border-radius:6px;
+  position:absolute; right:5px; width:18px; height:18px; border-radius:50%;
   display:none; place-content:center; cursor:pointer; padding:0;
-  background:rgba(255,255,255,.07); border:1px solid var(--tp-line);
-  color:var(--text-2); font-size:10px; line-height:1;
+  background:rgba(255,255,255,.1); border:none;
+  color:var(--text-2); font-size:9px; line-height:1;
 }
-.tp-find button:hover{ background:rgba(255,255,255,.14); color:var(--text-1) }
+.tp-find button:hover{ background:rgba(255,255,255,.2); color:var(--text-1) }
 
 /* Cards ──────────────────────────────────────────────────────── */
-.tp-channels{
-  width:100%; max-width:900px; display:grid; gap:9px;
-  grid-template-columns:repeat(auto-fill,minmax(164px,1fr));
-  max-height:246px; overflow-y:auto; padding:1px;
-  scrollbar-width:thin; scrollbar-color:rgba(255,255,255,.14) transparent;
+/* One row, scrolled by the arrows. A wrapping grid put four ragged rows
+   of thumbnails under the player and buried everything below it. */
+.tp-reel{ width:100%; max-width:900px; display:grid; gap:9px }
+.tp-reel-head{ display:flex; align-items:center; gap:10px }
+.tp-reel-head h2{
+  font-family:var(--font); font-size:10.5px; font-weight:900; letter-spacing:1.7px;
+  text-transform:uppercase; margin:0; color:var(--text-2);
 }
-.tp-channels::-webkit-scrollbar{ width:7px }
-.tp-channels::-webkit-scrollbar-thumb{ background:rgba(255,255,255,.14); border-radius:99px }
+.tp-reel-head > span{ font-size:10.5px; color:var(--text-3) }
+.tp-channels{
+  display:flex; gap:9px; overflow-x:auto; scroll-behavior:smooth;
+  padding:1px 0 2px;
+  /* The scrollbar would sit under the arrows and fight them. */
+  scrollbar-width:none;
+}
+.tp-channels::-webkit-scrollbar{ display:none }
+.tp-card{ flex:0 0 168px }
+@media (prefers-reduced-motion:reduce){ .tp-channels{ scroll-behavior:auto } }
 .tp-card{
   display:grid; grid-template-rows:auto auto; gap:0; padding:0; cursor:pointer;
   text-align:left; font-family:inherit; overflow:hidden; border-radius:9px;
@@ -82676,6 +82727,14 @@ body.q-max #queueOverlay{ padding:0 !important; }
       return;
     }
 
+    var cnt = $('tpReelCount');
+    if (cnt){
+      var liveN = streams.filter(function (m){ return m.live; }).length;
+      cnt.textContent = findQ
+        ? rows.length + ' of ' + streams.length
+        : (liveN ? liveN + ' live' : streams.length + ' scheduled');
+    }
+
     host.innerHTML = rows.map(function (r){
       var m = r.m;
       var foot = m.live
@@ -82693,6 +82752,15 @@ body.q-max #queueOverlay{ padding:0 !important; }
           '<span class="tp-card-f">' + esc(foot) + '</span>' +
         '</span></button>';
     }).join('');
+
+    /* After the row is rebuilt its width has changed, so the arrows have
+       to be re-evaluated -- and again as it is scrolled. */
+    if (!host.__tpBound){
+      host.__tpBound = true;
+      host.addEventListener('scroll', syncReel, { passive:true });
+      window.addEventListener('resize', syncReel, { passive:true });
+    }
+    requestAnimationFrame(syncReel);
   }
 
   window.tpSearch = function (v){
@@ -82701,6 +82769,26 @@ body.q-max #queueOverlay{ padding:0 !important; }
     if (el && el.value !== findQ) el.value = findQ;
     paintChannels();
   };
+
+  /* The same arrows the home page carousel uses, scrolling the track
+     rather than stepping an index -- the card count changes with the
+     search, and an offset can drift out of sync with a list that
+     changes underneath it. */
+  window.tpReel = function (dir){
+    var t = $('tpChannels');
+    if (!t) return;
+    t.scrollBy({ left: dir * Math.max(200, t.clientWidth - 80), behavior:'smooth' });
+  };
+
+  /* Arrows only when there is somewhere to go. */
+  function syncReel(){
+    var t = $('tpChannels'), pv = $('tpReelPrev'), nx = $('tpReelNext');
+    if (!t || !pv || !nx) return;
+    var over = t.scrollWidth > t.clientWidth + 4;
+    pv.disabled = !over || t.scrollLeft <= 2;
+    nx.disabled = !over || t.scrollLeft >= t.scrollWidth - t.clientWidth - 2;
+  }
+  window.tpSyncReel = syncReel;
   var SPK_ON = '<svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" ' +
     'stroke-width="2" stroke-linecap="round" stroke-linejoin="round">' +
     '<path d="M11 5 6 9H2v6h4l5 4z"/><path d="M15.5 8.5a5 5 0 0 1 0 7"/>' +
