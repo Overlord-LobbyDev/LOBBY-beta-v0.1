@@ -82536,13 +82536,28 @@ body.q-max #queueOverlay{ padding:0 !important; }
 .tp-stage-col{ min-width:0; padding:15px }
 .tp-rail{ min-width:0; display:grid; gap:20px; align-content:start }
 /* A region of the band rather than a panel on the page: no fill, no
-   border, no radius. The head sits at its natural height and the list
-   takes the rest, which is what lets the columns be equal height
-   without the contents floating in the middle of them. */
+   border, no radius.
+
+   Taken out of flow on purpose. A grid row is as tall as its tallest
+   item, so a rail that measures its own content will DRIVE the band
+   rather than fill it — eleven broadcasts made the band eleven
+   broadcasts tall. min-height:0 does not help: it lets an item shrink
+   below its content, but the row is still sized from every item. Pinned
+   to the column, the rail contributes no height at all, the stage is
+   the only thing left measuring, and the three regions end on the same
+   line by construction. */
+.tp-rail{ position:relative; min-height:0 }
 .tp-rail-b{
-  min-width:0; padding:15px; height:100%;
+  position:absolute; inset:0; overflow:hidden;
+  min-width:0; padding:15px;
   display:grid; grid-template-rows:auto minmax(0,1fr);
 }
+/* Whatever the head is followed by — the list, or the calendar — takes
+   the remaining height and scrolls inside it. */
+.tp-rail-b > :last-child{ min-height:0; overflow-y:auto;
+  scrollbar-width:thin; scrollbar-color:rgba(255,255,255,.14) transparent }
+.tp-rail-b > :last-child::-webkit-scrollbar{ width:6px }
+.tp-rail-b > :last-child::-webkit-scrollbar-thumb{ background:rgba(255,255,255,.14) }
 
 /* ── The rails are anchored to the window ──────────────────────────
    Each surface runs off its own side of the glass: square on that edge,
@@ -82570,11 +82585,17 @@ body.q-max #queueOverlay{ padding:0 !important; }
   }
   .tp-body::before{ display:none }
   .tp-stage-col{ border-left:0; border-right:0 }
+  /* Rows, not columns: nothing is filling anything, so the rails go
+     back into flow and measure themselves again. */
+  .tp-rail{ position:static }
   .tp-rail-b{
+    position:static; inset:auto; overflow:visible;
     height:auto; padding:15px;
     border:1px solid var(--tp-edge); background:var(--tp-well);
     box-shadow:inset 0 1px 0 var(--tp-lip);
   }
+  .tp-rail-b > :last-child{ overflow-y:visible }
+  .tp-rail-b .tp-scroll-col{ max-height:474px; overflow-y:auto }
 }
 @media (max-width:1700px){
   #tournamentsPage{ --tp-rail-l:290px; --tp-rail-r:330px; --tp-gap:20px; }
@@ -82596,7 +82617,7 @@ body.q-max #queueOverlay{ padding:0 !important; }
    and as tall as the window can spare. */
 .tp-frame{
   min-width:0; width:100%; margin:0 auto; display:grid; gap:12px;
-  max-width:calc(50vh * 16 / 9);
+  max-width:calc(40vh * 16 / 9);
 }
 .tp-player{
   position:relative; width:100%; aspect-ratio:16/9;
