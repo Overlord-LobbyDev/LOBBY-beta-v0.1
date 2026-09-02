@@ -82178,10 +82178,33 @@ body.q-max #queueOverlay{ padding:0 !important; }
         </div>
       </div>
 
-      <!-- The stage. Muted autoplay, controls under the picture. -->
+      <!-- The stage: the picture, what it is, and what else is on.
+           The strip is the carousel, moved up to sit with the player it
+           drives instead of a screen below it. -->
       <div class="tp-stage">
         <div class="tp-player" id="tpPlayer"></div>
         <div class="tp-now" id="tpBar"></div>
+        <div class="tp-strip">
+          <div class="tp-strip-h">
+            <span class="tp-strip-t">Also on</span>
+            <span class="tp-strip-n"><b id="tpOnAirN">0</b> <span id="tpOnAirW">live now</span></span>
+            <div class="tp-find">
+              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                   stroke-width="2.6" stroke-linecap="round" aria-hidden="true">
+                <circle cx="11" cy="11" r="7"/><line x1="21" y1="21" x2="16.5" y2="16.5"/></svg>
+              <input id="tpFind" type="text" placeholder="Search&hellip;"
+                     aria-label="Search streams" oninput="window.tpSearch(this.value)">
+              <button type="button" id="tpFindX" onclick="window.tpSearch('')" aria-label="Clear search">&#10005;</button>
+            </div>
+          </div>
+          <div class="tp-reel-wrap">
+            <button type="button" class="spotlight-carousel-btn prev" id="tpReelPrev"
+                    onclick="window.tpReel(-1)" aria-label="Scroll left">&lsaquo;</button>
+            <div class="tp-channels" id="tpChannels"></div>
+            <button type="button" class="spotlight-carousel-btn next" id="tpReelNext"
+                    onclick="window.tpReel(1)" aria-label="Scroll right">&rsaquo;</button>
+          </div>
+        </div>
       </div>
 
     </div>
@@ -82190,46 +82213,12 @@ body.q-max #queueOverlay{ padding:0 !important; }
   <div id="tpScroll">
     <div class="tp-measure">
 
-      <!-- ── 01 · On air ─────────────────────────────────────────── -->
-      <div class="hub-sec">
-        <div class="hub-sec-t">On air</div>
-        <div class="hub-sec-bar"></div>
-        <div class="hub-sec-k">
-          <span>01</span><span class="sep">/</span>
-          <svg viewBox="0 0 24 24" width="11" height="11" fill="none" stroke="currentColor"
-               stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-            <rect x="2" y="5" width="20" height="14" rx="2.5"/><path d="M10 10.2v3.6l3.2-1.8z" fill="currentColor" stroke="none"/></svg>
-          <span>Broadcasts</span><span class="sep">&middot;</span><span class="dot"></span>
-          <b id="tpOnAirN">0</b> <span id="tpOnAirW">channels</span>
-        </div>
-        <div class="hub-sec-s">Every major we can see, from the fighting game circuit to the
-          shooters, the strategy scene and the board. Pick one and it takes the stage above.</div>
-        <div class="hub-sec-act">
-          <div class="tp-find">
-            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor"
-                 stroke-width="2.6" stroke-linecap="round" aria-hidden="true">
-              <circle cx="11" cy="11" r="7"/><line x1="21" y1="21" x2="16.5" y2="16.5"/></svg>
-            <input id="tpFind" type="text" placeholder="Search what&rsquo;s on&hellip;"
-                   aria-label="Search streams" oninput="window.tpSearch(this.value)">
-            <button type="button" id="tpFindX" onclick="window.tpSearch('')" aria-label="Clear search">&#10005;</button>
-          </div>
-        </div>
-      </div>
-
-      <div class="tp-reel-wrap">
-        <button type="button" class="spotlight-carousel-btn prev" id="tpReelPrev"
-                onclick="window.tpReel(-1)" aria-label="Scroll left">&lsaquo;</button>
-        <div class="tp-channels" id="tpChannels"></div>
-        <button type="button" class="spotlight-carousel-btn next" id="tpReelNext"
-                onclick="window.tpReel(1)" aria-label="Scroll right">&rsaquo;</button>
-      </div>
-
-      <!-- ── 02 · Your run ───────────────────────────────────────── -->
+      <!-- ── 01 · Your run ───────────────────────────────────────── -->
       <div class="hub-sec" id="tpYoursHead">
         <div class="hub-sec-t">Your run</div>
         <div class="hub-sec-bar"></div>
         <div class="hub-sec-k">
-          <span>02</span><span class="sep">/</span>
+          <span>01</span><span class="sep">/</span>
           <svg viewBox="0 0 24 24" width="11" height="11" fill="none" stroke="currentColor"
                stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
             <path d="M8 21h8M12 17v4M7 4h10v5a5 5 0 0 1-10 0z"/></svg>
@@ -82241,12 +82230,12 @@ body.q-max #queueOverlay{ padding:0 !important; }
       </div>
       <div id="tpYours"></div>
 
-      <!-- ── 03 · The calendar ───────────────────────────────────── -->
+      <!-- ── 02 · The calendar ───────────────────────────────────── -->
       <div class="hub-sec">
         <div class="hub-sec-t">The calendar</div>
         <div class="hub-sec-bar"></div>
         <div class="hub-sec-k">
-          <span>03</span><span class="sep">/</span>
+          <span>02</span><span class="sep">/</span>
           <svg viewBox="0 0 24 24" width="11" height="11" fill="none" stroke="currentColor"
                stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
             <rect x="3" y="5" width="18" height="16" rx="2.5"/><path d="M3 10h18M8 3v4M16 3v4"/></svg>
@@ -82258,12 +82247,12 @@ body.q-max #queueOverlay{ padding:0 !important; }
       </div>
       <div id="tpCal"></div>
 
-      <!-- ── 04 · Brackets ───────────────────────────────────────── -->
+      <!-- ── 03 · Brackets ───────────────────────────────────────── -->
       <div class="hub-sec">
         <div class="hub-sec-t">Brackets</div>
         <div class="hub-sec-bar"></div>
         <div class="hub-sec-k">
-          <span>04</span><span class="sep">/</span>
+          <span>03</span><span class="sep">/</span>
           <svg viewBox="0 0 24 24" width="11" height="11" fill="none" stroke="currentColor"
                stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
             <path d="M3 5h6v6H3zM3 13h6v6H3zM15 9h6v6h-6z"/><path d="M9 8h3v8h3"/></svg>
@@ -82276,12 +82265,12 @@ body.q-max #queueOverlay{ padding:0 !important; }
       </div>
       <div id="tpBrowse"></div>
 
-      <!-- ── 05 · Run your own ───────────────────────────────────── -->
+      <!-- ── 04 · Run your own ───────────────────────────────────── -->
       <div class="hub-sec">
         <div class="hub-sec-t">Run your own</div>
         <div class="hub-sec-bar"></div>
         <div class="hub-sec-k">
-          <span>05</span><span class="sep">/</span>
+          <span>04</span><span class="sep">/</span>
           <svg viewBox="0 0 24 24" width="11" height="11" fill="none" stroke="currentColor"
                stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
             <path d="M12 5v14M5 12h14"/></svg>
@@ -82367,8 +82356,14 @@ body.q-max #queueOverlay{ padding:0 !important; }
     linear-gradient(180deg, rgba(0,0,0,.34) 0%, rgba(0,0,0,0) 100%);
 }
 #tournamentsPage .gt-hero-inner{
-  grid-template-columns:minmax(0,1fr) minmax(0,520px);
+  /* The shelves below are a centred 1320px measure with 36px of padding,
+     so their content is 1248 wide. Full-bleed, the hero floated the
+     player out past everything else with a column of nothing under it.
+     Same measure, same edges. */
+  max-width:1248px; margin:0 auto;
+  grid-template-columns:minmax(0,1fr) minmax(0,470px);
   gap:30px;
+  align-items:start;
 }
 #tournamentsPage .gt-hero-stats{ gap:18px; margin-top:16px }
 /* Figures get the mono treatment the rest of the app gives to numbers. */
@@ -82497,12 +82492,13 @@ body.q-max #queueOverlay{ padding:0 !important; }
    so narrowing the column is what shortens the band — a max-height would
    only stop the box being 16/9 and letterbox the picture inside it. */
 @media (max-height:860px){
-  #tournamentsPage .gt-hero-inner{ grid-template-columns:minmax(0,1fr) minmax(0,460px) }
+  #tournamentsPage .gt-hero-inner{ grid-template-columns:minmax(0,1fr) minmax(0,420px) }
 }
 @media (max-height:760px){
   #tournamentsPage .gt-hero{ padding:18px 36px 16px }
-  #tournamentsPage .gt-hero-inner{ grid-template-columns:minmax(0,1fr) minmax(0,392px) }
+  #tournamentsPage .gt-hero-inner{ grid-template-columns:minmax(0,1fr) minmax(0,370px) }
   #tournamentsPage .gt-hero-stats{ margin-top:12px }
+  #tournamentsPage .tp-strip{ display:none }   /* the caption still steps */
 }
 
 /* Stacked, the stream leads: it is the thing that is happening now. */
@@ -82520,17 +82516,17 @@ body.q-max #queueOverlay{ padding:0 !important; }
 
 /* The search belongs to the shelf it filters, so it sits in that
    shelf's action row rather than as a slab across the page. */
-.tp-find{ position:relative; display:flex; align-items:center }
+.tp-find{ position:relative; display:flex; align-items:center; margin-left:auto }
 .tp-find svg{ position:absolute; left:11px; color:var(--text-3); pointer-events:none }
 .tp-find input{
-  width:230px; height:30px; border-radius:99px; padding:0 28px 0 29px;
+  width:122px; height:26px; border-radius:99px; padding:0 24px 0 27px;
   background:rgba(255,255,255,.045); border:1px solid var(--tp-line);
   color:var(--text-1); font-family:var(--font); font-size:12px;
   transition:width .18s ease, border-color .15s ease, box-shadow .15s ease;
 }
 .tp-find input::placeholder{ color:var(--text-3) }
 .tp-find input:focus{
-  outline:none; width:300px;
+  outline:none; width:196px;
   border-color:color-mix(in srgb, var(--hub-accent) 55%, transparent);
   box-shadow:0 0 0 3px color-mix(in srgb, var(--hub-accent) 14%, transparent);
 }
@@ -82545,9 +82541,27 @@ body.q-max #queueOverlay{ padding:0 !important; }
 /* ── The reel ──────────────────────────────────────────────────── */
 /* One scrolling row with the home page's own arrows. A wrapping grid put
    four ragged rows of thumbnails here and buried everything below. */
-.tp-reel-wrap{ position:relative; margin-bottom:4px }
+/* The carousel, docked to the player. Small because it no longer has a
+   page width to fill, and because at this size four or five are visible
+   at once, which is what makes it feel like a channel list. */
+.tp-strip{ display:grid; gap:6px; margin-top:2px }
+.tp-strip-h{ display:flex; align-items:center; gap:9px }
+.tp-strip-t{
+  font-family:'Archivo', var(--font), sans-serif; font-size:9.5px; font-weight:900;
+  letter-spacing:1.6px; text-transform:uppercase; color:var(--text-2); white-space:nowrap;
+}
+.tp-strip-n{
+  font-family:'JetBrains Mono', ui-monospace, monospace; font-size:9px;
+  letter-spacing:1px; text-transform:uppercase; color:var(--text-3); white-space:nowrap;
+}
+.tp-strip-n b{ color:#fff; font-weight:700 }
+.tp-strip-empty{
+  font-size:11px; color:var(--text-3); padding:14px 2px; text-align:center;
+  border:1px dashed rgba(255,255,255,.09); border-radius:9px;
+}
+.tp-reel-wrap{ position:relative }
 .tp-channels{
-  display:flex; gap:12px; overflow-x:auto; scroll-behavior:smooth;
+  display:flex; gap:8px; overflow-x:auto; scroll-behavior:smooth;
   padding:2px 0 4px;
   scrollbar-width:none;   /* it would sit under the arrows and fight them */
 }
@@ -82555,15 +82569,15 @@ body.q-max #queueOverlay{ padding:0 !important; }
 /* hub-empty is written for a grid (grid-column:1/-1), and the reel is a
    flex row — without this it sizes to its own text instead of the row. */
 #tournamentsPage .tp-channels .hub-empty{ flex:1 1 100%; min-width:0 }
-#tournamentsPage .tp-channels .hub-skel{ flex:0 0 214px }
+#tournamentsPage .tp-channels .hub-skel{ flex:0 0 138px }
 @media (prefers-reduced-motion:reduce){ .tp-channels{ scroll-behavior:auto } }
-#tournamentsPage .spotlight-carousel-btn{ width:34px; height:34px }
+/* Left at the component's own inset. Pulled outside the track they would
+   sit in the hero's padding and be clipped by its overflow. */
+#tournamentsPage .spotlight-carousel-btn{ width:28px; height:28px; font-size:13px }
 #tournamentsPage .spotlight-carousel-btn:hover{ background:var(--tp); border-color:var(--tp) }
-#tournamentsPage .spotlight-carousel-btn.prev{ left:-10px }
-#tournamentsPage .spotlight-carousel-btn.next{ right:-10px }
 
 .tp-card{
-  flex:0 0 214px; display:grid; grid-template-rows:auto auto; padding:0; cursor:pointer;
+  flex:0 0 138px; display:grid; grid-template-rows:auto auto; padding:0; cursor:pointer;
   text-align:left; font-family:inherit; overflow:hidden;
 }
 .tp-card-th{
@@ -82591,12 +82605,15 @@ body.q-max #queueOverlay{ padding:0 !important; }
   font-family:'JetBrains Mono', ui-monospace, monospace; font-size:9px; font-weight:700;
   color:#fff; text-shadow:0 1px 3px rgba(0,0,0,.9);
 }
-.tp-card-b{ padding:8px 10px 10px; display:grid; gap:3px; min-width:0 }
+.tp-card-b{ padding:6px 7px 7px; display:grid; gap:1px; min-width:0 }
+/* One line each. Two lines of title at this width is a paragraph, and
+   the full name is on the card's title attribute and in the caption bar
+   the moment it is picked. */
 .tp-card-t{
-  font-size:11.5px; font-weight:700; color:var(--text-1); line-height:1.3;
-  display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical; overflow:hidden;
+  font-size:10.5px; font-weight:700; color:var(--text-1); line-height:1.32;
+  overflow:hidden; text-overflow:ellipsis; white-space:nowrap;
 }
-.tp-card-s{ font-size:9.5px; color:var(--text-3); overflow:hidden; text-overflow:ellipsis; white-space:nowrap }
+.tp-card-s{ font-size:9px; color:var(--text-3); overflow:hidden; text-overflow:ellipsis; white-space:nowrap }
 .tp-card.on{
   border-color:color-mix(in srgb, var(--hub-accent) 62%, transparent);
   box-shadow:0 0 0 1px color-mix(in srgb, var(--hub-accent) 34%, transparent),
@@ -82862,11 +82879,26 @@ body.q-max #queueOverlay{ padding:0 !important; }
   function setText(id, v){ var el = $(id); if (el) el.textContent = v; }
 
   /* ── Hero figures ────────────────────────────────────────────── */
+  /* The public list and the ones you are in, deduplicated. Counting only
+     the public list showed 0 LIVE NOW and 0 COMPETING beside eleven
+     entered brackets, which is not a figure, it is a contradiction. */
+  function everything(){
+    var seen = {}, out = [];
+    all.concat(mine).forEach(function (r){
+      var k = String(r && r.id);
+      if (!r || seen[k]) return;
+      seen[k] = 1; out.push(r);
+    });
+    return out;
+  }
   function paintTop(){
+    var u = everything();
     setText('tpStatAir', String(streams.filter(function (x){ return x.live; }).length));
-    setText('tpStatLive', String(all.filter(isLive).length));
+    setText('tpStatLive', String(u.filter(isLive).length));
+    /* Public only: your own entered brackets are not something you can
+       go and enter. */
     setText('tpStatOpen', String(all.filter(isOpen).length));
-    setText('tpStatPlayers', num(all.reduce(function (n, r){ return n + (Number(r.entrants) || 0); }, 0)));
+    setText('tpStatPlayers', num(u.reduce(function (n, r){ return n + (Number(r.entrants) || 0); }, 0)));
   }
 
   window.tpJoinCode = async function (){
@@ -83025,20 +83057,17 @@ body.q-max #queueOverlay{ padding:0 !important; }
       return [r.m.name, r.m.game, r.m.organiser].join(' ').toLowerCase().indexOf(q) >= 0;
     });
 
+    /* A full hub-empty is a 38px-padded panel — right for a shelf, far
+       too tall for a strip tucked under the player. */
     if (!streams.length){
-      host.innerHTML = empty({
-        icon:'bolt', title:'No broadcasts found',
-        sub:'Nothing is streaming and nothing is scheduled on the channels we watch. ' +
-            'The moment one goes live it appears here and takes the stage above.'
-      });
+      host.innerHTML = '<div class="tp-strip-empty">Nothing else is on. ' +
+        'The moment a watched channel goes live it appears here.</div>';
       return;
     }
     if (!rows.length){
-      host.innerHTML = empty({
-        icon:'search', title:'Nothing on matches that',
-        sub:'No broadcast matches “' + findQ + '”. Try the game, or the organiser.',
-        actions:'<button class="hub-chip on" style="cursor:pointer" onclick="window.tpSearch(\'\')">Clear search</button>'
-      });
+      host.innerHTML = '<div class="tp-strip-empty">Nothing on matches “' + esc(findQ) + '”. ' +
+        '<button class="hub-chip on" style="cursor:pointer;margin-left:6px" ' +
+        'onclick="window.tpSearch(\'\')">Clear</button></div>';
       return;
     }
 
@@ -83189,6 +83218,11 @@ body.q-max #queueOverlay{ padding:0 !important; }
       if (t.isHost) chips.push(chip('You host', 'gold'));
       if (t.joinCode) chips.push(chip(t.joinCode, 'on'));
       var when = typeof window.hubWhen === 'function' ? window.hubWhen(t.startTime) : '';
+      /* Always rendered. Without it the cards with a start time were a
+         row taller than the ones without, and a grid row is as tall as
+         its tallest card — so the short ones sat in a pool of empty
+         space. Every card says what is happening next, even when the
+         answer is "nothing yet". */
       var next = isLive(t)
         ? '<span class="tp-next"><b>' + esc(s.l) + '</b>' +
           '<span class="t">' + esc(t.nextOpponent ? 'vs ' + t.nextOpponent : 'in progress') + '</span>' +
@@ -83197,7 +83231,9 @@ body.q-max #queueOverlay{ padding:0 !important; }
             ? '<span class="tp-next"><b>Starts</b><span class="t">' +
               esc(new Date(t.startTime).toLocaleString([], { weekday:'short', hour:'2-digit', minute:'2-digit' })) +
               '</span>' + (when ? '<span class="c">' + esc(when) + '</span>' : '') + '</span>'
-            : '');
+            : isDone(t)
+              ? '<span class="tp-next"><b>Done</b><span class="t">this bracket has finished</span></span>'
+              : '<span class="tp-next"><b>Waiting</b><span class="t">no start time set yet</span></span>');
       return '<button type="button" class="tp-m hub-card" onclick="window.gtJoin(\'' + esc(t.id) + '\')">' +
         '<span class="tp-m-art"' + (art ? ' style="background-image:url(\'' + esc(art) + '\')"' : '') + '>' +
           (art ? '' : esc((t.name || '?').slice(0,1).toUpperCase())) + '</span>' +
