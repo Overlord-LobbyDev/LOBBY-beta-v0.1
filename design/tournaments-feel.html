@@ -1,0 +1,466 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Tournaments — the feel</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo:wght@600;900&family=Barlow:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;700&display=swap">
+
+<style>
+/* ─────────────────────────────────────────────────────────────────
+   Single theme, painted explicitly, same as the other two design
+   pages. Every pair below is the REAL css of each treatment, not a
+   picture of it — so what you see is what the page would do.
+   ───────────────────────────────────────────────────────────────── */
+:root{
+  --ground:#0d0e16;
+  --well:rgba(0,0,0,.24);
+  --lip:rgba(255,255,255,.055);
+  --cut:rgba(0,0,0,.46);
+  --text:#eceef6;
+  --text-2:#a8adc4;
+  --text-3:#6f748d;
+  --accent:#ff3d6e;
+  --gold:#f0b429;
+  --mono:'JetBrains Mono', ui-monospace, monospace;
+  --display:'Archivo', system-ui, sans-serif;
+  color-scheme:dark;
+}
+*{box-sizing:border-box}
+html,body{margin:0}
+body{
+  background:radial-gradient(1100px 520px at 78% -8%, rgba(255,61,110,.12) 0%, transparent 62%), var(--ground);
+  color:var(--text);
+  font-family:'Barlow', system-ui, sans-serif;
+  font-size:15px; line-height:1.6;
+  padding:0 0 110px;
+}
+.wrap{max-width:1360px;margin:0 auto;padding:0 32px}
+
+header.top{padding:60px 0 36px;border-bottom:1px solid rgba(255,255,255,.06);margin-bottom:20px}
+.eyebrow{
+  display:inline-flex;align-items:center;gap:8px;
+  font-family:var(--mono);font-size:10px;font-weight:700;
+  letter-spacing:2.2px;text-transform:uppercase;color:var(--accent);
+  background:rgba(255,61,110,.12);border:1px solid rgba(255,61,110,.34);
+  padding:6px 13px;border-radius:99px;
+}
+h1{
+  font-family:var(--display);font-weight:900;font-size:clamp(32px,4.2vw,54px);
+  letter-spacing:1.5px;text-transform:uppercase;line-height:1.02;margin:20px 0 0;
+}
+h1 span{color:var(--accent)}
+.lede{max-width:74ch;color:var(--text-2);font-size:17px;margin:18px 0 0}
+.lede b{color:var(--text)}
+
+nav.jump{position:sticky;top:0;z-index:20;background:rgba(13,14,22,.92);backdrop-filter:blur(10px);
+  border-bottom:1px solid rgba(255,255,255,.06);margin-bottom:44px}
+nav.jump .wrap{display:flex;gap:7px;padding-top:12px;padding-bottom:12px;flex-wrap:wrap}
+nav.jump a{
+  font-family:var(--mono);font-size:9.5px;font-weight:700;letter-spacing:1.3px;
+  text-transform:uppercase;color:var(--text-2);text-decoration:none;
+  padding:7px 12px;border:1px solid var(--cut);background:var(--well);
+}
+nav.jump a:hover{color:var(--text);border-color:var(--accent)}
+nav.jump a.pick{color:var(--accent);border-color:rgba(255,61,110,.5)}
+
+section.idea{margin:0 0 84px;scroll-margin-top:72px}
+.ihead{display:flex;align-items:flex-start;gap:16px;flex-wrap:wrap}
+.inum{font-family:var(--display);font-weight:900;font-size:38px;line-height:1;
+  color:transparent;-webkit-text-stroke:1.4px rgba(255,255,255,.16)}
+h2{font-family:var(--display);font-weight:900;font-size:24px;letter-spacing:1.3px;
+  text-transform:uppercase;margin:0;line-height:1.12}
+.tag{font-family:var(--mono);font-size:9px;font-weight:700;letter-spacing:1.3px;
+  text-transform:uppercase;padding:5px 10px;border-radius:99px;align-self:center;
+  background:rgba(255,61,110,.12);border:1px solid rgba(255,61,110,.4);color:var(--accent)}
+.tag.cheap{background:rgba(74,222,128,.1);border-color:rgba(74,222,128,.35);color:#4ade80}
+.why{max-width:82ch;color:var(--text-2);margin:6px 0 22px;font-size:15.5px}
+.why b{color:var(--text)}
+
+/* ── The comparison frame ─────────────────────────────────────── */
+.cmp{display:grid;grid-template-columns:1fr 1fr;gap:20px}
+@media (max-width:900px){.cmp{grid-template-columns:1fr}}
+.pane{border:1px solid var(--cut);background:#0b0c13;overflow:hidden}
+.pane-l{
+  display:flex;align-items:center;gap:8px;padding:9px 13px;
+  border-bottom:1px solid var(--cut);
+  font-family:var(--mono);font-size:9px;font-weight:700;letter-spacing:1.6px;
+  text-transform:uppercase;color:var(--text-3);
+}
+.pane-l b{color:var(--text-2)}
+.pane.now .pane-l b{color:var(--text-3)}
+.pane.idea .pane-l b{color:var(--accent)}
+.stagew{position:relative;height:224px;overflow:hidden;background:var(--ground)}
+
+/* Miniature of the real top band: rail, picture, calendar. */
+.band{display:grid;grid-template-columns:92px 1fr 84px;gap:10px;padding:10px;height:100%}
+.mini-rail{display:grid;gap:5px;align-content:start;padding:7px;
+  background:var(--well);border:1px solid var(--cut);box-shadow:inset 0 1px 0 var(--lip)}
+.mini-row{display:grid;grid-template-columns:26px 1fr;gap:5px;align-items:center;padding:4px;
+  background:var(--well);border:1px solid var(--cut);box-shadow:inset 0 1px 0 var(--lip)}
+.mini-th{height:16px;background:linear-gradient(140deg,#3a2b52,#1b1e2b)}
+.mini-ln{height:4px;background:rgba(255,255,255,.14)}
+.mini-ln.s{width:60%;background:rgba(255,255,255,.07);margin-top:3px}
+.mini-pic{background:linear-gradient(150deg,#4a1f33,#241228 60%,#12131c);
+  border:1px solid var(--cut);display:grid;place-content:center;
+  font-family:var(--mono);font-size:9px;letter-spacing:2px;color:rgba(255,255,255,.3)}
+.mini-cal{display:grid;gap:5px;align-content:start;padding:7px;
+  background:var(--well);border:1px solid var(--cut);box-shadow:inset 0 1px 0 var(--lip)}
+.mini-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:3px}
+.mini-d{aspect-ratio:1;background:rgba(0,0,0,.3);box-shadow:inset 0 1px 0 var(--lip)}
+.mini-d.on{background:var(--accent)}
+
+/* 01 — the band runs edge to edge */
+.band.bleed{grid-template-columns:102px 1fr 94px;gap:0;padding:0}
+.band.bleed .mini-rail{border-left:0;border-top:0;border-bottom:0;padding:7px 7px 7px 12px}
+.band.bleed .mini-cal{border-right:0;border-top:0;border-bottom:0;padding:7px 12px 7px 7px}
+.band.bleed .mini-pic{border-top:0;border-bottom:0}
+
+/* 02 — ambient tint from the artwork */
+.stagew.tint::before{
+  content:'';position:absolute;inset:0;pointer-events:none;
+  background:
+    radial-gradient(120% 90% at 50% 0%, rgba(214,58,74,.30) 0%, transparent 62%),
+    radial-gradient(80% 70% at 12% 100%, rgba(96,44,150,.22) 0%, transparent 60%);
+}
+.swatches{display:flex;gap:6px;margin-top:12px;align-items:center}
+.sw{width:22px;height:22px;border:1px solid var(--cut)}
+.swl{font-family:var(--mono);font-size:9px;letter-spacing:1.4px;text-transform:uppercase;color:var(--text-3)}
+
+/* 03 — regions without hairlines */
+.stack{padding:14px;display:grid;gap:0}
+.reg{padding:13px 14px}
+.reg-t{font-family:var(--display);font-weight:900;font-size:11px;letter-spacing:1.7px;
+  text-transform:uppercase;color:var(--text-2)}
+.reg-b{height:5px;background:rgba(255,255,255,.08);margin-top:8px}
+.stack.lined .reg{border-bottom:1px solid rgba(255,255,255,.09)}
+.stack.lined .reg:last-child{border-bottom:0}
+.stack.spaced{gap:0}
+.stack.spaced .reg{padding:20px 14px}
+.stack.spaced .reg + .reg{
+  box-shadow:inset 0 14px 18px -18px #000;   /* depth, not a line */
+}
+
+/* 04 — grain */
+.grainw{position:relative;height:170px;background:var(--ground);padding:16px;display:grid;gap:10px;align-content:start}
+.grainw.on::after{
+  content:'';position:absolute;inset:0;pointer-events:none;opacity:.55;
+  background-image:url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='140' height='140'><filter id='n'><feTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='3' stitchTiles='stitch'/><feColorMatrix type='saturate' values='0'/></filter><rect width='140' height='140' filter='url(%23n)' opacity='0.35'/></svg>");
+}
+.gcard{padding:12px 13px;background:var(--well);border:1px solid var(--cut);
+  box-shadow:inset 0 1px 0 var(--lip);position:relative;z-index:1}
+.gcard b{font-size:12.5px}
+.gcard p{margin:4px 0 0;font-size:11px;color:var(--text-3)}
+
+/* 05 — the live row reaches further */
+.onair{padding:12px 12px 12px 0;display:grid;gap:6px;background:var(--ground);height:170px;align-content:start}
+.oa{display:grid;grid-template-columns:34px 1fr;gap:8px;align-items:center;padding:6px 8px 6px 16px;
+  background:var(--well);border:1px solid var(--cut);border-left:0;box-shadow:inset 0 1px 0 var(--lip)}
+.oa-th{height:20px;background:linear-gradient(140deg,#3a2b52,#1b1e2b)}
+.oa-n{height:5px;background:rgba(255,255,255,.16)}
+.oa-s{height:4px;width:52%;background:rgba(255,255,255,.07);margin-top:4px}
+.onair.reach .oa.live{
+  margin-right:-12px;padding-left:24px;
+  background:linear-gradient(90deg, rgba(255,61,110,.2), var(--well) 55%);
+  border-color:rgba(255,61,110,.5);
+}
+.onair .oa.live{border-color:rgba(255,61,110,.5)}
+
+/* 06 — the page seats into the window */
+.chrome{background:#05060a;padding:16px;height:180px}
+.sheetp{height:100%;background:var(--ground);border:1px solid var(--cut);padding:14px}
+.sheetp.rounded{border-radius:14px 14px 0 0}
+.sheetp .reg-t{margin-bottom:8px}
+
+.trade{margin-top:18px;display:grid;gap:12px;grid-template-columns:repeat(auto-fit,minmax(290px,1fr))}
+.tc{border:1px solid var(--cut);padding:13px 15px;background:var(--well);box-shadow:inset 0 1px 0 var(--lip)}
+.tc h5{margin:0 0 5px;font-family:var(--mono);font-size:9.5px;font-weight:700;letter-spacing:1.5px;text-transform:uppercase}
+.tc.good h5{color:#4ade80}
+.tc.cost h5{color:var(--gold)}
+.tc p{margin:0;font-size:13.5px;color:var(--text-2)}
+
+footer{border-top:1px solid rgba(255,255,255,.06);padding-top:34px}
+footer h3{font-family:var(--display);font-weight:900;font-size:19px;letter-spacing:1.3px;
+  text-transform:uppercase;margin:0 0 12px}
+footer p{max-width:82ch;color:var(--text-2)}
+footer b{color:var(--text)}
+</style>
+</head>
+<body>
+
+<header class="top">
+  <div class="wrap">
+    <div class="eyebrow">Lobby &middot; Tournaments &middot; Feel, not layout</div>
+    <h1>Six ways to make it <span>one with the app</span></h1>
+    <p class="lede">
+      <b>Nothing here moves anything.</b> Same columns, same order, same placement &mdash; these are
+      all surface and depth. Each pair below is the real CSS of both treatments side by side, so
+      what you are looking at is what the page would actually do, not a picture of it.
+    </p>
+  </div>
+</header>
+
+<nav class="jump">
+  <div class="wrap">
+    <a class="pick" href="#a">01 &middot; One band</a>
+    <a class="pick" href="#b">02 &middot; Ambient tint</a>
+    <a href="#c">03 &middot; No hairlines</a>
+    <a href="#d">04 &middot; Grain</a>
+    <a href="#e">05 &middot; Live reaches out</a>
+    <a href="#f">06 &middot; Seated page</a>
+    <a href="#verdict">Verdict</a>
+  </div>
+</nav>
+
+<!-- 01 -->
+<section class="idea wrap" id="a">
+  <div class="ihead"><div class="inum">01</div><h2>The whole top band bleeds</h2><span class="tag">Biggest change</span></div>
+  <p class="why">
+    The left rail already runs off the glass, but the picture and the calendar still sit in boxes
+    with air around them &mdash; so the band reads as <b>one anchored thing and two floating
+    ones</b>. If all three run to the top and to their own edges with no gaps between, the entire
+    top of the page becomes a single surface that the stream is set into.
+  </p>
+  <div class="cmp">
+    <div class="pane now"><div class="pane-l"><b>Now</b> &middot; one anchored, two floating</div>
+      <div class="stagew"><div class="band">
+        <div class="mini-rail">
+          <div class="mini-row"><div class="mini-th"></div><div><div class="mini-ln"></div><div class="mini-ln s"></div></div></div>
+          <div class="mini-row"><div class="mini-th"></div><div><div class="mini-ln"></div><div class="mini-ln s"></div></div></div>
+          <div class="mini-row"><div class="mini-th"></div><div><div class="mini-ln"></div><div class="mini-ln s"></div></div></div>
+        </div>
+        <div class="mini-pic">Stream</div>
+        <div class="mini-cal"><div class="mini-grid">
+          <div class="mini-d"></div><div class="mini-d on"></div><div class="mini-d"></div><div class="mini-d"></div>
+          <div class="mini-d"></div><div class="mini-d"></div><div class="mini-d"></div><div class="mini-d"></div>
+          <div class="mini-d"></div><div class="mini-d"></div><div class="mini-d"></div><div class="mini-d"></div>
+        </div></div>
+      </div></div>
+    </div>
+    <div class="pane idea"><div class="pane-l"><b>Idea</b> &middot; one continuous band</div>
+      <div class="stagew"><div class="band bleed">
+        <div class="mini-rail">
+          <div class="mini-row"><div class="mini-th"></div><div><div class="mini-ln"></div><div class="mini-ln s"></div></div></div>
+          <div class="mini-row"><div class="mini-th"></div><div><div class="mini-ln"></div><div class="mini-ln s"></div></div></div>
+          <div class="mini-row"><div class="mini-th"></div><div><div class="mini-ln"></div><div class="mini-ln s"></div></div></div>
+        </div>
+        <div class="mini-pic">Stream</div>
+        <div class="mini-cal"><div class="mini-grid">
+          <div class="mini-d"></div><div class="mini-d on"></div><div class="mini-d"></div><div class="mini-d"></div>
+          <div class="mini-d"></div><div class="mini-d"></div><div class="mini-d"></div><div class="mini-d"></div>
+          <div class="mini-d"></div><div class="mini-d"></div><div class="mini-d"></div><div class="mini-d"></div>
+        </div></div>
+      </div></div>
+    </div>
+  </div>
+  <div class="trade">
+    <div class="tc good"><h5>What it buys</h5><p>The top of the page stops being three objects and
+      becomes one surface. It is the single biggest step toward "embedded".</p></div>
+    <div class="tc cost"><h5>What it costs</h5><p>The picture loses its floating frame, so the
+      stream meets the calendar with only a seam between them. Worth seeing at full size before
+      committing.</p></div>
+  </div>
+</section>
+
+<!-- 02 -->
+<section class="idea wrap" id="b">
+  <div class="ihead"><div class="inum">02</div><h2>Ambient tint from what is playing</h2><span class="tag cheap">Cheap</span></div>
+  <p class="why">
+    The page is the same colour whatever is on. Pull the dominant colour out of the current
+    broadcast's thumbnail and let a <b>very low wash of it sit behind the top band</b>, so the page
+    shifts with the stream. Discover already does exactly this on its cards with
+    <code>--dc-art</code>, so the pattern and the plumbing both exist &mdash; it is one custom
+    property and a gradient.
+  </p>
+  <div class="cmp">
+    <div class="pane now"><div class="pane-l"><b>Now</b> &middot; the same ground always</div>
+      <div class="stagew"><div class="band">
+        <div class="mini-rail">
+          <div class="mini-row"><div class="mini-th"></div><div><div class="mini-ln"></div><div class="mini-ln s"></div></div></div>
+          <div class="mini-row"><div class="mini-th"></div><div><div class="mini-ln"></div><div class="mini-ln s"></div></div></div>
+        </div>
+        <div class="mini-pic">Stream</div>
+        <div class="mini-cal"><div class="mini-grid">
+          <div class="mini-d"></div><div class="mini-d on"></div><div class="mini-d"></div><div class="mini-d"></div>
+          <div class="mini-d"></div><div class="mini-d"></div><div class="mini-d"></div><div class="mini-d"></div>
+        </div></div>
+      </div></div>
+    </div>
+    <div class="pane idea"><div class="pane-l"><b>Idea</b> &middot; tinted by the broadcast</div>
+      <div class="stagew tint"><div class="band">
+        <div class="mini-rail">
+          <div class="mini-row"><div class="mini-th"></div><div><div class="mini-ln"></div><div class="mini-ln s"></div></div></div>
+          <div class="mini-row"><div class="mini-th"></div><div><div class="mini-ln"></div><div class="mini-ln s"></div></div></div>
+        </div>
+        <div class="mini-pic">Stream</div>
+        <div class="mini-cal"><div class="mini-grid">
+          <div class="mini-d"></div><div class="mini-d on"></div><div class="mini-d"></div><div class="mini-d"></div>
+          <div class="mini-d"></div><div class="mini-d"></div><div class="mini-d"></div><div class="mini-d"></div>
+        </div></div>
+      </div></div>
+      <div style="padding:12px 13px">
+        <div class="swatches">
+          <span class="swl">Follows</span>
+          <span class="sw" style="background:#d63a4a"></span>
+          <span class="sw" style="background:#2f6fd0"></span>
+          <span class="sw" style="background:#3f9e5a"></span>
+          <span class="sw" style="background:#8b5cf6"></span>
+        </div>
+      </div>
+    </div>
+  </div>
+  <div class="trade">
+    <div class="tc good"><h5>What it buys</h5><p>The page belongs to whatever is on it, and it
+      changes as you flick through the carousel. Most feel per line of code on this list.</p></div>
+    <div class="tc good"><h5>Already proven</h5><p>Discover's cards read their artwork into a
+      custom property and tint from it. Same trick, one level up.</p></div>
+    <div class="tc cost"><h5>What it costs</h5><p>A thumbnail with no dominant colour gives mud, so
+      it needs a floor: below a saturation threshold, fall back to the hub accent.</p></div>
+  </div>
+</section>
+
+<!-- 03 -->
+<section class="idea wrap" id="c">
+  <div class="ihead"><div class="inum">03</div><h2>Depth instead of hairlines</h2></div>
+  <p class="why">
+    The bar, the top row and the breaker each draw their own 1px line. Lines are how a document
+    separates things; a surface separates them with <b>shadow and space</b>. Same regions, same
+    order &mdash; the divider is a soft shadow cast by the region above rather than a drawn edge.
+  </p>
+  <div class="cmp">
+    <div class="pane now"><div class="pane-l"><b>Now</b> &middot; drawn lines</div>
+      <div class="stack lined">
+        <div class="reg"><div class="reg-t">On air</div><div class="reg-b"></div></div>
+        <div class="reg"><div class="reg-t">The brackets</div><div class="reg-b"></div></div>
+        <div class="reg"><div class="reg-t">Run one</div><div class="reg-b"></div></div>
+      </div>
+    </div>
+    <div class="pane idea"><div class="pane-l"><b>Idea</b> &middot; cast shadow and space</div>
+      <div class="stack spaced">
+        <div class="reg"><div class="reg-t">On air</div><div class="reg-b"></div></div>
+        <div class="reg"><div class="reg-t">The brackets</div><div class="reg-b"></div></div>
+        <div class="reg"><div class="reg-t">Run one</div><div class="reg-b"></div></div>
+      </div>
+    </div>
+  </div>
+  <div class="trade">
+    <div class="tc good"><h5>What it buys</h5><p>Fewer drawn edges is most of what separates a
+      designed screen from a laid-out one.</p></div>
+    <div class="tc cost"><h5>What it costs</h5><p>It is subtler, and you told me the page needed
+      MORE obvious breakers a few rounds ago. This pulls the other way, so it may be the wrong
+      direction for the section heads even if it is right between the big regions.</p></div>
+  </div>
+</section>
+
+<!-- 04 -->
+<section class="idea wrap" id="d">
+  <div class="ihead"><div class="inum">04</div><h2>A little grain on the ground</h2><span class="tag cheap">Cheap</span></div>
+  <p class="why">
+    Flat dark UI reads as plastic because nothing in it has a texture. Two or three percent of
+    monochrome noise across the page ground reads as <b>a screen rather than a fill</b>, and it
+    makes the wells look deeper for free because the grain sits on the ground and not in them.
+    One generated image, no asset, no request.
+  </p>
+  <div class="cmp">
+    <div class="pane now"><div class="pane-l"><b>Now</b> &middot; flat fill</div>
+      <div class="grainw">
+        <div class="gcard"><b>Chess.com Blitz Arena</b><p>1 / 8 &middot; starts in 2d</p></div>
+        <div class="gcard"><b>Rocket League 2v2</b><p>5 / 8 &middot; starts in 5h</p></div>
+      </div>
+    </div>
+    <div class="pane idea"><div class="pane-l"><b>Idea</b> &middot; grain on the ground only</div>
+      <div class="grainw on">
+        <div class="gcard"><b>Chess.com Blitz Arena</b><p>1 / 8 &middot; starts in 2d</p></div>
+        <div class="gcard"><b>Rocket League 2v2</b><p>5 / 8 &middot; starts in 5h</p></div>
+      </div>
+    </div>
+  </div>
+  <div class="trade">
+    <div class="tc good"><h5>What it buys</h5><p>Depth for almost nothing, and the cards read as
+      cut into a real surface rather than drawn on a colour.</p></div>
+    <div class="tc cost"><h5>What it costs</h5><p>Overdone it looks dirty, and it must sit under the
+      cards rather than over them or every edge goes fuzzy. Needs to be dialled at full size.</p></div>
+  </div>
+</section>
+
+<!-- 05 -->
+<section class="idea wrap" id="e">
+  <div class="ihead"><div class="inum">05</div><h2>What is playing reaches further out</h2></div>
+  <p class="why">
+    The live row is marked with a border colour, which is the same way everything else is marked.
+    Since the rail is anchored to the glass, the current broadcast can say so <b>with position</b>:
+    it reaches a little further into the edge than its neighbours and carries a wash of the accent.
+    Selection becomes something the layout does rather than something a colour announces.
+  </p>
+  <div class="cmp">
+    <div class="pane now"><div class="pane-l"><b>Now</b> &middot; marked by border colour</div>
+      <div class="onair">
+        <div class="oa live"><div class="oa-th"></div><div><div class="oa-n"></div><div class="oa-s"></div></div></div>
+        <div class="oa"><div class="oa-th"></div><div><div class="oa-n"></div><div class="oa-s"></div></div></div>
+        <div class="oa"><div class="oa-th"></div><div><div class="oa-n"></div><div class="oa-s"></div></div></div>
+        <div class="oa"><div class="oa-th"></div><div><div class="oa-n"></div><div class="oa-s"></div></div></div>
+      </div>
+    </div>
+    <div class="pane idea"><div class="pane-l"><b>Idea</b> &middot; marked by reach</div>
+      <div class="onair reach">
+        <div class="oa live"><div class="oa-th"></div><div><div class="oa-n"></div><div class="oa-s"></div></div></div>
+        <div class="oa"><div class="oa-th"></div><div><div class="oa-n"></div><div class="oa-s"></div></div></div>
+        <div class="oa"><div class="oa-th"></div><div><div class="oa-n"></div><div class="oa-s"></div></div></div>
+        <div class="oa"><div class="oa-th"></div><div><div class="oa-n"></div><div class="oa-s"></div></div></div>
+      </div>
+    </div>
+  </div>
+  <div class="trade">
+    <div class="tc good"><h5>What it buys</h5><p>You can see which one is playing from the corner of
+      your eye, without reading a colour.</p></div>
+    <div class="tc cost"><h5>What it costs</h5><p>The list gets a ragged right edge. That is the
+      point, but it is a taste call.</p></div>
+  </div>
+</section>
+
+<!-- 06 -->
+<section class="idea wrap" id="f">
+  <div class="ihead"><div class="inum">06</div><h2>The page seats into the window</h2><span class="tag cheap">Cheap</span></div>
+  <p class="why">
+    The overlay meets the app chrome with hard corners, so it reads as a sheet dropped over the
+    window. Rounding only the <b>top two corners</b> of the scroll area seats it into the chrome
+    the way a panel does &mdash; the same detail that makes the sidebar and the chat feel built in
+    rather than layered on.
+  </p>
+  <div class="cmp">
+    <div class="pane now"><div class="pane-l"><b>Now</b> &middot; square against the chrome</div>
+      <div class="chrome"><div class="sheetp">
+        <div class="reg-t">Global tournaments</div><div class="reg-b"></div>
+      </div></div>
+    </div>
+    <div class="pane idea"><div class="pane-l"><b>Idea</b> &middot; seated</div>
+      <div class="chrome"><div class="sheetp rounded">
+        <div class="reg-t">Global tournaments</div><div class="reg-b"></div>
+      </div></div>
+    </div>
+  </div>
+  <div class="trade">
+    <div class="tc good"><h5>What it buys</h5><p>The page belongs to the window instead of covering
+      it. Two lines of CSS.</p></div>
+    <div class="tc cost"><h5>What it costs</h5><p>It has to match whatever the other hubs do, or
+      Tournaments becomes the odd one out. If we do it, we do it to all of them.</p></div>
+  </div>
+</section>
+
+<footer class="wrap" id="verdict">
+  <h3>What I would take</h3>
+  <p><b>02 and 01, in that order.</b> The ambient tint is the most feel for the least code and it
+    reuses a pattern the app already has, so it cannot look foreign. The single band is the bigger
+    move and the one that actually answers "embedded", but it is worth looking at full size first
+    because the stream ends up meeting the calendar with only a seam.</p>
+  <p><b>04 with them if you like it</b> &mdash; grain is nearly free and it flatters the wells.
+    <b>06 only if we do every hub</b>, otherwise Tournaments looks like a mistake.
+    <b>03 I would hold</b>: you asked for more obvious breakers a few rounds ago and this pulls
+    against that, so it is probably right between the big regions and wrong for the section heads.
+    <b>05 is a taste call</b> and I would do it last.</p>
+</footer>
+
+</body>
+</html>
