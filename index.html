@@ -82757,7 +82757,17 @@ body.q-max #queueOverlay{ padding:0 !important; }
 .tp-code-w input{ width:100%; min-width:0 }
 
 /* ── The grid, and the sheet over it ───────────────────────────── */
-.tp-browse-wrap{ position:relative; min-width:0 }
+/* The sheet gets a track rather than a layer. Closed, the grid has the
+   whole width; open, the cards reflow into the narrower track and
+   nothing is covered — which is what makes the dimming unnecessary. */
+.tp-browse-wrap{
+  min-width:0; display:grid; gap:20px; align-items:start;
+  grid-template-columns:minmax(0,1fr);
+}
+.tp-browse-wrap.sheet-open{ grid-template-columns:minmax(0,1fr) minmax(0,400px) }
+@media (max-width:1240px){
+  .tp-browse-wrap.sheet-open{ grid-template-columns:minmax(0,1fr) }
+}
 .tp-browse-k{
   font-family:'JetBrains Mono', ui-monospace, monospace; font-size:9.5px; font-weight:700;
   letter-spacing:1.6px; text-transform:uppercase; color:var(--text-3);
@@ -82765,15 +82775,13 @@ body.q-max #queueOverlay{ padding:0 !important; }
   background:rgba(255,255,255,.035); border:1px solid rgba(255,255,255,.07);
 }
 .tp-browse-k b{ color:#fff }
-/* Dimmed, not disabled: picking another card while the sheet is open
-   should swap what it shows rather than make you close it first. */
-.tp-browse-wrap.sheet-open #tpBrowse{ opacity:.42; transition:opacity .18s ease }
-@media (prefers-reduced-motion:reduce){ .tp-browse-wrap.sheet-open #tpBrowse{ transition:none } }
 /* An author display beats the user agent's [hidden] rule outright, so
    the attribute needs saying again here or el.hidden does nothing. */
 .tp-sheet[hidden]{ display:none }
 .tp-sheet{
-  position:absolute; top:0; right:0; width:min(420px, 100%);
+  /* Sticky, not absolute: it could not follow a long grid while it was
+     overlapping one. Needs align-self:start to have room to stick in. */
+  position:sticky; top:16px; align-self:start; min-width:0;
   border-radius:16px; padding:15px;
   background:linear-gradient(160deg,#191b28,#12131c);
   border:1px solid rgba(255,255,255,.1);
@@ -82781,7 +82789,7 @@ body.q-max #queueOverlay{ padding:0 !important; }
   display:grid; gap:12px; align-content:start;
   max-height:none;
 }
-@media (max-width:820px){ .tp-sheet{ position:static; width:auto; margin-top:16px } }
+@media (max-width:1240px){ .tp-sheet{ position:static } }
 .tp-sheet-h{ display:flex; align-items:flex-start; gap:10px }
 .tp-sheet-h .hub-sec{ flex:1; margin:0 }
 .tp-sheet-x{
@@ -82922,9 +82930,9 @@ body.q-max #queueOverlay{ padding:0 !important; }
 .tp-p-art{ position:relative; height:126px; background:#14151d center/cover }
 .tp-p-art::after{ content:''; position:absolute; inset:0;
   background:linear-gradient(0deg, rgba(10,11,17,.96), rgba(10,11,17,.2) 70%) }
-.tp-p-fb{ position:absolute; inset:0; display:grid; place-content:center;
+.tp-p-fb{ position:absolute; inset:0; z-index:1; display:grid; place-content:center;
   font-family:'Archivo', var(--font), sans-serif; font-size:38px; font-weight:900;
-  color:rgba(255,255,255,.2) }
+  color:rgba(255,255,255,.14) }
 .tp-p-head{ position:absolute; left:15px; right:15px; bottom:12px; z-index:2; display:grid; gap:7px }
 .tp-p-n{ font-family:'Archivo', var(--font), sans-serif; font-size:18px; font-weight:900;
   letter-spacing:.4px; color:#fff; line-height:1.2;
@@ -82971,7 +82979,7 @@ body.q-max #queueOverlay{ padding:0 !important; }
 /* ── Your run and Brackets grids ───────────────────────────────── */
 .tp-grid{ display:grid; gap:16px; grid-template-columns:repeat(auto-fill,minmax(330px,1fr)) }
 .tp-c{ cursor:pointer; text-align:left; padding:0; font-family:inherit;
-  display:grid; grid-template-rows:132px auto }
+  display:grid; grid-template-rows:104px auto; align-content:start }
 /* Most brackets have no game art, and 132px of flat grey is what makes
    a grid of them look unfinished. The ground is a quiet gradient so an
    artless card still reads as a card. */
@@ -82989,9 +82997,11 @@ body.q-max #queueOverlay{ padding:0 !important; }
 }
 .tp-c-badge.live{ background:var(--tp) }
 .tp-c-badge.open{ background:#f0b429; color:#241a00 }
-.tp-c-fb{ position:absolute; inset:0; display:grid; place-content:center;
-  font-family:'Archivo', var(--font), sans-serif; font-size:29px; font-weight:900;
-  color:rgba(255,255,255,.26) }
+/* Above .tp-c-art::after, which is generated after the children and so
+   paints over them — that wash is why this read as a smudge. */
+.tp-c-fb{ position:absolute; inset:0; z-index:1; display:grid; place-content:center;
+  font-family:'Archivo', var(--font), sans-serif; font-size:34px; font-weight:900;
+  color:rgba(255,255,255,.14); letter-spacing:2px }
 .tp-c-b{ padding:12px 13px 13px; display:grid; gap:8px }
 .tp-c-t{ font-size:14px; font-weight:800; line-height:1.25;
   display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical; overflow:hidden }
@@ -83000,8 +83010,18 @@ body.q-max #queueOverlay{ padding:0 !important; }
 .tp-fillbar span{ display:block; height:100%; border-radius:99px;
   background:linear-gradient(90deg, color-mix(in srgb, var(--hub-accent) 70%, #fff), var(--hub-accent)) }
 .tp-fillbar.full span{ background:linear-gradient(90deg,#f0b429,#f7d774) }
-.tp-c-seats{ font-size:10.5px; color:var(--text-3);
-  font-family:'JetBrains Mono', ui-monospace, monospace; font-variant-numeric:tabular-nums }
+/* One line, on every card, whatever it holds: the numbers and the
+   countdown left, where it lives right. Four chips wrapping to three
+   rows is what made the grid ragged. */
+.tp-c-f{ display:flex; align-items:baseline; gap:9px; min-width:0; margin-top:1px }
+.tp-c-f-l{
+  font-family:'JetBrains Mono', ui-monospace, monospace; font-size:10px;
+  color:var(--text-3); font-variant-numeric:tabular-nums; white-space:nowrap;
+}
+.tp-c-f-r{
+  margin-left:auto; min-width:0; font-size:10.5px; color:var(--text-3);
+  overflow:hidden; text-overflow:ellipsis; white-space:nowrap; opacity:.85;
+}
 .tp-c.on{ border-color:color-mix(in srgb, var(--hub-accent) 62%, transparent) }
 
 /* ── The calendar ──────────────────────────────────────────────── */
@@ -83650,14 +83670,16 @@ body.q-max #queueOverlay{ padding:0 !important; }
       var badge = isLive(r) ? '<span class="tp-c-badge live">' + esc(stageOf(r).l) + '</span>'
                 : isDone(r) ? '<span class="tp-c-badge">Finished</span>'
                 : '<span class="tp-c-badge open">' + (cap ? Math.max(0, cap - ent) + ' seats' : 'Open') + '</span>';
+      /* Two chips at most, and both about the bracket itself. The
+         numbers, the countdown, the prize and the Lobby go to the
+         footer, so every card is the same shape. */
       var chips = [];
       if (g && g.name) chips.push(chip(g.name));
-      if (r.prize) chips.push(chip(r.prize, 'gold'));
       if (isMine(r.id)) chips.push(chip(r.isHost ? 'You host' : 'You are in', 'on'));
-      /* Which Lobby it belongs to, so the source of a row is never a
-         guess once the Lobby tab is showing. */
-      if (inLobby(r)) chips.push(chip(r.lobbyName || 'Lobby'));
       var w = when(r.startTime);
+      var foot = [cap ? ent + ' / ' + cap : ent + ' in'];
+      if (w && !isDone(r)) foot.push(w);
+      if (r.prize) foot.push(r.prize);
       return '<button type="button" class="tp-c hub-card' +
           (String(r.id) === String(selId) ? ' on' : '') + '" ' +
         'onclick="window.tpSelect(\'' + esc(r.id) + '\')">' +
@@ -83670,8 +83692,10 @@ body.q-max #queueOverlay{ padding:0 !important; }
           (cap
             ? '<span class="tp-fillbar' + (pct >= 100 ? ' full' : '') + '"><span style="width:' + pct + '%"></span></span>'
             : '') +
-          '<span class="tp-c-seats">' + (cap ? ent + ' / ' + cap : ent + ' in') +
-            (w && !isDone(r) ? ' &middot; ' + esc(w) : '') + '</span>' +
+          '<span class="tp-c-f">' +
+            '<span class="tp-c-f-l">' + esc(foot.join(' · ')) + '</span>' +
+            (inLobby(r) ? '<span class="tp-c-f-r">' + esc(r.lobbyName || 'Lobby') + '</span>' : '') +
+          '</span>' +
         '</span></button>';
     }).join('') + '</div>';
   }
