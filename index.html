@@ -41128,10 +41128,35 @@ setTimeout(() => { updateMyStatusUI(); }, 100);
 
   let spMe = null, spPendingColour = "#5865f2", spTestMicStream = null, spMicMeterAnim = null;
 
+  /* The only way to reach the signed-in user, and it never remembers a
+     failure. spMe used to be assigned the raw result of api("/me"),
+     error bodies included; consumers all wrote `spMe || await api()`,
+     an object is truthy, so one failed request meant nobody ever
+     re-fetched. They then used spMe.id === undefined and asked for
+     /profile/undefined, which the backend answers 400 to, forever,
+     until a reload. A cache that holds "it went wrong" is worse than no
+     cache: it turns one bad moment into a permanent state. */
+  /* The only writer. A response that is not a user clears the cache
+     rather than becoming it, so one bad request costs one request and
+     not the rest of the session. */
+  function spSetMe(me) {
+    spMe = (me && !me.error && me.id) ? me : null;
+    return spMe;
+  }
+
+  async function spGetMe() {
+    if (spMe && spMe.id) return spMe;
+    const me = await apiStrict("/me");
+    if (!me || !me.id) throw new Error("Could not identify your account");
+    return spSetMe(me);
+  }
+
   async function loadProfile() {
     if (!token()) return;
-    spMe = await api("/me");
-    if (spMe.error) return;
+    /* Do not keep it unless it is a user. Assigning the error body here
+       is what poisoned every later lookup. */
+    const me = await api("/me");
+    if (!spSetMe(me)) return;
     const profile = await api(`/profile/${spMe.id}`);
     document.getElementById("spPreviewUsername").textContent = spMe.username;
     document.getElementById("spStatus").value = profile.status || "";
@@ -41747,7 +41772,7 @@ setTimeout(() => { updateMyStatusUI(); }, 100);
       /* apiStrict, so a 500 throws instead of arriving as an object with
          no steam_id on it — which used to be indistinguishable from an
          account that genuinely is not linked. */
-      const me = spMe || await apiStrict("/me");
+      const me = await spGetMe();
       const profile = await apiStrict(`/profile/${me.id}`);
       if (profile.steam_id) {
         showSteamConnected(profile.steam_id, profile.steam_name, profile.steam_avatar);
@@ -41856,7 +41881,7 @@ setTimeout(() => { updateMyStatusUI(); }, 100);
       try {
         /* apiStrict here too: a failed poll must be a retry, not a
            silent decision that the link did not happen. */
-        const me = spMe || await apiStrict("/me");
+        const me = await spGetMe();
         const profile = await apiStrict(`/profile/${me.id}`);
         if (profile.steam_id) {
           spStopSteamPoll();
@@ -41892,7 +41917,7 @@ setTimeout(() => { updateMyStatusUI(); }, 100);
          chess_username on it, and the code below reads that as "not
          linked" — blanking both inputs and resetting both buttons. Same
          false negative Steam had. */
-      const me = spMe || await apiStrict("/me");
+      const me = await spGetMe();
       // Pre-fill inputs and toggle unlink buttons
       const chesscomInput   = document.getElementById("spChesscomInput");
       const lichessInput    = document.getElementById("spLichessInput");
@@ -41959,7 +41984,7 @@ setTimeout(() => { updateMyStatusUI(); }, 100);
             const linkBtn   = document.getElementById(linkBtnId);
             if (unlinkBtn) unlinkBtn.style.display = "inline-flex";
             if (linkBtn)   linkBtn.textContent = "Update";
-            spMe = await api("/me");
+            spSetMe(await api("/me"));
             setTimeout(() => { if (statusEl) statusEl.textContent = ""; }, 3000);
           }
         };
@@ -41995,7 +42020,7 @@ setTimeout(() => { updateMyStatusUI(); }, 100);
         const linkBtn   = document.getElementById(linkBtnId);
         if (unlinkBtn) unlinkBtn.style.display = "inline-flex";
         if (linkBtn)   linkBtn.textContent = "Update";
-        spMe = meRes;
+        spSetMe(meRes);
         setTimeout(() => { if (statusEl) statusEl.textContent = ""; }, 3000);
       } else {
         if (statusEl) { statusEl.style.color = "#5865f2"; statusEl.innerHTML = `📧 Not linked yet. <button onclick="spCheckChessLink('${platform}', '${username}')" style="margin-left:8px;padding:4px 12px;background:#5865f2;color:#fff;border:none;border-radius:4px;font-size:12px;cursor:pointer;font-weight:600">Refresh</button>`; }
@@ -42021,7 +42046,7 @@ setTimeout(() => { updateMyStatusUI(); }, 100);
     
     try {
       const meRes = await api("/me");
-      spMe = meRes;
+      spSetMe(meRes);
       const linkedUsername = platform === "lichess" ? meRes.lichess_username : meRes.chess_username;
       
       if (linkedUsername === username) {
@@ -42063,7 +42088,7 @@ setTimeout(() => { updateMyStatusUI(); }, 100);
       if (unlinkBtn) unlinkBtn.style.display = "none";
       if (linkBtn)   linkBtn.textContent = "Link";
       if (statusEl) { statusEl.style.color = "var(--text-3)"; statusEl.textContent = "Unlinked."; }
-      spMe = await api("/me");
+      spSetMe(await api("/me"));
       setTimeout(() => { if (statusEl) statusEl.textContent = ""; }, 2000);
     } catch(e) {
       if (statusEl) { statusEl.style.color = "var(--danger)"; statusEl.textContent = `❌ ${e.message}`; }
