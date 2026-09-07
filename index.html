@@ -37872,6 +37872,21 @@ setTimeout(() => { updateMyStatusUI(); }, 100);
           </div>
           <div class="sp-msg" id="spSteamMsg"></div>
         </div>
+
+        <!-- Could not tell. A request that failed is not the same as an
+             account that is not linked, and saying the second when the
+             first happened is what made a linked account look like it
+             kept dropping. -->
+        <div id="spSteamUnknown" style="display:none">
+          <div style="background:var(--bg-2);border-radius:12px;padding:24px;border:1px solid rgba(237,66,69,.22);display:flex;flex-direction:column;align-items:center;gap:14px;text-align:center">
+            <div style="font-size:36px">📡</div>
+            <div>
+              <div style="font-size:15px;font-weight:700;color:var(--text-1);margin-bottom:6px">Couldn&rsquo;t check your Steam link</div>
+              <div style="font-size:13px;color:var(--text-3);line-height:1.5" id="spSteamUnknownWhy">The server did not answer. Your account has not been disconnected.</div>
+            </div>
+            <button onclick="window.spRetrySteam()" style="background:var(--bg-3);color:var(--text-1);border:1px solid rgba(255,255,255,.14);border-radius:9px;padding:9px 20px;font-size:13px;font-weight:700;font-family:inherit;cursor:pointer">Try again</button>
+          </div>
+        </div>
       </div>
 
       <!-- ── Chess ── -->
@@ -40901,6 +40916,9 @@ setTimeout(() => { updateMyStatusUI(); }, 100);
         document.querySelectorAll(".sp-section").forEach(s => s.classList.remove("active"));
         btn.classList.add("active");
         document.getElementById(`sp-${btn.dataset.sp}`).classList.add("active");
+        /* Whatever we are leaving, the Steam link poll is not wanted
+           any more — it used to keep running after the panel was gone. */
+        if (typeof window.spStopSteamPoll === "function") window.spStopSteamPoll();
         if (btn.dataset.sp === "audiovideo")  loadAVDevices();
         if (btn.dataset.sp === "themes")      loadThemeSection();
         if (btn.dataset.sp === "steam")       loadSteamSection();
@@ -41088,6 +41106,24 @@ setTimeout(() => { updateMyStatusUI(); }, 100);
   function authH() { return { Authorization: `Bearer ${token()}`, "Content-Type": "application/json" }; }
   async function api(path, opts = {}) {
     return fetch(`${AUTH_URL}${path}`, { ...opts, headers: { ...authH(), ...(opts.headers || {}) } }).then(r => r.json());
+  }
+
+  /* Same request, but a failure is an exception rather than a value.
+     api() above resolves with whatever JSON came back, error bodies
+     included, so `if (profile.steam_id)` reads a 500 as "not linked".
+     Anything deciding whether an account is CONNECTED has to be able to
+     tell "the server said no" from "the server did not answer". */
+  async function apiStrict(path, opts = {}) {
+    const r = await fetch(`${AUTH_URL}${path}`,
+      { ...opts, headers: { ...authH(), ...(opts.headers || {}) } });
+    const body = await r.json().catch(() => null);
+    if (!r.ok) {
+      const err = new Error((body && body.error) || ('HTTP ' + r.status));
+      err.status = r.status;
+      throw err;
+    }
+    if (body == null) throw new Error('Empty response');
+    return body;
   }
 
   let spMe = null, spPendingColour = "#5865f2", spTestMicStream = null, spMicMeterAnim = null;
@@ -41708,27 +41744,54 @@ setTimeout(() => { updateMyStatusUI(); }, 100);
   async function loadSteamSection() {
     if (!token()) return;
     try {
-      const me = spMe || await api("/me");
-      const profile = await api(`/profile/${me.id}`);
+      /* apiStrict, so a 500 throws instead of arriving as an object with
+         no steam_id on it — which used to be indistinguishable from an
+         account that genuinely is not linked. */
+      const me = spMe || await apiStrict("/me");
+      const profile = await apiStrict(`/profile/${me.id}`);
       if (profile.steam_id) {
         showSteamConnected(profile.steam_id, profile.steam_name, profile.steam_avatar);
         loadSteamGamesPreview();
       } else {
         showSteamDisconnected();
       }
-    } catch(e) { showSteamDisconnected(); }
+    } catch (e) {
+      /* Could not ask. That is not the same as not linked, and drawing
+         it as "Connect your Steam account" is what made a perfectly
+         good link look like it kept dropping. */
+      showSteamUnknown(e && e.message);
+    }
+  }
+  window.spRetrySteam = function (){ loadSteamSection(); };
+
+  /* The three states are mutually exclusive, so one place sets all
+     three displays. Two functions each setting two of them is how a
+     panel ends up showing none, or both. */
+  function spSteamState(which) {
+    const map = { connected:"spSteamConnected", disconnected:"spSteamDisconnected", unknown:"spSteamUnknown" };
+    Object.keys(map).forEach(k => {
+      const el = document.getElementById(map[k]);
+      if (el) el.style.display = (k === which) ? "block" : "none";
+    });
+  }
+
+  function showSteamUnknown(why) {
+    spSteamState("unknown");
+    const el = document.getElementById("spSteamUnknownWhy");
+    if (el) {
+      el.textContent = (why ? why + ". " : "The server did not answer. ") +
+        "Your account has not been disconnected.";
+    }
   }
 
   function showSteamConnected(steamId, personaName, avatar) {
-    document.getElementById("spSteamConnected").style.display = "block";
-    document.getElementById("spSteamDisconnected").style.display = "none";
+    spSteamState("connected");
     document.getElementById("spSteamPersonaName").textContent = personaName || "Steam User";
     document.getElementById("spSteamId").textContent = `Steam ID: ${steamId}`;
   }
 
   function showSteamDisconnected() {
-    document.getElementById("spSteamConnected").style.display = "none";
-    document.getElementById("spSteamDisconnected").style.display = "block";
+    spSteamState("disconnected");
   }
 
   async function loadSteamGamesPreview() {
@@ -41753,6 +41816,14 @@ setTimeout(() => { updateMyStatusUI(); }, 100);
     }
   }
 
+  /* One handle for the link poll. Without it, closing settings left it
+     running for two minutes and a second press of Connect started a
+     rival that wrote the same panel. */
+  let spSteamPoll = null;
+  function spStopSteamPoll() {
+    if (spSteamPoll) { clearInterval(spSteamPoll); spSteamPoll = null; }
+  }
+
   async function spConnectSteam() {
     const tok = token();
     if (!tok) { spShowMsg("spSteamMsg", "Not logged in", "error"); return; }
@@ -41773,18 +41844,22 @@ setTimeout(() => { updateMyStatusUI(); }, 100);
     const maxAttempts = 60;
     spShowMsg("spSteamMsg", "Waiting for Steam login…", "");
 
-    const poll = setInterval(async () => {
+    /* Replaces any poll already running rather than joining it. */
+    spStopSteamPoll();
+    spSteamPoll = setInterval(async () => {
       attempts++;
       if (attempts > maxAttempts) {
-        clearInterval(poll);
+        spStopSteamPoll();
         spShowMsg("spSteamMsg", "Timed out — please try again", "error");
         return;
       }
       try {
-        const me = spMe || await api("/me");
-        const profile = await api(`/profile/${me.id}`);
+        /* apiStrict here too: a failed poll must be a retry, not a
+           silent decision that the link did not happen. */
+        const me = spMe || await apiStrict("/me");
+        const profile = await apiStrict(`/profile/${me.id}`);
         if (profile.steam_id) {
-          clearInterval(poll);
+          spStopSteamPoll();
           showSteamConnected(profile.steam_id, profile.steam_name, profile.steam_avatar);
           loadSteamGamesPreview();
           spShowMsg("spSteamMsg", `Linked as ${profile.steam_name}!`, "success");
@@ -41796,6 +41871,7 @@ setTimeout(() => { updateMyStatusUI(); }, 100);
 
   // Expose globally so onclick attributes can reach it
   window.spConnectSteam   = spConnectSteam;
+  window.spStopSteamPoll  = spStopSteamPoll;
   window.spDisconnectSteam = spDisconnectSteam;
 
   async function spDisconnectSteam() {
@@ -41812,7 +41888,11 @@ setTimeout(() => { updateMyStatusUI(); }, 100);
   async function loadChessSection() {
     if (!token()) return;
     try {
-      const me = spMe || await api("/me");
+      /* apiStrict: a failed /me used to arrive as an object with no
+         chess_username on it, and the code below reads that as "not
+         linked" — blanking both inputs and resetting both buttons. Same
+         false negative Steam had. */
+      const me = spMe || await apiStrict("/me");
       // Pre-fill inputs and toggle unlink buttons
       const chesscomInput   = document.getElementById("spChesscomInput");
       const lichessInput    = document.getElementById("spLichessInput");
