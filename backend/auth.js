@@ -19,7 +19,28 @@ const app         = express();
 const PORT        = process.env.PORT || 3001;
 const SECRET      = process.env.JWT_SECRET || "change-this-secret-in-production";
 const SALT_ROUNDS = 12;
-const STEAM_KEY   = process.env.STEAM_API_KEY || "";
+/* Trimmed and unquoted. A trailing newline from a paste, a stray
+   space, or the quotes people wrap env values in all survive into the
+   query string, and Steam answers 403 to a key with whitespace in it
+   exactly as it would to a wrong one — while the dashboard shows the
+   right characters. This is the commonest reason a correctly
+   registered key is refused. */
+const STEAM_KEY   = (process.env.STEAM_API_KEY || "")
+  .trim()
+  .replace(/^["']|["']$/g, "")
+  .trim();
+
+/* Steam Web API keys are 32 hex characters. Saying so at boot turns a
+   silent 403 much later into one line in the deploy log. */
+const STEAM_KEY_OK = /^[0-9a-fA-F]{32}$/.test(STEAM_KEY);
+if (!STEAM_KEY) {
+  console.warn("[steam] STEAM_API_KEY is not set — Steam linking and game lists will not work");
+} else if (!STEAM_KEY_OK) {
+  console.warn("[steam] STEAM_API_KEY does not look like a Steam key: " +
+    STEAM_KEY.length + " characters, expected 32 hex. Steam will answer 403.");
+} else {
+  console.log("[steam] STEAM_API_KEY loaded (32 hex chars)");
+}
 
 /* The Steam Web API answers with JSON when it answers, and with an
    HTML error page when it refuses: 403 for a key it does not
@@ -2945,6 +2966,67 @@ app.get("/steam/callback", async (req, res) => {
       <script>setTimeout(() => window.close(), 4000);</script>
     </body></html>`);
   }
+});
+
+/* GET /admin/steam/diagnose — what does Steam say to THIS deployment?
+
+   Added because the failure mode is indistinguishable from the outside:
+   a rejected key, a rate limit and an outage all arrive as an HTML page
+   and used to surface as a JSON syntax error. This makes one real call
+   and reports the status and the first bytes of the reply.
+
+   It never returns the key. Length and shape separate "wrong value"
+   from "right value, rejected", and a secret printed once is a secret
+   in a log forever. Admin only, for the same reason. */
+app.get("/admin/steam/diagnose", requireAuth, requireAdmin, async (req, res) => {
+  const out = {
+    keySet: !!STEAM_KEY,
+    keyLength: STEAM_KEY.length,
+    keyLooksValid: STEAM_KEY_OK,
+  };
+  if (!STEAM_KEY) {
+    out.verdict = "STEAM_API_KEY is not set on this deployment.";
+    return res.json(out);
+  }
+  if (!STEAM_KEY_OK) {
+    out.verdict = "The value in STEAM_API_KEY is " + STEAM_KEY.length +
+      " characters; a Steam key is 32 hex characters. Steam will refuse it.";
+    return res.json(out);
+  }
+  /* A known-good public profile, so the only variable is the key. */
+  const url = "https://api.steampowered.com/ISteamUser/GetPlayerSummaries/v2/" +
+              "?key=" + STEAM_KEY + "&steamids=76561197960435530";
+  try {
+    const r = await fetch(url);
+    out.httpStatus = r.status;
+    const body = await r.text();
+    /* Redacted before it leaves the server: this endpoint exists for
+       the case where Steam is behaving unusually, which is exactly when
+       assuming its error page will not echo the query string is worth
+       nothing. */
+    out.bodyStart = body.slice(0, 120).replace(/\s+/g, " ")
+      .split(STEAM_KEY).join("<key>");
+    if (r.status === 403) {
+      out.verdict = "Steam rejected the key (403). Regenerate it at " +
+        "steamcommunity.com/dev/apikey and update STEAM_API_KEY.";
+    } else if (r.status === 429) {
+      out.verdict = "Steam is rate limiting this server (429). The key is fine.";
+    } else if (!r.ok) {
+      out.verdict = "Steam answered " + r.status + " — its problem, not the key.";
+    } else {
+      try {
+        const j = JSON.parse(body);
+        out.verdict = j?.response?.players?.length
+          ? "The key works. Steam answered normally."
+          : "The key works, but Steam returned no player for the test id.";
+      } catch (e) {
+        out.verdict = "Steam answered 200 with something that is not JSON.";
+      }
+    }
+  } catch (e) {
+    out.verdict = "Could not reach Steam from this server: " + (e.message || "network error");
+  }
+  res.json(out);
 });
 
 // DELETE /steam/unlink — remove Steam account from profile
