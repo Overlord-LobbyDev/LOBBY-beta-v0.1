@@ -32,6 +32,15 @@ const STEAM_KEY   = (process.env.STEAM_API_KEY || "")
 
 /* Steam Web API keys are 32 hex characters. Saying so at boot turns a
    silent 403 much later into one line in the deploy log. */
+/* This file renders a few small HTML pages — the Steam callback
+   results among them — so it needs its own escaper. The renderer has
+   one; that is a different file and a different process. */
+function escapeHtml(v) {
+  return String(v == null ? "" : v)
+    .replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;").replace(/'/g, "&#39;");
+}
+
 const STEAM_KEY_OK = /^[0-9a-fA-F]{32}$/.test(STEAM_KEY);
 if (!STEAM_KEY) {
   console.warn("[steam] STEAM_API_KEY is not set — Steam linking and game lists will not work");
@@ -2960,10 +2969,29 @@ app.get("/steam/callback", async (req, res) => {
       </body></html>`
     );
   } catch (err) {
+    /* The full reason always goes to the log, whoever is looking. */
     console.error("[steam/callback]", err);
-    res.send(`<html><body style="background:#1e1f22;color:#fff;font-family:sans-serif;display:flex;align-items:center;justify-content:center;height:100vh">
-      <div style="text-align:center"><div style="font-size:48px">❌</div><div>Server error: ${err.message}</div></div>
-      <script>setTimeout(() => window.close(), 4000);</script>
+
+    /* And to the screen only for someone who can act on it. A player
+       told to "check STEAM_API_KEY on the server" learns nothing and
+       is handed a detail about how the back end is arranged; the
+       person who runs it needs exactly that sentence. userId came out
+       of the token at the top of this route, so the two are already
+       distinguishable. */
+    let canSeeDetail = false;
+    try { canSeeDetail = (await getUserFlags(userId)).isAdmin; } catch (e) {}
+
+    const detail = canSeeDetail
+      ? String(err.message || "Unknown error")
+      : "Steam could not be reached just now. This is not a problem with " +
+        "your account — nothing has changed on it. Please try again later.";
+
+    res.send(`<html><body style="background:#1e1f22;color:#fff;font-family:sans-serif;display:flex;align-items:center;justify-content:center;height:100vh;margin:0">
+      <div style="text-align:center;max-width:460px;padding:0 24px">
+        <div style="font-size:48px">❌</div>
+        <div style="font-size:16px;margin-top:12px;line-height:1.5">${escapeHtml(detail)}</div>
+      </div>
+      <script>setTimeout(() => window.close(), 6000);</script>
     </body></html>`);
   }
 });
