@@ -21,6 +21,44 @@ const SECRET      = process.env.JWT_SECRET || "change-this-secret-in-production"
 const SALT_ROUNDS = 12;
 const STEAM_KEY   = process.env.STEAM_API_KEY || "";
 
+/* The Steam Web API answers with JSON when it answers, and with an
+   HTML error page when it refuses: 403 for a key it does not
+   recognise, 429 when rate limited, 5xx when it is unwell. Eleven
+   call sites did fetch(...).then(r => r.json()) straight, so a refusal
+   surfaced as "Unexpected token < in JSON at position 0" — a message
+   about our parser rather than about Steam.
+
+   This says what Steam said. The distinction that matters is 403,
+   because that one is not transient and no amount of retrying fixes
+   it: the key is wrong, revoked, or not set on this deployment. */
+async function steamApi(url, what) {
+  const label = what || "Steam";
+  if (!STEAM_KEY) throw new Error("No Steam API key is configured on the server");
+  let r;
+  try {
+    r = await fetch(url);
+  } catch (e) {
+    throw new Error(label + ": could not reach Steam (" + (e.message || "network error") + ")");
+  }
+  if (!r.ok) {
+    if (r.status === 403) {
+      throw new Error(label + ": Steam rejected the API key (403). Check STEAM_API_KEY on the server.");
+    }
+    if (r.status === 429) throw new Error(label + ": Steam is rate limiting us (429). Try again shortly.");
+    throw new Error(label + ": Steam answered " + r.status);
+  }
+  const body = await r.text();
+  try {
+    return JSON.parse(body);
+  } catch (e) {
+    /* 200 with a non-JSON body. Steam does this during maintenance.
+       Quote the beginning so the log says what arrived instead of
+       blaming the parser. */
+    const head = body.slice(0, 80).replace(/\s+/g, " ");
+    throw new Error(label + ": Steam sent something that is not JSON (" + head + ")");
+  }
+}
+
 // ── Cloudinary config ───────────────────────────────────────
 cloudinary.config({
   cloud_name: process.env.CLOUDINARY_CLOUD_NAME,
@@ -2866,10 +2904,9 @@ app.get("/steam/callback", async (req, res) => {
   }
 
   try {
-    const r = await fetch(
-      `https://api.steampowered.com/ISteamUser/GetPlayerSummaries/v2/?key=${STEAM_KEY}&steamids=${steamId}`
-    );
-    const data   = await r.json();
+    const data = await steamApi(
+      `https://api.steampowered.com/ISteamUser/GetPlayerSummaries/v2/?key=${STEAM_KEY}&steamids=${steamId}`,
+      "Looking up your Steam profile");
     const player = data?.response?.players?.[0];
 
     console.log("[steam/callback] player:", player?.personaname);
@@ -3285,10 +3322,9 @@ app.get("/steam/recent", requireAuth, async (req, res) => {
 
   try {
     // Fetch recently played games
-    const gamesRes = await fetch(
-      `https://api.steampowered.com/IPlayerService/GetRecentlyPlayedGames/v1/?key=${STEAM_KEY}&steamid=${steam_id}&count=${RECENT_COUNT}`
-    );
-    const gamesData = await gamesRes.json();
+    const gamesData = await steamApi(
+      `https://api.steampowered.com/IPlayerService/GetRecentlyPlayedGames/v1/?key=${STEAM_KEY}&steamid=${steam_id}&count=${RECENT_COUNT}`,
+      "Recently played");
     const games = gamesData?.response?.games || [];
 
     // Fetch achievements for all games in parallel
@@ -3376,10 +3412,9 @@ app.get("/steam/recent/:userId", requireAuth, async (req, res) => {
 
   try {
     // Fetch recently played games
-    const gamesRes = await fetch(
-      `https://api.steampowered.com/IPlayerService/GetRecentlyPlayedGames/v1/?key=${STEAM_KEY}&steamid=${steam_id}&count=${RECENT_COUNT}`
-    );
-    const gamesData = await gamesRes.json();
+    const gamesData = await steamApi(
+      `https://api.steampowered.com/IPlayerService/GetRecentlyPlayedGames/v1/?key=${STEAM_KEY}&steamid=${steam_id}&count=${RECENT_COUNT}`,
+      "Recently played");
     const games = gamesData?.response?.games || [];
 
     // Fetch achievements for all games in parallel
